@@ -1,0 +1,14 @@
+.git
+node_modules
+dist
+data
+.env
+.env.*
+coverage
+tmp
+output
+*.log
+*.sqlite*
+*.db*
+*.pem
+*.key

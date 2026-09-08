@@ -1,0 +1,26 @@
+{
+  "name": "catanova",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An open-source Catan-style game, starting with rules and reliable multiplayer foundations.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=24 <27" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch apps/server/src/index.ts",
+    "start": "node dist/apps/server/src/index.js",
+    "test": "tsx --test tests/*.test.ts",
+    "test:connectivity": "tsx --test tests/connectivity.test.ts",
+    "probe": "tsx scripts/probe.ts",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "4.23.13",
+    "typescript": "~5.9.3"
+  }
+}

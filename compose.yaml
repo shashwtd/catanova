@@ -1,0 +1,15 @@
+services:
+  catanova:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /app/data/probe.sqlite
+    volumes:
+      - catanova-data:/app/data
+    restart: unless-stopped
+    stop_grace_period: 15s
+volumes:
+  catanova-data:
