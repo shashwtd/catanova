@@ -16,7 +16,7 @@ Supabase should supply the durable database and, later if useful, account authen
 
 The repository currently uses local SQLite for a controlled connectivity proof. The Compose file includes a named data volume. It can recover from a process restart while that volume survives. It is **not** ready to run unchanged on an ephemeral Azure Container Apps filesystem: replicas and revisions can lose those local files.
 
-Before hosted game testing, implement and test the Postgres adapter, migration process, private-state projections, and account/invite controls. Do not claim durable cloud games by merely changing the container's host setting. No cloud app has been deployed by this initial setup.
+Before hosted game testing, implement and test the Postgres adapter, migration process and account/invite controls. Per-player state projections and local game recovery are now implemented and tested; cloud storage and failover remain separate work. Do not claim durable cloud games by merely changing the container's host setting. No cloud app has been deployed by this initial setup.
 
 ## Monthly starter budget
 

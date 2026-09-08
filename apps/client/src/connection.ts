@@ -54,6 +54,7 @@ export class Connection {
       ws.send(JSON.stringify({ type, version: PROTOCOL_VERSION, ...this.session }));
     };
     ws.onmessage = event => {
+      if (this.stopped || this.socket !== ws) return;
       let message: ServerMessage;
       try { message = JSON.parse(String(event.data)) as ServerMessage; }
       catch { ws.close(1002, 'Invalid server message'); return; }

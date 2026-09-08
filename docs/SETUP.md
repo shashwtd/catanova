@@ -22,10 +22,10 @@ The two roads listed for each player are independent starting roads. The second 
 
 | Reference color | First settlement | First road | Second settlement | Second road | Starting resources |
 | --- | --- | --- | --- | --- | --- |
-| Red | D1/D2/E1 | D1/E1 | A2/A3/B3 | A2/B3 | Wheat, sheep, wood |
-| Blue | C4/C5/D4 | C4/D4 | D2/D3/E2 | D2/E2 | Brick, ore, wheat |
-| Orange | B3/B4/C4 | B3/B4 | B1/B2/C2 | B1/C2 | Brick, sheep, wheat |
-| White | D3/D4/E3 | D3/E3 | C2/C3/D2 | C2/D2 | Wheat, brick, brick |
+| Red | D1/D2/E1 | D1/E1 | A2/A3/B3 | A2/B3 | Hay, sheep, Timber |
+| Blue | C4/C5/D4 | C4/D4 | D2/D3/E2 | D2/E2 | Clay, Rock, Hay |
+| Orange | B3/B4/C4 | B3/B4 | B1/B2/C2 | B1/C2 | Clay, sheep, Hay |
+| White | D3/D4/E3 | D3/E3 | C2/C3/D2 | C2/D2 | Hay, Clay, Clay |
 
 In a three-player fixed game, omit White's settlements and roads. Do not remove hexes or resources from the bank. Player colors are labels, not different powers.
 
@@ -33,7 +33,7 @@ In a three-player fixed game, omit White's settlements and roads. Do not remove 
 
 Nine ports exist, each granting access at the two ends of its designated coastal edge. There are four 3:1 ports and five resource-specific 2:1 ports. Use the frame's numbered arrangement for the fixed board. Reading around that frame clockwise from the upper-left general port gives:
 
-**3:1 → sheep 2:1 → 3:1 → 3:1 → brick 2:1 → wood 2:1 → 3:1 → wheat 2:1 → ore 2:1.**
+**3:1 → sheep 2:1 → 3:1 → 3:1 → Clay 2:1 → Timber 2:1 → 3:1 → Hay 2:1 → Rock 2:1.**
 
 For point-up hexes, name the six **edges** NE, E, SE, SW, W, and NW by their outward-facing direction. For example, E is the vertical right edge; NW joins the top corner to the upper-left corner. The fixed port edges are:
 
@@ -43,11 +43,11 @@ For point-up hexes, name the six **edges** NE, E, SE, SW, W, and NW by their out
 | A3 | NW | Sheep 2:1 |
 | B4 | NE | 3:1 |
 | C5 | E | 3:1 |
-| E3 | E | Brick 2:1 |
-| E2 | SE | Wood 2:1 |
+| E3 | E | Clay 2:1 |
+| E2 | SE | Timber 2:1 |
 | E1 | SW | 3:1 |
-| D1 | W | Wheat 2:1 |
-| B1 | W | Ore 2:1 |
+| D1 | W | Hay 2:1 |
+| B1 | W | Rock 2:1 |
 
 Each port is usable from either endpoint of its edge. These configuration facts were transcribed by inspecting both pages of the fixed-setup diagram. Add a rendered fixture check when the geometry is implemented; there is no board generator in the initial repository.
 
@@ -55,7 +55,7 @@ Each port is usable from either endpoint of its edge. These configuration facts 
 
 The published variable method shuffles the six coastal frame sections, randomizes terrain, and uses the A–R counterclockwise number spiral described in the [rulebook](RULEBOOK.md#32-variable-island-setup). Ports move with their frame sections; this is not the same as independently shuffling nine ports onto arbitrary coastal corners.
 
-Do not silently add a custom “fair board” sampler, constrain terrain clustering, or use unconstrained number placement. Such choices change the board distribution and belong in named optional presets. Preserve the setup method and seed/outcomes with a saved game.
+The current app uses the explicitly requested **balanced-v1** preset described in [Map generation](MAP_GENERATION.md). It constrains clustering and production, and shuffles port positions; its distribution differs from the official setup above. The fixed and classic variable presets on this page are reference targets and are not selectable yet. Every saved game preserves its actual board, preset and seed.
 
 ## Implementation checks required
 

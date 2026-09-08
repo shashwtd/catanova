@@ -1,33 +1,41 @@
 # Roadmap
 
-## Present: rules and connectivity
+## Present: first playable local game
 
-- [x] Name: Catanova; one repository with MIT-licensed original code and documentation.
-- [x] Independently written base-game rulebook with an edition/source ledger.
-- [x] Familiar resource names and shared game constants.
-- [x] Four-seat rooms, private resumable seat credentials, and room isolation.
-- [x] Durable test action, state revisions, unique command receipts, and stale-action rejection.
-- [x] Automatic client reconnect and current-state synchronization.
-- [x] Real-socket integration tests and abrupt-process-death recovery test.
-- [x] Docker/Compose recipe and CI definitions.
+- [x] Public Catanova repository, MIT license, independent rulebook and source ledger.
+- [x] Timber, Clay, Sheep, Hay and Rock; simple, original terrain atlas.
+- [x] Reproducible balanced islands with inventory, geometry and fairness tests across 500 seeds.
+- [x] Three/four-player lobbies, invitations, shuffled turn order and snake setup.
+- [x] Dice production, bank shortages, sevens/discards, robber and private theft.
+- [x] Roads, settlements, cities, piece limits and distance/connectivity rules.
+- [x] Bank/port exchanges and public player offers/acceptance.
+- [x] Development deck, card timing/effects, road/army awards and own-turn victory.
+- [x] React interface, clickable legal sites, private hands, journal and endgame.
+- [x] Saved games, revision checks, atomic command receipts and per-player projections.
+- [x] Reconnect, tab-refresh outbox recovery, restart and process-crash tests.
+- [x] One browser/server distribution, Docker/Compose and CI.
 - [x] Azure/Supabase architecture and cost estimate.
-- [ ] Resolve exceptional card-effect questions in the source ledger.
-- [ ] Implement and visually verify the documented board/port setup fixtures.
 
-## Next: executable rules
+## Next: human playtests and rule conformance
 
-Implement hex/edge/intersection topology, setup, turn phases, production, discards/robber/theft, building, bank/player trades, development cards, road/army scoring, and victory. Add scenario tests alongside each rule, deterministic replay with logged randomness, and resource/piece conservation checks. Reference `RULE_SOURCES.md` IDs in test names or fixtures. Keep every new match pinned to a ruleset version.
+- [ ] Play full games with three and four people; record usability and rule discrepancies.
+- [ ] Test desktop/mobile browsers, touch placement, accessibility and slow devices.
+- [ ] Resolve the two provisional rare-card decisions in the source ledger.
+- [ ] Turn every applicable source-ledger row into a reviewed fixture, including more award tie/split and piece-exhaustion cases.
+- [ ] Add classic spiral and fixed beginner presets, with verified port fixtures.
+- [ ] Decide whether to add trade counteroffers, chat, placement confirmation and rematch controls based on playtests.
+- [ ] Measure action, reconnect and frame-time distributions; add a repeatable network/load harness.
 
-## Then: one playable private game
+## Hosted games
 
-Implement the lobby, invite links, board, placement previews, hand, trade offers/counteroffers, action log, and endgame. Filter hidden information on the server before it is transmitted. Add reload recovery with private session storage and recovery of uncertain pending actions. Play complete games with three and four people.
+Implement and test the production Postgres adapter, schema migrations, server ownership/fencing, deployment draining, invitation/account policy, expiration and recovery. Add telemetry without private hands or tokens. Choose regions and budgets using available Azure/Supabase credits, then deploy a controlled internet playtest. Test sleeping devices, mobile networks, database failure and backup restoration separately from normal restart.
 
-## Hosted recovery and visual polish
+## Visual and audio polish
 
-Add the production Postgres adapter, migrations, safe deploy/restart recovery, invite/account controls, and expiration policies. Deploy a controlled test instance after selecting region, credits, and budget. Run real internet connectivity, failure, and load tests. Establish the visual reference sheet and test a small animated board with final-quality terrain, pieces, audio, and motion settings.
+Keep terrain instantly readable and playful. Improve pieces, resource arrivals, dice and interaction feedback using the current art direction. Add original sound with volume/mute controls. Verify performance before replacing the small SVG board with a GPU renderer; the current renderer has no continuous animation loop.
 
 ## Public playable release
 
-Resolve remaining compatibility questions, validate the complete ruleset, test supported devices and network failures, establish monitoring/backups, document self-hosting, and review naming/assets before promoting the finished game. Public source publication is an earlier milestone and does not imply the hosted game is ready.
+Complete compatibility review, full human games, supported-device checks, internet failure/load testing, operational monitoring/backups, self-hosting validation and naming/asset review before a stable release. Public GitHub source is already available; production hosting is a separate milestone.
 
-Expansions, ranked matchmaking, advanced bots, spectators, replay sharing, and native apps follow when the complete base game is dependable.
+Expansions, two-player variants, ranked matchmaking, bots, spectators, replay sharing and native apps follow a dependable base game.

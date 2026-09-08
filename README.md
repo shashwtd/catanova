@@ -1,48 +1,37 @@
 # Catanova
 
-An open-source Catan-style game built around reliable multiplayer and a richly illustrated board.
+An open-source Catan-style game for **three or four friends**, built around reliable multiplayer and a simple, playful island.
 
-Build settlements, trade wood and sheep, race for the longest road, and finish the game you started—even if your connection drops along the way.
+Trade **Timber, Clay, Sheep, Hay, and Rock**. Build settlements and cities. Race to ten points. Resume your seat when your connection drops.
 
-**Status: rules and connectivity foundation.** Catanova is not playable yet. This repository contains an independently written base-game rulebook, shared game constants, a resumable WebSocket client, a small authoritative server, and automated failure-recovery tests. The board, trading interface, and complete rules engine are next.
+**Status: first playable local build.** The browser game supports setup, dice and production, discards and the robber, building, bank/port and player trades, development cards, Longest Road, Largest Army, and victory. This is an early playtest, not a production service or a certified rules implementation. [Current scope and differences](docs/PLAYTEST.md).
 
-## Start with the rules
+## Play locally
 
-- [Base-game rulebook](docs/RULEBOOK.md): three or four players; wood, brick, sheep, wheat, and ore.
-- [Source and coverage ledger](docs/RULE_SOURCES.md): reference edition, clarifications, remaining questions, and implementation coverage.
-- [Setup reference](docs/SETUP.md): fixed beginner board and variable setup.
-- [Architecture](docs/ARCHITECTURE.md): one repository, separate responsibilities, one self-hostable distribution.
-- [Hosting and costs](docs/HOSTING.md): Azure and Supabase options, assumptions, and launch requirements.
-- [Roadmap](docs/ROADMAP.md): what is implemented and what comes next.
-
-## Run the connectivity prototype
-
-Use **Node.js 24 LTS** and npm. Node 26 is also tested. The prototype uses Node's built-in SQLite module, which is experimental on Node 24; it is a local prototype dependency, not the planned cloud database.
+Use **Node.js 24 LTS** or Node 26:
 
 ```sh
 npm ci
-npm run check
 npm run build
 npm start
 ```
 
-In another terminal:
+Open **http://127.0.0.1:3000**. Create a table, copy its invite link, and have friends join in separate tabs or browsers. The host can start with three or four players. To test all four seats on one machine, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
-```sh
-npm run probe
-```
+The local URL works on this machine. Other devices need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
-The probe creates a room, connects two independent clients, submits an increment command, and verifies that the other client receives the committed state. It prints a PASS result with the measured round trip and fanout time. **The counter is a transport test, not a game rule.** There is no browser game UI yet.
+The same application serves the browser and WebSocket endpoint. No separate client deployment or paid cloud service is required for local play. SQLite uses Node's built-in module (experimental in Node 24) and saves into `data/probe.sqlite`, excluded from Git. A restart preserves accepted actions, the board, hands, deck, dice, phases and seats.
 
-Health endpoint: `http://127.0.0.1:3000/healthz`. WebSocket endpoint: `ws://127.0.0.1:3000/ws`. Local data is stored in `data/probe.sqlite`, excluded from Git. Restarting the process preserves seats, state, and command receipts.
+## A fairer starting island
 
-To test an externally hosted instance:
+The default **balanced-v1** preset keeps the standard resource and number supplies, with explicit bounds:
 
-```sh
-npm run probe -- wss://your-host.example/ws
-```
+- No connected resource clusters larger than two tiles; every resource is spread across the island.
+- No adjacent 6/8 tiles, and no intersection above 11 production pips.
+- Each resource gets a reasonable share of production numbers.
+- Nine separated ports with the familiar ratios.
 
-This performs real network traffic and creates a small test room. A local pass does not establish internet latency, cloud availability, or capacity.
+Strong three-resource placements remain possible. Dice are independently random; there are no catch-up rolls. This is a named custom setup, separate from the official spiral/fixed presets. [Generation rules and tests](docs/MAP_GENERATION.md).
 
 ## One self-hostable distribution
 
@@ -50,40 +39,52 @@ This performs real network traffic and creates a small test room. A local pass d
 docker compose up --build --wait
 ```
 
-The included Compose configuration binds to localhost and mounts a named persistent volume. Run the same probe against it. Stop with `docker compose down`; adding `-v` **deletes the saved prototype data**.
+Open the same local URL. Compose binds to localhost and uses a named persistent volume. `docker compose down` stops it; adding `-v` **deletes saved games**.
 
-To configure a normal Node process, copy `.env.example` to `.env` and use:
+For environment configuration, copy `.env.example` and start with:
 
 ```sh
 node --env-file=.env dist/apps/server/src/index.js
 ```
 
-The server defaults to localhost. Set `HOST=0.0.0.0` when intentionally exposing it on a LAN or inside a container. `ALLOWED_ORIGINS` is an exact, comma-separated allowlist for future browser clients. Non-browser clients without an Origin header are allowed; this is not an authentication boundary. Use TLS at an ingress proxy for internet connections. See [hosting](docs/HOSTING.md) before running the prototype publicly.
+Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits additional exact origins, useful during development. A room code lets someone join the lobby; a separate secret token owns the seat. There is no account recovery yet.
+
+The planned hosted service uses one always-on Azure application with nearby Supabase Postgres. The production database adapter is not implemented and no cloud instance is deployed. Budget estimates remain **about $45–55/month lean, or $65–80/month with more headroom**, before credits and taxes; assumptions and source links are in [hosting and costs](docs/HOSTING.md).
+
+## Check the build
+
+```sh
+npm run check
+npm run probe
+```
+
+`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
+
+Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
 ## Project layout
 
 ```text
 apps/
-  client/       Browser-compatible connection and resume client; UI comes later
-  server/       WebSocket rooms, command validation, durable prototype storage
+  client/       React interface, SVG board, terrain atlas, recoverable connection
+  server/       Same-origin HTTP/WebSocket server, private snapshots, SQLite saves
 packages/
-  protocol/     Shared wire messages and input validation
-  rules/        Base-game constants; pure game engine comes next
-docs/           Rulebook, sources, setup, architecture, hosting, roadmap
-scripts/        Two-client connectivity probe
-tests/          Real sockets, restart, crash, authorization, and retry tests
+  protocol/     Shared messages and bounded input validation
+  rules/        Pure rules engine, board topology, seeded balanced generation
+docs/           Rulebook, source ledger, playtest, architecture, hosting, roadmap
+scripts/        Connectivity probe
+tests/          Rules, maps, four-client gameplay, recovery and HTTP checks
 ```
 
-Keep the client and server in the same repository so a protocol change can be reviewed and tested together. They are separate runtime boundaries: the server owns hidden information and validates actions. The intended production distribution will serve the built client and WebSocket endpoint from one application; the static client can move to a CDN later without splitting the repository.
+The client animates accepted state; the server owns randomness, hidden information and move validation. The rules engine stays independent of rendering and networking. One repository keeps those contracts reviewable together.
 
-## Reliability already exercised
+## Rules and contributing
 
-The automated suite uses real localhost sockets and a real database. It checks room isolation, four-seat capacity, seat authentication, malformed input, stale commands, duplicate receipts, replaced connections, write failures, automatic client reconnection, and a child server killed with `SIGKILL`.
+- [Base-game rulebook](docs/RULEBOOK.md) and [source/compatibility ledger](docs/RULE_SOURCES.md).
+- [Fixed and classic setup reference](docs/SETUP.md); these presets are not in the UI yet.
+- [Architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md), and [art provenance](docs/ART.md).
+- [Contributing](CONTRIBUTING.md) and [security](SECURITY.md).
 
-These checks cover the prototype. They do not certify the future rules engine, database disaster recovery, distributed failover, or production load. Single-instance SQLite is deliberately limited to local development and the connectivity proof; planned hosted matches use Postgres.
+Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). The terrain atlas is original AI-generated art, with its prompt and provenance recorded. Do not contribute official game artwork or copied rulebook passages.
 
-## Contributing and licensing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Original repository code and documentation are MIT-licensed; see [LICENSE](LICENSE). Future artwork, audio, and fonts must carry explicit provenance and license records. Contributors must not add official game artwork or copied rulebook passages.
-
-Catanova is an independent, unofficial project. It is not affiliated with, endorsed by, or licensed by CATAN GmbH or CATAN Studio. CATAN is a trademark of its respective owners. The original game was designed by Klaus Teuber. The MIT license applies to our original contributions and grants no rights to third-party trademarks or assets. Public source availability does not establish legal clearance for the name or a finished release.
+Catanova is an independent, unofficial project. It is not affiliated with, endorsed by, or licensed by CATAN GmbH or CATAN Studio. CATAN is a trademark of its respective owners. The original game was designed by Klaus Teuber. The MIT license applies to our contributions and grants no rights to third-party trademarks or assets. Public source availability does not establish legal clearance for the name or a finished release.

@@ -4,7 +4,7 @@ Ruleset: `base-3-4-v1` · Written 9 September 2026
 
 Catanova aims to reproduce the mechanics of the three- and four-player CATAN base game. This is an independently written explanation, with original organization and examples. It is not an official CATAN publication. The reference edition is the English sixth edition (2025), supplemented by applicable official clarifications. See [sources and compatibility decisions](RULE_SOURCES.md).
 
-This document specifies the intended game. The repository currently contains a connectivity prototype, not an implemented base game. Extensions, expansions, tournaments, and house rules are separate rulesets; they are not silently mixed into this one.
+This document specifies the base-game target. An early playable engine now implements the ordinary flow. The app defaults to a separately named [balanced island preset](MAP_GENERATION.md); [playtest notes](PLAYTEST.md) list setup/UI differences and two provisional rare-card decisions. Extensions, expansions and tournaments remain separate rulesets.
 
 ## 1. What you are trying to do
 
@@ -25,15 +25,15 @@ Your hidden Victory Point cards count toward your actual total. If you begin you
 
 ## 2. Resources, pieces, and the island
 
-We use the resource names people commonly say at the table:
+Catanova uses these player-facing resource names:
 
 | Catanova name | Produced by | Also called in CATAN editions |
 | --- | --- | --- |
-| **Wood** | Forest | Lumber, wood |
-| **Brick** | Hills | Brick |
+| **Timber** | Forest | Lumber, wood |
+| **Clay** | Hills | Brick |
 | **Sheep** | Pasture | Wool |
-| **Wheat** | Fields | Grain, wheat |
-| **Ore** | Mountains | Ore |
+| **Hay** | Fields | Grain, wheat |
+| **Rock** | Mountains | Ore |
 
 These are label changes only. A sheep card functions exactly as a wool card. The desert produces nothing.
 
@@ -121,7 +121,7 @@ Check the bank independently for each resource type before handing out any of th
 - If there are too few cards and two or more players are entitled to that resource, nobody receives that resource from this roll.
 - If only one player is entitled to that resource, give that player as many cards as the bank has, up to their entitlement.
 
-For example, if two players together need five sheep but the bank has four, neither collects sheep. Wood production from the same roll still happens normally. If one player alone needs five sheep and the bank has four, that player receives four. Missing production is not owed later.
+For example, if two players together need five sheep but the bank has four, neither collects sheep. Timber production from the same roll still happens normally. If one player alone needs five sheep and the bank has four, that player receives four. Missing production is not owed later.
 
 There is no ordinary maximum hand size. Seven cards is a discard threshold for a particular dice result, not a permanent hand limit.
 
@@ -151,7 +151,7 @@ After the sequence, continue your action phase. A Knight moves the robber and st
 
 During the active player's action phase, that player may exchange resources with another willing player at any mutually accepted ratio. Offers can request or include multiple resource types. Other players may propose offers and counteroffers, but every completed trade must include the active player.
 
-Only resource cards can be traded. Both sides must give at least one resource immediately, and a resource type cannot appear on both sides of the same trade. You cannot give cards away, exchange three wood for one wood, lend cards, pay later, trade buildings or development cards, or pay resources solely for a promise such as avoiding the robber. A trade's contents are public; secret exchanges are not permitted.
+Only resource cards can be traded. Both sides must give at least one resource immediately, and a resource type cannot appear on both sides of the same trade. You cannot give cards away, exchange three Timber for one Timber, lend cards, pay later, trade buildings or development cards, or pay resources solely for a promise such as avoiding the robber. A trade's contents are public; secret exchanges are not permitted.
 
 Negotiation does not reserve cards. Players may refuse offers. You can discuss future cooperation or bluff about your resources, but promises do not create enforceable future payments. You may trade and then play Monopoly, provided that card is eligible. Non-active players cannot trade with each other, including as one step of an arrangement that later benefits the active player.
 
@@ -164,7 +164,7 @@ With a settlement or city on either marked intersection of a port, you may use t
 - A **3:1 port** accepts three of any one resource type for one different resource.
 - A **2:1 port** accepts two of its depicted resource type for one different resource.
 
-The port's symbol identifies what you pay, not what you must receive. A sheep port exchanges two sheep for one wood, brick, wheat, or ore. Two different resources do not satisfy a matching pair. A city does not improve a port's ratio. Merely reaching a port with a road is insufficient. You cannot directly use somebody else's port.
+The port's symbol identifies what you pay, not what you must receive. A sheep port exchanges two sheep for one Timber, Clay, Hay, or Rock. Two different resources do not satisfy a matching pair. A city does not improve a port's ratio. Merely reaching a port with a road is insufficient. You cannot directly use somebody else's port.
 
 Each received card requires its own complete matching payment group. You may make multiple exchanges and use different eligible ratios, but cannot combine partial groups of different resources. You can use a newly occupied port immediately during the same action phase. A bank trade cannot take a card that is not available. Returned resources re-enter the bank.
 
@@ -172,7 +172,7 @@ Each received card requires its own complete matching payment group. You may mak
 
 Return the full cost to the bank for each action:
 
-| Purchase | Wood | Brick | Sheep | Wheat | Ore |
+| Purchase | Timber | Clay | Sheep | Hay | Rock |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Road | 1 | 1 | 0 | 0 | 0 |
 | Settlement | 1 | 1 | 1 | 1 | 0 |
@@ -223,11 +223,11 @@ Move the robber to a different land hex and resolve the theft described in secti
 
 Place two roads without paying resources. Each placement follows normal road rules and consumes a road from your remaining supply. Place them one at a time; the second may extend the first or go elsewhere legally. Recalculate Longest Road and victory after each placement.
 
-If only one road piece remains in your supply, you may play the card and place that road. You cannot exceed your piece supply or use the card to place a settlement. There is no trade or paid build between the two free placements. See the source ledger for the unresolved zero-placement and voluntarily-forgoing-placement questions; these require an explicit compatibility ruling before the rules engine implements that edge case.
+If only one road piece remains in your supply, you may play the card and place that road. You cannot exceed your piece supply or use the card to place a settlement. There is no trade or paid build between the two free placements. The playtest provisionally requires a legal first road and places a second whenever a legal site and piece remain; otherwise the effect ends after one. Zero-road play and voluntarily forgoing a legal road remain source questions in the ledger.
 
 ### Year of Plenty — 2 cards
 
-Choose two available resource cards from the bank and add them to your hand. You may choose two of the same type or one each of two types. This is the effect called **Invention** in the sixth edition. Complete the selection before spending either card; you cannot use the first choice to build and then decide the second. The bank cannot provide cards it does not have. The extreme case of fewer than two total cards in the bank is tracked in the source ledger.
+Choose two available resource cards from the bank and add them to your hand. You may choose two of the same type or one each of two types. This is the effect called **Invention** in the sixth edition. Complete the selection before spending either card; you cannot use the first choice to build and then decide the second. The bank cannot provide cards it does not have. The playtest provisionally takes the one remaining card if only one exists, and rejects use against an empty bank. This extreme-case interpretation remains tracked in the source ledger.
 
 ### Monopoly — 2 cards
 

@@ -5,8 +5,9 @@ import type { RoomState, ServerMessage } from '../../../packages/protocol/src/in
 import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
 import { RuleError } from '../../../packages/rules/src/game.js';
+import { serveClient } from './static.js';
 
-export async function startServer(options: { port?: number; host?: string; databasePath?: string; allowedOrigins?: string[]; heartbeatMs?: number } = {}) {
+export async function startServer(options: { port?: number; host?: string; databasePath?: string; allowedOrigins?: string[]; heartbeatMs?: number; clientDirectory?: string } = {}) {
   const store = new Store(options.databasePath ?? 'data/probe.sqlite');
   let closing = false;
   const http = createServer((request, response) => {
@@ -17,7 +18,7 @@ export async function startServer(options: { port?: number; host?: string; datab
         store.db.prepare('SELECT 1').get();
         response.writeHead(closing ? 503 : 200).end(JSON.stringify({ status: closing ? 'draining' : 'ok', service: 'catanova-connectivity', protocol: PROTOCOL_VERSION }));
       } catch { response.writeHead(503).end('{"status":"unavailable"}'); }
-    } else { response.writeHead(404).end('{"error":"not_found"}'); }
+    } else { void serveClient(request, response, options.clientDirectory ?? 'dist/client'); }
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, perMessageDeflate: false });
   const sessions = new Map<WebSocket, Seat>();
@@ -39,7 +40,8 @@ export async function startServer(options: { port?: number; host?: string; datab
   http.on('upgrade', (request, socket, head) => {
     const origin = request.headers.origin;
     const origins = options.allowedOrigins ?? [];
-    if (closing || request.url !== '/ws' || wss.clients.size >= 400 || (origin && !origins.includes(origin))) {
+    const sameOrigin = origin === `http://${request.headers.host}` || origin === `https://${request.headers.host}`;
+    if (closing || request.url !== '/ws' || wss.clients.size >= 400 || (origin && !sameOrigin && !origins.includes(origin))) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); return;
     }
     wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request));

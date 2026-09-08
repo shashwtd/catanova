@@ -1,6 +1,6 @@
 # Rule sources and compatibility ledger
 
-Reviewed 9 September 2026. Ruleset target: **ordinary three- and four-player English sixth-edition base game**, with applicable base-game clarifications. User-facing resource labels are wood, brick, sheep, wheat, and ore. Familiar names Longest Road and Year of Plenty correspond to the sixth edition's Longest Route and Invention.
+Reviewed 9 September 2026. Ruleset target: **ordinary three- and four-player English sixth-edition base game**, with applicable base-game clarifications. User-facing resource labels are Timber, Clay, Sheep, Hay, and Rock; their stable storage IDs are wood, brick, sheep, wheat, and ore. Familiar names Longest Road and Year of Plenty correspond to the sixth edition's Longest Route and Invention.
 
 ## Primary references
 
@@ -16,7 +16,7 @@ Reference PDFs were read outside the repository. No official artwork, explanator
 
 ## Coverage
 
-“Documented” means the behavior appears in our rulebook. It does **not** mean the engine implements it. The only implemented game material is the constants module; the tested server action is an unrelated connectivity counter.
+“Documented” means the behavior appears in our rulebook. It does **not** mean the engine implements it. An early engine now implements ordinary turns, setup, production, robber/discards, trades, construction, development cards and scoring. The table remains a source-coverage ledger, not a per-row certification. See [playtest scope](PLAYTEST.md) and the executable tests in `tests/game.test.ts`, `tests/board.test.ts` and `tests/multiplayer-game.test.ts`.
 
 | ID | Behavior | Rulebook section | Basis | Status |
 | --- | --- | --- | --- | --- |
@@ -104,17 +104,17 @@ Reference PDFs were read outside the repository. No official artwork, explanator
 5. **FAQ filtering:** the base-game FAQ includes old 5–6-player special-building rules, ships, and physical-knight language. Those entries do not authorize moving a base-game road or adding a special building phase.
 6. **Standard supply:** although a FAQ permits players to agree to extra cards, the standard preset uses the base box's 19 per resource. An enlarged bank is a labeled option.
 7. **Starting-player ties:** re-roll the tied highest totals. R6 specifies the highest roll but does not elaborate the tie procedure; this is our explicit tie-resolution convention.
-8. **Digital action commitment:** a placement preview is freely adjustable until confirmation. Confirmation is the digital commitment point. Tournament rules permitting physical repositioning within an unfinished action must not silently become an undo after a committed online action or revealed information.
+8. **Digital action commitment:** a placement preview is freely adjustable until confirmation. The early UI commits a placement when a highlighted site is clicked; selecting a build type is only a preview. Tournament rules permitting physical repositioning within an unfinished action must not silently become an undo after a committed online action or revealed information.
 
 ## Remaining source questions before claiming exact conformance
 
-The rulebook is a comprehensive base-game draft, not a claim that every conceivable corner has been independently adjudicated. The following must be resolved before implementing those cases or advertising certified 1:1 behavior:
+The rulebook is a comprehensive base-game draft, not a claim that every conceivable corner has been independently adjudicated. The following need authoritative confirmation before advertising certified 1:1 behavior. The playtest has explicit provisional decisions so games can progress:
 
-- **Road Building partial/no-effect play:** ordinary sources specify two legal free roads and finite pieces. The conventional one-road result when only one piece remains is included, but we still need an explicit authoritative base-game ruling for voluntarily declining a possible second road, having no legal first road, and using the card with no pieces. Do not borrow a Cities & Knights progress-card ruling without verifying that it applies.
-- **Year of Plenty with fewer than two cards in the entire bank:** the ordinary sources specify two available resources, but do not expressly settle a one-card or empty-bank effect. A common interpretation is to take the available remainder; mark it as an interpretation until confirmed.
+- **Road Building partial/no-effect play:** ordinary sources specify two legal free roads and finite pieces. The conventional one-road result when only one piece remains is included, but we still need an explicit authoritative base-game ruling for voluntarily declining a possible second road, having no legal first road, and using the card with no pieces. The playtest requires a legal first road and uses a second whenever possible; if no piece or legal site remains after the first, it finishes with one. Zero-road play and voluntarily declining an available road are not allowed provisionally. Do not borrow a Cities & Knights progress-card ruling without verifying that it applies.
+- **Year of Plenty with fewer than two cards in the entire bank:** the ordinary sources specify two available resources, but do not expressly settle a one-card or empty-bank effect. The playtest takes the remaining card when there is exactly one and rejects play into an empty bank. This is an interpretation until confirmed.
 
 No email has been sent to the publisher. A future clarification request needs the maintainer's authorization. A supplied official clarification or new edition should be linked here with its date and the resulting ruleset decision.
 
 ## Implementation conformance gate
 
-Translate each applicable row into executable game-state scenarios as the rules engine is implemented. Add resource and piece conservation properties, legal setup fixtures, phase-transition tests, Longest Road graph fixtures, per-player information tests, replay determinism, and immediate-win scenarios. Until then, passing connectivity tests means only that the multiplayer foundation passes those tests.
+Translate each applicable row into executable game-state scenarios as the rules engine is implemented. Add resource and piece conservation properties, legal setup fixtures, phase-transition tests, Longest Road graph fixtures, per-player information tests, replay determinism, and immediate-win scenarios. Current tests include these core categories, but the ledger has not yet been certified row by row. Fixed/spiral presets and complete human playtests remain outstanding.

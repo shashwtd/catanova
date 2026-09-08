@@ -1,6 +1,6 @@
 # Security
 
-The current server is a connectivity prototype for controlled testing. It is not ready for an unrestricted public game service.
+The current server is an early playable game for controlled local testing. It is not ready for an unrestricted public game service.
 
 Seat tokens are bearer credentials. The client generates them before the first handshake; the server stores only their SHA-256 hashes. Do not publish tokens, session exports, production database files, or private hands in bug reports. Use `wss://` when traffic leaves a trusted local machine. A room code is an invitation, not a password, and a display name is not an identity.
 
