@@ -4,6 +4,7 @@ import { parseClientMessage, PROTOCOL_VERSION } from '../../../packages/protocol
 import type { RoomState, ServerMessage } from '../../../packages/protocol/src/index.js';
 import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
+import { RuleError } from '../../../packages/rules/src/game.js';
 
 export async function startServer(options: { port?: number; host?: string; databasePath?: string; allowedOrigins?: string[]; heartbeatMs?: number } = {}) {
   const store = new Store(options.databasePath ?? 'data/probe.sqlite');
@@ -27,14 +28,13 @@ export async function startServer(options: { port?: number; host?: string; datab
     if (ws.bufferedAmount > 128 * 1024) { ws.close(1013, 'Slow connection; reconnect'); return; }
     ws.send(JSON.stringify(message));
   }
-  function snapshot(roomId: string): RoomState {
-    const state = store.snapshot(roomId);
+  function snapshot(roomId: string, viewer: string): RoomState {
+    const state = store.snapshot(roomId, viewer);
     return { ...state, players: state.players.map(p => ({ ...p, connected: activeSeats.get(p.id)?.readyState === WebSocket.OPEN })) };
   }
   function broadcast(roomId: string) {
     if (closing) return;
-    const state = snapshot(roomId);
-    for (const [ws, seat] of sessions) if (seat.room_id === roomId) send(ws, { type: 'state', state });
+    for (const [ws, seat] of sessions) if (seat.room_id === roomId) send(ws, { type: 'state', state: snapshot(roomId, seat.id) });
   }
   http.on('upgrade', (request, socket, head) => {
     const origin = request.headers.origin;
@@ -68,24 +68,24 @@ export async function startServer(options: { port?: number; host?: string; datab
             oldSocket.close(4001, 'Seat resumed elsewhere');
           }
           sessions.set(ws, seat); activeSeats.set(seat.id, ws); clearTimeout(handshakeTimeout);
-          send(ws, { type: 'welcome', playerId: seat.id, state: snapshot(seat.room_id), version: PROTOCOL_VERSION });
+          send(ws, { type: 'welcome', playerId: seat.id, state: snapshot(seat.room_id, seat.id), version: PROTOCOL_VERSION });
           broadcast(seat.room_id);
         } else {
           const seat = sessions.get(ws);
           if (!seat) throw new ProtocolError('NOT_JOINED', 'Join or resume before sending actions');
           if (message.type === 'ping') { send(ws, { type: 'pong', nonce: message.nonce }); return; }
-          if (message.type !== 'increment') throw new ProtocolError('INVALID_MESSAGE', 'Unknown action');
+          if (message.type !== 'increment' && message.type !== 'action') throw new ProtocolError('INVALID_MESSAGE', 'Unknown action');
           commandId = message.commandId;
-          const receipt = store.increment(seat, message.commandId, message.expectedRevision);
+          const receipt = message.type === 'action' ? store.action(seat, message.commandId, message.expectedRevision, message.action) : store.increment(seat, message.commandId, message.expectedRevision);
           // The database transaction has committed before any success reaches a client.
           send(ws, { type: 'ack', commandId: message.commandId, ...receipt });
           broadcast(seat.room_id);
         }
       } catch (error) {
-        const code = error instanceof ProtocolError ? error.code : error instanceof SyntaxError || (error instanceof Error && !('code' in error)) ? 'INVALID_MESSAGE' : 'STORAGE_ERROR';
-        send(ws, { type: 'error', code, message: error instanceof ProtocolError ? error.message : code === 'INVALID_MESSAGE' ? 'Invalid message or protocol version' : 'Could not save the action; no success was acknowledged', ...(commandId ? { commandId } : {}) });
+        const code = error instanceof ProtocolError || error instanceof RuleError ? error.code : error instanceof SyntaxError || (error instanceof Error && !('code' in error)) ? 'INVALID_MESSAGE' : 'STORAGE_ERROR';
+        send(ws, { type: 'error', code, message: error instanceof ProtocolError || error instanceof RuleError ? error.message : code === 'INVALID_MESSAGE' ? 'Invalid message or protocol version' : 'Could not save the action; no success was acknowledged', ...(commandId ? { commandId } : {}) });
         const seat = sessions.get(ws);
-        if (seat && code === 'STALE_STATE') send(ws, { type: 'state', state: snapshot(seat.room_id) });
+        if (seat && code === 'STALE_STATE') send(ws, { type: 'state', state: snapshot(seat.room_id, seat.id) });
       }
     });
     ws.on('close', () => {

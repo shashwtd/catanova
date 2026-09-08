@@ -1,7 +1,9 @@
 import { PROTOCOL_VERSION } from '../../../packages/protocol/src/index.js';
 import type { ClientMessage, RoomState, ServerMessage, Session } from '../../../packages/protocol/src/index.js';
+import type { GameAction } from '../../../packages/rules/src/game.js';
 
 type Ack = Extract<ServerMessage, { type: 'ack' }>;
+export type PendingCommand = Extract<ClientMessage, { type: 'increment' | 'action' }>;
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'closed';
 export function newSession(name: string, roomId?: string): Session {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -19,14 +21,19 @@ export class Connection {
   private retryTimer?: ReturnType<typeof setTimeout>;
   private watchdog?: ReturnType<typeof setInterval>;
   private lastReceived = 0;
-  private pending?: { message: Extract<ClientMessage, { type: 'increment' }>; resolve: (ack: Ack) => void; reject: (error: Error) => void };
+  private pending?: { message: PendingCommand; resolve: (ack: Ack) => void; reject: (error: Error) => void };
   private listeners = new Set<(message: ServerMessage) => void>();
   constructor(readonly url: string, readonly session: Session, private options: {
     onStatus?: (status: ConnectionStatus) => void;
     onSession?: (session: Session) => void;
+    onPending?: (command: PendingCommand | null) => void;
+    pending?: PendingCommand;
     minRetryMs?: number;
     maxRetryMs?: number;
-  } = {}) {}
+  } = {}) {
+    if (options.pending) this.pending = { message: options.pending, resolve: () => {}, reject: () => {} };
+  }
+  get awaitingConfirmation() { return !!this.pending; }
   subscribe(listener: (message: ServerMessage) => void) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   private setStatus(status: ConnectionStatus) { this.status = status; this.options.onStatus?.(status); }
   start() {
@@ -67,12 +74,12 @@ export class Connection {
       } else if (message.type === 'state') {
         if (!this.state || message.state.revision >= this.state.revision) this.state = message.state;
       } else if (message.type === 'ack' && this.pending?.message.commandId === message.commandId) {
-        this.pending.resolve(message); this.pending = undefined;
+        this.pending.resolve(message); this.pending = undefined; this.options.onPending?.(null);
       } else if (message.type === 'error') {
         if (message.commandId && this.pending?.message.commandId === message.commandId) {
-          this.pending.reject(new Error(`${message.code}: ${message.message}`)); this.pending = undefined;
+          this.pending.reject(new Error(`${message.code}: ${message.message}`)); this.pending = undefined; this.options.onPending?.(null);
         }
-        if (['INVALID_SESSION', 'ROOM_NOT_FOUND', 'ROOM_FULL', 'CAPACITY'].includes(message.code) || this.status !== 'connected') this.stop();
+        if (['INVALID_SESSION', 'ROOM_NOT_FOUND', 'ROOM_FULL', 'CAPACITY', 'VERSION_MISMATCH'].includes(message.code) || this.status !== 'connected') this.stop();
       }
       for (const listener of this.listeners) listener(message);
     };
@@ -88,15 +95,20 @@ export class Connection {
       this.retryTimer = setTimeout(() => this.connect(), delay);
     };
   }
-  increment(): Promise<Ack> {
+  private submit(action?: GameAction): Promise<Ack> {
     if (this.status !== 'connected' || !this.state || this.socket?.readyState !== WebSocket.OPEN) return Promise.reject(new Error('Wait until connected'));
     if (this.pending) return Promise.reject(new Error('An action is already awaiting confirmation'));
-    const message = { type: 'increment' as const, commandId: crypto.randomUUID(), expectedRevision: this.state.revision };
+    const common = { commandId: crypto.randomUUID(), expectedRevision: this.state.revision };
+    const message: PendingCommand = action ? { type: 'action', ...common, action } : { type: 'increment', ...common };
     return new Promise((resolve, reject) => {
+      // Persist intent before the network write, including across full page reloads.
+      this.options.onPending?.(message);
       this.pending = { message, resolve, reject };
       this.socket!.send(JSON.stringify(message));
     });
   }
+  increment() { return this.submit(); }
+  action(action: GameAction) { return this.submit(action); }
   stop() {
     this.stopped = true; clearTimeout(this.retryTimer); clearInterval(this.watchdog);
     this.socket?.close(); this.socket = null;

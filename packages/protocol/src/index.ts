@@ -1,14 +1,18 @@
+import { parseGameAction } from '../../rules/src/game.js';
+import type { GameAction, GameView } from '../../rules/src/game.js';
 export const PROTOCOL_VERSION = 1;
 export type Session = { token: string; name: string; roomId?: string; joined?: boolean };
 export type RoomState = {
   roomId: string;
   revision: number;
   counter: number;
+  game?: GameView;
   players: { id: string; name: string; connected: boolean }[];
 };
 export type ClientMessage =
   | { type: 'create' | 'join' | 'resume'; version: number; token: string; name: string; roomId?: string }
   | { type: 'increment'; commandId: string; expectedRevision: number }
+  | { type: 'action'; commandId: string; expectedRevision: number; action: GameAction }
   | { type: 'ping'; nonce: string };
 export type ServerMessage =
   | { type: 'welcome'; playerId: string; state: RoomState; version: number }
@@ -29,10 +33,11 @@ export function parseClientMessage(input: string): ClientMessage {
     if (v.type !== 'create' && (typeof v.roomId !== 'string' || !/^[A-Z2-9]{8}$/.test(v.roomId))) throw new Error('Invalid room code');
     return { type: v.type, version: v.version, token: v.token, name: v.name.trim(), ...(typeof v.roomId === 'string' ? { roomId: v.roomId } : {}) };
   }
-  if (v.type === 'increment') {
+  if (v.type === 'increment' || v.type === 'action') {
     if (typeof v.commandId !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(v.commandId)) throw new Error('Invalid command ID');
     if (!Number.isSafeInteger(v.expectedRevision) || (v.expectedRevision as number) < 0) throw new Error('Invalid revision');
-    return { type: 'increment', commandId: v.commandId, expectedRevision: v.expectedRevision as number };
+    const base = { commandId: v.commandId, expectedRevision: v.expectedRevision as number };
+    return v.type === 'increment' ? { type: 'increment', ...base } : { type: 'action', ...base, action: parseGameAction(v.action) };
   }
   if (v.type === 'ping' && typeof v.nonce === 'string' && v.nonce.length <= 80) return { type: 'ping', nonce: v.nonce };
   throw new Error('Unknown or invalid operation');
