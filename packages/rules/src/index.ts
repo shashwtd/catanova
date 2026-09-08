@@ -1,7 +1,8 @@
-/** Base-game constants only. Move validation and the game state machine come next. */
 export const RULESET = 'base-3-4-v1';
 export const RESOURCES = ['wood', 'brick', 'sheep', 'wheat', 'ore'] as const;
 export type Resource = (typeof RESOURCES)[number];
+/** Stable storage IDs; these are the names players see throughout Catanova. */
+export const RESOURCE_NAMES: Record<Resource, string> = { wood: 'Timber', brick: 'Clay', sheep: 'Sheep', wheat: 'Hay', ore: 'Rock' };
 export const SUPPLY = { resourcesPerType: 19, roads: 15, settlements: 5, cities: 4 } as const;
 export const DEVELOPMENT_DECK = { knight: 14, roadBuilding: 2, yearOfPlenty: 2, monopoly: 2, victoryPoint: 5 } as const;
 export const COSTS = {
