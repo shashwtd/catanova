@@ -54,7 +54,7 @@ test('invite previews expose the exact persisted board without private game stat
   const before = await preview();
   assert.equal(before.started, false);
   assert.equal(before.players.length, 3);
-  assert.deepEqual(Object.keys(before).sort(), ['board', 'players', 'roomId', 'started']);
+  assert.deepEqual(Object.keys(before).sort(), ['board', 'players', 'roomId', 'settings', 'started']);
   assert.deepEqual(Object.keys(before.players[0]!).sort(), ['id', 'name', 'profile', 'ready']);
   assert.ok(!JSON.stringify(before).includes(s.token));
   await server.close();

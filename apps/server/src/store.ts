@@ -1,6 +1,8 @@
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
+import { DEFAULT_ROOM_SETTINGS, parseRoomSettings } from '../../../packages/protocol/src/settings.js';
+import type { RoomSettings, TurnClock } from '../../../packages/protocol/src/settings.js';
 import type { Identity } from './auth.js';
 import { createHash, randomBytes, randomUUID, randomInt } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -8,6 +10,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { applyAction, createGame, gameView, parseGameAction } from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
+import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
 import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
 
@@ -27,7 +30,11 @@ const privateRandom = () => randomInt(0, 2 ** 32) / 2 ** 32;
 /** Single-process probe store. Cloud play will use the Postgres adapter described in docs. */
 export class Store {
   readonly db: DatabaseSync;
-  constructor(path: string) {
+  private readonly now: () => number;
+  private readonly random: () => number;
+  constructor(path: string, options: { now?: () => number; random?: () => number } = {}) {
+    this.now = options.now ?? Date.now;
+    this.random = options.random ?? privateRandom;
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(`
@@ -64,6 +71,21 @@ export class Store {
         payload_hash TEXT NOT NULL, revision INTEGER NOT NULL, counter INTEGER NOT NULL,
         PRIMARY KEY(room_id, player_id, command_id)
       );
+      CREATE TABLE IF NOT EXISTS settings_receipts (
+        room_id TEXT NOT NULL REFERENCES rooms(id), player_id TEXT NOT NULL REFERENCES seats(id),
+        command_id TEXT NOT NULL, payload_hash TEXT NOT NULL,
+        revision INTEGER NOT NULL, counter INTEGER NOT NULL,
+        PRIMARY KEY(room_id, player_id, command_id)
+      );
+      CREATE TABLE IF NOT EXISTS room_settings (
+        room_id TEXT PRIMARY KEY REFERENCES rooms(id), settings TEXT NOT NULL,
+        revision INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS turn_clocks (
+        room_id TEXT PRIMARY KEY REFERENCES rooms(id), state TEXT NOT NULL,
+        next_deadline INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS clocks_due ON turn_clocks(next_deadline);
       CREATE TABLE IF NOT EXISTS game_events (
         room_id TEXT NOT NULL REFERENCES rooms(id), revision INTEGER NOT NULL,
         command_id TEXT NOT NULL, actor TEXT, action TEXT NOT NULL,
@@ -199,6 +221,9 @@ export class Store {
         ready: !!p.ready,
       })),
       historyRevision: this.eventHead(roomId)?.revision ?? 0,
+      settings: this.settings(roomId),
+      serverNow: this.now(),
+      ...(this.clock(roomId) ? { turnClock: this.clock(roomId)! } : {}),
       board: this.board(roomId),
       ...(game ? { game: gameView(game, viewer!) } : {}),
     };
@@ -219,7 +244,13 @@ export class Store {
   }
   preview(roomId: string) {
     const state = this.snapshot(roomId);
-    return { roomId, board: state.board, players: state.players, started: !!this.loadGame(roomId) };
+    return {
+      roomId,
+      board: state.board,
+      players: state.players,
+      settings: state.settings,
+      started: !!this.loadGame(roomId),
+    };
   }
   hasAccountSeat(roomId: string, userId: string) {
     return !!this.db
@@ -228,6 +259,7 @@ export class Store {
   }
   leave(seat: Seat, commandId: string, expectedRevision: number) {
     return this.transaction(() => {
+      this.rejectSettingsReceipt(seat, commandId);
       if (
         this.db
           .prepare('SELECT 1 FROM lobby_receipts WHERE room_id = ? AND player_id = ? AND command_id = ?')
@@ -304,6 +336,7 @@ export class Store {
     game: Game,
     lines: string[],
     kind: string,
+    automatic = false,
   ) {
     const state = JSON.stringify(game);
     const entry: HistoryEntry = {
@@ -311,8 +344,9 @@ export class Store {
       actor,
       kind,
       turn: game.turn,
-      at: new Date().toISOString(),
+      at: new Date(this.now()).toISOString(),
       lines,
+      ...(automatic ? { automatic: true } : {}),
     };
     this.db
       .prepare(
@@ -345,6 +379,7 @@ export class Store {
     const profile = input ? parseProfile(input) : undefined;
     const payloadHash = hash(JSON.stringify({ expectedRevision, ready, profile }));
     return this.transaction(() => {
+      this.rejectSettingsReceipt(seat, commandId);
       for (const table of ['receipts', 'game_receipts', 'leave_receipts'])
         if (
           this.db
@@ -367,6 +402,11 @@ export class Store {
       // Readiness is an explicit intent for this seat, independent of another seat's update.
       if (expectedRevision > room.revision)
         throw new ProtocolError('STALE_STATE', 'The lobby changed; try again');
+      const settingsRevision = this.db
+        .prepare('SELECT revision FROM room_settings WHERE room_id = ?')
+        .get(seat.room_id)?.revision as number | undefined;
+      if (settingsRevision !== undefined && expectedRevision < settingsRevision)
+        throw new ProtocolError('STALE_STATE', 'Game settings changed; review them before getting ready');
       if (this.loadGame(seat.room_id)) throw new ProtocolError('GAME_STARTED', 'The game has started');
       if (!room.players.some((p) => p.id === seat.id))
         throw new ProtocolError('SEAT_LEFT', 'You left this lobby');
@@ -386,6 +426,140 @@ export class Store {
       return { revision, counter: room.counter, duplicate: false };
     });
   }
+  settings(roomId: string): RoomSettings {
+    const row = this.db.prepare('SELECT settings FROM room_settings WHERE room_id = ?').get(roomId) as
+      { settings: string } | undefined;
+    return row ? parseRoomSettings(JSON.parse(row.settings)) : { ...DEFAULT_ROOM_SETTINGS };
+  }
+  private rejectSettingsReceipt(seat: Seat, commandId: string) {
+    if (
+      this.db
+        .prepare('SELECT 1 FROM settings_receipts WHERE room_id = ? AND player_id = ? AND command_id = ?')
+        .get(seat.room_id, seat.id, commandId)
+    )
+      throw new ProtocolError('COMMAND_REUSED', 'Command ID was already used for game settings');
+  }
+  configureSettings(seat: Seat, commandId: string, expectedRevision: number, input: RoomSettings) {
+    const settings = parseRoomSettings(input);
+    const payloadHash = hash(JSON.stringify({ expectedRevision, settings }));
+    return this.transaction(() => {
+      for (const table of ['receipts', 'game_receipts', 'leave_receipts', 'lobby_receipts'])
+        if (
+          this.db
+            .prepare('SELECT 1 FROM ' + table + ' WHERE room_id = ? AND player_id = ? AND command_id = ?')
+            .get(seat.room_id, seat.id, commandId)
+        )
+          throw new ProtocolError('COMMAND_REUSED', 'Command ID was already used');
+      const old = this.db
+        .prepare(
+          'SELECT payload_hash, revision, counter FROM settings_receipts WHERE room_id = ? AND player_id = ? AND command_id = ?',
+        )
+        .get(seat.room_id, seat.id, commandId) as
+        { payload_hash: string; revision: number; counter: number } | undefined;
+      if (old) {
+        if (old.payload_hash !== payloadHash)
+          throw new ProtocolError('COMMAND_REUSED', 'Command ID was already used with different intent');
+        return { revision: old.revision, counter: old.counter, duplicate: true };
+      }
+      const room = this.snapshot(seat.room_id);
+      if (this.loadGame(seat.room_id))
+        throw new ProtocolError('GAME_STARTED', 'Game settings are locked after starting');
+      if (room.players[0]?.id !== seat.id)
+        throw new ProtocolError('NOT_HOST', 'Only the host can change game settings');
+      if (room.revision !== expectedRevision)
+        throw new ProtocolError('STALE_STATE', 'The lobby changed; review the latest settings');
+      const revision = room.revision + 1;
+      this.db
+        .prepare(
+          'INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET settings = excluded.settings, revision = excluded.revision',
+        )
+        .run(seat.room_id, JSON.stringify(settings), revision);
+      this.db.prepare('UPDATE seats SET ready = 0 WHERE room_id = ? AND departed = 0').run(seat.room_id);
+      this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
+      this.db
+        .prepare('INSERT INTO settings_receipts VALUES (?, ?, ?, ?, ?, ?)')
+        .run(seat.room_id, seat.id, commandId, payloadHash, revision, room.counter);
+      return { revision, counter: room.counter, duplicate: false };
+    });
+  }
+  clock(roomId: string): TurnClock | undefined {
+    const row = this.db.prepare('SELECT state FROM turn_clocks WHERE room_id = ?').get(roomId) as
+      { state: string } | undefined;
+    return row ? (JSON.parse(row.state) as TurnClock) : undefined;
+  }
+  private updateClock(roomId: string, next: Game) {
+    const seconds = this.settings(roomId).turnTimerSeconds;
+    if (seconds === null || next.turn === 0 || next.phase === 'finished') {
+      this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
+      return;
+    }
+    const now = this.now();
+    const playerId = next.players[next.active]!.id;
+    let clock = this.clock(roomId);
+    if (!clock || clock.turn !== next.turn || clock.playerId !== playerId)
+      clock = { playerId, turn: next.turn, startedAt: now, deadlineAt: now + seconds * 1000 };
+    if (next.phase === 'discard') {
+      clock.pausedAt ??= now;
+      const existing = clock.discardDeadlines ?? {};
+      clock.discardDeadlines = Object.fromEntries(
+        Object.keys(next.discards).map((id) => [id, existing[id] ?? now + seconds * 1000]),
+      );
+    } else if (clock.pausedAt !== undefined) {
+      clock.deadlineAt += Math.max(0, now - clock.pausedAt);
+      delete clock.pausedAt;
+      delete clock.discardDeadlines;
+    }
+    const nextDeadline =
+      clock.pausedAt === undefined ? clock.deadlineAt : Math.min(...Object.values(clock.discardDeadlines!));
+    this.db
+      .prepare(
+        'INSERT INTO turn_clocks(room_id, state, next_deadline) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET state = excluded.state, next_deadline = excluded.next_deadline',
+      )
+      .run(roomId, JSON.stringify(clock), nextDeadline);
+  }
+  dueRooms(): string[] {
+    // Bound each scheduler batch so a backlog after restart cannot monopolize the event loop.
+    return this.db
+      .prepare('SELECT room_id FROM turn_clocks WHERE next_deadline <= ? ORDER BY next_deadline LIMIT 32')
+      .all(this.now())
+      .map((r) => r.room_id as string);
+  }
+  /** Each chosen action commits independently, so a crash resumes from the last saved mandatory choice. */
+  expireRoom(roomId: string): boolean {
+    let changed = false;
+    const firstClock = this.clock(roomId);
+    if (!firstClock) return false;
+    // At most four discards, two free roads, a robber move, a roll and an end-turn.
+    for (let step = 0; step < 12; step++) {
+      const clock = this.clock(roomId);
+      if (!clock || clock.turn !== firstClock.turn) break;
+      let playerId = clock.playerId;
+      if (clock.pausedAt !== undefined) {
+        const due = Object.entries(clock.discardDeadlines ?? {}).find(
+          ([, deadline]) => deadline <= this.now(),
+        );
+        if (!due) break;
+        playerId = due[0];
+      } else if (clock.deadlineAt > this.now()) break;
+      const game = this.loadGame(roomId);
+      if (!game || game.phase === 'finished') break;
+      const action = timeoutAction(game, playerId, this.random);
+      if (!action)
+        throw new ProtocolError(
+          'CLOCK_STATE',
+          'The turn clock needs recovery before automatic play can continue',
+        );
+      const player = game.players.find((p) => p.id === playerId)!;
+      const revision = this.db.prepare('SELECT revision FROM rooms WHERE id = ?').get(roomId)!
+        .revision as number;
+      const commandId =
+        'timer-' +
+        hash(JSON.stringify({ roomId, playerId, revision, turn: game.turn, phase: game.phase })).slice(0, 48);
+      this.action({ id: playerId, name: player.name, room_id: roomId }, commandId, revision, action, true);
+      changed = true;
+    }
+    return changed;
+  }
   loadGame(roomId: string): Game | undefined {
     const row = this.db.prepare('SELECT state FROM games WHERE room_id = ?').get(roomId) as
       { state: string } | undefined;
@@ -398,10 +572,14 @@ export class Store {
       throw new ProtocolError('VERSION_MISMATCH', 'This saved game needs a compatible server version');
     return game;
   }
-  action(seat: Seat, commandId: string, expectedRevision: number, input: GameAction) {
+  action(seat: Seat, commandId: string, expectedRevision: number, input: GameAction, automatic = false) {
     const action = parseGameAction(input);
-    const payloadHash = hash(JSON.stringify({ expectedRevision, action }));
+    if (!automatic) this.expireRoom(seat.room_id);
+    const payloadHash = hash(
+      JSON.stringify({ expectedRevision, action, ...(automatic ? { automatic: true } : {}) }),
+    );
     return this.transaction(() => {
+      this.rejectSettingsReceipt(seat, commandId);
       if (
         this.db
           .prepare('SELECT 1 FROM lobby_receipts WHERE room_id = ? AND player_id = ? AND command_id = ?')
@@ -440,19 +618,26 @@ export class Store {
         if (current) throw new ProtocolError('GAME_STARTED', 'This game is already underway');
         if (room.players[0]?.id !== seat.id)
           throw new ProtocolError('NOT_HOST', 'Only the room creator can start the game');
-        if (!room.players.every((p) => p.ready))
-          throw new ProtocolError('NOT_READY', 'Every player must be ready');
+        if (!room.players.slice(1).every((p) => p.ready))
+          throw new ProtocolError('NOT_READY', 'Every other player must be ready');
         next = createGame(
           shuffle(
             room.players.map((p) => ({ id: p.id, name: p.name })),
-            privateRandom,
+            this.random,
           ),
           room.board.seed,
-          privateRandom,
+          this.random,
         );
       } else {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');
-        next = applyAction(current, seat.id, action, privateRandom);
+        next = applyAction(current, seat.id, action, this.random);
+      }
+      if (automatic) {
+        next.log.push({
+          id: next.nextLog++,
+          text: `${seat.name}'s timer expired; ${timeoutDescription(action)}.`,
+        });
+        if (next.log.length > 80) next.log.shift();
       }
       if (current && !this.eventHead(seat.room_id))
         this.recordEvent(
@@ -478,12 +663,14 @@ export class Store {
         next,
         next.log.filter((e) => e.id >= (current?.nextLog ?? 0)).map((e) => e.text),
         action.kind,
+        automatic,
       );
       this.db
         .prepare(
           'INSERT INTO games(room_id, state) VALUES (?, ?) ON CONFLICT(room_id) DO UPDATE SET state = excluded.state',
         )
         .run(seat.room_id, JSON.stringify(next));
+      this.updateClock(seat.room_id, next);
       this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
       this.db
         .prepare(
@@ -495,6 +682,7 @@ export class Store {
   }
   increment(seat: Seat, commandId: string, expectedRevision: number) {
     return this.transaction(() => {
+      this.rejectSettingsReceipt(seat, commandId);
       if (
         this.db
           .prepare('SELECT 1 FROM lobby_receipts WHERE room_id = ? AND player_id = ? AND command_id = ?')

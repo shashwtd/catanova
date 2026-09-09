@@ -10,6 +10,18 @@ import type { Seat } from './store.js';
 import { RuleError } from '../../../packages/rules/src/game.js';
 import { serveClient } from './static.js';
 
+/** Validation errors must release a pending command without reflecting arbitrary payload text. */
+function validationCommandId(input: string): string | undefined {
+  try {
+    const value: unknown = JSON.parse(input);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const id = (value as Record<string, unknown>).commandId;
+    return typeof id === 'string' && /^[a-zA-Z0-9_-]{8,80}$/.test(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function startServer(
   options: {
     port?: number;
@@ -20,11 +32,13 @@ export async function startServer(
     clientDirectory?: string;
     auth?: AuthConfig | null;
     verifyIdentity?: VerifyIdentity;
+    now?: () => number;
   } = {},
 ) {
   const auth = options.auth === null ? undefined : (options.auth ?? readAuthConfig());
   const verify = options.verifyIdentity ?? (auth ? createVerifier(auth) : undefined);
-  const store = new Store(options.databasePath ?? 'data/probe.sqlite');
+  const now = options.now ?? Date.now;
+  const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now });
   let closing = false;
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -75,14 +89,12 @@ export async function startServer(
         const authorization = request.headers.authorization;
         const identity =
           verify && authorization?.startsWith('Bearer ') ? await verify(authorization.slice(7)) : undefined;
-        response
-          .writeHead(200)
-          .end(
-            JSON.stringify({
-              ...preview,
-              ...(identity ? { canResume: store.hasAccountSeat(preview.roomId, identity.id) } : {}),
-            }),
-          );
+        response.writeHead(200).end(
+          JSON.stringify({
+            ...preview,
+            ...(identity ? { canResume: store.hasAccountSeat(preview.roomId, identity.id) } : {}),
+          }),
+        );
       } catch (error) {
         response
           .writeHead(error instanceof ProtocolError && error.code === 'ROOM_NOT_FOUND' ? 404 : 503)
@@ -171,7 +183,13 @@ export async function startServer(
           return;
         }
         if (isBinary) throw new ProtocolError('INVALID_MESSAGE', 'Use JSON text messages');
-        const message = parseClientMessage(data.toString());
+        let message: ReturnType<typeof parseClientMessage>;
+        try {
+          message = parseClientMessage(data.toString());
+        } catch (error) {
+          commandId = validationCommandId(data.toString());
+          throw error;
+        }
         if (message.type === 'create' || message.type === 'join' || message.type === 'resume') {
           if (sessions.has(ws)) throw new ProtocolError('ALREADY_JOINED', 'Socket already has a seat');
           if (authenticating) throw new ProtocolError('ALREADY_JOINING', 'Joining is already in progress');
@@ -220,7 +238,7 @@ export async function startServer(
           if (message.type === 'ping') {
             const revision = store.db.prepare('SELECT revision FROM rooms WHERE id = ?').get(seat.room_id)!
               .revision as number;
-            send(ws, { type: 'pong', nonce: message.nonce, revision });
+            send(ws, { type: 'pong', nonce: message.nonce, revision, serverNow: now() });
             return;
           }
           if (message.type === 'sync') {
@@ -248,6 +266,18 @@ export async function startServer(
             broadcast(seat.room_id);
             return;
           }
+          if (message.type === 'settings') {
+            commandId = message.commandId;
+            const receipt = store.configureSettings(
+              seat,
+              commandId,
+              message.expectedRevision,
+              message.settings,
+            );
+            send(ws, { type: 'ack', commandId, ...receipt });
+            broadcast(seat.room_id);
+            return;
+          }
           if (message.type === 'leave') {
             commandId = message.commandId;
             const receipt = store.leave(seat, commandId, message.expectedRevision);
@@ -261,6 +291,8 @@ export async function startServer(
           if (message.type !== 'increment' && message.type !== 'action')
             throw new ProtocolError('INVALID_MESSAGE', 'Unknown action');
           commandId = message.commandId;
+          // Resolve the persisted deadline before accepting a late move, even between scheduler ticks.
+          if (message.type === 'action' && store.expireRoom(seat.room_id)) broadcast(seat.room_id);
           if (
             message.type === 'action' &&
             message.action.kind === 'start' &&
@@ -324,6 +356,42 @@ export async function startServer(
     }
   }, options.heartbeatMs ?? 15000);
   heartbeat.unref();
+  const clockErrors = new Set<string>();
+  const clockScheduler = setInterval(() => {
+    if (closing) return;
+    let due: string[];
+    try {
+      due = store.dueRooms();
+      clockErrors.delete('scheduler');
+    } catch (error) {
+      if (!clockErrors.has('scheduler')) {
+        clockErrors.add('scheduler');
+        console.error('Turn clock storage is unavailable:', error);
+      }
+      return;
+    }
+    for (const roomId of due) {
+      try {
+        if (store.expireRoom(roomId)) broadcast(roomId);
+        clockErrors.delete(roomId);
+      } catch (error) {
+        // A failed transaction never advances the game; retry from its last committed clock next tick.
+        broadcast(roomId);
+        if (!clockErrors.has(roomId)) {
+          clockErrors.add(roomId);
+          console.error('Turn clock could not finish a saved turn:', error);
+          for (const [ws, seat] of sessions)
+            if (seat.room_id === roomId)
+              send(ws, {
+                type: 'error',
+                code: 'CLOCK_STATE',
+                message: 'Automatic turn completion is waiting for server recovery. Saved moves are intact.',
+              });
+        }
+      }
+    }
+  }, 500);
+  clockScheduler.unref();
   try {
     await new Promise<void>((resolve, reject) => {
       http.once('error', reject);
@@ -331,6 +399,7 @@ export async function startServer(
     });
   } catch (error) {
     clearInterval(heartbeat);
+    clearInterval(clockScheduler);
     wss.close();
     store.close();
     throw error;
@@ -344,6 +413,7 @@ export async function startServer(
     async close() {
       closing = true;
       clearInterval(heartbeat);
+      clearInterval(clockScheduler);
       for (const ws of wss.clients) ws.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await new Promise<void>((resolve, reject) =>

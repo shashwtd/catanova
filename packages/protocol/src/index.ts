@@ -1,5 +1,7 @@
 import { parseProfile } from './profile.js';
 import type { Profile } from './profile.js';
+import { parseRoomSettings } from './settings.js';
+import type { RoomSettings, TurnClock } from './settings.js';
 import { parseGameAction } from '../../rules/src/game.js';
 import type { GameAction, GameView } from '../../rules/src/game.js';
 import type { Board } from '../../rules/src/board.js';
@@ -12,6 +14,7 @@ export type HistoryEntry = {
   turn: number;
   at: string;
   lines: string[];
+  automatic?: boolean;
 };
 export type RoomPlayer = { id: string; name: string; connected: boolean; profile?: Profile; ready?: boolean };
 export type RoomState = {
@@ -22,6 +25,9 @@ export type RoomState = {
   board?: Board;
   players: RoomPlayer[];
   historyRevision?: number;
+  settings?: RoomSettings;
+  turnClock?: TurnClock;
+  serverNow?: number;
 };
 export type RoomPreview = {
   canResume?: boolean;
@@ -29,6 +35,7 @@ export type RoomPreview = {
   board: Board;
   players: Omit<RoomPlayer, 'connected'>[];
   started: boolean;
+  settings?: RoomSettings;
 };
 export type ClientMessage =
   | {
@@ -44,6 +51,7 @@ export type ClientMessage =
   | { type: 'leave'; commandId: string; expectedRevision: number }
   | { type: 'action'; commandId: string; expectedRevision: number; action: GameAction }
   | { type: 'lobby'; commandId: string; expectedRevision: number; ready: boolean; profile?: Profile }
+  | { type: 'settings'; commandId: string; expectedRevision: number; settings: RoomSettings }
   | { type: 'sync' }
   | { type: 'history'; before?: number }
   | { type: 'ping'; nonce: string };
@@ -59,7 +67,7 @@ export type ServerMessage =
       released?: boolean;
     }
   | { type: 'history'; entries: HistoryEntry[]; before?: number; hasMore: boolean }
-  | { type: 'pong'; nonce: string; revision?: number }
+  | { type: 'pong'; nonce: string; revision?: number; serverNow?: number }
   | { type: 'error'; code: string; message: string; commandId?: string };
 
 /** Bounds and a strict operation whitelist keep untrusted messages out of the store. */
@@ -86,12 +94,19 @@ export function parseClientMessage(input: string): ClientMessage {
       ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
     };
   }
-  if (v.type === 'increment' || v.type === 'action' || v.type === 'leave' || v.type === 'lobby') {
+  if (
+    v.type === 'increment' ||
+    v.type === 'action' ||
+    v.type === 'leave' ||
+    v.type === 'lobby' ||
+    v.type === 'settings'
+  ) {
     if (typeof v.commandId !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(v.commandId))
       throw new Error('Invalid command ID');
     if (!Number.isSafeInteger(v.expectedRevision) || (v.expectedRevision as number) < 0)
       throw new Error('Invalid revision');
     const base = { commandId: v.commandId, expectedRevision: v.expectedRevision as number };
+    if (v.type === 'settings') return { type: 'settings', ...base, settings: parseRoomSettings(v.settings) };
     if (v.type === 'lobby') {
       if (typeof v.ready !== 'boolean') throw new Error('Invalid ready state');
       return {
