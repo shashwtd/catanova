@@ -60,7 +60,7 @@ test('every dock is perpendicular to its own coastal edge, facing outward, ancho
       const angle = (pose.angle * Math.PI) / 180;
       assert.ok(Math.abs(Math.sin(angle) - pose.nx) < 1e-8);
       assert.ok(Math.abs(-Math.cos(angle) - pose.ny) < 1e-8);
-      assert.ok(Math.abs(Math.hypot(pose.markerX - pose.x, pose.markerY - pose.y) - 70) < 1e-8);
+      assert.ok(Math.abs(Math.hypot(pose.markerX - pose.x, pose.markerY - pose.y) - 106) < 1e-8);
     }
     assert.throws(
       () => portPlacement(board, board.edges.find((e) => e.hexes.length === 2)!.id),

@@ -52,7 +52,7 @@ void main(){
   vec2 uv=clamp(local/128.0+0.5,vec2(0.004),vec2(0.996));
   vec3 terrain=texture(uTerrain,(cell+uv)/vec2(3.0,2.0)).rgb;
   float light=dot(terrain,vec3(0.2126,0.7152,0.0722));
-  terrain=clamp(mix(vec3(light),terrain,1.10)*1.04,0.0,1.0);
+  terrain=clamp((mix(vec3(light),terrain,0.94)-0.5)*0.94+0.54,0.0,1.0);
   color=mix(color,terrain,terrainMask);
   // The outer ocean ring has a quiet physical rim against the wooden table.
   float boundary=10000.0;
@@ -98,7 +98,7 @@ export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boo
       });
       if (!gl) return;
       const images = await Promise.all(
-        ['/art/terrain-vibrant.png', '/art/environment.png'].map(async (src) => {
+        ['/art/terrain-painted.png', '/art/environment-painted.png'].map(async (src) => {
           const image = new Image();
           image.src = src;
           await image.decode();

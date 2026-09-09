@@ -1,24 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth, entryLocation } from './auth.js';
+import { Avatar, ProfileEditor } from './Profile.js';
+import { Lobby, Invite, InviteRoster } from './Lobby.js';
+import { PlayerRail } from './PlayerRail.js';
+import { ConnectionPanel } from './ConnectionPanel.js';
+import { BoardViewport } from './BoardViewport.js';
+import { initialMetrics } from './connection.js';
+import type { Profile } from '../../../packages/protocol/src/profile.js';
+import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  UserRound,
+  LogOut,
+  Sailboat,
   ArrowLeft,
   ArrowRight,
   Castle,
   Check,
   CircleHelp,
-  Copy,
-  Crown,
   DoorOpen,
   Dices,
   House,
-  Layers,
   LoaderCircle,
   Maximize,
   Plus,
   Route,
   ScrollText,
-  Swords,
   Trophy,
   Users,
   Wifi,
@@ -34,12 +42,11 @@ import '@fontsource/barlow/latin-600.css';
 import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
-import { generateBoard } from '../../../packages/rules/src/board.js';
 import { CARD_NAMES, canPay, emptyHand, robberVictims, total } from '../../../packages/rules/src/game.js';
 import type { Card, GameAction, Hand } from '../../../packages/rules/src/game.js';
 import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
-import { Board, PLAYER_COLORS, ResourceIcon } from './Board.js';
+import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
 import { invitationCode, roomPath, shouldResume, validRoomCode } from './navigation.js';
 import './style.css';
@@ -200,35 +207,15 @@ function ResourceSelect({
     </label>
   );
 }
-function Dice({ dice, turn }: { dice: [number, number] | null; turn: number }) {
-  const locations: Record<number, number[]> = {
-    1: [4],
-    2: [0, 8],
-    3: [0, 4, 8],
-    4: [0, 2, 6, 8],
-    5: [0, 2, 4, 6, 8],
-    6: [0, 2, 3, 5, 6, 8],
-  };
-  return (
-    <div className="dice-pair" aria-label={dice ? `Rolled ${dice[0]} and ${dice[1]}` : 'Dice'}>
-      {(dice ?? [0, 0]).map((n, i) => (
-        <div key={`${turn}-${n}-${i}`} className={`die ${n ? 'rolled' : 'unrolled'}`}>
-          {n ? (
-            Array.from({ length: 9 }, (_, j) => (
-              <i key={j} className={locations[n]!.includes(j) ? 'pip filled' : 'pip'} />
-            ))
-          ) : (
-            <Dices />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function App() {
+  const auth = useAuth();
   const connection = useRef<Connection | null>(null);
-  const initialInvite = useRef(invitationCode(location.pathname, location.search));
+  const [metrics, setMetrics] = useState(initialMetrics);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
+    [historyHasMore, setHistoryHasMore] = useState(false);
+  const historyLoaded = useRef(false);
+  const initialInvite = useRef(invitationCode(entryLocation().pathname, entryLocation().search));
   const [entry, setEntry] = useState<'home' | 'create' | 'join' | 'invite'>(
     initialInvite.current ? 'invite' : 'home',
   );
@@ -245,7 +232,9 @@ function App() {
   const [name, setName] = useState(() => localStorage.getItem('catanova.name') ?? ''),
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
-    [panel, setPanel] = useState<'trade' | 'cards' | 'rules' | 'journal' | 'leave' | null>(null);
+    [panel, setPanel] = useState<
+      'trade' | 'cards' | 'rules' | 'journal' | 'leave' | 'profile' | 'network' | 'invite' | null
+    >(null);
   const [robberHex, setRobberHex] = useState<number | null>(null),
     [selected, setSelected] = useState<Hand>(emptyHand),
     [give, setGive] = useState<Hand>(emptyHand),
@@ -254,7 +243,7 @@ function App() {
     [bankReceive, setBankReceive] = useState<Resource>('brick');
   const [selectedCard, setSelectedCard] = useState<Card | null>(null),
     [cardResource, setCardResource] = useState<Resource>('wood');
-  const preview = useMemo(() => generateBoard(2026), []);
+
   const g = room?.game,
     player = g?.players.find((p) => p.id === me),
     active = g?.players[g.active],
@@ -275,6 +264,9 @@ function App() {
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(OUTBOX_KEY);
     setRoom(null);
+    setHistoryEntries([]);
+    historyLoaded.current = false;
+    setMetrics(initialMetrics());
     setMe(undefined);
     setStatus('idle');
     setBusy(false);
@@ -299,6 +291,10 @@ function App() {
       session,
       {
         pending,
+        accessToken: auth.accessToken,
+        onMetrics: (value) => {
+          if (connection.current === c) setMetrics(value);
+        },
         onStatus: (value) => {
           if (connection.current === c) setStatus(value);
         },
@@ -322,6 +318,15 @@ function App() {
         setMe(c.playerId ?? undefined);
         if (message.type === 'welcome') history.replaceState(null, '', roomPath(message.state.roomId));
       }
+      if (message.type === 'history') {
+        if (message.before !== undefined || !historyLoaded.current) setHistoryHasMore(message.hasMore);
+        historyLoaded.current = true;
+        setHistoryEntries((current) =>
+          [...new Map([...current, ...message.entries].map((e) => [e.revision, e])).values()].sort(
+            (a, b) => b.revision - a.revision,
+          ),
+        );
+      }
       if (message.type === 'ack' && message.released !== undefined) {
         home(message.released);
         return;
@@ -336,7 +341,7 @@ function App() {
         }
         setError(message.message);
         if (message.commandId) setBusy(false);
-        if (['SEAT_LEFT', 'INVALID_SESSION', 'ROOM_NOT_FOUND'].includes(message.code)) {
+        if (['SEAT_LEFT', 'INVALID_SESSION', 'ROOM_NOT_FOUND', 'AUTH_MISMATCH'].includes(message.code)) {
           sessionStorage.removeItem(SESSION_KEY);
           sessionStorage.removeItem(OUTBOX_KEY);
           localStorage.removeItem(LAST_SEAT_KEY);
@@ -348,11 +353,22 @@ function App() {
     c.start();
   }
   useEffect(() => {
+    if (!auth.canPlay || connection.current) return;
     const saved = readJSON<Session>(sessionStorage, SESSION_KEY);
     if (shouldResume(saved, initialInvite.current))
       connect(saved!, readJSON<PendingCommand>(sessionStorage, OUTBOX_KEY));
-    return () => connection.current?.stop();
-  }, []);
+  }, [auth.canPlay, auth.user?.id]);
+  useEffect(() => () => connection.current?.stop(), []);
+  useEffect(() => {
+    if (!auth.loading && auth.config?.mode === 'authenticated' && !auth.user && connection.current)
+      home(false);
+  }, [auth.loading, auth.user?.id]);
+  useEffect(() => {
+    if (auth.profile.name) setName(auth.profile.name);
+  }, [auth.profile.name]);
+  useEffect(() => {
+    if (panel === 'journal' && connected && room?.game) connection.current?.history();
+  }, [panel, connected, room?.historyRevision]);
   useEffect(() => {
     if (!invite || room) return;
     setPreviewRoom(null);
@@ -363,12 +379,20 @@ function App() {
     }
     const controller = new AbortController();
     setPreviewLoading(true);
-    fetch(`/api/rooms/${invite}`, { signal: controller.signal })
+    (async () => {
+      const token = auth.user ? await auth.accessToken() : undefined;
+      return fetch(`/api/rooms/${invite}`, {
+        signal: controller.signal,
+        ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+      });
+    })()
       .then(async (response) => {
         if (!response.ok) throw new Error(response.status === 404 ? 'Room not found' : 'Room unavailable');
         return response.json() as Promise<RoomPreview>;
       })
-      .then(setPreviewRoom)
+      .then((preview) => {
+        if (!controller.signal.aborted) setPreviewRoom(preview);
+      })
       .catch((e) => {
         if (!controller.signal.aborted) setPreviewError(e instanceof Error ? e.message : 'Room unavailable');
       })
@@ -376,7 +400,7 @@ function App() {
         if (!controller.signal.aborted) setPreviewLoading(false);
       });
     return () => controller.abort();
-  }, [invite, room?.roomId]);
+  }, [invite, room?.roomId, auth.user?.id]);
   useEffect(() => {
     setMode(null);
     setRobberHex(null);
@@ -424,9 +448,13 @@ function App() {
       }
     }
   }
-  function enter(e: FormEvent, kind: 'create' | 'join') {
+  async function enter(e: FormEvent, kind: 'create' | 'join') {
     e.preventDefault();
     setError('');
+    if (!auth.canPlay) {
+      await auth.signIn(invite ? roomPath(invite) : '/');
+      return;
+    }
     if (!name.trim()) {
       setError('Enter your name');
       return;
@@ -438,7 +466,14 @@ function App() {
     }
     sessionStorage.removeItem(OUTBOX_KEY);
     localStorage.setItem('catanova.name', name.trim());
-    connect(newSession(name.trim(), kind === 'join' ? target : undefined));
+    setBusy(true);
+    try {
+      const profile = await auth.saveProfile({ ...auth.profile, name: name.trim() });
+      connect(newSession(profile.name, kind === 'join' ? target : undefined, profile));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save profile');
+      setBusy(false);
+    }
   }
   async function copyInvite() {
     const id = room?.roomId ?? invite;
@@ -449,6 +484,9 @@ function App() {
     } catch {
       setError(`Room code: ${id}`);
     }
+  }
+  async function signOut() {
+    if (await auth.signOut()) home(true);
   }
   function chooseRobber(hex: number) {
     if (!g || !me) return;
@@ -463,10 +501,35 @@ function App() {
       setToast('Fullscreen unavailable');
     }
   }
-  const roster = g?.players ?? room?.players ?? previewRoom?.players;
-  const visibleBoard = g?.board ?? room?.board ?? previewRoom?.board ?? preview;
   const last = readJSON<Session>(localStorage, LAST_SEAT_KEY);
-  const resumableInvite = entry === 'invite' && last?.roomId === invite && last.joined;
+  const resumableInvite =
+    entry === 'invite' && (!!previewRoom?.canResume || (last?.roomId === invite && last.joined));
+  async function ready(value: boolean) {
+    const c = connection.current;
+    if (!c || disabled) return;
+    setBusy(true);
+    try {
+      await c.lobby(value);
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Could not update readiness');
+    } finally {
+      if (connection.current === c) setBusy(c.awaitingConfirmation);
+    }
+  }
+  async function saveProfile(profile: Profile) {
+    const c = connection.current;
+    if (room && !g && c) {
+      setBusy(true);
+      try {
+        await c.lobby(false, profile);
+      } finally {
+        setBusy(c.awaitingConfirmation);
+      }
+    }
+    await auth.saveProfile(profile);
+    setName(profile.name);
+    setPanel(null);
+  }
   const phaseText = !g
     ? ''
     : g.winner
@@ -492,32 +555,40 @@ function App() {
                       : 'Your turn';
   return (
     <main className={`game-world ${g ? 'playing' : room ? 'lobby' : 'entry-world'}`}>
-      <div className="board-anchor">
-        <Board
-          board={visibleBoard}
-          game={g}
-          me={me}
-          mode={mode}
-          disabled={disabled}
-          onAction={(a) => void act(a)}
-          onRobber={chooseRobber}
-        />
-      </div>
-      <nav className="side-controls" aria-label="Game controls">
+      {g && (
+        <div className="board-anchor">
+          <BoardViewport seed={g.board.seed}>
+            <Board
+              board={g.board}
+              game={g}
+              me={me}
+              mode={mode}
+              disabled={disabled}
+              onAction={(a) => void act(a)}
+              onRobber={chooseRobber}
+            />
+          </BoardViewport>
+        </div>
+      )}
+      <nav className="side-controls game-controls" aria-label="Current game tools">
+        {g && (
+          <IconButton
+            label="Move history"
+            active={panel === 'journal'}
+            onClick={() => setPanel(panel === 'journal' ? null : 'journal')}
+          >
+            <ScrollText />
+          </IconButton>
+        )}
         {room && (
-          <>
-            <IconButton label="Copy invite link" onClick={() => void copyInvite()}>
-              <Copy />
-            </IconButton>
-            <IconButton
-              label="Leave room"
-              onClick={() => (g && !g.winner ? setPanel('leave') : void leave())}
-              disabled={busy}
-              className="leave-control"
-            >
-              <DoorOpen />
-            </IconButton>
-          </>
+          <IconButton
+            label="Connection and ping"
+            active={panel === 'network'}
+            className={connected ? 'connected' : 'disconnected'}
+            onClick={() => setPanel(panel === 'network' ? null : 'network')}
+          >
+            {networkBusy ? <LoaderCircle className="spin" /> : connected ? <Wifi /> : <WifiOff />}
+          </IconButton>
         )}
         <IconButton
           label="Rules"
@@ -527,96 +598,52 @@ function App() {
           <CircleHelp />
         </IconButton>
         {g && (
-          <IconButton
-            label="Game log"
-            active={panel === 'journal'}
-            onClick={() => setPanel(panel === 'journal' ? null : 'journal')}
-          >
-            <ScrollText />
+          <IconButton label="Fullscreen" onClick={() => void fullscreen()}>
+            <Maximize />
           </IconButton>
         )}
-        <IconButton label="Fullscreen" onClick={() => void fullscreen()}>
-          <Maximize />
-        </IconButton>
+      </nav>
+      <nav className="side-controls room-controls" aria-label="Room and profile">
+        {auth.canPlay && (
+          <IconButton label="Your profile" active={panel === 'profile'} onClick={() => setPanel('profile')}>
+            <UserRound />
+          </IconButton>
+        )}
         {room && (
-          <span
-            className={`network-indicator ${connected ? 'connected' : ''}`}
-            title={busy ? 'Saving' : connected ? 'Connected' : status}
-            aria-label={busy ? 'Saving' : status}
-          >
-            {networkBusy || busy ? <LoaderCircle className="spin" /> : connected ? <Wifi /> : <WifiOff />}
-          </span>
+          <>
+            <IconButton
+              label="Room invitation"
+              active={panel === 'invite'}
+              onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
+            >
+              <Users />
+            </IconButton>
+            <IconButton
+              label="Leave room"
+              disabled={busy}
+              onClick={() => (g && !g.winner ? setPanel('leave') : void leave())}
+            >
+              <DoorOpen />
+            </IconButton>
+          </>
+        )}
+        {auth.user && !room && (
+          <IconButton label="Sign out" onClick={() => void signOut()}>
+            <LogOut />
+          </IconButton>
         )}
       </nav>
-      {!!roster && (
-        <div className="table-hud">
-          <div className="room-indicator">
-            <span>{room?.roomId ?? invite}</span>
-            <Users size={13} />
-            <span>{roster.length}/4</span>
-          </div>
-          <div className={`player-roster count-${g ? roster.length : 4}`}>
-            {Array.from({ length: g ? roster.length : 4 }, (_, i) => {
-              const p = roster[i],
-                details = g?.players.find((x) => x.id === p?.id),
-                presence = room?.players.find((x) => x.id === p?.id);
-              return p ? (
-                <div
-                  key={p.id}
-                  className={`player-hud ${active?.id === p.id ? 'active' : ''} ${p.id === me ? 'self' : ''}`}
-                  style={{ '--player-color': PLAYER_COLORS[i] } as CSSProperties}
-                >
-                  <div className="portrait">
-                    {p.name.slice(0, 1).toUpperCase()}
-                    {room?.players[0]?.id === p.id && !g && <Crown className="host-crown" size={12} />}
-                    <i className={`presence ${presence?.connected ? 'online' : ''}`} />
-                  </div>
-                  <div className="player-data">
-                    <strong title={p.name}>{p.name}</strong>
-                    {details && (
-                      <span className="player-stats">
-                        <span title="Resource cards">
-                          <Layers />
-                          {details.resourceCount}
-                        </span>
-                        <span title="Development cards">
-                          <ScrollText />
-                          {details.cardCount}
-                        </span>
-                        <span title="Played knights">
-                          <Swords />
-                          {details.knights}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                  {details && (
-                    <span className="score" title="Victory points">
-                      <Trophy />
-                      <NumberPop value={details.points} />
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <button
-                  key={i}
-                  className="empty-seat"
-                  title="Copy invite link"
-                  aria-label="Invite player"
-                  disabled={!room}
-                  onClick={() => void copyInvite()}
-                >
-                  <Plus />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {error && (
+      {g && room && <PlayerRail room={room} game={g} me={me} />}
+      {(error || auth.error) && (
         <div className="error-toast" role="alert">
-          <span>{error}</span>
-          <IconButton label="Dismiss error" onClick={() => setError('')}>
+          <span>{error || auth.error}</span>
+          <IconButton
+            label="Dismiss error"
+            onClick={() => {
+              setError('');
+              auth.clearError();
+            }}
+          >
             <X />
           </IconButton>
         </div>
@@ -658,20 +685,47 @@ function App() {
           >
             {entry === 'home' ? (
               <>
+                <Sailboat className="menu-emblem" />
                 <h1>Catanova</h1>
-                <div className="entry-actions">
-                  <button className="gold-button" onClick={() => setEntry('create')}>
-                    <Plus />
-                    Create room
+                {auth.loading ? (
+                  <div className="menu-loading">
+                    <LoaderCircle className="spin" />
+                  </div>
+                ) : auth.canPlay ? (
+                  <>
+                    <button className="menu-profile" onClick={() => setPanel('profile')}>
+                      <Avatar profile={auth.profile} />
+                      <span>{auth.profile.name || 'Choose your profile'}</span>
+                    </button>
+                    <div className="entry-actions">
+                      <button className="gold-button" onClick={() => setEntry('create')}>
+                        <Plus />
+                        Create room
+                      </button>
+                      <button className="dark-button" onClick={() => setEntry('join')}>
+                        <Users />
+                        Join room
+                      </button>
+                    </div>
+                    {last?.joined && (
+                      <button className="resume-button" onClick={() => connect(last)}>
+                        Resume game
+                        <ArrowRight size={15} />
+                      </button>
+                    )}
+                    {auth.config?.mode === 'local' && <span className="local-mode">Local playtest</span>}
+                  </>
+                ) : auth.user ? (
+                  <button className="dark-button" onClick={() => void auth.retryProfile()}>
+                    {auth.error ? 'Retry profile' : 'Loading profile…'}
                   </button>
-                  <button className="dark-button" onClick={() => setEntry('join')}>
-                    <Users />
-                    Join room
-                  </button>
-                </div>
-                {last?.joined && (
-                  <button className="resume-button" onClick={() => connect(last)}>
-                    Resume game <ArrowRight size={15} />
+                ) : (
+                  <button
+                    className="google-button"
+                    disabled={!auth.config?.auth}
+                    onClick={() => void auth.signIn()}
+                  >
+                    <span className="google-letter">G</span>Continue with Google
                   </button>
                 )}
               </>
@@ -683,11 +737,28 @@ function App() {
                   </IconButton>
                   <h1>{entry === 'create' ? 'Create room' : 'Join room'}</h1>
                 </div>
-                {entry === 'invite' && <div className="invite-room-code">{invite}</div>}
+                {entry === 'invite' && (
+                  <>
+                    <div className="invite-room-code">{invite}</div>
+                    {previewRoom && <InviteRoster room={previewRoom} />}
+                  </>
+                )}
                 {previewError && entry === 'invite' ? (
                   <p className="entry-error">{previewError}</p>
+                ) : !auth.canPlay && auth.user ? (
+                  <button className="dark-button" onClick={() => void auth.retryProfile()}>
+                    {auth.error ? 'Retry profile' : 'Loading profile…'}
+                  </button>
+                ) : !auth.canPlay && !auth.loading ? (
+                  <button
+                    className="google-button"
+                    disabled={!auth.config?.auth}
+                    onClick={() => void auth.signIn(invite ? roomPath(invite) : '/')}
+                  >
+                    <span className="google-letter">G</span>Sign in to join
+                  </button>
                 ) : (
-                  <form onSubmit={(e) => enter(e, entry === 'create' ? 'create' : 'join')}>
+                  <form onSubmit={(e) => void enter(e, entry === 'create' ? 'create' : 'join')}>
                     {entry === 'join' && (
                       <label className="field">
                         Room code
@@ -703,7 +774,7 @@ function App() {
                       </label>
                     )}
                     <label className="field">
-                      Your name
+                      Display name
                       <input
                         autoComplete="nickname"
                         maxLength={32}
@@ -725,18 +796,30 @@ function App() {
                       <button
                         type="button"
                         className="gold-button"
-                        disabled={networkBusy}
-                        onClick={() => connect(last!)}
+                        disabled={networkBusy || !auth.canPlay}
+                        onClick={() =>
+                          connect(
+                            last?.roomId === invite
+                              ? last
+                              : newSession(auth.profile.name, invite!, auth.profile),
+                          )
+                        }
                       >
-                        Resume room <ArrowRight />
+                        Resume room
+                        <ArrowRight />
                       </button>
                     ) : (
                       <button
                         type="submit"
                         className="gold-button"
-                        disabled={networkBusy || (entry === 'invite' && (previewLoading || !previewRoom))}
+                        disabled={
+                          busy ||
+                          networkBusy ||
+                          !auth.canPlay ||
+                          (entry === 'invite' && (previewLoading || !previewRoom))
+                        }
                       >
-                        {networkBusy || previewLoading ? (
+                        {networkBusy || previewLoading || busy ? (
                           <LoaderCircle className="spin" />
                         ) : entry === 'create' ? (
                           <Plus />
@@ -754,21 +837,17 @@ function App() {
         </div>
       )}
       {room && !g && (
-        <div className="lobby-start">
-          {room.players[0]?.id === me ? (
-            <button
-              className="gold-button"
-              disabled={disabled || room.players.length < 3}
-              onClick={() => act({ kind: 'start' })}
-            >
-              <Dices />
-              Start game
-            </button>
-          ) : (
-            <span className="waiting-label">Waiting for host</span>
-          )}
-          {room.players.length < 3 && <span className="minimum-players">3 players minimum</span>}
-        </div>
+        <Lobby
+          room={room}
+          me={me}
+          busy={busy}
+          connected={connected}
+          onReady={(v) => void ready(v)}
+          onStart={() => void act({ kind: 'start' })}
+          onInvite={() => void copyInvite()}
+          onLeave={() => void leave()}
+          onEdit={() => setPanel('profile')}
+        />
       )}
       {g && (
         <>
@@ -781,48 +860,41 @@ function App() {
               </IconButton>
             )}
           </div>
-          <div className="awards-hud">
-            <span
-              title={`Longest Road: ${g.longestRoad ? g.players.find((p) => p.id === g.longestRoad)?.name : 'unclaimed, 5 required'}`}
-              className={g.longestRoad === me ? 'owned' : ''}
-            >
-              <Route />
-              <b>{player?.roadLength ?? 0}</b>
-            </span>
-            <span
-              title={`Largest Army: ${g.largestArmy ? g.players.find((p) => p.id === g.largestArmy)?.name : 'unclaimed, 3 required'}`}
-              className={g.largestArmy === me ? 'owned' : ''}
-            >
-              <Swords />
-              <b>{player?.knights ?? 0}</b>
-            </span>
-          </div>
-          <div className="bottom-hud">
-            <div className="resource-hand" aria-label="Your resources">
-              {RESOURCES.map((r) => (
-                <div
-                  key={r}
-                  className={`resource-card resource-${r}`}
-                  title={`${RESOURCE_NAMES[r]}: ${hand[r]}`}
-                >
-                  <ResourceIcon resource={r} />
-                  <NumberPop value={hand[r]} />
-                </div>
-              ))}
-            </div>
-            <div className="action-hud">
+          <div className="card-table">
+            <div className="hand-zone">
+              <div className="resource-hand" aria-label="Your resource cards">
+                {RESOURCES.map((r, i) => (
+                  <div
+                    key={r}
+                    className={`resource-card resource-${r} ${hand[r] ? '' : 'empty-card'}`}
+                    style={{ '--card-angle': (i - 2) * 4 + 'deg' } as CSSProperties}
+                    title={`${RESOURCE_NAMES[r]}: ${hand[r]}`}
+                  >
+                    <span className="card-corner">
+                      <NumberPop value={hand[r]} />
+                    </span>
+                    <div className="card-illustration">
+                      <ResourceIcon resource={r} />
+                    </div>
+                    <span className="card-name">{RESOURCE_NAMES[r]}</span>
+                    <span className="card-mark">✦</span>
+                  </div>
+                ))}
+              </div>
               <div className="build-actions">
                 {(['road', 'settlement', 'city'] as const).map((kind, i) => {
-                  const sites =
-                    kind === 'road' ? g.legal.roads : kind === 'city' ? g.legal.cities : g.legal.settlements;
-                  const Icon = [Route, House, Castle][i]!;
+                  const Icon = [Route, House, Castle][i]!,
+                    sites =
+                      kind === 'road'
+                        ? g.legal.roads
+                        : kind === 'city'
+                          ? g.legal.cities
+                          : g.legal.settlements;
                   return (
                     <IconButton
                       key={kind}
-                      label={`${kind[0]!.toUpperCase() + kind.slice(1)} · ${RESOURCES.filter(
-                        (r) => COSTS[kind][r],
-                      )
-                        .map((r) => `${COSTS[kind][r]} ${RESOURCE_NAMES[r]}`)
+                      label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
+                        .map((r) => COSTS[kind][r] + ' ' + RESOURCE_NAMES[r])
                         .join(', ')}`}
                       active={mode === kind}
                       disabled={disabled || !actionPhase || !sites.length}
@@ -837,18 +909,7 @@ function App() {
                 })}
                 <span className="action-divider" />
                 <IconButton
-                  label="Trade"
-                  active={panel === 'trade'}
-                  disabled={g.phase !== 'actions'}
-                  onClick={() => {
-                    setPanel(panel === 'trade' ? null : 'trade');
-                    setMode(null);
-                  }}
-                >
-                  <ArrowLeftRight />
-                </IconButton>
-                <IconButton
-                  label="Development cards"
+                  label="Your development cards"
                   active={panel === 'cards'}
                   onClick={() => {
                     setPanel(panel === 'cards' ? null : 'cards');
@@ -859,32 +920,53 @@ function App() {
                   {!!player?.cards?.length && <small className="button-count">{player.cards.length}</small>}
                 </IconButton>
               </div>
-              <div className="turn-actions">
-                <Dice dice={g.dice} turn={g.turn} />
-                {myTurn && g.phase === 'roll' ? (
-                  <button className="gold-button" disabled={disabled} onClick={() => act({ kind: 'roll' })}>
-                    Roll <Dices />
-                  </button>
-                ) : actionPhase ? (
-                  <button
-                    className="gold-button"
-                    disabled={disabled}
-                    onClick={() => act({ kind: 'endTurn' })}
-                  >
-                    End turn <ArrowRight />
-                  </button>
-                ) : (
-                  <span className="turn-wait">
-                    {g.phase.startsWith('setup')
-                      ? 'Setup'
-                      : g.winner
-                        ? 'Finished'
-                        : myTurn
-                          ? 'Choose on board'
-                          : active?.name}
-                  </span>
-                )}
-              </div>
+            </div>
+            <div className="table-actions">
+              <button
+                className="dice-button"
+                disabled={disabled || !myTurn || g.phase !== 'roll'}
+                onClick={() => void act({ kind: 'roll' })}
+              >
+                <Dices size={32} />
+                <span>
+                  <strong>
+                    {g.dice ? g.dice[0] + ' + ' + g.dice[1] + ' = ' + (g.dice[0] + g.dice[1]) : 'Roll dice'}
+                  </strong>
+                  <small>
+                    {g.dice ? 'Last roll' : myTurn && g.phase === 'roll' ? 'Your turn' : 'Waiting for turn'}
+                  </small>
+                </span>
+              </button>
+              <button
+                className="table-action"
+                disabled={disabled || g.phase !== 'actions'}
+                onClick={() => {
+                  setPanel(panel === 'trade' ? null : 'trade');
+                  setMode(null);
+                }}
+              >
+                <ArrowLeftRight size={18} />
+                Trade
+              </button>
+              <button
+                className="table-action"
+                disabled={disabled || !g.legal.canBuyCard}
+                title="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
+                onClick={() => void act({ kind: 'buyCard' })}
+              >
+                <ScrollText size={18} />
+                Buy development card
+              </button>
+              {actionPhase && (
+                <button
+                  className="table-action end-turn"
+                  disabled={disabled}
+                  onClick={() => void act({ kind: 'endTurn' })}
+                >
+                  End turn
+                  <ArrowRight size={17} />
+                </button>
+              )}
             </div>
           </div>
           {g.trade && !myTurn && (
@@ -910,20 +992,39 @@ function App() {
           {(panel === 'trade' || panel === 'cards' || panel === 'journal') && (
             <aside className="game-panel floating-panel" aria-label={panel}>
               <div className="panel-heading">
-                <h2>{panel === 'trade' ? 'Trade' : panel === 'cards' ? 'Development' : 'Game log'}</h2>
+                <h2>{panel === 'trade' ? 'Trade' : panel === 'cards' ? 'Development' : 'Move history'}</h2>
                 <IconButton label="Close panel" onClick={() => setPanel(null)}>
                   <X />
                 </IconButton>
               </div>
               {panel === 'journal' && (
-                <ol className="event-log">
-                  {g.log
-                    .slice(-30)
-                    .reverse()
-                    .map((e) => (
-                      <li key={e.id}>{e.text}</li>
-                    ))}
-                </ol>
+                <>
+                  <ol className="event-log">
+                    {historyEntries.length
+                      ? historyEntries.map((e) => (
+                          <li key={e.revision}>
+                            <span className="event-meta">
+                              {e.turn ? 'Turn ' + e.turn : 'Setup'} · #{e.revision}
+                            </span>
+                            {e.lines.map((line, i) => (
+                              <p key={i}>{line}</p>
+                            ))}
+                          </li>
+                        ))
+                      : g.log
+                          .slice()
+                          .reverse()
+                          .map((e) => <li key={e.id}>{e.text}</li>)}
+                  </ol>
+                  {historyHasMore && (
+                    <button
+                      className="dark-button history-more"
+                      onClick={() => connection.current?.history(historyEntries.at(-1)?.revision)}
+                    >
+                      Earlier moves
+                    </button>
+                  )}
+                </>
               )}
               {panel === 'trade' &&
                 (actionPhase ? (
@@ -1087,6 +1188,47 @@ function App() {
             </aside>
           )}
         </>
+      )}
+      {panel === 'network' && room && (
+        <aside className="game-panel utility-panel floating-panel">
+          <div className="panel-heading">
+            <h2>Connection</h2>
+            <IconButton label="Close connection panel" onClick={() => setPanel(null)}>
+              <X />
+            </IconButton>
+          </div>
+          <ConnectionPanel
+            metrics={metrics}
+            status={status}
+            revision={room.revision}
+            pending={busy}
+            onSync={() => connection.current?.sync()}
+          />
+        </aside>
+      )}
+      {panel === 'invite' && room && (
+        <Dialog title="Room invitation" compact onClose={() => setPanel(null)}>
+          <Invite code={room.roomId} copy={() => void copyInvite()} />
+        </Dialog>
+      )}
+      {panel === 'profile' && (
+        <Dialog title="Your profile" onClose={() => setPanel(null)}>
+          {g ? (
+            <>
+              <div className="profile-preview">
+                <Avatar profile={room?.players.find((p) => p.id === me)?.profile ?? auth.profile} />
+                <strong>{player?.name}</strong>
+              </div>
+              <p className="muted">Change your avatar, frame and name in the lobby before your next game.</p>
+            </>
+          ) : (
+            <ProfileEditor
+              initial={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
+              busy={busy}
+              onSave={saveProfile}
+            />
+          )}
+        </Dialog>
       )}
       {panel === 'leave' && (
         <Dialog title="Leave game?" compact onClose={() => setPanel(null)}>

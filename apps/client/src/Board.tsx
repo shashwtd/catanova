@@ -16,7 +16,7 @@ import {
   WORLD,
 } from './scene.js';
 
-export const PLAYER_COLORS = ['#ef8849', '#54b8e2', '#c285ed', '#e5c04b'];
+export const PLAYER_COLORS = ['#cf6345', '#3787b5', '#9867b5', '#c5a335'];
 export type BuildMode = 'road' | 'settlement' | 'city' | null;
 export function Sprite({
   kind,
@@ -36,7 +36,7 @@ export function Sprite({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <image href="/art/sprites.png" width="2048" height="1024" />
+      <image href="/art/sprites-painted.png" width="2048" height="1024" />
     </svg>
   );
 }
@@ -116,12 +116,12 @@ export function Board({
           </filter>
           <pattern id="ocean-material" width="240" height="240" patternUnits="userSpaceOnUse">
             <svg width="240" height="240" viewBox="0 0 512 512">
-              <image href="/art/environment.png" width="1024" height="1024" />
+              <image href="/art/environment-painted.png" width="1024" height="1024" />
             </svg>
           </pattern>
           <pattern id="sand-material" width="150" height="150" patternUnits="userSpaceOnUse">
             <svg width="150" height="150" viewBox="0 512 512 512">
-              <image href="/art/environment.png" width="1024" height="1024" />
+              <image href="/art/environment-painted.png" width="1024" height="1024" />
             </svg>
           </pattern>
           {board.hexes.map((h) => (
@@ -179,7 +179,7 @@ export function Board({
                   height={SIZE * 2}
                   viewBox={`${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
                 >
-                  <image href="/art/terrain-vibrant.png" width="1536" height="1024" />
+                  <image href="/art/terrain-painted.png" width="1536" height="1024" />
                 </svg>
               </g>
             );
@@ -205,10 +205,7 @@ export function Board({
                 })
               }
             >
-              <title>
-                {name}
-                {h.number ? ` · ${h.number} · ${pips(h.number)} production pips` : ''}
-              </title>
+              <title>{`${name}${h.number ? ` · ${h.number} · ${pips(h.number)} production pips` : ''}`}</title>
               <polygon className="hex-hit" points={hexPoints(x, y, 60)} />
               {h.id === game?.robber && (
                 <polygon points={hexPoints(x, y, 57)} fill="#101b26" opacity=".28" pointerEvents="none" />
@@ -247,29 +244,63 @@ export function Board({
           return (
             <g
               key={port.edge}
-              className="port"
-              aria-label={`${port.resource === 'any' ? 'Any resource' : RESOURCE_NAMES[port.resource]} port ${port.resource === 'any' ? '3 to 1' : '2 to 1'}`}
+              className="harbor"
+              aria-label={
+                port.resource === 'any'
+                  ? 'General harbor. Three of any one resource for one other resource.'
+                  : RESOURCE_NAMES[port.resource] + ' harbor. Two for one.'
+              }
             >
-              <title>
-                {port.resource === 'any' ? 'Any resource' : RESOURCE_NAMES[port.resource]} ·{' '}
-                {port.resource === 'any' ? '3:1' : '2:1'}
-              </title>
-              <g transform={`translate(${p.x},${p.y}) rotate(${p.angle})`} filter="url(#piece-shadow)">
-                <svg x="-42" y="-71" width="84" height="84" viewBox="1024 512 512 512">
-                  <image href="/art/sprites.png" width="2048" height="1024" />
+              <title>{`${
+                port.resource === 'any' ? 'General 3:1 harbor' : RESOURCE_NAMES[port.resource] + ' 2:1 harbor'
+              } · Build at either bridge entrance`}</title>
+              {p.bridges.map((bridge, i) => {
+                const dx = bridge.to.x - bridge.from.x,
+                  dy = bridge.to.y - bridge.from.y,
+                  length = Math.hypot(dx, dy);
+                return (
+                  <g
+                    key={i}
+                    data-port-entrance={i}
+                    transform={`translate(${bridge.from.x},${bridge.from.y}) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI})`}
+                  >
+                    <rect className="pier-shadow" x="0" y="-5" width={length} height="12" rx="2" />
+                    <rect className="pier-deck" x="0" y="-6" width={length} height="10" />
+                    {Array.from({ length: Math.ceil(length / 5) }, (_, j) => (
+                      <path key={j} className="pier-plank" d={`M${j * 5} -5V4`} />
+                    ))}
+                    <path className="pier-rail" d={`M2 -7H${length}M2 5H${length}`} />
+                    {[3, length / 2, length - 3].map((j) => (
+                      <g key={j}>
+                        <circle className="pier-post" cx={j} cy="-7" r="2" />
+                        <circle className="pier-post" cx={j} cy="5" r="2" />
+                      </g>
+                    ))}
+                  </g>
+                );
+              })}
+              <g transform={`translate(${p.x + p.nx * 70},${p.y + p.ny * 70}) rotate(${p.angle})`}>
+                <svg x="-26" y="-28" width="52" height="56" viewBox="1536 512 512 512">
+                  <image href="/art/sprites-painted.png" width="2048" height="1024" />
                 </svg>
               </g>
               <g transform={`translate(${p.markerX},${p.markerY})`}>
-                <circle className="port-medallion" r="18" />
-                <svg
-                  x="-16"
-                  y="-20"
-                  width="32"
-                  height="32"
-                  viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
-                >
-                  <image href="/art/sprites.png" width="2048" height="1024" />
-                </svg>
+                <circle className="port-medallion" r="17" />
+                {port.resource === 'any' ? (
+                  <text className="port-any" textAnchor="middle" y="5">
+                    ?
+                  </text>
+                ) : (
+                  <svg
+                    x="-16"
+                    y="-20"
+                    width="32"
+                    height="32"
+                    viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
+                  >
+                    <image href="/art/sprites-painted.png" width="2048" height="1024" />
+                  </svg>
+                )}
                 <rect className="port-rate-bg" x="-14" y="10" width="28" height="15" rx="5" />
                 <text className="port-rate" textAnchor="middle" y="21">
                   {port.resource === 'any' ? '3:1' : '2:1'}
@@ -279,52 +310,69 @@ export function Board({
           );
         })}
         {game &&
-          Object.entries(game.roads).map(([id, player]) => {
+          Object.entries(game.roads).map(([id, owner]) => {
             const e = board.edges[Number(id)]!,
               a = board.vertices[e.a]!,
               b = board.vertices[e.b]!;
+            const length = Math.hypot(b.x - a.x, b.y - a.y) * SIZE;
             return (
-              <g key={id} className="built-piece" filter="url(#piece-shadow)">
-                <line
-                  className="built-road-outline"
-                  x1={a.x * SIZE}
-                  y1={a.y * SIZE}
-                  x2={b.x * SIZE}
-                  y2={b.y * SIZE}
+              <g
+                key={id}
+                data-road-id={id}
+                className={`built-piece road-piece ${owner === me ? 'own-piece' : ''}`}
+                transform={`translate(${((a.x + b.x) * SIZE) / 2},${((a.y + b.y) * SIZE) / 2}) rotate(${(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI})`}
+              >
+                <title>{`${game.players.find((p) => p.id === owner)?.name} · Road ${Number(id) + 1}`}</title>
+                <rect
+                  className="road-foundation"
+                  x={-length / 2 + 4}
+                  y="-7"
+                  width={length - 8}
+                  height="14"
+                  rx="4"
                 />
-                <line
-                  className="built-road"
-                  stroke={color(player)}
-                  x1={a.x * SIZE}
-                  y1={a.y * SIZE}
-                  x2={b.x * SIZE}
-                  y2={b.y * SIZE}
+                <rect
+                  className="road-body"
+                  fill={color(owner)}
+                  x={-length / 2 + 6}
+                  y="-5"
+                  width={length - 12}
+                  height="10"
+                  rx="2"
                 />
+                <path className="road-sheen" d={`M${-length / 2 + 8} -3H${length / 2 - 8}`} />
               </g>
             );
           })}
         {game &&
           Object.entries(game.buildings).map(([id, b]) => {
-            const v = board.vertices[Number(id)]!;
+            const v = board.vertices[Number(id)]!,
+              city = b.kind === 'city';
             return (
               <g
                 key={`${id}-${b.kind}`}
-                className="built-piece"
+                data-building-id={id}
+                className={`built-piece house-piece ${b.player === me ? 'own-piece' : ''}`}
                 transform={`translate(${v.x * SIZE},${v.y * SIZE})`}
-                filter="url(#piece-shadow)"
               >
-                <title>
-                  {game.players.find((p) => p.id === b.player)?.name} · {b.kind}
-                </title>
+                <title>{`${game.players.find((p) => p.id === b.player)?.name} · ${b.kind}`}</title>
+                <ellipse className="building-plinth" rx={city ? 22 : 18} ry="10" cy="7" />
                 <path
                   className="building"
                   fill={color(b.player)}
-                  d={
-                    b.kind === 'city'
-                      ? 'M-13 8V-7L-5-14L3-7V-1H12V8ZM-5-3V2'
-                      : 'M-10 8V-4L0-12L10-4V8ZM-2 8V1H2V8'
-                  }
+                  d={city ? 'M-17 8V-9L-8-17L1-9V-1L9-9L18-1V8Z' : 'M-13 8V-5L0-17L13-5V8Z'}
                 />
+                <path
+                  className="roof-highlight"
+                  d={city ? 'M-17-9L-8-17L1-9M1-1L9-9L18-1' : 'M-13-5L0-17L13-5'}
+                />
+                <path className="house-door" d="M-3 8V0H3V8" />
+                {city && (
+                  <>
+                    <path className="house-window" d="M-12-4H-8V0H-12ZM8 1H12V5H8Z" />
+                    <path className="city-wing" d="M1-1V8" />
+                  </>
+                )}
               </g>
             );
           })}

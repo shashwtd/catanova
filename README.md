@@ -1,6 +1,6 @@
 # Catanova
 
-An open-source Catan-style game for **three or four friends**, built around reliable multiplayer and a vibrant, textured island.
+An open-source Catan-style game for **three or four friends**, built around reliable multiplayer and a hand-painted island.
 
 Trade **Timber, Clay, Sheep, Hay, and Rock**. Build settlements and cities. Race to ten points. Resume your seat when your connection drops.
 
@@ -16,7 +16,9 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**. The copy icon shares a direct room link; friends see that room’s island and a Join prompt. The door icon leaves the room. The host can start with three or four players. To test all four seats on one machine, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a portrait, accent and frame, invite friends, and mark Ready. The host starts when all three or four players are ready and connected. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+
+Game tools and connection details sit at top left; room, invite and profile controls sit at bottom left. Players and awards are on the right. Resource cards sit above the bottom table edge, beside the dice, trade and development-card buttons. Scroll/pinch to zoom, drag to pan, or use the reset control. Each harbor has two bridges to its eligible coastal corners.
 
 The local URL works on this machine. Other devices need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
@@ -47,7 +49,11 @@ For environment configuration, copy `.env.example` and start with:
 node --env-file=.env dist/apps/server/src/index.js
 ```
 
-Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits additional exact origins, useful during development. A room code lets someone join the lobby; a separate secret token owns the seat. There is no account recovery yet.
+Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits additional exact origins, useful during development.
+
+**Google login through Supabase is integrated and requires project configuration.** Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google in that project, and configure its OAuth redirects. [Authentication setup](docs/AUTH.md). Authenticated seats and saved cosmetics belong to the verified account; opening the same invite on another device can recover that account’s seat.
+
+With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Public guest accounts are **not enabled**; [the proposed guest policy](docs/GUEST_ACCESS.md) awaits approval.
 
 The planned hosted service uses one always-on Azure application with nearby Supabase Postgres. The production database adapter is not implemented and no cloud instance is deployed. Budget estimates remain **about $45–55/month lean, or $65–80/month with more headroom**, before credits and taxes; assumptions and source links are in [hosting and costs](docs/HOSTING.md).
 
@@ -58,7 +64,7 @@ npm run check
 npm run probe
 ```
 
-`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, invite previews, lobby departures, dock/coast geometry, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
+`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, concurrent lobby readiness, account ownership, the Supabase verification contract, durable move history, invite previews, lobby departures, both harbor entrances, all 72 road orientations, bounded zoom, rejected rollback snapshots, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
 
 Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
@@ -85,6 +91,6 @@ The client animates accepted state; the server owns randomness, hidden informati
 - [Architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md), and [art provenance](docs/ART.md).
 - [Contributing](CONTRIBUTING.md) and [security](SECURITY.md).
 
-Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). Terrain, environment and resource atlases are original AI-generated art, with their prompts and provenance recorded. Bundled fonts and interface icons retain their own licenses, listed in the art documentation. Do not contribute official game artwork or copied rulebook passages.
+Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). Terrain, environment, resource and avatar atlases are original AI-generated art, with their prompts and provenance recorded. Bundled fonts and interface icons retain their own licenses, listed in the art documentation. Do not contribute official game artwork or copied rulebook passages.
 
 Catanova is an independent, unofficial project. It is not affiliated with, endorsed by, or licensed by CATAN GmbH or CATAN Studio. CATAN is a trademark of its respective owners. The original game was designed by Klaus Teuber. The MIT license applies to our contributions and grants no rights to third-party trademarks or assets. Public source availability does not establish legal clearance for the name or a finished release.

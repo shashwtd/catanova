@@ -6,6 +6,11 @@
 - [x] Timber, Clay, Sheep, Hay and Rock; textured original terrain, environment and resource atlases.
 - [x] Reproducible balanced islands with inventory, geometry and fairness tests across 500 seeds.
 - [x] Three/four-player lobbies, direct invite previews, explicit Create/Join, lobby leave and host transfer.
+- [x] Separate ready-up lobby; twelve portraits, six accents and three frames with saved cosmetics.
+- [x] Supabase Google integration and verified account-owned seats; real project activation still pending.
+- [x] Durable paginated move history and guards against incomplete or rollback snapshots.
+- [x] Softer painted art, two harbor bridges, player-profile awards and a bottom card table.
+- [x] Bounded board zoom/pan and live ping diagnostics.
 - [x] Shuffled turn order and snake setup.
 - [x] Dice production, bank shortages, sevens/discards, robber and private theft.
 - [x] Roads, settlements, cities, piece limits and distance/connectivity rules.
@@ -29,7 +34,7 @@
 
 ## Hosted games
 
-Implement and test the production Postgres adapter, schema migrations, server ownership/fencing, deployment draining, invitation/account policy, expiration and recovery. Add telemetry without private hands or tokens. Choose regions and budgets using available Azure/Supabase credits, then deploy a controlled internet playtest. Test sleeping devices, mobile networks, database failure and backup restoration separately from normal restart.
+Configure and exercise Google OAuth on the chosen Supabase project. Review the [guest proposal](GUEST_ACCESS.md) before adding anonymous accounts. Implement and test the production Postgres adapter, schema migrations, server ownership/fencing, deployment draining, invitation/account policy, expiration and recovery. Add telemetry without private hands or tokens. Choose regions and budgets using available Azure/Supabase credits, then deploy a controlled internet playtest. Test sleeping devices, mobile networks, database failure and backup restoration separately from normal restart.
 
 ## Visual and audio polish
 

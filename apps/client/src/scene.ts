@@ -102,7 +102,11 @@ export function portPlacement(board: Board, edgeId: number) {
     nx,
     ny,
     angle: (Math.atan2(nx, -ny) * 180) / Math.PI,
-    markerX: x + nx * 70,
-    markerY: y + ny * 70,
+    bridges: [a, b].map((v) => ({
+      from: { x: v.x * HEX_SIZE, y: v.y * HEX_SIZE },
+      to: { x: x + nx * 48, y: y + ny * 48 },
+    })),
+    markerX: x + nx * 106,
+    markerY: y + ny * 106,
   };
 }
