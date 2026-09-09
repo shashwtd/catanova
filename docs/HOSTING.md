@@ -2,13 +2,13 @@
 
 For `catanova.io`, the wiki options, rollout sequence and explanation of the historical $90–105 estimate, use the [launch infrastructure plan](LAUNCH_INFRASTRUCTURE.md). There is **no paid wiki subscription**: Fandom hosting is free, while self-hosted MediaWiki is free software that consumes cloud resources. Neither wiki is provisioned by this plan. The ACA calculations below describe a later architecture, not a required first-launch bill.
 
-Planning estimate checked **9 September 2026**, in **USD before taxes**, credits, and negotiated discounts. Azure subscription and regional SKU availability have been inspected; credit balance, expiry and Supabase billing remain unverified. No Catanova cloud resources have been provisioned. The [concrete Central India VM proposal](../deploy/single-vm/AZURE.md) has a **$32.37/month base retail estimate**, with **$35–40/month** allowed for initial light usage rather than a hard cap.
+Retail estimate checked **9 September 2026**, in **USD before taxes**, credits, and negotiated discounts. The Azure VM was deployed on **10 September 2026**: `catanova-game-01`, Central India zone 2, `Standard_B2als_v2`. HTTPS/access checks, a full reboot and isolated two-client state recovery passed. Private backup upload, authenticated download and snapshot integrity checks passed; the fifteen-minute timer is active. Real Google/guest sessions and recovery of a played match from a downloaded backup remain untested. No monitoring alerts or wiki have been created; credit balance, expiry and Supabase billing remain unverified. The [deployment record](../deploy/single-vm/AZURE.md) has a **$32.37/month base retail estimate**, with **$35–40/month** allowed for initial light usage rather than a hard cap. See the [operator runbook](../deploy/single-vm/OPERATIONS.md).
 
 ## Recommendation
 
-Use one repository and one distributable game application image. For a small hosted playtest, keep the existing SQLite store on **one Azure Linux VM with a managed data disk**, using eligible Azure credits after checking the account. Keep Supabase for the implemented accounts/friends system. Select the region and VM size from real latency and memory/load measurements; there is no established concurrent-player capacity yet.
+The hosted playtest uses one repository and one distributable game application image, with SQLite on **one Azure Linux VM with a managed data disk**. Supabase handles the implemented accounts/friends system. Revisit the initial region and VM size using real latency and memory/load measurements; there is no established concurrent-player capacity yet.
 
-Mount the managed disk into the application's data directory, retain it across VM replacement, and keep one game-server process. Supply HTTPS, updates, monitoring and off-host database backups. Do not use the VM's temporary disk: its contents can disappear during maintenance or redeployment. The linked VM proposal itemizes compute, disks, IP and backup capacity; actual usage, tax and credits remain separate. [Azure disk guidance](https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview)
+The managed disk holds the container volumes, with one game-server process and Caddy HTTPS. It is retained across VM replacement; keep its contents and certificate volumes during updates. Reboot persistence and an isolated snapshot's structure have been verified, while played-match restoration from backup and monitoring setup remain outstanding. Do not use the VM's temporary disk: its contents can disappear during maintenance or redeployment. The linked deployment record itemizes compute, disks, IP and backup capacity; actual usage, tax and credits remain separate. [Azure disk guidance](https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview)
 
 This gives us a route to testing online without first rewriting game storage. A single VM can still fail and cause a recovery window. Persistent storage and tested backups improve recovery; they do not make the service continuously available through host or regional failures.
 
@@ -28,7 +28,7 @@ Supabase account authentication and private friend/profile access are implemente
 
 The playable game currently persists rooms, state, events and command receipts in local SQLite. The Compose file includes a named data volume. It can recover from a process restart while that volume survives. It is **not** ready to run unchanged on an ephemeral Azure Container Apps filesystem: replicas and revisions can lose those local files.
 
-Before any Container Apps deployment, implement and test the Postgres game-state adapter and schema setup. Do not substitute an Azure Files network share for SQLite WAL, which needs processes on the same host. Account/invite controls, per-player state projections and local recovery exist; hosted OAuth, disk recovery and backup restore remain deployment checks. No cloud app has been deployed by this plan. [SQLite WAL constraints](https://sqlite.org/wal.html)
+Before any Container Apps deployment, implement and test the Postgres game-state adapter and schema setup. Do not substitute an Azure Files network share for SQLite WAL, which needs processes on the same host. The deployed VM passed reboot and isolated state-recovery checks; hosted OAuth and played-match restoration from backup remain untested. Replacing a lost VM is a separate recovery scenario from rebooting it. Container Apps has not been deployed. [SQLite WAL constraints](https://sqlite.org/wal.html)
 
 ### Fly Machines alternative
 
@@ -78,19 +78,19 @@ Without those free grants, the same active resource allocation is about $39.42/m
 
 ## Other costs and credit caveats
 
-- **A domain:** the owner has purchased `catanova.io`. DNS and HTTPS still need configuration; renewal remains a separate registrar expense.
+- **A domain:** `catanova.io` resolves to the VM, and ordinary DNS-based HTTPS has a verified certificate. Renewal remains a separate registrar expense.
 - **Artwork and sound:** production costs rather than a per-turn expense. Generate and license assets during development, compress them, then serve the resulting files. Ordinary gameplay should require no image-generation or LLM API call.
 - **Asset bandwidth:** large textures and audio can outweigh game-command traffic. Texture atlases, caching, compression, and eventual CDN delivery help. Measure download sizes before forecasting a public launch.
 - **Observability:** sample routine logs, cap retention, and alert on save failures, reconnect spikes, memory, and database latency. Unbounded logs can create a significant bill.
 - **Email/authentication:** Google and guest sign-in are implemented. Additional login providers, email delivery and abuse controls may add costs if introduced.
-- **Backups:** accepted moves live in the VM's SQLite database in the initial plan; Supabase account backups do not cover those files. Make application-consistent copies to separate storage and test restoration. If game state later moves to Postgres, Supabase backup/PITR choices become relevant; paid PITR is not part of the initial plan. A daily backup alone can lose the intervening day's changes in disaster recovery. [SQLite backup guidance](https://sqlite.org/backup.html), [Supabase backups](https://supabase.com/docs/guides/platform/backups)
+- **Backups:** accepted moves live in the deployed VM's SQLite database; Supabase account backups do not cover those files. The private backup worker has completed uploads before and after reboot; a downloaded snapshot passed isolated structural checks. Recovery of a played match from backup remains untested. Monitor successful backups, since a configured schedule alone does not establish a recovery point. If game state later moves to Postgres, Supabase backup/PITR choices become relevant; paid PITR is not part of the initial plan. [SQLite backup guidance](https://sqlite.org/backup.html), [Supabase backups](https://supabase.com/docs/guides/platform/backups)
 - **Credits:** Azure credits can offset eligible Azure charges; Supabase credits offset eligible Supabase charges according to their grant terms. They are not interchangeable, may expire, and may exclude some services. Keep a post-credit budget and billing alerts. The owner must check amounts, expiration dates, and eligible services in the account portals.
 
 ## Release gates for reliability
 
 1. Preserve the existing atomic save of state, events, randomness and command receipts on the managed disk; verify an acknowledged move survives process death and VM replacement with that retained disk. If migrating to Postgres later, prove the same contract there.
 2. Test a lost acknowledgment followed by retry and a saved match resumed after redeployment.
-3. Choose the game server region after measuring player latency. Measure the auth-service hop too; if game state later moves to Supabase Postgres, include that hop in every command's commit-latency measurements.
+3. Measure player latency to the initial Central India region and revisit placement if needed. Measure the auth-service hop too; if game state later moves to Supabase Postgres, include that hop in every command's commit-latency measurements.
 4. Test reconnects across real Wi-Fi interruption, mobile backgrounding, and the cloud proxy. Heartbeats help detect a dead path; they do not prevent network loss.
 5. Test backup restore separately from ordinary application restart. State the resulting recovery-point and recovery-time expectations.
 6. Load-test to set room limits and memory headroom. Measure p95 and p99 acknowledgment time under load.

@@ -2,13 +2,13 @@
 
 An open-source Catan-style game for **two to four invited friends**, built around reliable multiplayer and a hand-painted island.
 
-**Home: [catanova.io](https://catanova.io)** — domain secured; public hosting is being prepared. The game currently runs as the local playtest below.
+**Home: [catanova.io](https://catanova.io)** — the first Azure-hosted playtest is deployed. You can also run it locally using the instructions below.
 
 Trade **Timber, Clay, Sheep, Hay, and Rock**. Build settlements and cities. Race to ten points. Resume your seat when your connection drops. Rooms are invite-only; there is no solo mode or public matchmaking.
 
 Two-player rooms use the same board, resource supply, building costs, turn flow and ten-point goal as our base mechanics. This is Catanova’s own two-player option, with no neutral players or special two-player rules; it is not an implementation of an official two-player variant. Three- and four-player games remain the base-game compatibility target.
 
-**Status: first playable local build.** The browser game supports setup, dice and production, discards and the robber, building, bank/port and player trades, development cards, Longest Road, Largest Army, and victory. This is an early playtest, not a production service or a certified rules implementation. [Current scope and differences](docs/PLAYTEST.md).
+**Status: early hosted playtest.** The browser game supports setup, dice and production, discards and the robber, building, bank/port and player trades, development cards, Longest Road, Largest Army, and victory. VM reboot and isolated two-client recovery checks passed; real login testing, capacity and continuous availability are not established. [Current scope and differences](docs/PLAYTEST.md).
 
 The welcome screen leads with **Create room** and **Join room**, followed by Google or guest access when needed. A brighter [Catanova mark and full wordmark](docs/art/logo-concepts/README.md) sit over the game's own coastal scenery.
 
@@ -32,7 +32,7 @@ Two thrown dice settle on the accepted server result, pause for reading, and mov
 
 Trade uses clickable resource cards. Choose an exact return, or post an open **?** offer and accept one opponent's proposed return. Both sides must pay; the server rejects stale offers and commits a completed exchange together. Move history groups icon-based entries by turn. Original SVG controls include a rulebook, Wi-Fi status and distinct enter/exit fullscreen icons; thin rope texture remains on portraits only.
 
-The local URL works on this machine. Other devices currently need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
+The local URL works on this machine. Other devices can use the hosted playtest; reaching your own local server from another device requires an HTTPS proxy/tunnel. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
 The same application serves the browser and WebSocket endpoint. No separate client deployment or paid cloud service is required for local play. SQLite uses Node's built-in module (experimental in Node 24) and saves into `data/probe.sqlite`, excluded from Git. A restart preserves accepted actions, the board, hands, deck, dice, phases and seats.
 
@@ -63,11 +63,11 @@ node --env-file=.env dist/apps/server/src/index.js
 
 Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits additional exact origins, useful during development.
 
-**Supabase Google/guest accounts, unique usernames and private friends are implemented.** Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google and anonymous sign-ins, enable manual identity linking, and run the [fresh-project account schema](supabase/schema.sql) as described in [authentication setup](docs/AUTH.md). Players choose a unique username and a game portrait or verified Google photo before entering a room. Guests expire after seven days of inactivity and can link Google while retaining the same account and username; friends require Google. Opening the same invite can recover an account-owned seat. Setting up the account schema and completing a real Google sign-in round trip remain deployment checks.
+**Supabase Google/guest accounts, unique usernames and private friends are implemented.** When self-hosting, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google and anonymous sign-ins, enable manual identity linking, and run the [fresh-project account schema](supabase/schema.sql) as described in [authentication setup](docs/AUTH.md). Players choose a unique username and a game portrait or verified Google photo before entering a room. Guests expire after seven days of inactivity and can link Google while retaining the same account and username; friends require Google. Opening the same invite can recover an account-owned seat. Real Google sign-in and guest Turnstile sessions remain checks for the hosted release.
 
 With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Configured guests use Supabase anonymous accounts and the [implemented seven-day guest policy](docs/GUEST_ACCESS.md); local playtest tokens do not reserve global usernames.
 
-The initial hosted playtest will keep the frontend and Node game server together on one Azure VM with persistent storage, using the existing SQLite game saves and Supabase accounts. A free wiki is planned. No cloud instance is deployed yet. The future Container Apps/Postgres adapter and safe multi-instance room ownership remain separate scaling work. See the [launch infrastructure and cost breakdown](docs/LAUNCH_INFRASTRUCTURE.md); the earlier $90–105 estimate included a paid wiki and is not a minimum launch cost.
+The hosted playtest at **[catanova.io](https://catanova.io)** runs the frontend and Node game server on one Azure VM with durable SQLite storage and Supabase accounts. Private backups run every fifteen minutes, and VM reboot recovery has been verified. See the [deployment record](deploy/single-vm/AZURE.md) for costs and remaining checks, the [operator runbook](deploy/single-vm/OPERATIONS.md) for updates and recovery, and the [infrastructure plan](docs/LAUNCH_INFRASTRUCTURE.md) for future scaling and wiki options.
 
 The [single-VM deployment bundle](deploy/single-vm/README.md) adds a production Compose configuration with Caddy HTTPS, required authentication and persistent game/certificate volumes. It keeps port 3000 private and serves the app and WebSockets through one hostname.
 
