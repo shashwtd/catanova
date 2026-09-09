@@ -26,8 +26,8 @@ function conserved(g: Game) {
   for (const r of RESOURCES) { assert.equal(g.bank[r] + g.players.reduce((n, p) => n + p.hand[r], 0), 19, r); assert.ok(g.bank[r] >= 0); }
   for (const p of g.players) { for (const r of RESOURCES) assert.ok(Number.isInteger(p.hand[r]) && p.hand[r] >= 0); const n = pieces(g, p.id); assert.ok(n.roads <= 15 && n.settlements <= 5 && n.cities <= 4); }
 }
-test('three- and four-player snake setup grants resources only from the second settlement', () => {
-  for (const count of [3, 4]) {
+test('two- through four-player snake setup grants resources only from the second settlement', () => {
+  for (const count of [2, 3, 4]) {
     let g = createGame(seats.slice(0, count), 7, random); const order: string[] = [];
     for (let i = 0; i < count * 2; i++) {
       const p = activePlayer(g); order.push(p.id);
@@ -39,7 +39,8 @@ test('three- and four-player snake setup grants resources only from the second s
     assert.deepEqual(order, [...seats.slice(0, count), ...seats.slice(0, count).reverse()].map(p => p.id));
     assert.equal(g.phase, 'roll'); assert.equal(g.turn, 1); assert.equal(g.active, 0); conserved(g);
   }
-  assert.throws(() => createGame(seats.slice(0, 2), 1, random), /three or four/);
+  assert.throws(() => createGame(seats.slice(0, 1), 1, random), /two to four/);
+  assert.throws(() => createGame([...seats, { id: 'extra', name: 'Extra' }], 1, random), /two to four/);
 });
 test('invalid moves cannot mutate input; turn, distance, road connection and costs are enforced', () => {
   const g = setup(); const before = structuredClone(g);

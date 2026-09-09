@@ -4,14 +4,16 @@ Ruleset: `base-3-4-v1` · Written 9 September 2026
 
 Catanova aims to reproduce the mechanics of the three- and four-player CATAN base game. This is an independently written explanation, with original organization and examples. It is not an official CATAN publication. The reference edition is the English sixth edition (2025), supplemented by applicable official clarifications. See [sources and compatibility decisions](RULE_SOURCES.md).
 
-This document specifies the base-game target. An early playable engine now implements the ordinary flow. The app defaults to a separately named [balanced island preset](MAP_GENERATION.md); [playtest notes](PLAYTEST.md) list setup/UI differences and two provisional rare-card decisions. Extensions, expansions and tournaments remain separate rulesets.
+Catanova rooms accept **two to four invited players**, with no solo mode or public matchmaking. A two-player room uses the same 19-hex island, resource bank, piece supplies, costs, normal turn flow and ten-point goal described here. Its setup order is **1, 2, 2, 1**. This is our own two-player option: no neutral players or additional two-player mechanisms are added, and it is not an implementation of an official two-player variant. Two-player balance still needs human playtesting.
+
+This document specifies the base-game target for three/four players and the mechanics reused by the two-player option. An early playable engine now implements the ordinary flow. The app defaults to a separately named [balanced island preset](MAP_GENERATION.md); [playtest notes](PLAYTEST.md) list setup/UI differences and two provisional rare-card decisions. Extensions, expansions and tournaments remain separate rulesets.
 
 ## 1. What you are trying to do
 
 Be the first player with at least **10 victory points during your own turn**. The game ends immediately when that happens. Players do not get an equalizing final round.
 
 | What you own | Victory points |
-| --- | ---: |
+| ------------------------------------------ | ----------------------------------------: |
 | Each settlement on the board | 1 |
 | Each city on the board | 2 total, replacing its settlement's point |
 | Each hidden Victory Point development card | 1 |
@@ -28,7 +30,7 @@ Your hidden Victory Point cards count toward your actual total. If you begin you
 Catanova uses these player-facing resource names:
 
 | Catanova name | Produced by | Also called in CATAN editions |
-| --- | --- | --- |
+| ------------- | ----------- | ----------------------------- |
 | **Timber** | Forest | Lumber, wood |
 | **Clay** | Hills | Brick |
 | **Sheep** | Pasture | Wool |
@@ -55,7 +57,7 @@ The land forms five rows of 3, 4, 5, 4, and 3 hexes, surrounded by sea. A **hex*
 
 ### 3.1 Prepare the supply
 
-Choose three or four players and give each a distinct color and their complete piece supply. Separate the five resource types. Shuffle the development cards into a single hidden deck. Nobody starts with a development card. Set both awards aside with no owner.
+Choose two to four invited players in Catanova; the reference base game has three or four. Give each a distinct color and their complete piece supply. Separate the five resource types. Shuffle the development cards into a single hidden deck. Nobody starts with a development card. Set both awards aside with no owner.
 
 ### 3.2 Variable island setup
 
@@ -64,7 +66,7 @@ Arrange the six coastal frame sections in a shuffled order, retaining the port l
 Choose an outer corner and follow a counterclockwise spiral through the land hexes, finishing toward the center. Skip the desert without consuming a number token. Place the following sequence on the remaining hexes:
 
 | Token | A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ------ | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Number | 5 | 2 | 6 | 3 | 8 | 10 | 9 | 12 | 11 | 4 | 8 | 10 | 9 | 4 | 5 | 6 | 3 | 11 |
 
 Put the robber on the desert. The desert never receives a number. The standard spiral is the setup procedure; an unrestricted shuffle of all number tokens is not interchangeable with it. Any additional board-balancing algorithm must be a separately labeled option.
@@ -78,7 +80,7 @@ Setup consists of two passes:
 1. In clockwise order from the starting player, each player places one settlement and then one road touching that settlement.
 2. Starting with the last player from the first pass, work backward. Each player places their second settlement and one road touching that second settlement.
 
-With four players numbered in turn order, placement order is **1, 2, 3, 4, 4, 3, 2, 1**. With three it is **1, 2, 3, 3, 2, 1**.
+With four players numbered in turn order, placement order is **1, 2, 3, 4, 4, 3, 2, 1**. With three it is **1, 2, 3, 3, 2, 1**. Catanova’s two-player option uses **1, 2, 2, 1**.
 
 Both initial settlements obey the distance rule: no neighboring intersection may already contain anyone's settlement. Your second settlement need not connect to your first settlement or road. Each setup road must touch the settlement you just placed. Setup placements cost no resources. Ports and coastal intersections are valid setup choices. There is no trading or development-card play during setup.
 
@@ -175,7 +177,7 @@ Each received card requires its own complete matching payment group. You may mak
 Return the full cost to the bank for each action:
 
 | Purchase | Timber | Clay | Sheep | Hay | Rock |
-| --- | ---: | ---: | ---: | ---: | ---: |
+| ---------------- | -----: | ---: | ----: | --: | ---: |
 | Road | 1 | 1 | 0 | 0 | 0 |
 | Settlement | 1 | 1 | 1 | 1 | 0 |
 | City upgrade | 0 | 0 | 0 | 2 | 3 |
@@ -276,7 +278,7 @@ The bank's precise remaining stacks may be counted to resolve a possible product
 
 ## 13. What is not a base-game rule
 
-This base ruleset does not add a friendly robber, an opening grace period without sevens, extra resources, forced balanced dice, resource hand caps, undo after revealed information, automatic forfeits, special building phases, or two-player rules. These may be considered as explicit options or separate rulesets later. The app also offers an optional [turn timer](TURN_CLOCK.md), disabled by default and documented separately as a house rule.
+This base ruleset does not add a friendly robber, an opening grace period without sevens, extra resources, forced balanced dice, resource hand caps, undo after revealed information, automatic forfeits, or special building phases. Catanova’s two-player option reuses these mechanics without official two-player variant rules or neutral players; see the scope at the beginning of this document. Other variants remain separate future rulesets. The app also offers an optional [turn timer](TURN_CLOCK.md), disabled by default and documented separately as a house rule.
 
 Network loss is also not a game action. It must not change a dice result, reroll a theft, remove a building, discard a hand, or transfer a seat. [Online behavior](ARCHITECTURE.md) is specified separately so recovery does not change the board-game rules.
 

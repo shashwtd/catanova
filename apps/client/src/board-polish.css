@@ -1,59 +1,49 @@
-/* Saturated ownership faces sit on dark contact shadows, without pale outer halos. */
+/* Original flat pieces from 3813b24; placement previews share the same shapes. */
 .road-foundation,
 .own-piece .road-foundation {
-  fill: #10232bc7;
+  fill: #293b3b79;
   stroke: none;
 }
 .road-body {
-  stroke: #23343c;
-  stroke-width: 1.25;
+  stroke: #33463f;
+  stroke-width: 1.1;
 }
 .road-sheen {
-  stroke: #ffe3a66e;
-  stroke-width: 1.4;
+  stroke: #fff7d44d;
+  stroke-width: 1.5;
 }
 .building-plinth,
 .own-piece .building-plinth {
-  fill: #12263065;
-  stroke: none;
-}
-.building-contact {
-  fill: #11212fcc;
+  fill: #26373170;
   stroke: none;
 }
 .building,
 .legal-vertex .building {
-  stroke: #23333d;
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-}
-.building-roof,
-.legal-vertex .building-roof {
-  fill: color-mix(in srgb, currentColor 66%, #192b38);
-  stroke: #26343d;
-  stroke-width: 1.5;
+  stroke: #31453e;
+  stroke-width: 1.7;
   stroke-linejoin: round;
 }
 .roof-highlight,
 .legal-vertex .roof-highlight {
-  stroke: #f8d19152;
-  stroke-width: 1;
+  stroke: #36463f88;
+  stroke-width: 1.4;
 }
 .house-door,
 .legal-vertex .house-door {
-  fill: #253743;
-  stroke: none;
+  fill: #344b45;
+  stroke: #263831;
+  stroke-width: 0.65;
 }
 .house-window,
 .legal-vertex .house-window {
-  fill: #ffd67b;
-  stroke: #33444a;
-  stroke-width: 0.6;
+  fill: #e4c783;
+  stroke: #5c704f;
+  stroke-width: 0.4;
 }
 .city-wing,
 .legal-vertex .city-wing {
-  stroke: #334650;
-  stroke-width: 1.2;
+  stroke: #3e584e;
+  stroke-width: 1.4;
 }
 .road-piece,
 .house-piece {
@@ -83,69 +73,39 @@
 .red-number text {
   fill: #b23827;
 }
-.ship-shadow {
-  fill: #173b4566;
-  stroke: #173b452e;
-  stroke-width: 4;
-}
-.ship-hull {
-  fill: #79503a;
-  stroke: #243b44;
-  stroke-width: 2;
-  stroke-linejoin: round;
-}
-.ship-deck {
-  fill: #c09b65;
-  stroke: #e4c184;
+.port-badge {
+  fill: currentColor;
+  stroke: #e0c494;
   stroke-width: 1;
 }
-.ship-planks {
-  fill: none;
-  stroke: #785d42;
-  stroke-width: 0.9;
+.port-cargo {
+  color: #80765e;
 }
-.ship-gunwale,
-.ship-stern {
-  fill: none;
-  stroke: #d9b072;
-  stroke-width: 2.3;
-  stroke-linecap: round;
+.port-cargo[data-resource='wood'] {
+  color: #426953;
 }
-.ship-mast {
-  fill: none;
-  stroke: #4f3b32;
-  stroke-width: 3;
-  stroke-linecap: round;
+.port-cargo[data-resource='brick'] {
+  color: #a35b42;
 }
-.ship-sail {
-  fill: #f1dfb2;
-  stroke: #9a7951;
-  stroke-width: 1;
-  stroke-linejoin: round;
+.port-cargo[data-resource='sheep'] {
+  color: #74874e;
 }
-.ship-sail-seam {
-  fill: none;
-  stroke: #bf9f6e;
-  stroke-width: 0.7;
+.port-cargo[data-resource='wheat'] {
+  color: #a98535;
 }
-.ship-pennant {
-  fill: #7996a1;
-  stroke: #36505c;
-  stroke-width: 0.8;
-}
-.ship-cargo-cloth {
-  fill: #264655cb;
-  stroke: none;
-}
-.port-rate-plaque {
-  fill: #f0d6a0;
-  stroke: #765c40;
-  stroke-width: 1;
+.port-cargo[data-resource='ore'] {
+  color: #526f88;
 }
 .port-cargo .port-rate {
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 800;
-  fill: #423a31;
+  fill: #fff0cc;
+}
+.port-cargo .port-any {
+  font-family: Barlow, sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  fill: #fff0cc;
 }
 /* Empty, affordable locations reveal the actual piece only when approached. */
 .legal-road,

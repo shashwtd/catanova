@@ -1,6 +1,6 @@
 # First playable build
 
-This is an early local playtest for **three or four people**. It is not a hosted production service. The same process serves the browser game and `/ws`; every accepted game action is saved before it is acknowledged.
+This is an early local playtest for **two to four invited people**. It is not a hosted production service. The same process serves the browser game and `/ws`; every accepted game action is saved before it is acknowledged.
 
 ## Open a table
 
@@ -12,11 +12,11 @@ npm run build
 npm start
 ```
 
-Open `http://127.0.0.1:3000`. Choose **Create room**, then enter your name. Meet in the lobby, select a fantasy avatar, and share the invitation from the invite block or an empty seat’s plus icon. **Join room** is a separate form. An invite opens `/room/CODE`, shows that room’s roster, and asks the friend to join. A saved seat in another room never overrides the invitation. Everyone except the host marks **Ready**; the host starts once all three or four are connected and the other players are ready. The host can set the optional turn timer through Settings. A settings change asks the other players to ready up again. The board appears after Start. Turn order is randomized. Additional players cannot join a started match. Existing account owners can resume.
+Open `http://127.0.0.1:3000`. Choose **Create room**, then enter your name. Meet in the lobby, select a fantasy avatar, and share the invitation from the invite block or an empty seat’s plus icon. **Join room** is a separate form. An invite opens `/room/CODE`, shows that room’s roster, and asks the friend to join. A saved seat in another room never overrides the invitation. Everyone except the host marks **Ready**; the host starts once all two to four are connected and the other players are ready. The host can set the optional turn timer through Settings. A settings change asks the other players to ready up again. The board appears after Start. Turn order is randomized. Additional players cannot join a started match. Existing account owners can resume.
 
-For a single-machine connectivity playtest, open the URL in four **independently opened tabs** and join the same room. Refreshing a tab resumes its own seat. Duplicating a tab may copy its session storage; that resumes the existing seat instead of creating a new player. A seat opened elsewhere closes the old connection.
+For a single-machine connectivity playtest, open the URL in two to four **independently opened tabs** and join the same room. Refreshing a tab resumes its own seat. Duplicating a tab may copy its session storage; that resumes the existing seat instead of creating a new player. A seat opened elsewhere closes the old connection.
 
-`127.0.0.1` links only work on the server machine. For friends on other devices, use an HTTPS reverse proxy/tunnel to this process, or the eventual hosted deployment. Secure browser contexts are required for seat-token generation. An ordinary HTTP LAN address is insufficient. No public game server has been deployed yet.
+`127.0.0.1` links only work on the server machine. For friends on other devices, use an HTTPS reverse proxy/tunnel to this process, or the eventual hosted deployment. The current client uses secure-context APIs such as `crypto.randomUUID()` for command IDs. An ordinary HTTP LAN address is not yet supported; the [LAN proposal](LAN_PROPOSAL.md) describes the packaging and compatibility work needed. No public game server has been deployed yet.
 
 ## Playing
 
@@ -55,13 +55,14 @@ With the timer off (the default), the game waits for its player. If the host ena
 - The server randomizes seat order instead of showing ceremonial starting-player dice rolls.
 - Two rare card situations use visible provisional decisions: Road Building requires a legal first road and uses the second whenever possible; Year of Plenty takes the bank's remaining card if only one exists and cannot be played into an empty bank. These await primary-source confirmation; see the [ledger](RULE_SOURCES.md).
 - Move history groups accepted actions by turn, using action/resource icons and an **Earlier turns** control without displaying revision numbers. A game created before the ledger was added only retains its surviving old journal entries plus new events. The public journal omits stolen resource identities and discarded mixes. Exact bank counts are available for resource selection, so bank changes can reveal discarded resources; this remains an information-policy difference to review. Opponent hands and deck order are never sent.
-- Three/four-player ordinary play is implemented. Expansions, two-player rules, bots, matchmaking, rematch controls, chat and spectating are not implemented. Supabase Google login remains inactive pending its publishable key and provider/redirect configuration; public guests remain disabled.
+- Rooms accept two to four invited players. Three/four-player ordinary play is the base compatibility target. Two-player rooms use the same 19-hex board, bank, piece supply, costs, normal turns and ten-point goal, with snake setup **1–2–2–1**. This is a Catanova house option with no neutral players or official two-player variant mechanics; its balance needs full human playtests.
+- No solo mode or public matchmaking is provided. Expansions, official two-player variants, bots, rematch controls, chat and spectating are not implemented.
 - The interface includes responsive layout, keyboard-accessible board targets, a native modal for rules, and reduced-motion support. Device/browser visual QA and full human games are still needed.
 
 ## Development
 
 `npm run dev` builds the client and watches server sources. For client hot reload, keep that process running and run `npm run dev:client` separately, then open `http://127.0.0.1:5173`. Its proxy forwards WebSockets and API requests to the game server. Use `.env.example`'s origins if a reverse proxy changes the browser origin.
 
-`npm run check` runs TypeScript, rules/property scenarios, four-client gameplay/restart tests, abrupt process crash and socket recovery tests, and the production build. `npm run probe` remains a small transport smoke test, using separate counter-only rooms. It cannot increment a started game.
+`npm run check` runs TypeScript, rules/property scenarios, two- and four-client gameplay/restart tests, abrupt process crash and socket recovery tests, and the production build. `npm run probe` remains a small transport smoke test, using separate counter-only rooms. It cannot increment a started game.
 
 Each port has two wooden entrances, corresponding to the two coastal settlement corners that receive its benefit. The four **? 3:1** harbors trade three of any one resource for one other resource; the five **2:1** harbors each specialize in a resource. Question marks mean general trade, not unknown future rewards.

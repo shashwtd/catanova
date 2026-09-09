@@ -77,7 +77,7 @@ export function parseGameAction(input: unknown): GameAction {
 }
 
 export function createGame(seats: { id: string; name: string }[], seed: number, random: () => number): Game {
-  requireRule(seats.length === 3 || seats.length === 4, 'Start with three or four players');
+  requireRule(seats.length >= 2 && seats.length <= 4, 'Start with two to four players');
   requireRule(new Set(seats.map(p => p.id)).size === seats.length, 'Seats must be unique');
   const board = generateBoard(seed);
   const g: Game = {

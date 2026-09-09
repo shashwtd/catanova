@@ -141,4 +141,10 @@ test('terrain retains accessible production odds without native title popups', (
   assert.ok(!/<title>[^<]*production pips/.test(html));
   assert.equal([...html.matchAll(/class="port-boat"/g)].length, 9);
   assert.equal([...html.matchAll(/class="port-cargo"/g)].length, 9);
+  assert.equal(
+    [...html.matchAll(/class="port-boat" transform="translate\([^)]+\) rotate\(90\)"/g)].length,
+    9,
+  );
+  assert.equal([...html.matchAll(/viewBox="1536 512 512 512"/g)].length, 9);
+  assert.ok(!html.includes('class="ship-hull"'));
 });

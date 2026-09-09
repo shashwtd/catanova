@@ -5,7 +5,7 @@ Reviewed 9 September 2026. Ruleset target: **ordinary three- and four-player Eng
 ## Primary references
 
 | ID | Reference | Use |
-| --- | --- | --- |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | R6 | [CATAN: The Game, English sixth edition, 2025](https://www.catan.com/sites/default/files/2025-03/CN3081%20CATAN%E2%80%93The%20Game%20Rulebook%20secure%20%281%29.pdf) | Main mechanics, supply, setup, action phase, card effects |
 | FAQ | [Official base-game FAQ](https://www.catan.com/faq/basegame) | Ordinary base-game edge cases; filter out expansion and legacy entries |
 | R5 | [Archived English base rules and almanac, 2020](https://www.catan.com/sites/default/files/2021-06/catan_base_rules_2020_200707.pdf) | Supplemental explanations of unchanged mechanics and familiar terminology |
@@ -19,7 +19,7 @@ Reference PDFs were read outside the repository. No official artwork, explanator
 “Documented” means the behavior appears in our rulebook. It does **not** mean the engine implements it. An early engine now implements ordinary turns, setup, production, robber/discards, trades, construction, development cards and scoring. The table remains a source-coverage ledger, not a per-row certification. See [playtest scope](PLAYTEST.md) and the executable tests in `tests/game.test.ts`, `tests/board.test.ts` and `tests/multiplayer-game.test.ts`.
 
 | ID | Behavior | Rulebook section | Basis | Status |
-| --- | --- | --- | --- | --- |
+| --- | --------------------------------------------------------------- | ---------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
 | B01 | Three/four players; 10-point goal | 1–3 | R6 pp. 2–5, 10–12 | Documented |
 | B02 | Supply, terrain, token and deck quantities | 2 | R6 p. 3 | Documented; constants started |
 | B03 | Familiar resource-name mapping | 2 | R6 p. 3; R5 | Documented |
@@ -95,6 +95,8 @@ Reference PDFs were read outside the repository. No official artwork, explanator
 | B73 | Forgotten valid win remains a win in ordinary base game | 1 | FAQ: Victory Conditions | Documented; tournament differs |
 | B74 | No automatic grace period, free gifts, or special build phase | 13 | R6 scope; WC25 3.0.16 cross-check | Documented |
 
+Catanova also permits two invited players using these same base mechanics. That additional player-count option is a project choice, not a claim of official two-player conformance. It adds no neutral players or other two-player-specific mechanisms; [the rulebook](RULEBOOK.md) describes its scope.
+
 ## Edition and interpretation decisions
 
 1. **Sixth-edition action phase:** trading and building can interleave. Older separated trade/build instructions are not the default.
@@ -104,7 +106,7 @@ Reference PDFs were read outside the repository. No official artwork, explanator
 5. **FAQ filtering:** the base-game FAQ includes old 5–6-player special-building rules, ships, and physical-knight language. Those entries do not authorize moving a base-game road or adding a special building phase.
 6. **Standard supply:** although a FAQ permits players to agree to extra cards, the standard preset uses the base box's 19 per resource. An enlarged bank is a labeled option.
 7. **Starting-player ties:** re-roll the tied highest totals. R6 specifies the highest roll but does not elaborate the tie procedure; this is our explicit tie-resolution convention.
-8. **Digital action commitment:** a placement preview is freely adjustable until confirmation. The early UI commits a placement when a highlighted site is clicked; selecting a build type is only a preview. Tournament rules permitting physical repositioning within an unfinished action must not silently become an undo after a committed online action or revealed information.
+8. **Digital action commitment:** a placement preview is freely adjustable until confirmation. The UI keeps a temporary piece after a site is clicked and commits only when the player confirms Build; selecting a build type or a site is only a preview. Tournament rules permitting physical repositioning within an unfinished action must not silently become an undo after a committed online action or revealed information.
 
 ## Remaining source questions before claiming exact conformance
 
