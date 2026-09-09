@@ -295,8 +295,8 @@
   justify-content: center;
   gap: 14px 30px;
   align-items: center;
-  min-height: 84px;
-  padding: 24px 24px 22px;
+  min-height: 48px;
+  padding: 6px 24px max(10px, env(safe-area-inset-bottom));
   color: #fff;
   text-align: center;
   font:
@@ -306,7 +306,7 @@
 .landing-footer::before {
   content: '';
   position: absolute;
-  inset: -28px 0 0;
+  inset: 0;
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(180deg, #173c2d00, #143425c4 60%, #112e24ed);
@@ -316,18 +316,23 @@
   mask-image: linear-gradient(180deg, transparent, #000 48%);
 }
 .landing-footer p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
   margin: 0;
+  font: inherit;
 }
 .landing-footer a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 28px;
-  margin-inline: 3px;
   color: #fff;
   font: inherit;
   text-decoration: none;
-  vertical-align: middle;
+  white-space: nowrap;
 }
 .landing-footer a:hover {
   text-decoration: underline;
@@ -438,7 +443,7 @@
   .landing-footer {
     flex-direction: column;
     gap: 6px;
-    padding: 22px 16px 16px;
+    padding: 6px 16px max(10px, env(safe-area-inset-bottom));
     font-size: 13px;
   }
 }
