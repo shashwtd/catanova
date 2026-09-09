@@ -11,6 +11,8 @@ data/
 *.db-*
 *.log
 *.tsbuildinfo
+__pycache__/
+*.pyc
 .DS_Store
 .idea/
 .vscode/

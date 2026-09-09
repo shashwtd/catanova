@@ -1,0 +1,33 @@
+[Unit]
+Description=Back up the Catanova game database to private Azure Blob Storage
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/catanova/backup.env
+Environment=TMPDIR=/var/tmp
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B /opt/catanova-backup/backup.py
+TimeoutStartSec=5min
+TimeoutStopSec=10s
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+LockPersonality=true
+MemoryMax=256M
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

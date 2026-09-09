@@ -28,6 +28,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Check deployment bootstrap and backup recovery
+        run: |
+          bash -n deploy/single-vm/bootstrap.sh
+          python3 -B -m unittest discover -s deploy/single-vm/backup -p 'test_*.py'
       - name: Validate authenticated production deployment
         env:
           CATANOVA_DOMAIN: catanova.example

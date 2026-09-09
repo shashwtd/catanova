@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up Catanova every fifteen minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/15:00
+Persistent=true
+AccuracySec=1s
+Unit=catanova-backup.service
+
+[Install]
+WantedBy=timers.target
