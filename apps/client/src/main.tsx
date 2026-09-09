@@ -74,6 +74,8 @@ import './polish.css';
 import './board-polish.css';
 import './hand-profile-polish.css';
 import './interface-polish.css';
+import './profile-presence.css';
+import './compact-panels.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',

@@ -12,7 +12,45 @@ import {
   WORLD,
   MATERIAL_GUTTER,
   MATERIAL_QUADRANTS,
+  SHIP_BOUNDS,
+  SHIP_CARGO_AFT,
+  SHIP_HULL_PATH,
+  WATER_FEATHER,
 } from '../apps/client/src/scene.js';
+
+/** Sample the rendered hull's actual Bézier segments for cargo containment checks. */
+function shipHullPoints() {
+  const points: { x: number; y: number }[] = [];
+  let from = { x: 0, y: 0 };
+  for (const [, command, coordinates] of SHIP_HULL_PATH.matchAll(/([MCQZ])([^MCQZ]*)/g)) {
+    const values = (coordinates!.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    if (command === 'M') {
+      from = { x: values[0]!, y: values[1]! };
+      points.push(from);
+    } else if (command === 'C' || command === 'Q') {
+      const controls = [
+        from,
+        ...Array.from({ length: values.length / 2 }, (_, index) => ({
+          x: values[index * 2]!,
+          y: values[index * 2 + 1]!,
+        })),
+      ];
+      for (let step = 1; step <= 24; step++) {
+        const t = step / 24;
+        let level = controls;
+        while (level.length > 1)
+          level = level.slice(0, -1).map((point, index) => ({
+            x: point.x * (1 - t) + level[index + 1]!.x * t,
+            y: point.y * (1 - t) + level[index + 1]!.y * t,
+          }));
+        points.push(level[0]!);
+      }
+      from = controls.at(-1)!;
+    }
+  }
+  if (points.at(-1)?.x === points[0]?.x && points.at(-1)?.y === points[0]?.y) points.pop();
+  return points;
+}
 
 test('the calm continuous water band follows the coast and leaves room for its shadow within the scene', () => {
   const board = generateBoard(42),
@@ -46,6 +84,7 @@ test('the calm continuous water band follows the coast and leaves room for its s
 });
 
 test('every dock is perpendicular to its own coastal edge, facing outward, anchored at the midpoint', () => {
+  const hull = shipHullPoints();
   for (const seed of [1, 42, 2026, 98765]) {
     const board = generateBoard(seed);
     const coast = coastline(board)
@@ -76,23 +115,74 @@ test('every dock is perpendicular to its own coastal edge, facing outward, ancho
       );
       for (const bridge of pose.bridges)
         assert.ok(Math.abs(Math.hypot(bridge.to.x - pose.x, bridge.to.y - pose.y) - 34) < 1e-8);
-      assert.equal(pose.markerX, pose.boatX, 'cargo badge sits on the ship, not beside the coast');
-      assert.equal(pose.markerY, pose.boatY);
-      assert.ok(Math.abs((pose.markerX - pose.x) * pose.nx + (pose.markerY - pose.y) * pose.ny - 61) < 1e-8);
-      const halfWidth = 35 * Math.abs(Math.cos(angle)) + 37 * Math.abs(Math.sin(angle));
-      const halfHeight = 35 * Math.abs(Math.sin(angle)) + 37 * Math.abs(Math.cos(angle));
-      for (const [x, y, px, py] of [
-        [pose.markerX, pose.markerY, 15, 15],
-        [pose.boatX, pose.boatY, halfWidth, halfHeight],
-      ]) {
-        assert.ok(x! - px! >= WORLD.x && x! + px! <= WORLD.x + WORLD.width);
-        assert.ok(y! - py! >= WORLD.y && y! + py! <= WORLD.y + WORLD.height);
+      assert.ok(Math.abs(pose.markerX - pose.boatX + pose.nx * SHIP_CARGO_AFT) < 1e-8);
+      assert.ok(Math.abs(pose.markerY - pose.boatY + pose.ny * SHIP_CARGO_AFT) < 1e-8);
+      assert.ok(
+        SHIP_CARGO_AFT > 0 && SHIP_CARGO_AFT < 12,
+        'cargo stays in the aft deck, away from the bow sail',
+      );
+      const shipCorners = [SHIP_BOUNDS.x, SHIP_BOUNDS.x + SHIP_BOUNDS.width].flatMap((x) =>
+        [SHIP_BOUNDS.y, SHIP_BOUNDS.y + SHIP_BOUNDS.height].map((y) => ({
+          x: pose.boatX + x * Math.cos(angle) - y * Math.sin(angle),
+          y: pose.boatY + x * Math.sin(angle) + y * Math.cos(angle),
+        })),
+      );
+      const cargoCorners = [-22, 22].flatMap((x) =>
+        [-27, 31].map((y) => ({
+          x: pose.markerX + x,
+          y: pose.markerY + y,
+        })),
+      );
+      for (const x of [-22, 22])
+        for (const y of [-27, 31]) {
+          const localX = x * Math.cos(angle) + y * Math.sin(angle);
+          const localY = -x * Math.sin(angle) + y * Math.cos(angle) + SHIP_CARGO_AFT;
+          assert.ok(
+            coastDistance(hull, localX, localY) < 0,
+            `upright cargo stays on ship: edge ${edge.id}, local ${localX},${localY}`,
+          );
+        }
+      for (const { x, y } of [...shipCorners, ...cargoCorners]) {
+        assert.ok(
+          x >= WORLD.x + 4 && x <= WORLD.x + WORLD.width - 4,
+          'ship and cargo fit the camera horizontally',
+        );
+        assert.ok(
+          y >= WORLD.y + 4 && y <= WORLD.y + WORLD.height - 4,
+          'ship and cargo fit the camera vertically',
+        );
       }
     }
     assert.throws(
       () => portPlacement(board, board.edges.find((e) => e.hexes.length === 2)!.id),
       /coastal edge/,
     );
+  }
+});
+
+test('the feather mask covers the entire coast and becomes transparent before the world boundary', () => {
+  const board = generateBoard(42),
+    coast = coastPoints(board),
+    halfOpacity = waterOutline(board, WATER_FEATHER / 2),
+    opaqueCore = waterOutline(board, WATER_FEATHER);
+  assert.ok(coast.every(({ x, y }) => coastDistance(opaqueCore, x, y) < 0));
+  for (const { x, y } of halfOpacity) {
+    const width = waterWidth(Math.atan2(y, x));
+    assert.ok(Math.abs(coastDistance(coast, x, y) - (width - WATER_FEATHER / 2)) < 0.001);
+  }
+  // Both the smoothstep shader and the fallback's inset, three-sigma mask fade
+  // finish before these bounds, including where the hex footprint is widest.
+  for (let step = 0; step <= 100; step++) {
+    const x = WORLD.x + (WORLD.width * step) / 100,
+      y = WORLD.y + (WORLD.height * step) / 100;
+    for (const point of [
+      { x, y: WORLD.y },
+      { x, y: WORLD.y + WORLD.height },
+      { x: WORLD.x, y },
+      { x: WORLD.x + WORLD.width, y },
+    ]) {
+      assert.ok(coastDistance(coast, point.x, point.y) - waterWidth(Math.atan2(point.y, point.x)) > 8);
+    }
   }
 });
 

@@ -200,3 +200,28 @@ test('game profiles retain turn, score, awards and disconnect status without con
   assert.ok(!html.includes('profile-pieces'));
   assert.ok(!/>Connected<|>You<|>Playing</.test(html));
 });
+
+test('profile score plaques show only projected points and keep a long name available to assistive technology', () => {
+  const room = lobby(),
+    name = 'Alexandria of the Northern Isles';
+  assert.equal(name.length, 32);
+  room.players[0]!.name = name;
+  room.players[0]!.profile = defaultProfile(name);
+  room.players[1]!.connected = false;
+  const saved = createGame(room.players, 82, () => 0.34);
+  saved.players[0]!.cards = [{ id: 'own-point', kind: 'victoryPoint', boughtTurn: 0 }];
+  saved.players[1]!.cards = [{ id: 'private-opponent-point', kind: 'victoryPoint', boughtTurn: 0 }];
+  const game = gameView(saved, 'p0');
+  assert.equal(game.players[0]!.points, 1);
+  assert.equal(game.players[1]!.points, 0);
+  const html = renderToStaticMarkup(createElement(PlayerRail, { room, game, me: 'p0' }));
+  const own = html.match(/<article[^>]*data-player-profile="p0"[\s\S]*?<\/article>/)![0];
+  const opponent = html.match(/<article[^>]*data-player-profile="p1"[\s\S]*?<\/article>/)![0];
+  assert.match(own, /aria-label="1 victory points"/);
+  assert.match(opponent, /aria-label="0 victory points"/);
+  assert.ok(own.includes(`title="${name}"`) && own.includes(`>${name}</strong>`));
+  assert.equal([...html.matchAll(/>VP<\/span>/g)].length, 3);
+  assert.match(opponent, /aria-label="Disconnected"/);
+  assert.match(opponent, />Offline<\/span>/);
+  assert.ok(!html.includes('private-opponent-point'));
+});

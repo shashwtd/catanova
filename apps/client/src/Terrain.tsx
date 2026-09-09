@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Board } from '../../../packages/rules/src/board.js';
-import { HEX_SIZE, MATERIAL_GUTTER, WATER_BAND, WATER_EDGE_WAVES, TERRAIN_INDEX, WORLD } from './scene.js';
+import {
+  HEX_SIZE,
+  MATERIAL_GUTTER,
+  WATER_BAND,
+  WATER_FEATHER,
+  WATER_EDGE_WAVES,
+  TERRAIN_INDEX,
+  WORLD,
+} from './scene.js';
 
 const vertexSource = `#version 300 es
 in vec2 aPosition;
@@ -33,7 +41,7 @@ void main(){
   float angle=atan(p.y,p.x);
   float waterWidth=${WATER_BAND.toFixed(1)}${WATER_EDGE_WAVES.map((wave) => `+sin(angle*${wave.frequency.toFixed(1)}+${wave.phase.toFixed(2)})*${wave.amplitude.toFixed(2)}`).join('')};
   float outer=land-waterWidth;
-  if(outer>3.0){outColor=vec4(0);return;}
+  if(outer>=0.0){outColor=vec4(0);return;}
   float rough=(noise(p*0.13)-0.5)*3.0+(noise(p*0.043)-0.5)*3.0;
   vec2 waterUv=(p+vec2(470,430))/370.0;
   vec3 deep=environment(waterUv,vec2(0,0));
@@ -55,10 +63,8 @@ void main(){
   float light=dot(terrain,vec3(0.2126,0.7152,0.0722));
   terrain=clamp((mix(vec3(light),terrain,0.94)-0.5)*0.94+0.54,0.0,1.0);
   color=mix(color,terrain,terrainMask);
-  // A rugged cut-water silhouette sits softly on the wooden surface.
-  float rim=smoothstep(-5.0,0.0,outer);
-  color=mix(color,vec3(0.11,0.30,0.34),rim*0.42);
-  outColor=vec4(color,1.0-smoothstep(-0.5,1.5,outer));
+  // Water becomes transparent over a broad band; no dark rim cuts it out of the table.
+  outColor=vec4(color,1.0-smoothstep(-${WATER_FEATHER.toFixed(1)},0.0,outer));
 }
 `;
 function compile(gl: WebGL2RenderingContext, type: number, source: string) {

@@ -1,4 +1,4 @@
-import { Activity, RefreshCw, Wifi, WifiOff } from './GameIcons.js';
+import { Activity, Wifi, WifiOff } from './GameIcons.js';
 import type { NetworkMetrics, ConnectionStatus } from './connection.js';
 export function ConnectionPanel({
   metrics,
@@ -104,9 +104,25 @@ export function ConnectionPanel({
           {metrics.syncIssue}. Your displayed pieces are retained while the server is checked.
         </p>
       )}
-      <button className="dark-button" onClick={onSync} disabled={status !== 'connected'}>
-        <RefreshCw size={15} />
-        Resync
+      <button
+        className="dark-button connection-refresh"
+        onClick={onSync}
+        disabled={status !== 'connected'}
+        aria-label="Refresh game state from the server"
+      >
+        <svg
+          className="sync-refresh"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M20 9a8 8 0 0 0-14-3L3 9m0-5v5h5M4 15a8 8 0 0 0 14 3l3-3m0 5v-5h-5" />
+        </svg>
+        Refresh game
       </button>
       <p className="connection-note">
         <Activity size={13} />

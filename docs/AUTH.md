@@ -35,6 +35,6 @@ Without Supabase configuration, development keeps the existing token-based local
 
 The Google path deliberately rejects Supabase anonymous users. [Guest access](GUEST_ACCESS.md) is a proposal for review, not an enabled sign-in option.
 
-## Validation and remaining activation
+## Validation and remaining sign-in check
 
-Automated tests cover calls through the Supabase SDK to a local Auth fixture, forged/expired credentials, required Google identity, cross-account takeover denial, profile ownership, same-account device recovery, and production configuration. A valid public key alone does not enable the Google provider or configure redirects. The real Google/Supabase flow has not been verified. After configuration, check an invite → Google → same lobby round trip, profile persistence after logout/login, and resume on a second device before public hosting.
+Automated tests cover calls through the Supabase SDK to a local Auth fixture, forged/expired credentials, required Google identity, cross-account takeover denial, profile ownership, same-account device recovery, and production configuration. A valid public key alone does not enable the Google provider or configure redirects. The configured local server has been checked in authenticated mode, the live Google provider is enabled, and OAuth initiation redirects to Google. The user-consent and callback round trip has not yet been verified. After configuration, check an invite → Google → same lobby round trip, profile persistence after logout/login, and resume on a second device before public hosting.

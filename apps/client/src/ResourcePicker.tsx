@@ -8,7 +8,7 @@ export function ResourceSummary({ hand }: { hand: Hand }) {
   return (
     <span className="resource-summary">
       {RESOURCES.filter((r) => hand[r]).map((r) => (
-        <span key={r} role="img" aria-label={`${hand[r]} ${RESOURCE_NAMES[r]}`}>
+        <span key={r} role="img" aria-label={`${hand[r]} ${RESOURCE_NAMES[r]}`} data-count={hand[r]}>
           <ResourceIcon resource={r} />
           <b>{hand[r]}</b>
         </span>

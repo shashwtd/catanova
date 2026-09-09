@@ -14,11 +14,11 @@ The actual game state already contains the new hand and determines legal actions
 
 ## Cards
 
-Resource cards have a restrained glossy finish across the whole colored card, with artwork and a count. They have no visible names or tooltips; accessible labels retain each resource's name and quantity. The card lifts as one surface on hover, with no independent artwork shift. Positive resource counts allow hover audio even with reduced motion; empty cards remain muted and silent.
+Resource cards use a simple colored face, uniform border, artwork and count, with no offset backing or top/left accent. They have no visible names or tooltips; accessible labels retain each resource's name and quantity. The card lifts as one surface on hover, with no independent artwork shift. Positive resource counts allow hover audio even with reduced motion; empty cards remain muted and silent.
 
 Development cards sit inline beside the resource hand. A distinct plus/development **Buy** slot displays its Sheep, Hay and Rock price. Up to five illustrated stacks group identical cards and choose a playable copy first. Tooltips retain the story, effect and availability counts. Selecting a card opens a detail panel; a separate labeled Play button confirms it. Monopoly and Year of Plenty show resource choices there. Newly bought cards explain the next-turn restriction; victory points explain that they already count.
 
-Trade sits to the left of Roll/End, and these actions are enabled only in the local player's appropriate turn phase. Other players answer live offers through a separate notice. Player-color banners and portrait edges match the brighter board pieces; points, hand counts, awards and the current-turn ribbon remain prominent. Disconnections place a Wi-Fi-off overlay on the avatar. [GameIcons.tsx](../apps/client/src/GameIcons.tsx) supplies original SVG controls, including a rulebook and separate fullscreen entry/exit symbols. Only portraits retain the thin rope-and-wood texture.
+Trade sits to the left of Roll/End, and these actions are enabled only in the local player's appropriate turn phase. Other players answer live offers through a separate notice. Player-colored portrait outlines match the board pieces. A light VP plaque sits beside each portrait, below a larger name; hand counts, awards and the current-turn ribbon remain visible. Disconnections add a static translucent red distressed overlay and Wi-Fi-off symbol, without flickering. [GameIcons.tsx](../apps/client/src/GameIcons.tsx) supplies original SVG controls, including a rulebook and separate fullscreen entry/exit symbols. Only portraits retain the thin rope-and-wood texture.
 
 ## Intent and history
 

@@ -148,9 +148,13 @@ function Move({ entry, names }: { entry: HistoryEntry; names: string[] }) {
     <li className="journal-move">
       <span className="journal-action">
         <Icon />
-        {entry.automatic && <Clock3 className="automatic-mark" aria-label="Timer move" />}
+        {entry.automatic && (
+          <span className="automatic-mark" role="img" aria-label="Automatic timer move">
+            <Clock3 />
+          </span>
+        )}
       </span>
-      <div>
+      <div className="journal-lines">
         {entry.lines.map((line, i) => (
           <p key={i}>{historyTokens(line, names)}</p>
         ))}

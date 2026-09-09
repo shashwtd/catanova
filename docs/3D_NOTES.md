@@ -1,6 +1,6 @@
 # Board, camera and dice presentation
 
-The current board is a flat, straight-down scene. [Board.tsx](../apps/client/src/Board.tsx) draws brighter coral, cyan, lilac and gold pieces in SVG using the rules engine's edge and vertex IDs. Thinner outlines and lighter ground shadows define the pieces. Affordable legal sites reveal hover/focus previews; clicking opens a separate Build confirmation. Painted terrain, the continuous sea band and pieces retain one coordinate system.
+The current board is a flat, straight-down scene. [Board.tsx](../apps/client/src/Board.tsx) draws brighter coral, cyan, lilac and gold pieces in SVG using the rules engine's edge and vertex IDs. Distinct filled roofs, narrow dark contours and contact shadows define the pieces. Affordable legal sites reveal hover/focus previews; clicking opens a separate Build confirmation. Painted terrain, the continuous sea band and pieces retain one coordinate system.
 
 ## Camera and table
 
@@ -8,7 +8,7 @@ The current board is a flat, straight-down scene. [Board.tsx](../apps/client/src
 
 Wheel and keyboard zoom use a short glide that stops at its target. Pointer dragging and pinch movement follow the gesture directly. A `ResizeObserver` updates the available board area, and changing the board seed restores the initial camera. Dragging suppresses accidental placement clicks. Reduced motion applies camera changes without the glide. There is no idle camera animation or perspective transform.
 
-The terrain renderer draws on load, resize, board changes and graphics-context recovery. Its SVG fallback uses the same artwork with a simpler shoreline. Both use the same gentler outer-sea curves, preserving the coast-following band and island shape. Mirrored material repeats and atlas gutters reduce seams and adjacent-cell bleed. The water is not an extra ring of playable hexes. See [art and renderer details](ART.md).
+The terrain renderer draws on load, resize, board changes and graphics-context recovery. Its SVG fallback uses the same artwork with a simpler shoreline. Both preserve the coast-following sea band and feather its outer edge into the table instead of drawing a hard rim. Mirrored material repeats and atlas gutters reduce seams and adjacent-cell bleed. The water is not an extra ring of playable hexes. See [art and renderer details](ART.md).
 
 ## Accepted dice and finite effects
 

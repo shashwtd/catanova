@@ -16,11 +16,13 @@ import {
   waterOutline,
   portPlacement,
   SPRITE_INDEX,
+  SHIP_HULL_PATH,
   TERRAIN_INDEX,
+  WATER_FEATHER,
   WORLD,
 } from './scene.js';
 
-export const PLAYER_COLORS = ['#f6967c', '#79c9e7', '#c0a3ec', '#edcf69'] as const;
+export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#e2bd4c'] as const;
 export type BuildMode = 'road' | 'settlement' | 'city' | null;
 function roadGeometry(board: Island, id: number) {
   const edge = board.edges[id]!,
@@ -34,35 +36,44 @@ function roadGeometry(board: Island, id: number) {
 function RoadShape({ length, color }: { length: number; color: string }) {
   return (
     <>
-      <rect className="road-foundation" x={-length / 2 + 4} y="-3" width={length - 8} height="11" rx="4" />
+      <rect className="road-foundation" x={-length / 2 + 3} y="-4" width={length - 6} height="15" rx="4" />
       <rect
         className="road-body"
         fill={color}
-        x={-length / 2 + 6}
-        y="-6"
-        width={length - 12}
-        height="12"
+        x={-length / 2 + 5}
+        y="-7"
+        width={length - 10}
+        height="13"
         rx="2"
       />
-      <path className="road-sheen" d={`M${-length / 2 + 8} -3H${length / 2 - 8}`} />
+      <path className="road-sheen" d={`M${-length / 2 + 9} -4H${length / 2 - 9}`} />
     </>
   );
 }
 function BuildingShape({ city, color }: { city: boolean; color: string }) {
   return (
     <>
-      <ellipse className="building-plinth" rx={city ? 23 : 18} ry="7" cy="10" />
+      <ellipse className="building-plinth" rx={city ? 27 : 21} ry="8" cy="12" />
+      <ellipse className="building-contact" rx={city ? 23 : 17} ry="4.5" cy="12" />
       <path
         className="building"
         fill={color}
-        d={city ? 'M-19 9V-10L-9-20L2-10V-2L11-12L21-2V9Z' : 'M-14 9V-6L0-20L14-6V9Z'}
+        d={city ? 'M-21 11V-12L-11-22L-1-12V-3L10-14L21-3V11Z' : 'M-14 11V-8L0-21L14-8V11Z'}
       />
-      <path className="roof-highlight" d={city ? 'M-19-10L-9-20L2-10M2-2L11-12L21-2' : 'M-14-6L0-20L14-6'} />
-      <path className="house-door" d="M-3 8V0H3V8" />
+      <path
+        className="building-roof"
+        style={{ color }}
+        d={city ? 'M-25-10L-11-25L3-10ZM-4-2L10-17L24-2Z' : 'M-18-6L0-24L18-6Z'}
+      />
+      <path
+        className="roof-highlight"
+        d={city ? 'M-21-11L-11-21L-2-11M1-3L10-13L19-3' : 'M-12-7L0-19L12-7'}
+      />
+      <path className="house-door" d="M-3 11V2H3V11" />
+      <path className="house-window" d={city ? 'M-15-3H-10V2H-15ZM10 2H15V7H10Z' : 'M-10-1H-6V3H-10Z'} />
       {city && (
         <>
-          <path className="house-window" d="M-12-4H-8V0H-12ZM8 1H12V5H8Z" />
-          <path className="city-wing" d="M1-1V8" />
+          <path className="city-wing" d="M-1-1V10" />
         </>
       )}
     </>
@@ -132,7 +143,7 @@ export function Board({
   const coast = useMemo(() => coastline(board), [board.seed]);
   const water = useMemo(
     () =>
-      waterOutline(board)
+      waterOutline(board, WATER_FEATHER / 2)
         .map((p) => `${p.x},${p.y}`)
         .join(' '),
     [board.seed],
@@ -189,6 +200,31 @@ export function Board({
         aria-label="Island board"
       >
         <defs>
+          <filter
+            id="water-feather"
+            filterUnits="userSpaceOnUse"
+            x={WORLD.x}
+            y={WORLD.y}
+            width={WORLD.width}
+            height={WORLD.height}
+            colorInterpolationFilters="sRGB"
+          >
+            <feGaussianBlur stdDeviation={WATER_FEATHER / 6} />
+            <feComponentTransfer>
+              <feFuncA type="linear" slope="1.006" intercept="-0.003" />
+            </feComponentTransfer>
+          </filter>
+          <mask
+            id="water-fade-mask"
+            maskUnits="userSpaceOnUse"
+            x={WORLD.x}
+            y={WORLD.y}
+            width={WORLD.width}
+            height={WORLD.height}
+            style={{ maskType: 'alpha' }}
+          >
+            <polygon points={water} fill="white" filter="url(#water-feather)" />
+          </mask>
           <filter id="piece-shadow" x="-60%" y="-60%" width="220%" height="220%">
             <feDropShadow dx="1" dy="3" stdDeviation="1.5" floodColor="#0b1519" floodOpacity=".7" />
           </filter>
@@ -240,13 +276,14 @@ export function Board({
           ))}
         </defs>
         <g className="terrain-fallback" aria-hidden="true">
-          <polygon
+          <rect
             className="water-band"
-            points={water}
+            x={WORLD.x}
+            y={WORLD.y}
+            width={WORLD.width}
+            height={WORLD.height}
             fill="url(#ocean-material)"
-            stroke="#275c62"
-            strokeWidth="3"
-            strokeLinejoin="round"
+            mask="url(#water-fade-mask)"
           />
           <polygon
             points={coast}
@@ -392,28 +429,39 @@ export function Board({
                 );
               })}
               <g className="port-boat" transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
-                <svg x="-35" y="-37" width="70" height="74" viewBox="1536 512 512 512">
-                  <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
-                </svg>
+                <path className="ship-shadow" transform="translate(0 3)" d={SHIP_HULL_PATH} />
+                <path className="ship-hull" d={SHIP_HULL_PATH} />
+                <path
+                  className="ship-deck"
+                  d="M0-36C22-25 35-10 35 8C35 27 25 40 17 43Q0 49-17 43C-25 40-35 27-35 8C-35-10-22-25 0-36Z"
+                />
+                <path
+                  className="ship-planks"
+                  d="M-17-18H17M-29-7H29M-34 5H34M-32 17H32M-27 29H27M-17 41H17"
+                />
+                <path
+                  className="ship-gunwale"
+                  d="M-3-40C-26-26-38-7-37 13Q-35 32-23 44M3-40C26-26 38-7 37 13Q35 32 23 44"
+                />
+                <path className="ship-mast" d="M-6-38V-13" />
+                <path className="ship-sail" d="M-4-36Q12-29 18-16L-4-18Z" />
+                <path className="ship-sail-seam" d="M-2-31L12-19" />
+                <path className="ship-pennant" d="M-6-40L5-36L-6-32Z" />
+                <path className="ship-stern" d="M-17 46Q0 51 17 46" />
               </g>
               <g className="port-cargo" transform={`translate(${p.markerX},${p.markerY})`}>
-                <circle className="port-medallion" r="14" />
-                {port.resource === 'any' ? (
-                  <text className="port-any" textAnchor="middle" y="1">
-                    ?
-                  </text>
-                ) : (
-                  <svg
-                    x="-12"
-                    y="-15"
-                    width="24"
-                    height="24"
-                    viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
-                  >
-                    <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
-                  </svg>
-                )}
-                <text className="port-rate" textAnchor="middle" y="11">
+                <path className="ship-cargo-cloth" d="M-21-17Q0-24 21-17L20 16Q0 21-20 16Z" />
+                <svg
+                  x="-22"
+                  y="-27"
+                  width="44"
+                  height="44"
+                  viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
+                >
+                  <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
+                </svg>
+                <rect className="port-rate-plaque" x="-16" y="14" width="32" height="17" rx="3" />
+                <text className="port-rate" textAnchor="middle" y="27">
                   {port.resource === 'any' ? '3:1' : '2:1'}
                 </text>
               </g>

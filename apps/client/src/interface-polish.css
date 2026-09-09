@@ -1,4 +1,8 @@
 /* Quiet carved controls: full-size symbols, a painted rim, and one small bevel. */
+.playing {
+  --table-button-size: 58px;
+  --turn-button-size: 68px;
+}
 .side-controls .icon-button,
 .turn-action,
 .trade-action {
@@ -96,10 +100,57 @@
 .playing .table-actions {
   gap: 12px;
 }
+.playing .trade-action,
+.playing .development-hand-inline .development-buy {
+  width: var(--table-button-size);
+  min-width: var(--table-button-size);
+  height: var(--table-button-size);
+  flex: none;
+}
+.playing .turn-action {
+  width: var(--turn-button-size);
+  height: var(--turn-button-size);
+}
+.playing .turn-action .game-icon {
+  width: calc(var(--turn-button-size) * 0.53);
+  height: calc(var(--turn-button-size) * 0.53);
+}
+.playing .development-hand-inline .development-buy {
+  gap: 2px;
+  padding: 4px 2px;
+  border-radius: 10px;
+  box-shadow: 0 3px 5px #14251e99;
+}
+.playing .development-buy-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.playing .development-hand-inline .development-buy-mark,
+.playing .development-hand-inline .development-buy-mark > .game-icon:first-child {
+  width: max(17px, calc(var(--table-button-size) * 0.44));
+  height: max(17px, calc(var(--table-button-size) * 0.44));
+}
+.playing .development-hand-inline .development-buy-mark {
+  padding: 0;
+}
+.playing .development-hand-inline .development-buy-mark > .game-icon:last-child {
+  width: clamp(11px, calc(var(--table-button-size) * 0.26), 16px);
+  height: clamp(11px, calc(var(--table-button-size) * 0.26), 16px);
+}
+.playing .development-buy-cost > span,
+.playing .development-buy-cost .sprite {
+  width: clamp(9px, calc(var(--table-button-size) * 0.25), 14px);
+  height: clamp(9px, calc(var(--table-button-size) * 0.25), 14px);
+}
 .dice-dock {
   left: auto;
   right: 0;
-  width: 58px;
+  width: var(--turn-button-size);
+  bottom: calc(var(--turn-button-size) + 12px);
 }
 
 /* A shared material for settings, rules, trades, journal, and profile selection. */
@@ -932,16 +983,17 @@
 }
 
 @media (max-width: 1000px) {
+  .playing {
+    --table-button-size: 49px;
+    --turn-button-size: 58px;
+  }
   .playing .card-table {
     gap: 22px;
     padding-inline: 13px;
-    max-width: calc(100% - 85px);
+    max-width: calc(100% - 24px);
   }
   .playing .hand-zone {
     column-gap: 24px;
-  }
-  .dice-dock {
-    width: 49px;
   }
   .playing .trade-panel,
   .playing .journal-panel {
@@ -954,6 +1006,15 @@
   }
 }
 @media (max-width: 700px) {
+  .playing {
+    --table-button-size: 40px;
+    --turn-button-size: 48px;
+  }
+  .playing .development-hand-inline .development-buy {
+    padding: 2px 1px;
+    gap: 1px;
+    border-radius: 8px;
+  }
   .playing .card-table {
     gap: 20px;
     padding: 0 10px 12px;
@@ -969,9 +1030,6 @@
   }
   .playing .table-actions {
     gap: 10px;
-  }
-  .dice-dock {
-    width: 39px;
   }
   .side-controls .icon-button {
     padding: 4px;
@@ -1048,6 +1106,13 @@
   }
 }
 @media (max-width: 480px) {
+  .playing {
+    --table-button-size: 35px;
+    --turn-button-size: 42px;
+  }
+  .playing .player-rail {
+    bottom: calc(var(--hud-bottom) + 30px);
+  }
   :root {
     --hand-card-width: 28px;
     --hand-card-height: 54px;
@@ -1064,7 +1129,7 @@
     gap: 6px;
   }
   .dice-dock {
-    width: 35px;
+    bottom: calc(var(--turn-button-size) + var(--table-button-size) + 14px);
   }
   .game-dialog .panel-heading h2 {
     font-size: 18px;
@@ -1085,6 +1150,13 @@
   }
 }
 @media (max-width: 380px) {
+  .playing {
+    --table-button-size: 32px;
+    --turn-button-size: 39px;
+  }
+  .playing .development-hand-inline .development-buy {
+    padding: 1px;
+  }
   :root {
     --hand-card-width: 24px;
     --hand-card-height: 49px;
@@ -1096,14 +1168,6 @@
   }
   .development-hand-inline {
     gap: 8px;
-  }
-  .development-hand-inline .development-buy {
-    min-width: 38px;
-  }
-  .development-buy-cost > span,
-  .development-buy-cost .sprite {
-    width: 11px;
-    height: 11px;
   }
   .picker-cards {
     gap: 5px;
@@ -1128,9 +1192,6 @@
   .playing .trade-panel,
   .playing .journal-panel {
     padding: 14px;
-  }
-  .dice-dock {
-    width: 32px;
   }
   .rules-scores .game-icon {
     width: 23px;

@@ -1,0 +1,363 @@
+/* Compact blue surfaces with quiet wood-colored labels; scoped to these three panels. */
+.playing .game-panel.journal-panel,
+.playing .game-panel.utility-panel:has(.connection-detail),
+.game-dialog:has(.rules-book) {
+  border-color: #8aa39d66;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #344e57, #273e49 80%);
+  box-shadow:
+    inset 0 1px #cad9ca1a,
+    0 9px 28px #0c19286b;
+}
+.playing .game-panel.journal-panel {
+  width: min(335px, calc(100vw - 90px));
+  padding: 12px 14px;
+  max-height: calc(100dvh - 155px);
+}
+.playing .game-panel.journal-panel > .panel-heading,
+.playing .game-panel.utility-panel:has(.connection-detail) > .panel-heading,
+.game-dialog:has(.rules-book) .panel-heading {
+  margin-bottom: 10px;
+  padding-bottom: 7px;
+  border-color: #a5bdb32b;
+}
+.playing .game-panel.journal-panel > .panel-heading h2,
+.playing .game-panel.utility-panel:has(.connection-detail) > .panel-heading h2,
+.game-dialog:has(.rules-book) .panel-heading h2 {
+  font-size: 17px;
+}
+.turn-journal .journal-turn {
+  margin: 0 0 13px;
+}
+.turn-journal .journal-turn:last-child {
+  margin-bottom: 0;
+}
+.turn-journal .journal-turn h3 {
+  margin: 0 0 6px;
+  padding: 3px 0 5px;
+  color: #d9c89f;
+  font:
+    600 11px/1.3 Barlow,
+    sans-serif;
+  letter-spacing: 0.04em;
+}
+.turn-journal .journal-turn ol {
+  gap: 5px;
+}
+.turn-journal .journal-move {
+  gap: 7px;
+}
+.turn-journal .journal-action {
+  width: 21px;
+  height: 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.turn-journal .journal-action > .game-icon {
+  width: 20px;
+  height: 20px;
+}
+.turn-journal .journal-action .automatic-mark {
+  right: -3px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+}
+.turn-journal .automatic-mark > .game-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.turn-journal .journal-lines {
+  flex: 1;
+  min-width: 0;
+}
+.turn-journal .journal-move p {
+  margin: 1px 0 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.turn-journal .journal-move p:last-child {
+  margin-bottom: 0;
+}
+.turn-journal .journal-resource .sprite {
+  width: 19px;
+  height: 21px;
+}
+.turn-journal .journal-item .game-icon {
+  width: 17px;
+  height: 17px;
+}
+.turn-journal .journal-resource b {
+  font-size: 12px;
+}
+.turn-journal .journal-person {
+  font-weight: 600;
+}
+.turn-journal .history-more {
+  min-height: 31px;
+  margin-top: 8px;
+  padding: 5px 9px;
+  font-size: 11px;
+}
+
+.game-dialog:has(.rules-book) {
+  width: min(420px, calc(100vw - 24px));
+}
+.game-dialog:has(.rules-book) .dialog-surface {
+  padding: 17px 18px;
+}
+.rules-book .rules-victory {
+  gap: 10px;
+  padding: 0 0 13px;
+}
+.rules-book .rules-victory > .game-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+.rules-book .rules-victory strong {
+  font:
+    600 18px/1.2 Barlow,
+    sans-serif;
+  color: #efdfbb;
+}
+.rules-book .rules-victory p {
+  margin: 3px 0 0;
+  font-size: 11px;
+}
+.rules-book .rules-scores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin: 0;
+  padding: 0 0 11px;
+  border: 0;
+  border-bottom: 1px solid #acbeb32b;
+  border-radius: 0;
+  background: transparent;
+}
+.rules-scores > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+.rules-scores dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #e0e0cb;
+  font-size: 12px;
+}
+.rules-scores dd {
+  margin: 0;
+  color: #ecdbb2;
+  font-weight: 650;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.rules-book .rules-scores .game-icon {
+  width: 23px;
+  height: 23px;
+}
+.rules-awards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 11px 0 0;
+}
+.rules-awards section > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.rules-awards .game-icon {
+  width: 21px;
+  height: 21px;
+  flex: none;
+}
+.rules-awards strong {
+  color: #e7dec2;
+  font-size: 11px;
+  font-weight: 600;
+}
+.rules-awards b {
+  margin-left: auto;
+  white-space: nowrap;
+  color: #e2c994;
+  font-size: 11px;
+  font-weight: 600;
+}
+.rules-awards p {
+  color: #bccdc6;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 4px 0 0;
+}
+.rules-book .rules-rhythm {
+  gap: 6px;
+  margin: 15px 0 13px;
+  font-size: 11px;
+}
+.rules-book .rules-rhythm > .game-icon {
+  width: 13px;
+  height: 13px;
+}
+.rules-book .rules-rhythm > .game-icon:first-child {
+  width: 21px;
+  height: 21px;
+}
+.rules-build h3 {
+  margin: 0 0 5px;
+  color: #decdab;
+  font-size: 12px;
+  font-weight: 600;
+}
+.rules-book .rules-costs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.rules-book .rules-costs > .build-recipe {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #a7bbae26;
+  border-radius: 8px;
+  background: #17303b66;
+}
+.rules-book .rules-costs dt {
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.rules-book .rules-costs dt > .game-icon {
+  width: 23px;
+  height: 23px;
+  flex: none;
+}
+.rules-book .rules-costs dd {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.recipe-pay {
+  color: #c1cfc4;
+  font-size: 10px;
+  flex: none;
+}
+.rules-book .rules-costs .resource-summary {
+  gap: 3px;
+}
+.rules-book .rules-costs .resource-summary .sprite {
+  width: 24px;
+  height: 26px;
+}
+.rules-book .rules-costs .resource-summary b {
+  font-size: 12px;
+}
+.rules-book .rules-costs .resource-summary > [data-count='1'] > b {
+  display: none;
+}
+.rules-book .rules-costs .resource-summary > span + span::before {
+  content: '+';
+  color: #95b1aa;
+  margin-right: 3px;
+  font-size: 10px;
+}
+.rules-book .rules-notes {
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.rules-book .rules-notes p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.rules-book .rulebook-link {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 11px;
+}
+.rules-book .rulebook-link .game-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.playing .game-panel.utility-panel:has(.connection-detail) {
+  width: min(315px, calc(100vw - 90px));
+  padding: 13px 15px;
+}
+.connection-detail .connection-quality {
+  gap: 7px;
+  font-size: 12px;
+  background: transparent;
+}
+.connection-detail .connection-quality .game-icon {
+  width: 22px;
+  height: 22px;
+}
+.connection-detail .connection-quality b {
+  font-size: 18px;
+}
+.connection-detail .ping-graph {
+  margin: 12px 0 10px;
+  border-radius: 6px;
+}
+.connection-detail .connection-stats {
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.connection-detail .connection-stats dt {
+  color: #b8cbc3;
+}
+.connection-detail .connection-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  min-height: 32px;
+  font-size: 11px;
+}
+.connection-detail .sync-refresh {
+  width: 17px;
+  height: 17px;
+}
+.connection-detail .connection-note {
+  margin-top: 10px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+@media (max-width: 700px) {
+  .playing .game-panel.journal-panel,
+  .playing .game-panel.utility-panel:has(.connection-detail) {
+    left: 47px;
+    width: min(335px, calc(100vw - 62px));
+    max-height: calc(100dvh - 145px);
+    padding: 11px 12px;
+  }
+}
+@media (max-width: 390px) {
+  .game-dialog:has(.rules-book) .dialog-surface {
+    padding: 14px;
+  }
+  .rules-awards {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .rules-awards p {
+    margin-left: 26px;
+  }
+}

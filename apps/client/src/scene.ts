@@ -3,6 +3,12 @@ import type { Board, Terrain } from '../../../packages/rules/src/board.js';
 export const HEX_SIZE = 64;
 export const WORLD = { x: -392, y: -368, width: 784, height: 736 };
 export const WATER_BAND = 90;
+export const WATER_FEATHER = 48;
+/** Includes the hull, mast, and contact shadow in the ship's local coordinates. */
+export const SHIP_BOUNDS = { x: -43, y: -48, width: 86, height: 107 };
+export const SHIP_HULL_PATH =
+  'M0-46C23-38 40-18 40 8C40 29 31 47 20 50Q0 56-20 50C-31 47-40 29-40 8C-40-18-23-38 0-46Z';
+export const SHIP_CARGO_AFT = 8;
 export const WATER_EDGE_WAVES = [
   { frequency: 5, phase: 0.35, amplitude: 1.7 },
   { frequency: 9, phase: 1.7, amplitude: 0.65 },
@@ -91,7 +97,7 @@ export function waterWidth(angle: number) {
   );
 }
 /** One continuous offset coast, not an extra ring of board-game hexagons. */
-export function waterOutline(board: Board): ShorePoint[] {
+export function waterOutline(board: Board, inset = 0): ShorePoint[] {
   const coast = coastPoints(board);
   return Array.from({ length: 240 }, (_, index) => {
     const angle = (index * Math.PI * 2) / 240,
@@ -101,7 +107,7 @@ export function waterOutline(board: Board): ShorePoint[] {
       high = 440;
     for (let step = 0; step < 22; step++) {
       const radius = (low + high) / 2;
-      if (coastDistance(coast, radius * nx, radius * ny) < waterWidth(angle)) low = radius;
+      if (coastDistance(coast, radius * nx, radius * ny) < waterWidth(angle) - inset) low = radius;
       else high = radius;
     }
     return { x: ((low + high) / 2) * nx, y: ((low + high) / 2) * ny };
@@ -133,7 +139,7 @@ export function portPlacement(board: Board, edgeId: number) {
     })),
     boatX: x + nx * 61,
     boatY: y + ny * 61,
-    markerX: x + nx * 61,
-    markerY: y + ny * 61,
+    markerX: x + nx * (61 - SHIP_CARGO_AFT),
+    markerY: y + ny * (61 - SHIP_CARGO_AFT),
   };
 }
