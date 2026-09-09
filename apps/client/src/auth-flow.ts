@@ -2,6 +2,23 @@ import type { SupabaseClient, Session } from '@supabase/supabase-js';
 
 export const LINK_KEY = 'catanova.auth.link';
 type GuestLink = { id: string; access_token: string; refresh_token: string };
+export async function beginGuestSignIn(
+  client: SupabaseClient,
+  captchaRequired: boolean,
+  captchaToken?: string,
+  expiredGuest = false,
+) {
+  if (captchaRequired && !captchaToken) throw new Error('Complete the quick check to continue.');
+  if (expiredGuest) {
+    const { error } = await client.auth.signOut({ scope: 'local' });
+    if (error) throw error;
+  }
+  // Supabase consumes this single-use token; never validate it a second time on our server.
+  const { error } = await client.auth.signInAnonymously(
+    captchaToken ? { options: { captchaToken } } : undefined,
+  );
+  if (error) throw error;
+}
 export async function beginGoogleSignIn(
   client: SupabaseClient,
   storage: Storage,

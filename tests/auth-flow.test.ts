@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { beginGoogleSignIn, completeGoogleLink, LINK_KEY } from '../apps/client/src/auth-flow.js';
+import {
+  beginGoogleSignIn,
+  beginGuestSignIn,
+  completeGoogleLink,
+  LINK_KEY,
+} from '../apps/client/src/auth-flow.js';
 
 function session(id: string, anonymous: boolean): Session {
   return {
@@ -39,6 +44,11 @@ function fixture(initial: Session | null) {
         calls.push({ kind: 'oauth', args });
         return { error: null };
       },
+      signInAnonymously: async (args: unknown) => {
+        calls.push({ kind: 'guest', args });
+        current = session('new-guest', true);
+        return { data: { session: current }, error: null };
+      },
       refreshSession: async () => {
         calls.push({ kind: 'refresh' });
         if (current) current = session(current.user.id, false);
@@ -66,6 +76,30 @@ function fixture(initial: Session | null) {
     },
   };
 }
+test('guest CAPTCHA is required before replacing an expired identity and its token goes directly to Supabase', async () => {
+  const f = fixture(session('expired', true));
+  await assert.rejects(beginGuestSignIn(f.client, true, undefined, true), /quick check/);
+  assert.equal(f.current()!.user.id, 'expired');
+  assert.deepEqual(f.calls, []);
+  await beginGuestSignIn(f.client, true, 'single-use-token', true);
+  assert.deepEqual(f.calls, [
+    { kind: 'signout', args: { scope: 'local' } },
+    { kind: 'guest', args: { options: { captchaToken: 'single-use-token' } } },
+  ]);
+});
+test('a rejected guest challenge is not retried or reused, while unconfigured projects keep their existing flow', async () => {
+  const f = fixture(null);
+  const attempts: unknown[] = [];
+  f.client.auth.signInAnonymously = async (args) => {
+    attempts.push(args);
+    return { data: { user: null, session: null }, error: new Error('captcha_failed') } as never;
+  };
+  await assert.rejects(beginGuestSignIn(f.client, true, 'expired-token'), /captcha_failed/);
+  assert.deepEqual(attempts, [{ options: { captchaToken: 'expired-token' } }]);
+  const noCaptcha = fixture(null);
+  await beginGuestSignIn(noCaptcha.client, false);
+  assert.deepEqual(noCaptcha.calls, [{ kind: 'guest', args: undefined }]);
+});
 test('Google sign-in links a live anonymous identity; permanent sign-in uses OAuth', async () => {
   const guest = fixture(session('guest', true));
   await beginGoogleSignIn(guest.client, guest.storage, 'https://game.test/auth/callback');

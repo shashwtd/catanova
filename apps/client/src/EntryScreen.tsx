@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { BrandLogo } from './BrandLogo.js';
 import { rememberEntryIntent } from './entry-intent.js';
+import { Turnstile } from './Turnstile.js';
 import type { RoomPreview, Session } from '../../../packages/protocol/src/index.js';
 import { ArrowLeft, ArrowRight, LoaderCircle, LogOut, Plus, Settings2, Users } from './GameIcons.js';
 import { Avatar } from './Profile.js';
@@ -61,10 +62,17 @@ export function EntryScreen({
   onRules?: () => void;
 }) {
   const [signInOpen, setSignInOpen] = useState(false);
+  const [guestCheck, setGuestCheck] = useState(false);
   const local = auth.config?.mode === 'local';
   const homeMenu = entry === 'home' && (!signInOpen || auth.canPlay) && !auth.needsOnboarding;
   const goBack = () => {
+    if (guestCheck) {
+      setGuestCheck(false);
+      auth.clearError();
+      return;
+    }
     rememberEntryIntent(sessionStorage, 'home');
+    setGuestCheck(false);
     setSignInOpen(false);
     onBack();
   };
@@ -185,7 +193,22 @@ export function EntryScreen({
                   {previewRoom && <InviteRoster room={previewRoom} />}
                 </>
               )}
-              {auth.user && !auth.guestExpired ? (
+              {guestCheck && (!auth.user || auth.guestExpired) && auth.config?.captcha?.siteKey ? (
+                <div className="guest-check">
+                  <p>One quick check to play as a guest.</p>
+                  {auth.error ? (
+                    <button className="dark-button" onClick={auth.clearError}>
+                      Retry check
+                    </button>
+                  ) : (
+                    <Turnstile
+                      siteKey={auth.config.captcha.siteKey}
+                      action="guest_signup"
+                      onVerify={(token) => void auth.signInGuest(returnPath, token)}
+                    />
+                  )}
+                </div>
+              ) : auth.user && !auth.guestExpired ? (
                 <button className="dark-button" onClick={() => void auth.retryProfile()}>
                   Retry account
                 </button>
@@ -200,7 +223,11 @@ export function EntryScreen({
                   <button
                     className="dark-button guest-button"
                     disabled={!auth.config?.auth}
-                    onClick={() => void auth.signInGuest(returnPath)}
+                    onClick={() => {
+                      auth.clearError();
+                      if (auth.config?.captcha?.siteKey) setGuestCheck(true);
+                      else void auth.signInGuest(returnPath);
+                    }}
                   >
                     Play as guest
                     <ArrowRight size={20} />

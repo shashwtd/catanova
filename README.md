@@ -10,6 +10,8 @@ Two-player rooms use the same board, resource supply, building costs, turn flow 
 
 The welcome screen leads with **Create room** and **Join room**, followed by Google or guest access when needed. A brighter [Catanova mark and full wordmark](docs/art/logo-concepts/README.md) sit over the game's own coastal scenery.
 
+Guest signups support Cloudflare Turnstile, validated by Supabase. Google sign-in stays direct. [Authentication and CAPTCHA setup](docs/AUTH.md).
+
 ## Play locally
 
 Use **Node.js 24 LTS** or Node 26:

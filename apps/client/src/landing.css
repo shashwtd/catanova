@@ -275,6 +275,34 @@
   background: #d6dfbd;
   border-color: #6b8c58;
 }
+.guest-check {
+  text-align: center;
+}
+.guest-check > p {
+  margin: 0 0 18px;
+  color: #52634b;
+  font-size: 15px;
+}
+.captcha-check {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.captcha-check-widget {
+  min-width: 150px;
+  min-height: 140px;
+}
+.captcha-check-status {
+  color: #52634b;
+  font-size: 13px;
+}
+.captcha-check-status:empty {
+  display: none;
+}
+.captcha-check-retry {
+  max-width: 250px;
+}
 @media (max-width: 650px) {
   .entry-world .landing-screen {
     padding: 94px 18px 78px;

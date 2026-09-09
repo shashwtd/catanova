@@ -10,6 +10,13 @@ Catanova uses Supabase Auth with PKCE, plus Supabase Postgres for globally uniqu
 4. Set up a fresh project by running [supabase/schema.sql](../supabase/schema.sql) in the Supabase SQL editor. It creates the account tables, scoped functions and permissions, with no old-user import or migration history. It is safe to rerun. The app returns `ACCOUNT_SETUP_REQUIRED` with a retry message when the functions are absent; it never substitutes a local username reservation.
 5. In Supabase Authentication → URL Configuration, allow the exact application callback: `http://127.0.0.1:3000/auth/callback` for the local server, `http://127.0.0.1:5173/auth/callback` for Vite, and your production HTTPS callback when hosting. Set the Site URL and keep the hostname consistent.
 6. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `REQUIRE_AUTH=true` in the server environment, then build and restart. Changing these runtime values does not require rebuilding the client.
+7. For guest CAPTCHA, select **Cloudflare Turnstile** under Supabase Authentication → Bot and Abuse Protection and save its secret there. Set only the public `TURNSTILE_SITE_KEY` in the game's environment. Allow the game's hostname in the Turnstile widget settings, including `127.0.0.1` or `localhost` when testing locally. The secret is not needed in this repository or the game server.
+
+## Guest verification
+
+Choosing **Play as guest** opens a compact Turnstile check. Its single-use token goes directly to `signInAnonymously({ options: { captchaToken } })`; Supabase performs server-side validation. A failed attempt waits for an explicit retry and a new token, and leaving the screen removes the widget. The script is loaded only when the guest check opens; the server's content security policy permits the Cloudflare script and frame only when a site key is configured.
+
+Google sign-in and guest-to-Google linking remain direct, with no additional CAPTCHA. Existing guest sessions do not repeat the check on every room join or reconnect. Supabase's CAPTCHA setting must remain enabled to protect direct anonymous signup requests as well as the app's UI. See [Supabase's CAPTCHA guide](https://supabase.com/docs/guides/auth/auth-captcha), [anonymous sign-in API](https://supabase.com/docs/reference/javascript/auth-signinanonymously), and [Cloudflare hostname management](https://developers.cloudflare.com/turnstile/additional-configuration/hostname-management/).
 
 ```sh
 npm run build

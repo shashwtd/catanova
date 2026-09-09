@@ -33,6 +33,7 @@ export async function startServer(
     clientDirectory?: string;
     auth?: AuthConfig | null;
     verifyIdentity?: VerifyIdentity;
+    captcha?: { siteKey: string } | null;
     now?: () => number;
   } = {},
 ) {
@@ -40,15 +41,24 @@ export async function startServer(
   const verify = options.verifyIdentity ?? (auth ? createVerifier(auth) : undefined);
   const accounts = auth ? new AccountService(auth) : undefined;
   const now = options.now ?? Date.now;
+  const siteKey =
+    options.captcha === null
+      ? undefined
+      : (options.captcha?.siteKey ?? process.env.TURNSTILE_SITE_KEY)?.trim();
+  const captcha = siteKey ? { siteKey } : undefined;
   const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now });
   let closing = false;
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
     response.setHeader('Cache-Control', 'no-store');
     if (request.method === 'GET' && request.url === '/api/config') {
-      response
-        .writeHead(200)
-        .end(JSON.stringify({ auth: auth ?? null, mode: verify ? 'authenticated' : 'local' }));
+      response.writeHead(200).end(
+        JSON.stringify({
+          auth: auth ?? null,
+          mode: verify ? 'authenticated' : 'local',
+          ...(captcha ? { captcha } : {}),
+        }),
+      );
     } else if (request.url?.startsWith('/api/account') || request.url?.startsWith('/api/friends')) {
       try {
         if (!accounts)
@@ -202,7 +212,7 @@ export async function startServer(
           );
       }
     } else {
-      void serveClient(request, response, options.clientDirectory ?? 'dist/client', auth?.url);
+      void serveClient(request, response, options.clientDirectory ?? 'dist/client', auth?.url, !!captcha);
     }
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 24576, perMessageDeflate: false });

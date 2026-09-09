@@ -8,10 +8,11 @@ import {
 } from '../../../packages/protocol/src/profile.js';
 import type { Account, Profile, UsernameAvailability } from '../../../packages/protocol/src/profile.js';
 import { accountApi, AccountApiError } from './account-api.js';
-import { beginGoogleSignIn, completeGoogleLink } from './auth-flow.js';
+import { beginGoogleSignIn, beginGuestSignIn, completeGoogleLink } from './auth-flow.js';
 export type RuntimeConfig = {
   auth: { url: string; publishableKey: string } | null;
   mode: 'local' | 'authenticated';
+  captcha?: { siteKey: string } | null;
 };
 const RETURN_KEY = 'catanova.auth.return',
   PROFILE_KEY = 'catanova.local-profile';
@@ -290,7 +291,7 @@ export function useAuth() {
       setLoading(false);
     }
   }
-  async function signInGuest(returnPath = location.pathname) {
+  async function signInGuest(returnPath = location.pathname, captchaToken?: string) {
     if (!client.current) {
       setError('Guest accounts need Supabase to be configured');
       return;
@@ -304,12 +305,12 @@ export function useAuth() {
         await reloadProfile.current();
         return;
       }
-      if (guestExpired) {
-        const { error } = await client.current.auth.signOut({ scope: 'local' });
-        if (error) throw error;
-      }
-      const { error } = await client.current.auth.signInAnonymously();
-      if (error) throw error;
+      await beginGuestSignIn(
+        client.current,
+        !!configRef.current?.captcha?.siteKey,
+        captchaToken,
+        guestExpired,
+      );
       // No navigation: preserve an invite room while the same screen opens onboarding.
       if (/^\/room\/[A-Z2-9]{8}$/.test(returnPath)) sessionStorage.setItem(RETURN_KEY, returnPath);
       await reloadProfile.current();
