@@ -3,9 +3,10 @@
 ## Present: first playable local game
 
 - [x] Public Catanova repository, MIT license, independent rulebook and source ledger.
-- [x] Timber, Clay, Sheep, Hay and Rock; simple, original terrain atlas.
+- [x] Timber, Clay, Sheep, Hay and Rock; textured original terrain, environment and resource atlases.
 - [x] Reproducible balanced islands with inventory, geometry and fairness tests across 500 seeds.
-- [x] Three/four-player lobbies, invitations, shuffled turn order and snake setup.
+- [x] Three/four-player lobbies, direct invite previews, explicit Create/Join, lobby leave and host transfer.
+- [x] Shuffled turn order and snake setup.
 - [x] Dice production, bank shortages, sevens/discards, robber and private theft.
 - [x] Roads, settlements, cities, piece limits and distance/connectivity rules.
 - [x] Bank/port exchanges and public player offers/acceptance.
@@ -32,7 +33,7 @@ Implement and test the production Postgres adapter, schema migrations, server ow
 
 ## Visual and audio polish
 
-Keep terrain instantly readable and playful. Improve pieces, resource arrivals, dice and interaction feedback using the current art direction. Add original sound with volume/mute controls. Verify performance before replacing the small SVG board with a GPU renderer; the current renderer has no continuous animation loop.
+Keep terrain instantly readable and playful. Improve pieces, resource arrivals, dice and interaction feedback using the current art direction. Add original sound with volume/mute controls. Measure the new static WebGL terrain layer and its SVG fallback across devices. Optimize the generated PNG delivery pack for slow connections. Keep the renderer free of continuous idle animation.
 
 ## Public playable release
 

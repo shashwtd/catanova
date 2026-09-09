@@ -1,6 +1,6 @@
 # Catanova
 
-An open-source Catan-style game for **three or four friends**, built around reliable multiplayer and a simple, playful island.
+An open-source Catan-style game for **three or four friends**, built around reliable multiplayer and a vibrant, textured island.
 
 Trade **Timber, Clay, Sheep, Hay, and Rock**. Build settlements and cities. Race to ten points. Resume your seat when your connection drops.
 
@@ -16,7 +16,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Create a table, copy its invite link, and have friends join in separate tabs or browsers. The host can start with three or four players. To test all four seats on one machine, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**. The copy icon shares a direct room link; friends see that room’s island and a Join prompt. The door icon leaves the room. The host can start with three or four players. To test all four seats on one machine, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
 The local URL works on this machine. Other devices need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
@@ -58,7 +58,7 @@ npm run check
 npm run probe
 ```
 
-`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
+`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, invite previews, lobby departures, dock/coast geometry, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
 
 Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
@@ -66,7 +66,7 @@ Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a s
 
 ```text
 apps/
-  client/       React interface, SVG board, terrain atlas, recoverable connection
+  client/       React game UI, WebGL terrain + SVG controls, recoverable connection
   server/       Same-origin HTTP/WebSocket server, private snapshots, SQLite saves
 packages/
   protocol/     Shared messages and bounded input validation
@@ -85,6 +85,6 @@ The client animates accepted state; the server owns randomness, hidden informati
 - [Architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md), and [art provenance](docs/ART.md).
 - [Contributing](CONTRIBUTING.md) and [security](SECURITY.md).
 
-Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). The terrain atlas is original AI-generated art, with its prompt and provenance recorded. Do not contribute official game artwork or copied rulebook passages.
+Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). Terrain, environment and resource atlases are original AI-generated art, with their prompts and provenance recorded. Bundled fonts and interface icons retain their own licenses, listed in the art documentation. Do not contribute official game artwork or copied rulebook passages.
 
 Catanova is an independent, unofficial project. It is not affiliated with, endorsed by, or licensed by CATAN GmbH or CATAN Studio. CATAN is a trademark of its respective owners. The original game was designed by Klaus Teuber. The MIT license applies to our contributions and grants no rights to third-party trademarks or assets. Public source availability does not establish legal clearance for the name or a finished release.

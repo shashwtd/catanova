@@ -4,7 +4,7 @@
 
 `packages/rules` owns pure game transitions and board generation. `packages/protocol` defines bounded, canonical network messages. `apps/server` authenticates seats, supplies private randomness, commits actions and sends authorized views. `apps/client` renders those views and submits player intent.
 
-The first playable client uses React and a small SVG board with one original terrain atlas. This keeps 19 tiles and their accessible interaction targets simple; animations are finite and honor reduced motion. A PixiJS renderer remains an option if measured effects or device performance justify it. Rendering can change without rewriting rules.
+The client uses React, a static WebGL 2 terrain layer and an SVG interaction layer. Signed hex masks with noise blend textured biomes into shared ground; the coast and an 18-hex ocean ring use an environment atlas. Docks face the outward normal of their own coastal edge. WebGL draws on load and resize, capped at 2× pixel density; it has no idle animation loop. An SVG terrain fallback remains visible if WebGL is unavailable or loses its context. Placement targets stay accessible in SVG, and finite feedback animations honor reduced motion. See [art and renderer details](ART.md). Rendering stays independent of the rules.
 
 The Node process serves the built client and `/ws` on the same origin. Local play needs one install/build/start flow, and Docker ships both. A CDN can be introduced later without creating separate repositories. React/Vite integration follows the [React client API](https://react.dev/reference/react-dom/client/createRoot) and [Vite build documentation](https://vite.dev/guide/build).
 
@@ -16,7 +16,11 @@ The database stores full authoritative state. `gameView` emits a separate snapsh
 
 ## Sessions and command commitment
 
-`create` and `join` reserve one of four seats; a game starts with three or four. The room creator starts the game, and new seats are rejected after start. Each seat has a 256-bit client-generated secret token, stored only as a SHA-256 hash on the server. Repeated handshakes with the same token return the same seat, including when the first response was lost. Resuming replaces and immediately revokes the prior socket.
+`create` and `join` reserve one of four seats; a game starts with three or four. The first remaining lobby seat hosts the game, and new seats are rejected after start. Each seat has a 256-bit client-generated secret token, stored only as a SHA-256 hash on the server. Repeated handshakes with the same token return the same seat, including when the first response was lost. Resuming replaces and immediately revokes the prior socket.
+
+The server creates and persists the balanced board when the room is created. `GET /api/rooms/CODE` returns only that board, public player identities and whether play has started. The invite route opens a Join prompt over this preview. Starting the game uses the same board seed; private deck and turn-order randomness are separate. Legacy rooms without a stored preview board acquire one on first access.
+
+A `leave` command atomically marks a lobby seat departed, increments its revision and records the receipt. Departed credentials cannot resume; old receipts remain intact. Leaving after start preserves the seat and game state. The server closes intentional departures with code 4002, which stops automatic reconnection. A lost lobby-leave acknowledgment resolves on resume as `SEAT_LEFT`; the tab clears its pending departure.
 
 Every action has a UUID command ID, expected room revision and canonical payload. A SQLite transaction checks the receipt and revision, validates the move, saves next state, increments the revision and writes a receipt. A replay with the same ID and payload returns the original result. Reusing an ID with different intent or submitting a stale new action is rejected. The server never silently reinterprets stale intent.
 
