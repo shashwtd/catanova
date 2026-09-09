@@ -1,16 +1,18 @@
 # Hosting, reliability, and costs
 
-For `catanova.io`, the **free wiki choice (pending)**, rollout sequence and explanation of the historical $90–105 estimate, use the [launch infrastructure plan](LAUNCH_INFRASTRUCTURE.md). The current plan has **$0 wiki hosting**, with no paid wiki subscription. The ACA calculations below describe a later architecture, not a required first-launch bill.
+For `catanova.io`, the wiki options, rollout sequence and explanation of the historical $90–105 estimate, use the [launch infrastructure plan](LAUNCH_INFRASTRUCTURE.md). There is **no paid wiki subscription**: Fandom hosting is free, while self-hosted MediaWiki is free software that consumes cloud resources. Neither wiki is provisioned by this plan. The ACA calculations below describe a later architecture, not a required first-launch bill.
 
-Planning estimate checked **9 September 2026**, in **USD before taxes**, credits, and negotiated discounts. This document proposes a deployment; it does not provision cloud resources. No Azure or Supabase account has been inspected, and no credit balance or eligibility is assumed.
+Planning estimate checked **9 September 2026**, in **USD before taxes**, credits, and negotiated discounts. Azure subscription and regional SKU availability have been inspected; credit balance, expiry and Supabase billing remain unverified. No Catanova cloud resources have been provisioned. The [concrete Central India VM proposal](../deploy/single-vm/AZURE.md) has a **$32.37/month base retail estimate**, with **$35–40/month** allowed for initial light usage rather than a hard cap.
 
 ## Recommendation
 
-Use one repository and one distributable application image. For a small hosted playtest, keep the existing SQLite store on **one Azure Linux VM with a managed data disk**, using eligible Azure credits after checking the account. Keep Supabase for the implemented accounts/friends system. Select the region and VM size from real latency and memory/load measurements; there is no established concurrent-player capacity yet.
+Use one repository and one distributable game application image. For a small hosted playtest, keep the existing SQLite store on **one Azure Linux VM with a managed data disk**, using eligible Azure credits after checking the account. Keep Supabase for the implemented accounts/friends system. Select the region and VM size from real latency and memory/load measurements; there is no established concurrent-player capacity yet.
 
-Mount the managed disk into the application's data directory, retain it across VM replacement, and keep one game-server process. Supply HTTPS, updates, monitoring and off-host database backups. Do not use the VM's temporary disk: its contents can disappear during maintenance or redeployment. The VM, OS/data disks, public IP, bandwidth and backup storage need an actual regional quote; no fixed all-in VM price is assumed. [Azure disk guidance](https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview)
+Mount the managed disk into the application's data directory, retain it across VM replacement, and keep one game-server process. Supply HTTPS, updates, monitoring and off-host database backups. Do not use the VM's temporary disk: its contents can disappear during maintenance or redeployment. The linked VM proposal itemizes compute, disks, IP and backup capacity; actual usage, tax and credits remain separate. [Azure disk guidance](https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview)
 
 This gives us a route to testing online without first rewriting game storage. A single VM can still fail and cause a recovery window. Persistent storage and tested backups improve recovery; they do not make the service continuously available through host or regional failures.
+
+The existing static `/guide/` needs no extra service. An optional Fandom community adds browser editing without running another server. For an owned editable encyclopedia, the [MediaWiki plan](wiki/README.md#concrete-self-hosted-mediawiki-plan) uses separate MediaWiki and MariaDB workloads, persistent uploads/configuration and off-host backups. Those workloads need measured memory/CPU headroom and resource limits; they share the VM's outage window and may require a larger VM. Free software does not establish $0 incremental hosting cost.
 
 ### Future managed-container deployment
 
@@ -45,7 +47,7 @@ The following estimates assume 730 hours/month, one replica, fully active billin
 | Planning allowance: logs, small storage/registry, modest egress |                       **$5–15** |                            **$5–20** |
 | Estimated total before credits/tax                              |          **about $45–55/month** |               **about $65–80/month** |
 
-These are the earlier **game-service-only** examples, using a $5–20 operating allowance and excluding any wiki. The historical combined launch estimate used $10–20 for operations and added $17.99 for MyWikis, yielding $86.99–102.99, rounded to $90–105. Removing the paid wiki from that same combined model gives **$69–85**, but the initial VM/SQLite route must be quoted separately. None of these figures is current spending or a promise of player capacity.
+These are the earlier **game-service-only** examples, using a $5–20 operating allowance and excluding any wiki. The historical combined launch estimate used $10–20 for operations and added $17.99 for MyWikis, yielding $86.99–102.99, rounded to $90–105. Removing the paid wiki from that same combined model gives **$69–85** with free hosted Fandom or a free static wiki; this does not price a self-hosted MediaWiki workload. The initial VM/SQLite route and any colocated wiki must be quoted separately. None of these figures is current spending or a promise of player capacity.
 
 The existing Supabase project does not need to be upgraded merely to run the SQLite playtest. Free can be used within its limits for a controlled test, with possible inactivity pausing and no always-available promise. Pro starts at $25/month with compute credit for one Micro project; extra usage can increase charges. Check the actual plan and credits before changing it. [Supabase pricing](https://supabase.com/pricing)
 

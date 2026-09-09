@@ -4,6 +4,8 @@ This deployment runs the existing Node HTTP/WebSocket server and SQLite store be
 
 Use this bundle for the first controlled online release. It has one authoritative game process and a brief interruption during updates, not automatic failover. Do not add replicas or mount its SQLite volume into another running game server. The fixed container name prevents accidental Compose scaling.
 
+The [Azure setup proposal](AZURE.md) specifies the VM, retained disks, network and itemized monthly estimate. Resources still need provisioning.
+
 ## Prepare the host and accounts
 
 - Use a Linux VM with Docker Engine and the Compose plugin, with Docker's volume directory on a persistent managed disk rather than an Azure temporary/resource disk. VM deletion can still delete attached storage depending on its delete settings; decide that during provisioning.
