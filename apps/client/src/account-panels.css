@@ -1,0 +1,280 @@
+/* Account controls share the quiet blue panel surfaces used at the table. */
+.account-setup,
+.friends-panel {
+  width: 100%;
+  min-width: 0;
+  color: #eadfc3;
+  text-align: left;
+}
+.account-setup h2,
+.account-section-heading h2 {
+  margin: 0;
+  font:
+    600 21px/1.25 Barlow,
+    sans-serif;
+  color: #f1e2bd;
+}
+.account-intro,
+.account-note {
+  margin: 9px 0 15px;
+  color: #c3d0c4;
+  font:
+    400 13px/1.5 Barlow,
+    sans-serif;
+}
+.account-note {
+  font-size: 12px;
+  color: #acbfb6;
+}
+.account-setup .profile-editor,
+.friends-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.account-setup .profile-editor {
+  gap: 0;
+}
+.profile-editor .profile-preview {
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.profile-editor .profile-preview .field {
+  min-width: 0;
+  flex: 1;
+}
+.profile-editor .field input,
+.friends-panel .field input {
+  min-width: 0;
+  width: 100%;
+  background: #17323e;
+  border: 1px solid #95afa96b;
+  border-radius: 6px;
+  color: #f8ecd5;
+  box-shadow: inset 0 1px 3px #101d2a50;
+}
+.profile-editor .field input:focus-visible,
+.friends-panel .field input:focus-visible {
+  outline: 2px solid #dcbd79;
+  outline-offset: 2px;
+}
+.username-feedback {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 29px;
+  margin: 0 0 8px;
+  color: #becec1;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.username-feedback p {
+  margin: 0;
+}
+.username-feedback[data-status='available'] {
+  color: #b7d397;
+}
+.username-feedback[data-status='unavailable'],
+.username-feedback[data-status='error'] {
+  color: #efb29b;
+}
+.username-feedback .text-button {
+  min-height: 0;
+  padding: 0 4px;
+  font-size: inherit;
+  text-decoration: underline;
+}
+.avatar-medallion .avatar-photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 9%;
+  object-fit: cover;
+}
+.google-photo-choice {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  margin: 2px 0 14px;
+  padding: 7px 10px;
+  border: 1px solid #a5beb357;
+  border-radius: 8px;
+  background: #203b4677;
+  color: #e5dfc8;
+  text-align: left;
+  font-size: 13px;
+}
+.google-photo-choice .avatar-medallion {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+.google-photo-choice[aria-pressed='true'] {
+  border-color: #d9ba7f;
+  background: #42554d;
+}
+.google-photo-choice > .game-icon {
+  margin-left: auto;
+}
+.profile-editor .avatar-choices {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.profile-editor .avatar-choices button {
+  min-width: 0;
+  padding: 3px;
+}
+.profile-editor .avatar-choices .avatar-medallion {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.profile-editor .gold-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.account-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.account-section-heading > .game-icon {
+  width: 26px;
+  height: 26px;
+}
+.friends-panel .account-intro,
+.friends-panel .account-note,
+.friends-panel .entry-error,
+.friends-panel .account-success {
+  margin: 0;
+}
+.account-success {
+  color: #bedba7;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.friend-search {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.friend-search .field {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.friend-search > button {
+  flex: none;
+  min-height: 38px;
+  padding: 7px 11px;
+}
+.friends-section {
+  min-width: 0;
+  border-top: 1px solid #8fa99f38;
+  padding-top: 12px;
+}
+.friends-section h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 9px;
+  color: #ded2b0;
+  font:
+    600 13px/1.3 Barlow,
+    sans-serif;
+}
+.friends-section h3 > span {
+  color: #aebdb0;
+  font-size: 11px;
+}
+.friends-section ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.friend-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #91aa9e25;
+  border-radius: 7px;
+  background: #18323e6b;
+}
+.friend-row .avatar-medallion {
+  width: 34px;
+  height: 34px;
+}
+.friend-identity {
+  min-width: 0;
+}
+.friend-identity strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #eee4c9;
+}
+.friend-identity small,
+.friend-status {
+  color: #adbcac;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.friend-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.friend-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 30px;
+  padding: 5px 7px;
+  font-size: 11px;
+}
+.friend-refresh {
+  align-self: flex-start;
+  padding: 3px 0;
+  font-size: 11px;
+}
+@media (max-width: 380px) {
+  .profile-editor .avatar-choices {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .friend-row {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .friend-row .avatar-medallion {
+    width: 32px;
+    height: 32px;
+  }
+  .friend-row > .friend-actions,
+  .friend-row > .friend-status,
+  .friend-row > button {
+    grid-column: 2;
+    justify-self: end;
+  }
+}

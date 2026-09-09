@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "recordedAtUtc": "2026-09-09T13:17:00Z",
+  "project": "Catanova",
+  "status": "current",
+  "tool": "image_gen__imagegen",
+  "generationMode": "Fresh built-in image generation; text-only prompt",
+  "referenceImages": [],
+  "asset": {
+    "name": "title-landscape",
+    "savedPath": "apps/client/public/art/title-landscape.png",
+    "generatedSource": "generated_images/01a082ea-d1b1-7941-a18c-1bc2fbf1157e/exec-7d2f504a-1461-4216-bd75-4a8c9154045b.png",
+    "generationDate": "2026-09-09",
+    "use": "Wide title and lobby background; lettering and interface are separate code-rendered elements",
+    "requestedDimensions": {
+      "width": 1920,
+      "height": 1080,
+      "qualifier": "approximately; prompt requests 16:9"
+    },
+    "actualDimensions": {
+      "width": 1672,
+      "height": 941
+    },
+    "format": "PNG",
+    "mode": "RGB",
+    "bitDepth": 8,
+    "alpha": false,
+    "bytes": 2414627,
+    "sha256": "bde5b239acc08862f627cc08a07ab5c9a10d349de1e5974fc273254329aecabc",
+    "prompt": "Use case: stylized-concept.\nAsset type: final wide landscape background illustration for Catanova's fantasy board-game title and lobby screen, approximately 1920x1080 landscape.\nPrimary request: a beautiful welcoming hand-painted coastal island scenery. A winding shoreline, a few small vermilion-roof timber settlements, a modest wooden sailing boat at a harbor, golden fields, soft green woodland hills and pale distant rocky heights. Compose as one coherent inhabited island landscape, viewed from a nearby grassy hillside, not a literal hex board and not an isometric UI illustration.\nStyle: polished whimsical fantasy game background with expressive organic silhouettes, gouache-like color shapes, deliberate painterly texture, warm directional sunlight and cool atmospheric distance. Friendly and natural, moderate detail, crisp broad shapes, restrained surface texture. Inspiration in the broad feeling of richly painted platform-game worlds, original scenery and no existing franchise characters.\nComposition: landscape 16:9. Strong beautiful scenery primarily across left and middle lower half. Calm warm pale sky and distant mist in upper-left and upper-middle provide readable space for an app title that will be added in code. Rightmost 30 percent is quieter, darker teal-green wooded shadow and soft mist, suitable behind a sign-in panel that will be added in code. Foreground frames lower corners gently, without obstructing the central scenery.\nLighting: golden late-afternoon sun with soft warm clouds, inviting pale honey sky and sea-glass turquoise water. Greens varied and natural, no neon saturation or murky darkness. The red roofs provide small accents, not huge focal castles.\nConstraints: scenery only. No words, text, letters, logos, UI, buttons, borders, emblem, cards, dice, portraits or figures. No giant castle. Avoid generic shiny mobile-game 3D, photorealism, excessive microtexture, overwhelming contrast, floating resource piles, copied franchise imagery or watermarks. One finished painting, no contact sheet.",
+    "embeddedMetadata": "Original PNG includes a caBX chunk, preserved unchanged. This record does not assert independent verification of its signed contents.",
+    "visualAssessment": "Inspected as a standalone asset: warm coastal bay with a small sailing boat, red-roofed settlement, fields, wooded hills and distant pale mountains. Light sky and sea occupy the left; darker wooded slopes frame the right. No typography, logo, buttons or frame is baked into the painting.",
+    "copyValidation": "Compared the original generated PNG and saved asset byte for byte: identical, with matching SHA-256 and byte length.",
+    "postProcessing": "None. Source PNG copied unchanged; responsive display cropping and interface overlays are performed in code."
+  },
+  "rightsNote": "Original AI-generated scenery requested, with no image references. Painted describes its visual style, not human authorship. No assertion of exclusive image rights or third-party trademark rights."
+}

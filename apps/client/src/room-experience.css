@@ -1,0 +1,553 @@
+/* The entry and room screens share one landscape; the game keeps its wooden table. */
+.title-scenery {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #172c2d05 30%, #132b3b66),
+    url('/art/title-landscape.png') center / cover;
+}
+.game-world.entry-world,
+.game-world.lobby {
+  overflow-y: auto;
+  background: #283e3e;
+}
+.title-screen {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  align-items: center;
+  gap: 6vw;
+  min-height: 100dvh;
+  padding: 110px 7vw 60px;
+}
+.title-toolbar {
+  position: absolute;
+  inset: 24px 28px auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.title-tools,
+.lobby-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.lobby-self {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px 6px 6px;
+  border: 1px solid #ceb48863;
+  border-radius: 10px;
+  background: #142e39d9;
+  color: #f4dfaf;
+  box-shadow: 0 3px 12px #11253130;
+  max-width: 65%;
+}
+.lobby-self .avatar-medallion {
+  width: 47px;
+  height: 47px;
+  flex: none;
+}
+.lobby-self strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font:
+    600 19px Barlow,
+    sans-serif;
+}
+.lobby-self > span:last-child:not(.avatar-medallion) {
+  color: #b5c1b7;
+  font-size: 12px;
+}
+.title-wordmark {
+  align-self: start;
+  margin-top: clamp(30px, 11vh, 145px);
+  text-align: center;
+  color: #fff2d3;
+  text-shadow:
+    0 3px 0 #624637,
+    0 5px 10px #60433270,
+    0 14px 30px #70554440;
+}
+.title-wordmark h1 {
+  margin: 0;
+  font:
+    700 clamp(48px, 7.6vw, 122px)/1.15 Cinzel,
+    serif;
+  letter-spacing: -0.045em;
+}
+.title-wordmark > span {
+  display: block;
+  margin: 18px auto;
+  height: 2px;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, #fff0c9, transparent);
+}
+.title-panel {
+  width: 100%;
+  max-width: 450px;
+  justify-self: end;
+  padding: 32px;
+  border: 1px solid #c0ac7966;
+  border-radius: 15px;
+  background: linear-gradient(145deg, #223e47f7, #102836f5);
+  box-shadow:
+    0 18px 60px #14242c6b,
+    inset 0 1px #ebce9633;
+  color: #f2e6c7;
+}
+.title-panel h2 {
+  margin: 0 0 25px;
+  font:
+    600 26px/1.2 Cinzel,
+    serif;
+}
+.title-panel .entry-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 13px;
+  margin: 0;
+}
+.title-panel .gold-button,
+.title-panel .dark-button,
+.title-panel .google-button {
+  width: 100%;
+  justify-content: center;
+  min-height: 50px;
+  font-size: 16px;
+}
+.title-panel .google-button {
+  background: #f4ecd8;
+  color: #243c43;
+  border: 1px solid #fff4d4;
+}
+.title-panel .guest-button {
+  margin-top: 13px;
+}
+.title-panel .guest-policy {
+  margin: 15px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: #aebdb7;
+}
+.title-panel .entry-heading {
+  margin-bottom: 20px;
+  gap: 12px;
+}
+.title-panel .entry-heading h2 {
+  margin: 0;
+  font-size: 23px;
+}
+.title-panel .field {
+  margin-bottom: 18px;
+  color: #c5cfbc;
+}
+.title-panel .field input {
+  color: #fff0cc;
+  background: #122b37;
+  border: 1px solid #819c937d;
+}
+.title-panel .resume-button {
+  margin: 18px auto 0;
+  color: #d6d6b7;
+}
+.title-panel .local-mode {
+  display: block;
+  margin-top: 15px;
+  text-align: center;
+  color: #aebdb7;
+}
+.title-panel .menu-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  min-height: 140px;
+  color: #e4d7b4;
+}
+.title-panel .invite-room-code {
+  color: #e4c991;
+  margin-bottom: 15px;
+}
+.entry-invite-caption {
+  display: block;
+  margin: -12px 0 22px;
+  color: #cabb98;
+}
+.title-panel.onboarding-panel {
+  max-width: 510px;
+  padding: 25px;
+}
+.title-panel .account-setup h2 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+.title-panel .account-intro {
+  margin-bottom: 15px;
+}
+.title-panel .profile-preview .avatar-medallion {
+  width: 60px;
+  height: 60px;
+}
+.title-panel .profile-preview .field {
+  margin: 0;
+}
+.title-panel .profile-editor .avatar-choices {
+  gap: 6px;
+}
+.room-lobby.lobby-screen {
+  top: 0;
+  transform: none;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 25px 4vw 30px;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(#17323a70, #19354220 28%, #183039cc);
+  box-shadow: none;
+  color: #f1e6c7;
+}
+.room-lobby .lobby-heading {
+  padding: 0;
+  border: none;
+}
+.room-lobby .lobby-heading .icon-button {
+  background: linear-gradient(#354848, #203441);
+  color: #ead5a5;
+  border-color: #bba57966;
+}
+.room-lobby .lobby-center {
+  width: min(940px, 100%);
+  margin: auto;
+  padding: 42px 0 30px;
+}
+.lobby-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 13px;
+  margin-bottom: 24px;
+  text-shadow: 0 2px 7px #1b2d2f;
+}
+.lobby-caption h1 {
+  margin: 0;
+  font:
+    600 32px Cinzel,
+    serif;
+}
+.lobby-caption > span {
+  font-size: 14px;
+  color: #e0d6b4;
+}
+.room-lobby .lobby-seats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.room-lobby .lobby-seat {
+  padding: 28px 12px 23px;
+  min-height: 250px;
+  gap: 16px;
+  border-radius: 14px;
+  border: 1px solid #b9af8266;
+  background: linear-gradient(155deg, #2e4b50e8, #173140f2);
+  box-shadow:
+    0 10px 28px #10273150,
+    inset 0 1px #ddd4a922;
+}
+.room-lobby .lobby-seat.self {
+  border-color: #e1bc72b0;
+  background: linear-gradient(155deg, #425b53f0, #243a46f2);
+}
+.room-lobby .lobby-avatar .avatar-medallion {
+  width: clamp(72px, 9vw, 115px);
+  height: auto;
+  aspect-ratio: 1;
+}
+.room-lobby .lobby-seat > strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f3e9d0;
+  font:
+    600 20px Barlow,
+    sans-serif;
+}
+.room-lobby .ready-status {
+  min-height: 20px;
+  color: #b7c7ba;
+  font-size: 13px;
+  gap: 5px;
+}
+.room-lobby .ready-status.ready {
+  color: #d8e7a2;
+}
+.room-lobby .host-mark {
+  right: -7px;
+  bottom: -3px;
+  top: auto;
+  background: none;
+  padding: 0;
+  color: #f2c563;
+  filter: drop-shadow(0 2px 2px #263038);
+}
+.room-lobby .offline-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: #c1403f0d;
+  color: #f8716488;
+  box-shadow: none;
+}
+.room-lobby .open-seat {
+  color: #efdfaa;
+  background: #17344066;
+  border-style: dashed;
+}
+.room-lobby .open-seat:hover {
+  background: #35534bca;
+  border-color: #dac690;
+}
+.lobby-timer {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  margin: 20px auto 0;
+  background: #1c344276;
+  color: #d7d5b9;
+  border: 1px solid #adbd9733;
+  border-radius: 20px;
+  font-size: 13px;
+}
+.room-lobby .lobby-footer {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  border: 0;
+  padding: 15px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: end;
+  justify-content: space-between;
+}
+.room-share {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ac9b765e;
+  border-radius: 10px;
+  background: #1b3341df;
+  color: #ebdfbd;
+}
+.room-share .room-code-label {
+  font-size: 12px;
+  color: #b3bdac;
+}
+.room-share code {
+  font:
+    600 20px/1 Barlow,
+    sans-serif;
+  letter-spacing: 0.1em;
+  user-select: all;
+}
+.room-share-actions {
+  display: flex;
+  gap: 3px;
+}
+.room-share-actions button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #ddd5ad;
+}
+.room-share-actions button:hover {
+  background: #4b625c;
+  border-color: #a5b19a55;
+}
+.room-share .copy-feedback {
+  flex-basis: 100%;
+  color: #d9dfa7;
+  font-size: 12px;
+}
+.room-share .share-link-field {
+  flex-basis: 100%;
+  min-width: 0;
+  width: 100%;
+  background: #102936;
+  border: 1px solid #8eaa9066;
+  color: #eddfbb;
+}
+.room-lobby .lobby-launch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.lobby-launch > span {
+  color: #d2d4b9;
+  font-size: 13px;
+}
+.lobby-launch > button {
+  min-width: 200px;
+  min-height: 53px;
+  justify-content: center;
+  font-size: 18px;
+}
+@media (max-width: 900px) {
+  .title-screen {
+    padding: 105px 4vw 35px;
+    gap: 4vw;
+    grid-template-columns: minmax(0, 1fr) minmax(310px, 1fr);
+  }
+  .title-panel {
+    padding: 24px;
+  }
+  .title-wordmark h1 {
+    font-size: clamp(40px, 6.7vw, 68px);
+  }
+  .room-lobby .lobby-seats {
+    gap: 12px;
+  }
+  .room-lobby .lobby-seat {
+    min-height: 218px;
+    padding: 23px 8px;
+  }
+}
+@media (max-width: 650px) {
+  .title-screen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 25px;
+    padding: 110px 20px 35px;
+  }
+  .title-wordmark {
+    margin: 0;
+    align-self: center;
+  }
+  .title-wordmark h1 {
+    font-size: clamp(45px, 12vw, 70px);
+  }
+  .title-wordmark > span {
+    margin: 12px auto 0;
+  }
+  .title-toolbar {
+    inset: 17px 16px auto;
+  }
+  .title-toolbar .lobby-self {
+    gap: 6px;
+    max-width: 62%;
+    padding-right: 9px;
+  }
+  .lobby-self strong {
+    font-size: 15px;
+  }
+  .lobby-self .avatar-medallion {
+    width: 35px;
+    height: 35px;
+  }
+  .lobby-self > span:last-child:not(.avatar-medallion) {
+    display: none;
+  }
+  .title-tools,
+  .lobby-tools {
+    gap: 5px;
+  }
+  .title-panel {
+    align-self: center;
+    padding: 25px;
+  }
+  .room-lobby.lobby-screen {
+    padding: 17px 13px 24px;
+  }
+  .room-lobby .lobby-center {
+    padding-top: 35px;
+  }
+  .lobby-caption h1 {
+    font-size: 25px;
+  }
+  .room-lobby .lobby-seats {
+    gap: 7px;
+  }
+  .room-lobby .lobby-seat {
+    min-height: 165px;
+    gap: 14px;
+    padding: 18px 4px;
+    border-radius: 9px;
+  }
+  .room-lobby .lobby-avatar .avatar-medallion {
+    width: clamp(42px, 14vw, 78px);
+  }
+  .room-lobby .lobby-seat > strong {
+    font-size: 14px;
+  }
+  .room-lobby .ready-status {
+    font-size: 11px;
+  }
+  .room-lobby .lobby-footer {
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 20px;
+  }
+  .room-lobby .lobby-launch {
+    align-items: center;
+    width: 100%;
+  }
+  .lobby-launch > button {
+    width: min(320px, 100%);
+  }
+  .room-share {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .room-share code {
+    font-size: 18px;
+  }
+}
+@media (max-height: 600px) and (min-width: 651px) {
+  .title-screen {
+    padding-top: 95px;
+  }
+  .title-wordmark {
+    margin-top: 35px;
+  }
+  .room-lobby .lobby-center {
+    padding: 18px 0;
+  }
+  .room-lobby .lobby-seat {
+    min-height: 180px;
+    padding: 16px 8px;
+    gap: 10px;
+  }
+  .room-lobby .lobby-avatar .avatar-medallion {
+    width: 76px;
+  }
+}

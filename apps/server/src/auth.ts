@@ -1,6 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { ProtocolError } from './store.js';
-export type Identity = { id: string; name: string; expiresAt: number };
+import { AccountService } from './accounts.js';
+import type { Profile } from '../../../packages/protocol/src/profile.js';
+export type Identity = {
+  id: string;
+  name: string;
+  expiresAt: number;
+  tokenExpiresAt?: number;
+  profile?: Profile;
+  isGuest?: boolean;
+  guestExpiresAt?: number;
+};
 export type AuthConfig = { url: string; publishableKey: string };
 export type VerifyIdentity = (token: string | undefined) => Promise<Identity>;
 export function readAuthConfig(): AuthConfig | undefined {
@@ -36,12 +46,13 @@ export function readAuthConfig(): AuthConfig | undefined {
 }
 /** The Auth server validates the token. No browser-provided user ID or decoded claim is trusted alone. */
 export function createVerifier(config: AuthConfig): VerifyIdentity {
+  const accounts = new AccountService(config);
   const supabase = createClient(config.url, config.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(8000) }) },
   });
   return async (token) => {
-    if (!token) throw new ProtocolError('AUTH_REQUIRED', 'Sign in with Google to continue');
+    if (!token) throw new ProtocolError('AUTH_REQUIRED', 'Sign in to continue');
     let result;
     try {
       result = await supabase.auth.getUser(token);
@@ -51,7 +62,7 @@ export function createVerifier(config: AuthConfig): VerifyIdentity {
     const user = result.data.user;
     if (result.error || !user) throw new ProtocolError('AUTH_REQUIRED', 'Please sign in again');
     if (
-      user.is_anonymous ||
+      !user.is_anonymous &&
       !(user.app_metadata.providers ?? [user.app_metadata.provider]).includes('google')
     )
       throw new ProtocolError('AUTH_REQUIRED', 'Use a Google account to sign in');
@@ -63,10 +74,23 @@ export function createVerifier(config: AuthConfig): VerifyIdentity {
     }
     if (typeof exp !== 'number' || exp * 1000 <= Date.now())
       throw new ProtocolError('AUTH_REQUIRED', 'Please sign in again');
+    const account = await accounts.get(token);
+    if (account.id !== user.id)
+      throw new ProtocolError('AUTH_MISMATCH', 'Account identity did not match the verified session');
+    if (!account.registered || !account.profile)
+      throw new ProtocolError('ONBOARDING_REQUIRED', 'Choose your username and avatar before playing');
+    const guestExpiresAt = account.expiresAt ? Date.parse(account.expiresAt) : undefined;
+    if (exp * 1000 <= Date.now()) throw new ProtocolError('AUTH_REQUIRED', 'Please sign in again');
+    if (guestExpiresAt !== undefined && guestExpiresAt <= Date.now())
+      throw new ProtocolError('GUEST_EXPIRED', 'Your guest profile has expired');
     return {
       id: user.id,
-      name: String(user.user_metadata.full_name ?? user.user_metadata.name ?? 'Player').slice(0, 32),
-      expiresAt: exp * 1000,
+      name: account.profile.name,
+      profile: account.profile,
+      isGuest: account.isGuest,
+      tokenExpiresAt: exp * 1000,
+      ...(guestExpiresAt === undefined ? {} : { guestExpiresAt }),
+      expiresAt: Math.min(exp * 1000, guestExpiresAt ?? Infinity),
     };
   };
 }

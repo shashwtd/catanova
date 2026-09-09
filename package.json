@@ -2,7 +2,7 @@
   "name": "catanova",
   "version": "0.1.0",
   "private": true,
-  "description": "An open-source island game for three or four friends, with balanced maps and recoverable multiplayer.",
+  "description": "An open-source island game for two to four friends, with balanced maps and recoverable multiplayer.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -25,6 +25,7 @@
     "format": "prettier --write apps packages tests scripts docs README.md"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",

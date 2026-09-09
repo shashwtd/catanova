@@ -164,6 +164,19 @@ export class Store {
           throw new ProtocolError('INVALID_SESSION', 'Seat belongs to another room');
         if (identity && !existing.user_id)
           this.db.prepare('UPDATE seats SET user_id = ? WHERE id = ?').run(identity.id, existing.id);
+        // Account cosmetics/names are canonical before a match starts; live match names stay historical.
+        if (identity?.profile && !this.loadGame(existing.room_id)) {
+          const profile = parseProfile(identity.profile),
+            encoded = JSON.stringify(profile);
+          const saved = this.db.prepare('SELECT profile FROM seats WHERE id=?').get(existing.id)!;
+          if (saved.profile !== encoded || existing.name !== profile.name) {
+            this.db
+              .prepare('UPDATE seats SET name=?,profile=?,ready=0 WHERE id=?')
+              .run(profile.name, encoded, existing.id);
+            this.db.prepare('UPDATE rooms SET revision=revision+1 WHERE id=?').run(existing.room_id);
+            existing.name = profile.name;
+          }
+        }
         return { id: existing.id, room_id: existing.room_id, name: existing.name };
       }
       if (mode === 'resume') throw new ProtocolError('INVALID_SESSION', 'This seat cannot be resumed');
@@ -191,7 +204,7 @@ export class Store {
       if (this.loadGame(roomId!))
         throw new ProtocolError('GAME_STARTED', 'This game has already started; existing players can resume');
       const profile = identity
-        ? this.profile(identity.id, identity.name)
+        ? (identity.profile ?? this.profile(identity.id, identity.name))
         : parseProfile(requestedProfile ?? defaultProfile(name));
       const seat = { id: randomUUID(), room_id: roomId!, name: profile.name };
       this.db

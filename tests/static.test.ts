@@ -27,6 +27,10 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.match(await response.text(), /Catanova/);
   assert.match(response.headers.get('content-security-policy')!, /frame-ancestors 'none'/);
   assert.ok(response.headers.get('content-security-policy')!.includes(auth.url));
+  assert.match(
+    response.headers.get('content-security-policy')!,
+    /img-src 'self' data: https:\/\/\*\.googleusercontent\.com/,
+  );
   const config = await fetch(origin + '/api/config');
   assert.deepEqual(await config.json(), { auth, mode: 'authenticated' });
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');

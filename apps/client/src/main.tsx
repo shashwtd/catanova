@@ -7,7 +7,7 @@ import type { PlacementDraft } from './placement.js';
 import { usePreferences } from './preferences.js';
 import { useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
-import { DevelopmentCards } from './DevelopmentCards.js';
+import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
 import { GameSettings } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
@@ -15,7 +15,9 @@ import { FantasyTransition } from './FantasyTransition.js';
 import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
 import { useAuth, entryLocation } from './auth.js';
 import { Avatar, ProfileEditor } from './Profile.js';
-import { Lobby, Invite, InviteRoster } from './Lobby.js';
+import { Lobby, Invite } from './Lobby.js';
+import { EntryScreen } from './EntryScreen.js';
+import { FriendsPanel } from './FriendsPanel.js';
 import { PlayerRail } from './PlayerRail.js';
 import { ConnectionPanel } from './ConnectionPanel.js';
 import { BoardViewport } from './BoardViewport.js';
@@ -28,10 +30,6 @@ import { createRoot } from 'react-dom/client';
 import {
   History,
   Settings2,
-  UserRound,
-  LogOut,
-  Sailboat,
-  ArrowLeft,
   ArrowRight,
   Castle,
   Check,
@@ -42,9 +40,7 @@ import {
   LoaderCircle,
   Maximize,
   Minimize,
-  Plus,
   Route,
-  Users,
   Wifi,
   WifiOff,
   X,
@@ -76,6 +72,9 @@ import './hand-profile-polish.css';
 import './interface-polish.css';
 import './profile-presence.css';
 import './compact-panels.css';
+import './account-panels.css';
+import './room-experience.css';
+import './hud-layout.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -181,7 +180,16 @@ function App() {
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
-      'settings' | 'trade' | 'rules' | 'journal' | 'leave' | 'profile' | 'network' | 'invite' | null
+      | 'settings'
+      | 'trade'
+      | 'rules'
+      | 'journal'
+      | 'leave'
+      | 'profile'
+      | 'network'
+      | 'invite'
+      | 'friends'
+      | null
     >(null);
   const [robberHex, setRobberHex] = useState<number | null>(null),
     [selected, setSelected] = useState<Hand>(emptyHand);
@@ -264,6 +272,7 @@ function App() {
     setError('');
     setInvite(null);
     setPreviewRoom(null);
+    setPreviewLoading(false);
     setPreviewError('');
     setEntry('home');
     history.replaceState(null, '', '/');
@@ -348,7 +357,7 @@ function App() {
         }
         setError(message.message);
         feedback.sound.play('error');
-        if (message.commandId) setBusy(false);
+        if (message.commandId || !c.state) setBusy(false);
         if (['SEAT_LEFT', 'INVALID_SESSION', 'ROOM_NOT_FOUND', 'AUTH_MISMATCH'].includes(message.code)) {
           sessionStorage.removeItem(SESSION_KEY);
           sessionStorage.removeItem(OUTBOX_KEY);
@@ -380,6 +389,7 @@ function App() {
   useEffect(() => {
     if (!invite || room) return;
     setPreviewRoom(null);
+    setPreviewLoading(false);
     setPreviewError('');
     if (!validRoomCode(invite)) {
       setPreviewError('Invalid room link');
@@ -481,16 +491,6 @@ function App() {
       setBusy(false);
     }
   }
-  async function copyInvite() {
-    const id = room?.roomId ?? invite;
-    if (!id) return;
-    try {
-      await navigator.clipboard.writeText(`${location.origin}${roomPath(id)}`);
-      setToast('Link copied');
-    } catch {
-      setError(`Room code: ${id}`);
-    }
-  }
   async function signOut() {
     if (await auth.signOut()) home(true);
   }
@@ -509,7 +509,7 @@ function App() {
   }
   const last = readJSON<Session>(localStorage, LAST_SEAT_KEY);
   const resumableInvite =
-    entry === 'invite' && (!!previewRoom?.canResume || (last?.roomId === invite && last.joined));
+    entry === 'invite' && (!!previewRoom?.canResume || (last?.roomId === invite && !!last.joined));
   async function ready(value: boolean) {
     const c = connection.current;
     if (!c || disabled) return;
@@ -533,17 +533,17 @@ function App() {
     }
   }
   async function saveProfile(profile: Profile) {
+    const canonical = await auth.saveProfile(profile);
     const c = connection.current;
     if (room && !g && c) {
       setBusy(true);
       try {
-        await c.lobby(false, profile);
+        await c.lobby(false, canonical);
       } finally {
         setBusy(c.awaitingConfirmation);
       }
     }
-    await auth.saveProfile(profile);
-    setName(profile.name);
+    setName(canonical.name);
     setPanel(null);
   }
   const phaseText = !g
@@ -594,8 +594,9 @@ function App() {
           </BoardViewport>
         </div>
       )}
-      <nav className="side-controls game-controls" aria-label="Current game tools">
-        {g && (
+      {!g && <div className="title-scenery" aria-hidden="true" />}
+      {g && (
+        <nav className="side-controls game-controls" aria-label="Current game tools">
           <IconButton
             label="Move history"
             active={panel === 'journal'}
@@ -603,8 +604,6 @@ function App() {
           >
             <History />
           </IconButton>
-        )}
-        {room && (
           <IconButton
             label="Connection and ping"
             active={panel === 'network'}
@@ -613,85 +612,35 @@ function App() {
           >
             {networkBusy ? <LoaderCircle className="spin" /> : connected ? <Wifi /> : <WifiOff />}
           </IconButton>
-        )}
-        <IconButton
-          label="Rules"
-          active={panel === 'rules'}
-          onClick={() => setPanel(panel === 'rules' ? null : 'rules')}
-        >
-          <CircleHelp />
-        </IconButton>
-        {g && (
           <IconButton
             label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             onClick={() => void fullscreen()}
           >
             {isFullscreen ? <Minimize /> : <Maximize />}
           </IconButton>
-        )}
-        {g && (
-          <div className="construction-tools" aria-label="Build">
-            {(['road', 'settlement', 'city'] as const).map((kind, i) => {
-              const Icon = [Route, House, Castle][i]!,
-                sites =
-                  kind === 'road' ? g.legal.roads : kind === 'city' ? g.legal.cities : g.legal.settlements;
-              return (
-                <IconButton
-                  key={kind}
-                  className="build-control"
-                  label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
-                    .map((r) => `${COSTS[kind][r]} ${RESOURCE_NAMES[r]}`)
-                    .join(', ')}`}
-                  active={mode === kind}
-                  disabled={disabled || !actionPhase || !sites.length}
-                  onClick={() => {
-                    setPlacement(null);
-                    setMode(mode === kind ? null : kind);
-                    setPanel(null);
-                  }}
-                >
-                  <Icon />
-                </IconButton>
-              );
-            })}
-          </div>
-        )}
-      </nav>
-      <nav className="side-controls room-controls" aria-label="Room and profile">
-        <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
-          <Settings2 />
-        </IconButton>
-        {auth.canPlay && !g && (
-          <IconButton label="Your profile" active={panel === 'profile'} onClick={() => setPanel('profile')}>
-            <UserRound />
+        </nav>
+      )}
+      {g && (
+        <nav className="side-controls room-controls" aria-label="Room tools">
+          <IconButton
+            label="Rules"
+            active={panel === 'rules'}
+            onClick={() => setPanel(panel === 'rules' ? null : 'rules')}
+          >
+            <CircleHelp />
           </IconButton>
-        )}
-        {room && (
-          <>
-            {!g && (
-              <IconButton
-                label="Room invitation"
-                active={panel === 'invite'}
-                onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
-              >
-                <Users />
-              </IconButton>
-            )}
-            <IconButton
-              label="Leave room"
-              disabled={busy}
-              onClick={() => (g && !g.winner ? setPanel('leave') : void leave())}
-            >
-              <DoorOpen />
-            </IconButton>
-          </>
-        )}
-        {auth.user && !room && (
-          <IconButton label="Sign out" onClick={() => void signOut()}>
-            <LogOut />
+          <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
+            <Settings2 />
           </IconButton>
-        )}
-      </nav>
+          <IconButton
+            label="Leave room"
+            disabled={busy}
+            onClick={() => (!g.winner ? setPanel('leave') : void leave())}
+          >
+            <DoorOpen />
+          </IconButton>
+        </nav>
+      )}
       {g && room && (
         <PlayerRail
           room={room}
@@ -752,163 +701,37 @@ function App() {
         </div>
       )}
       {!room && (
-        <div className="entry-overlay">
-          <section
-            className={`entry-card ${entry === 'home' ? 'main-menu' : ''}`}
-            aria-label={entry === 'home' ? 'Game menu' : entry === 'create' ? 'Create room' : 'Join room'}
-          >
-            {entry === 'home' ? (
-              <>
-                <Sailboat className="menu-emblem" />
-                <h1>Catanova</h1>
-                {auth.loading ? (
-                  <div className="menu-loading">
-                    <LoaderCircle className="spin" />
-                  </div>
-                ) : auth.canPlay ? (
-                  <>
-                    <button className="menu-profile" onClick={() => setPanel('profile')}>
-                      <Avatar profile={auth.profile} />
-                      <span>{auth.profile.name || 'Choose your profile'}</span>
-                    </button>
-                    <div className="entry-actions">
-                      <button className="gold-button" onClick={() => setEntry('create')}>
-                        <Plus />
-                        Create room
-                      </button>
-                      <button className="dark-button" onClick={() => setEntry('join')}>
-                        <Users />
-                        Join room
-                      </button>
-                    </div>
-                    {last?.joined && (
-                      <button className="resume-button" onClick={() => connect(last)}>
-                        Resume game
-                        <ArrowRight size={15} />
-                      </button>
-                    )}
-                    {auth.config?.mode === 'local' && <span className="local-mode">Local playtest</span>}
-                  </>
-                ) : auth.user ? (
-                  <button className="dark-button" onClick={() => void auth.retryProfile()}>
-                    {auth.error ? 'Retry profile' : 'Loading profile…'}
-                  </button>
-                ) : (
-                  <button
-                    className="google-button"
-                    disabled={!auth.config?.auth}
-                    onClick={() => void auth.signIn()}
-                  >
-                    <span className="google-letter">G</span>Continue with Google
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="entry-heading">
-                  <IconButton label="Back" onClick={() => home(false)}>
-                    <ArrowLeft />
-                  </IconButton>
-                  <h1>{entry === 'create' ? 'Create room' : 'Join room'}</h1>
-                </div>
-                {entry === 'invite' && (
-                  <>
-                    <div className="invite-room-code">{invite}</div>
-                    {previewRoom && <InviteRoster room={previewRoom} />}
-                  </>
-                )}
-                {previewError && entry === 'invite' ? (
-                  <p className="entry-error">{previewError}</p>
-                ) : !auth.canPlay && auth.user ? (
-                  <button className="dark-button" onClick={() => void auth.retryProfile()}>
-                    {auth.error ? 'Retry profile' : 'Loading profile…'}
-                  </button>
-                ) : !auth.canPlay && !auth.loading ? (
-                  <button
-                    className="google-button"
-                    disabled={!auth.config?.auth}
-                    onClick={() => void auth.signIn(invite ? roomPath(invite) : '/')}
-                  >
-                    <span className="google-letter">G</span>Sign in to join
-                  </button>
-                ) : (
-                  <form onSubmit={(e) => void enter(e, entry === 'create' ? 'create' : 'join')}>
-                    {entry === 'join' && (
-                      <label className="field">
-                        Room code
-                        <input
-                          autoComplete="off"
-                          autoCapitalize="characters"
-                          maxLength={8}
-                          value={code}
-                          onChange={(e) => setCode(e.target.value.toUpperCase())}
-                          placeholder="XXXXXXXX"
-                          required
-                        />
-                      </label>
-                    )}
-                    <label className="field">
-                      Display name
-                      <input
-                        autoComplete="nickname"
-                        maxLength={32}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Name"
-                        required
-                        autoFocus
-                      />
-                    </label>
-                    {entry === 'invite' && previewRoom?.started && !resumableInvite ? (
-                      <p className="entry-error">This game has started.</p>
-                    ) : entry === 'invite' &&
-                      previewRoom &&
-                      previewRoom.players.length >= 4 &&
-                      !resumableInvite ? (
-                      <p className="entry-error">This room is full.</p>
-                    ) : resumableInvite ? (
-                      <button
-                        type="button"
-                        className="gold-button"
-                        disabled={networkBusy || !auth.canPlay}
-                        onClick={() =>
-                          connect(
-                            last?.roomId === invite
-                              ? last
-                              : newSession(auth.profile.name, invite!, auth.profile),
-                          )
-                        }
-                      >
-                        Resume room
-                        <ArrowRight />
-                      </button>
-                    ) : (
-                      <button
-                        type="submit"
-                        className="gold-button"
-                        disabled={
-                          busy ||
-                          networkBusy ||
-                          !auth.canPlay ||
-                          (entry === 'invite' && (previewLoading || !previewRoom))
-                        }
-                      >
-                        {networkBusy || previewLoading || busy ? (
-                          <LoaderCircle className="spin" />
-                        ) : entry === 'create' ? (
-                          <Plus />
-                        ) : (
-                          <ArrowRight />
-                        )}
-                        {entry === 'create' ? 'Create room' : 'Join room'}
-                      </button>
-                    )}
-                  </form>
-                )}
-              </>
-            )}
-          </section>
-        </div>
+        <EntryScreen
+          auth={auth}
+          entry={entry}
+          setEntry={setEntry}
+          name={name}
+          setName={setName}
+          code={code}
+          setCode={setCode}
+          invite={invite}
+          previewRoom={previewRoom}
+          previewLoading={previewLoading}
+          previewError={previewError}
+          resumableInvite={resumableInvite}
+          last={last}
+          busy={busy || networkBusy}
+          onEnter={(event, kind) => void enter(event, kind)}
+          onResume={() => {
+            const seat =
+              entry === 'invite'
+                ? last?.roomId === invite
+                  ? last
+                  : newSession(auth.profile.name, invite!, auth.profile)
+                : last;
+            if (seat) connect(seat);
+          }}
+          onBack={() => home(false)}
+          onProfile={() => setPanel('profile')}
+          onFriends={() => setPanel('friends')}
+          onSettings={() => setPanel('settings')}
+          onSignOut={() => void signOut()}
+        />
       )}
       {room && !g && (
         <Lobby
@@ -918,7 +741,8 @@ function App() {
           connected={connected}
           onReady={(v) => void ready(v)}
           onStart={() => void act({ kind: 'start' })}
-          onInvite={() => void copyInvite()}
+          onInvite={() => setPanel('invite')}
+          onFriends={auth.config?.mode === 'authenticated' ? () => setPanel('friends') : undefined}
           onLeave={() => void leave()}
           onEdit={() => setPanel('profile')}
           onSettings={() => setPanel('settings')}
@@ -942,6 +766,36 @@ function App() {
               )}
             </div>
           )}
+          {g && (
+            <div className="construction-tools build-shelf" aria-label="Build">
+              {(['road', 'settlement', 'city'] as const).map((kind, i) => {
+                const Icon = [Route, House, Castle][i]!,
+                  sites =
+                    kind === 'road' ? g.legal.roads : kind === 'city' ? g.legal.cities : g.legal.settlements;
+                return (
+                  <IconButton
+                    key={kind}
+                    className={`build-control build-${kind}`}
+                    label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
+                      .map((r) => `${COSTS[kind][r]} ${RESOURCE_NAMES[r]}`)
+                      .join(', ')}`}
+                    active={mode === kind}
+                    disabled={disabled || !actionPhase || !sites.length}
+                    onClick={() => {
+                      setPlacement(null);
+                      setMode(mode === kind ? null : kind);
+                      setPanel(null);
+                    }}
+                  >
+                    <Icon />
+                    <span className="build-control-label">
+                      {kind === 'settlement' ? 'House' : kind === 'city' ? 'City' : 'Road'}
+                    </span>
+                  </IconButton>
+                );
+              })}
+            </div>
+          )}
           <div className="card-table">
             <div className="hand-zone">
               <ResourceHand
@@ -950,7 +804,7 @@ function App() {
                 reducedMotion={reducedMotion}
                 onHover={() => feedback.sound.play('hover')}
               />
-              {me && (
+              {me && !!player?.cards?.length && (
                 <DevelopmentCards
                   game={g}
                   me={me}
@@ -963,26 +817,32 @@ function App() {
                     setPanel(null);
                     setPlacement(null);
                   }}
-                  canBuy={g.legal.canBuyCard}
-                  onBuy={() => void act({ kind: 'buyCard' })}
                 />
               )}
             </div>
             <div className="table-actions">
               <div className="dice-dock" data-dice-dock aria-hidden="true" />
-              <button
-                className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
-                aria-label="Trade"
-                title="Trade"
-                disabled={disabled || !actionPhase}
-                onClick={() => {
-                  setPanel(panel === 'trade' ? null : 'trade');
-                  setMode(null);
-                }}
-              >
-                <ArrowLeftRight size={33} />
-                <span>Trade</span>
-              </button>
+              <div className="utility-actions">
+                <button
+                  className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
+                  aria-label="Trade"
+                  title="Trade"
+                  disabled={disabled || !actionPhase}
+                  onClick={() => {
+                    setPanel(panel === 'trade' ? null : 'trade');
+                    setMode(null);
+                  }}
+                >
+                  <ArrowLeftRight size={33} />
+                  <span>Trade</span>
+                </button>
+                <div className="development-hand-inline purchase-control">
+                  <DevelopmentPurchase
+                    disabled={disabled || !g.legal.canBuyCard}
+                    onBuy={() => void act({ kind: 'buyCard' })}
+                  />
+                </div>
+              </div>
               <button
                 className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
                 aria-label={actionPhase ? 'End turn' : 'Roll dice'}
@@ -1153,7 +1013,7 @@ function App() {
       )}
       {panel === 'invite' && room && (
         <Dialog title="Room invitation" compact onClose={() => setPanel(null)}>
-          <Invite code={room.roomId} copy={() => void copyInvite()} />
+          <Invite code={room.roomId} />
         </Dialog>
       )}
       {panel === 'profile' && (
@@ -1170,9 +1030,16 @@ function App() {
             <ProfileEditor
               initial={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
               busy={busy}
+              checkUsername={auth.config?.mode === 'authenticated' ? auth.checkUsername : undefined}
+              googleAvatarUrl={auth.googleAvatarUrl}
               onSave={saveProfile}
             />
           )}
+        </Dialog>
+      )}
+      {panel === 'friends' && (
+        <Dialog title="Friends" onClose={() => setPanel(null)}>
+          <FriendsPanel auth={auth} />
         </Dialog>
       )}
       {panel === 'leave' && (

@@ -7,6 +7,8 @@ export const GAME_ICON_NAMES = [
   'settlement',
   'city',
   'road',
+  'robber',
+  'discard',
   'development',
   'history',
   'settings',
@@ -35,6 +37,8 @@ export const GAME_ICON_NAMES = [
   'pause',
   'edit',
   'copy',
+  'link',
+  'share',
   'refresh',
   'activity',
   'spark',
@@ -99,6 +103,22 @@ const paths: Record<GameIconName, ReactNode> = {
       <path d="m5 21 5 3m1-7 4 4m3-12 5 3m1-6 3 4" stroke={c.paper} strokeWidth="1.3" />
     </>
   ),
+  robber: (
+    <>
+      <path fill={c.indigo} d="M4 28 7 13Q9 3 16 2q7 1 9 11l3 15Z" />
+      <path fill={c.ink} d="M8 16q1-8 8-9 7 1 8 9l-3 10H11Z" />
+      <path d="m10 15 5 1m3 0 4-1" stroke={c.paper} strokeWidth="2" />
+      <path d="m7 27 4-7m14 7-4-7" stroke={c.blue} strokeWidth="2" />
+    </>
+  ),
+  discard: (
+    <>
+      <path fill={c.blue} d="m4 5 11-2 3 17-11 2Z" />
+      <path fill={c.paper} d="m11 5 11 2-3 16-11-2Z" />
+      <path fill={c.red} d="M23 13h5v9h3l-5.5 7-5.5-7h3Z" />
+      <path d="M3 27h13" stroke={c.wood} strokeWidth="3" />
+    </>
+  ),
   development: (
     <>
       <path fill={c.indigo} d="m7 5 19-2 2 23-19 3Z" />
@@ -108,9 +128,12 @@ const paths: Record<GameIconName, ReactNode> = {
   ),
   history: (
     <>
-      <path fill={c.blue} d="M2 8q7-4 14 0 7-4 14 0l-1 21q-7-4-13-1-6-3-13 0Z" />
-      <path fill={c.paper} d="M4 5q7-2 12 2 5-4 12-2l-.5 19q-6-2-11.5 1-5-3-11-1Z" />
-      <path d="M16 8v16M7 10l6 1m-6 4 6 1m6-5 6-1m-6 6 6-1" stroke={c.wood} strokeWidth="1.2" />
+      <circle cx="17" cy="16" r="10.5" fill={c.paper} />
+      <path d="M6 10a12 12 0 1 1-1 12" fill="none" stroke={c.ink} strokeWidth="5" />
+      <path d="M6 10a12 12 0 1 1-1 12" fill="none" stroke={c.blue} strokeWidth="3" />
+      <path fill={c.blue} d="M2 4v10h10Z" />
+      <path d="M17 9v8l5 3" fill="none" stroke={c.wood} strokeWidth="2.5" />
+      <circle cx="17" cy="17" r="1.5" fill={c.ink} stroke="none" />
     </>
   ),
   settings: (
@@ -302,6 +325,31 @@ const paths: Record<GameIconName, ReactNode> = {
       <path fill={c.green} d="M26 2 17 12l13 2Z" />
     </>
   ),
+  link: (
+    <>
+      <path
+        d="m13 8 3-3a7 7 0 0 1 10 10l-4 4m-3 5-3 3A7 7 0 0 1 6 17l4-4"
+        fill="none"
+        stroke={c.ink}
+        strokeWidth="7"
+      />
+      <path
+        d="m13 8 3-3a7 7 0 0 1 10 10l-4 4m-3 5-3 3A7 7 0 0 1 6 17l4-4"
+        fill="none"
+        stroke={c.blue}
+        strokeWidth="4"
+      />
+      <path d="m11 21 10-10" stroke={c.paper} strokeWidth="3.5" />
+    </>
+  ),
+  share: (
+    <>
+      <path d="m9 15 14-8M9 17l14 8" stroke={c.paper} strokeWidth="3" />
+      <circle cx="7" cy="16" r="5" fill={c.blue} />
+      <circle cx="25" cy="6" r="4.5" fill={c.green} />
+      <circle cx="25" cy="26" r="4.5" fill={c.green} />
+    </>
+  ),
   activity: <path d="M2 18h6l4-10 6 18 5-12 3 4h4" fill="none" stroke={c.green} strokeWidth="3.5" />,
   spark: (
     <>
@@ -345,6 +393,8 @@ export const Dices = icon('dice'),
   House = icon('settlement'),
   Castle = icon('city'),
   Route = icon('road'),
+  Robber = icon('robber'),
+  Discard = icon('discard'),
   ScrollText = icon('development'),
   History = icon('history'),
   Settings2 = icon('settings'),
@@ -374,6 +424,8 @@ export const Dices = icon('dice'),
   Pause = icon('pause'),
   Pencil = icon('edit'),
   Copy = icon('copy'),
+  Link = icon('link'),
+  Share2 = icon('share'),
   RefreshCw = icon('refresh'),
   Activity = icon('activity'),
   LoaderCircle = icon('timer'),

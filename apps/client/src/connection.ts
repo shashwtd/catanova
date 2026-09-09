@@ -272,6 +272,10 @@ export class Connection {
             'VERSION_MISMATCH',
             'AUTH_REQUIRED',
             'AUTH_MISMATCH',
+            'GUEST_EXPIRED',
+            'ONBOARDING_REQUIRED',
+            'ACCOUNT_SETUP_REQUIRED',
+            'ACCOUNT_UNAVAILABLE',
             'STATE_INTEGRITY',
           ].includes(message.code) ||
           this.status !== 'connected'

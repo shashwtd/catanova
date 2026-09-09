@@ -1,0 +1,230 @@
+/* Building has its own shelf. The hand is resources / development cards / actions. */
+.playing .construction-tools.build-shelf {
+  position: fixed;
+  z-index: 16;
+  left: 76px;
+  bottom: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 12px 16px;
+  border: 1px solid #b890604d;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(#5a4536, #352f2d);
+  box-shadow:
+    0 -2px 8px #161b245c,
+    inset 0 1px #dcb68740;
+}
+.playing .build-shelf .build-control {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  width: 54px;
+  height: 57px;
+  padding: 5px;
+  border: 1px solid #dbbd7560;
+  border-radius: 8px;
+  color: #eee0b3;
+  background: linear-gradient(#667c64, #344f49);
+  box-shadow:
+    inset 0 1px #eff6b82b,
+    0 2px 3px #1e282861;
+}
+.playing .build-shelf .build-control::before,
+.playing .build-shelf .build-control::after {
+  display: none;
+}
+.playing .build-shelf .build-control.build-settlement {
+  background: linear-gradient(#977348, #67502f);
+}
+.playing .build-shelf .build-control.build-city {
+  background: linear-gradient(#617899, #3b4e6c);
+}
+.playing .build-shelf .build-control .game-icon {
+  width: 29px;
+  height: 29px;
+}
+.playing .build-control-label {
+  font:
+    600 10px Barlow,
+    sans-serif;
+  letter-spacing: 0.02em;
+}
+.playing .build-shelf .build-control:disabled {
+  opacity: 0.52;
+  filter: saturate(0.5);
+}
+.playing .build-shelf .build-control.is-selected {
+  border-color: #fff0a8;
+  box-shadow:
+    0 0 0 2px #c0a35c55,
+    inset 0 0 12px #ffeaa74a;
+}
+.playing .card-table {
+  left: auto;
+  right: 24px;
+  max-width: calc(100% - 320px);
+  transform: none;
+  gap: 28px;
+}
+.playing .hand-zone {
+  flex: none;
+  gap: 28px;
+}
+.playing .table-actions {
+  flex-direction: row;
+  gap: 17px;
+  padding: 0;
+  align-items: center;
+  position: relative;
+}
+.playing .utility-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.playing .purchase-control {
+  margin: 0;
+  padding: 0;
+}
+.playing .turn-action.roll-turn:not(:disabled) {
+  border-color: #ffe9a4;
+  background: linear-gradient(#efc876, #c28e3f);
+  box-shadow:
+    0 0 0 3px #ffe4a334,
+    0 0 23px #ffdb7859,
+    inset 0 1px #fff7d8,
+    0 3px 5px #20283680;
+  color: #4b3825;
+}
+.playing .dice-dock {
+  right: 0;
+  left: auto;
+  bottom: calc(var(--turn-button-size) + 12px);
+  width: var(--turn-button-size);
+}
+@media (max-width: 1100px) {
+  .playing .construction-tools.build-shelf {
+    left: 70px;
+    bottom: 119px;
+    padding: 8px;
+    border-radius: 10px;
+    gap: 7px;
+  }
+  .playing .build-shelf .build-control {
+    width: 45px;
+    height: 47px;
+  }
+  .playing .build-shelf .build-control .game-icon {
+    width: 25px;
+    height: 25px;
+  }
+  .playing .card-table {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    max-width: calc(100% - 28px);
+    gap: 20px;
+  }
+  .playing .hand-zone {
+    gap: 22px;
+  }
+  .playing .table-actions {
+    gap: 13px;
+  }
+}
+@media (max-width: 700px) {
+  .playing .construction-tools.build-shelf {
+    left: 52px;
+    bottom: 102px;
+    gap: 5px;
+    padding: 6px;
+  }
+  .playing .build-shelf .build-control {
+    width: 39px;
+    height: 42px;
+  }
+  .playing .build-shelf .build-control .game-icon {
+    width: 23px;
+    height: 23px;
+  }
+  .playing .build-control-label {
+    font-size: 9px;
+  }
+  .playing .card-table {
+    max-width: calc(100% - 16px);
+    padding-inline: 6px;
+    gap: 10px;
+  }
+  .playing .hand-zone {
+    gap: 12px;
+  }
+  .playing .table-actions {
+    gap: 7px;
+  }
+  .playing .utility-actions {
+    gap: 4px;
+  }
+  .playing .development-hand-inline .development-slot {
+    margin-left: -16px;
+  }
+  .playing .development-hand-inline .development-slot:first-child {
+    margin-left: 0;
+  }
+}
+@media (max-width: 480px) {
+  .playing .card-table {
+    padding-inline: 2px;
+    gap: 7px;
+  }
+  .playing .hand-zone {
+    gap: 9px;
+  }
+  .playing .table-actions {
+    gap: 4px;
+    flex-direction: row;
+  }
+  .playing .utility-actions {
+    gap: 3px;
+  }
+  .playing .development-hand-inline .development-slot {
+    margin-left: -13px;
+  }
+  .playing .development-hand-inline .development-slot:first-child {
+    margin-left: 0;
+  }
+}
+@media (max-width: 380px) {
+  .playing {
+    --table-button-size: 30px;
+    --turn-button-size: 36px;
+  }
+  .playing .card-table {
+    max-width: calc(100% - 8px);
+    padding-inline: 2px;
+    gap: 7px;
+  }
+  .playing .hand-zone {
+    gap: 9px;
+  }
+  .playing .table-actions {
+    gap: 4px;
+  }
+  .playing .utility-actions {
+    gap: 2px;
+  }
+  .playing .development-buy-cost > span,
+  .playing .development-buy-cost .sprite {
+    width: 8px;
+    height: 8px;
+  }
+  .playing .resource-hand {
+    gap: 2px;
+  }
+  .playing .development-hand-inline .development-slot {
+    margin-left: -13px;
+  }
+}

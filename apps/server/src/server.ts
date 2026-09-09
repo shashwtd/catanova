@@ -1,5 +1,6 @@
 import { createVerifier, readAuthConfig } from './auth.js';
 import type { AuthConfig, Identity, VerifyIdentity } from './auth.js';
+import { AccountService, accountFailure } from './accounts.js';
 import { parseProfile } from '../../../packages/protocol/src/profile.js';
 import { createServer } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -37,6 +38,7 @@ export async function startServer(
 ) {
   const auth = options.auth === null ? undefined : (options.auth ?? readAuthConfig());
   const verify = options.verifyIdentity ?? (auth ? createVerifier(auth) : undefined);
+  const accounts = auth ? new AccountService(auth) : undefined;
   const now = options.now ?? Date.now;
   const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now });
   let closing = false;
@@ -47,13 +49,94 @@ export async function startServer(
       response
         .writeHead(200)
         .end(JSON.stringify({ auth: auth ?? null, mode: verify ? 'authenticated' : 'local' }));
+    } else if (request.url?.startsWith('/api/account') || request.url?.startsWith('/api/friends')) {
+      try {
+        if (!accounts)
+          throw new ProtocolError(
+            'ACCOUNT_SETUP_REQUIRED',
+            'Supabase accounts are not configured on this server',
+          );
+        const authorization = request.headers.authorization;
+        const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+        const url = new URL(request.url, 'http://localhost');
+        const body = async () => {
+          let value = '';
+          for await (const chunk of request) {
+            value += String(chunk);
+            if (value.length > 4096) throw new Error('Request too large');
+          }
+          return JSON.parse(value || '{}') as Record<string, unknown>;
+        };
+        let result: unknown;
+        if (request.method === 'GET' && url.pathname === '/api/account') result = await accounts.get(token);
+        else if (request.method === 'POST' && url.pathname === '/api/account/activity')
+          result = await accounts.touch(token);
+        else if (request.method === 'GET' && url.pathname === '/api/account/username')
+          result = await accounts.username(token, url.searchParams.get('name') ?? '');
+        else if (request.method === 'PUT' && url.pathname === '/api/account/profile') {
+          const account = await accounts.save(token, await body());
+          result = account;
+        } else if (request.method === 'GET' && url.pathname === '/api/friends')
+          result = await accounts.friends(token);
+        else if (request.method === 'GET' && url.pathname === '/api/friends/search')
+          result = await accounts.search(token, url.searchParams.get('q') ?? '');
+        else if (request.method === 'POST' && url.pathname === '/api/friends') {
+          const value = await body();
+          if (typeof value.action !== 'string' || typeof value.other !== 'string')
+            throw accountFailure('FRIEND_INVALID');
+          result = await accounts.friendAction(token, value.action, value.other);
+        } else {
+          response.writeHead(404).end();
+          return;
+        }
+        response.writeHead(200).end(JSON.stringify(result));
+      } catch (error) {
+        const code = error instanceof ProtocolError ? error.code : 'INVALID_ACCOUNT_REQUEST';
+        const status = ['ACCOUNT_SETUP_REQUIRED', 'ACCOUNT_UNAVAILABLE'].includes(code)
+          ? 503
+          : code === 'AUTH_REQUIRED'
+            ? 401
+            : code === 'GUEST_EXPIRED'
+              ? 410
+              : code === 'GOOGLE_REQUIRED'
+                ? 403
+                : code === 'USERNAME_TAKEN'
+                  ? 409
+                  : code === 'ACCOUNT_RATE_LIMIT'
+                    ? 429
+                    : 400;
+        response.writeHead(status).end(
+          JSON.stringify({
+            code,
+            error: error instanceof Error ? error.message : 'Could not update your account',
+          }),
+        );
+      }
     } else if (request.url === '/api/profile') {
       try {
         if (!verify) throw new ProtocolError('AUTH_REQUIRED', 'Google sign-in is not configured');
         const authorization = request.headers.authorization;
-        const identity = await verify(
-          authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined,
-        );
+        const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+        if (accounts) {
+          let account;
+          if (request.method === 'GET') account = await accounts.get(token);
+          else if (request.method === 'PUT') {
+            let body = '';
+            for await (const chunk of request) {
+              body += String(chunk);
+              if (body.length > 4096) throw new Error('Profile too large');
+            }
+            account = await accounts.save(token, JSON.parse(body));
+          } else {
+            response.writeHead(405).end();
+            return;
+          }
+          if (!account.profile)
+            throw new ProtocolError('ONBOARDING_REQUIRED', 'Choose your username and avatar before playing');
+          response.writeHead(200).end(JSON.stringify(account.profile));
+          return;
+        }
+        const identity = await verify(token);
         if (request.method === 'GET')
           response.writeHead(200).end(JSON.stringify(store.profile(identity.id, identity.name)));
         else if (request.method === 'PUT') {
@@ -67,8 +150,19 @@ export async function startServer(
         } else response.writeHead(405).end();
       } catch (error) {
         response
-          .writeHead(error instanceof ProtocolError ? (error.code === 'AUTH_UNAVAILABLE' ? 503 : 401) : 400)
-          .end(JSON.stringify({ error: error instanceof ProtocolError ? error.message : 'Invalid profile' }));
+          .writeHead(
+            error instanceof ProtocolError
+              ? ['AUTH_UNAVAILABLE', 'ACCOUNT_UNAVAILABLE', 'ACCOUNT_SETUP_REQUIRED'].includes(error.code)
+                ? 503
+                : 401
+              : 400,
+          )
+          .end(
+            JSON.stringify({
+              code: error instanceof ProtocolError ? error.code : 'INVALID_PROFILE',
+              error: error instanceof ProtocolError ? error.message : 'Invalid profile',
+            }),
+          );
       }
     } else if (request.method === 'GET' && request.url === '/healthz') {
       try {
@@ -87,8 +181,13 @@ export async function startServer(
       try {
         const preview = store.preview(request.url!.split('/').pop()!);
         const authorization = request.headers.authorization;
-        const identity =
-          verify && authorization?.startsWith('Bearer ') ? await verify(authorization.slice(7)) : undefined;
+        const identity = authorization?.startsWith('Bearer ')
+          ? accounts
+            ? await accounts.get(authorization.slice(7))
+            : verify
+              ? await verify(authorization.slice(7))
+              : undefined
+          : undefined;
         response.writeHead(200).end(
           JSON.stringify({
             ...preview,
@@ -171,6 +270,60 @@ export async function startServer(
     let messages = 0;
     let authenticating = false;
     let authExpiry: ReturnType<typeof setTimeout> | undefined;
+    let accountToken: string | undefined, accountIdentity: Identity | undefined;
+    let activityPending = false,
+      lastActivityWrite = 0,
+      profileUpdating = false;
+    function setAuthDeadline() {
+      clearTimeout(authExpiry);
+      if (!accountIdentity) return;
+      authExpiry = setTimeout(
+        () => ws.close(4003, 'Refresh account session'),
+        Math.max(1, Math.min(2147483647, accountIdentity.expiresAt - Date.now())),
+      );
+      authExpiry.unref();
+    }
+    function assertSession(seat: Seat) {
+      if (ws.readyState !== WebSocket.OPEN || sessions.get(ws) !== seat || activeSeats.get(seat.id) !== ws)
+        throw new ProtocolError('SESSION_REPLACED', 'This seat is connected elsewhere');
+      if (accountIdentity && accountIdentity.expiresAt <= Date.now()) {
+        const guestExpired =
+          accountIdentity.guestExpiresAt !== undefined && accountIdentity.guestExpiresAt <= Date.now();
+        throw accountFailure(guestExpired ? 'GUEST_EXPIRED' : 'AUTH_REQUIRED');
+      }
+    }
+    function recordGuestActivity() {
+      const identity = accountIdentity;
+      if (!accounts || !identity?.isGuest || activityPending || Date.now() - lastActivityWrite < 60000)
+        return;
+      activityPending = true;
+      lastActivityWrite = Date.now();
+      // Game commits do not wait for Supabase. Only a confirmed activity write extends the known deadline.
+      void accounts
+        .touch(accountToken)
+        .then((account) => {
+          if (ws.readyState !== WebSocket.OPEN || accountIdentity !== identity || !sessions.has(ws)) return;
+          if (account.id !== identity.id || !account.registered || !account.profile) {
+            ws.close(4003, 'Account unavailable');
+            return;
+          }
+          identity.isGuest = account.isGuest;
+          identity.guestExpiresAt = account.expiresAt ? Date.parse(account.expiresAt) : undefined;
+          identity.expiresAt = Math.min(
+            identity.tokenExpiresAt ?? identity.expiresAt,
+            identity.guestExpiresAt ?? Infinity,
+          );
+          setAuthDeadline();
+        })
+        .catch((error) => {
+          if (error instanceof ProtocolError && ['GUEST_EXPIRED', 'AUTH_REQUIRED'].includes(error.code))
+            ws.close(4003, 'Refresh account session');
+          // A service outage never extends identity validity; later activity retries after the throttle.
+        })
+        .finally(() => {
+          activityPending = false;
+        });
+    }
     ws.on('message', async (data, isBinary) => {
       let commandId: string | undefined;
       try {
@@ -201,6 +354,12 @@ export async function startServer(
             authenticating = false;
           }
           if (ws.readyState !== WebSocket.OPEN) return;
+          if (identity && identity.expiresAt <= Date.now())
+            throw accountFailure(
+              identity.guestExpiresAt !== undefined && identity.guestExpiresAt <= Date.now()
+                ? 'GUEST_EXPIRED'
+                : 'AUTH_REQUIRED',
+            );
           const seat = store.enter(
             message.type,
             message.token,
@@ -210,11 +369,9 @@ export async function startServer(
             message.profile,
           );
           if (identity) {
-            authExpiry = setTimeout(
-              () => ws.close(4003, 'Refresh account session'),
-              Math.max(1, Math.min(2147483647, identity.expiresAt - Date.now())),
-            );
-            authExpiry.unref();
+            accountToken = message.accessToken;
+            accountIdentity = identity;
+            setAuthDeadline();
           }
           const oldSocket = activeSeats.get(seat.id);
           if (oldSocket && oldSocket !== ws) {
@@ -235,6 +392,7 @@ export async function startServer(
         } else {
           const seat = sessions.get(ws);
           if (!seat) throw new ProtocolError('NOT_JOINED', 'Join or resume before sending actions');
+          assertSession(seat);
           if (message.type === 'ping') {
             const revision = store.db.prepare('SELECT revision FROM rooms WHERE id = ?').get(seat.room_id)!
               .revision as number;
@@ -253,6 +411,37 @@ export async function startServer(
             });
             return;
           }
+          if (accounts && accountIdentity) {
+            commandId = 'commandId' in message ? message.commandId : undefined;
+            if (profileUpdating) throw accountFailure('ACCOUNT_BUSY');
+            let account;
+            if (message.type === 'lobby' && message.profile) {
+              profileUpdating = true;
+              try {
+                account = await accounts.get(accountToken);
+              } finally {
+                profileUpdating = false;
+              }
+              // Authentication/profile checks may yield while another socket resumes this exact seat.
+              assertSession(seat);
+            }
+            if (account && (account.id !== accountIdentity.id || !account.registered || !account.profile))
+              throw accountFailure('ONBOARDING_REQUIRED');
+            if (
+              account &&
+              message.type === 'lobby' &&
+              message.profile &&
+              !store.db
+                .prepare('SELECT 1 FROM lobby_receipts WHERE room_id=? AND player_id=? AND command_id=?')
+                .get(seat.room_id, seat.id, message.commandId)
+            ) {
+              if (JSON.stringify(parseProfile(message.profile)) !== JSON.stringify(account.profile))
+                throw new ProtocolError(
+                  'ACCOUNT_PROFILE_MISMATCH',
+                  'Save your account profile before updating the lobby',
+                );
+            }
+          }
           if (message.type === 'lobby') {
             commandId = message.commandId;
             const receipt = store.lobby(
@@ -262,6 +451,7 @@ export async function startServer(
               message.ready,
               message.profile,
             );
+            recordGuestActivity();
             send(ws, { type: 'ack', commandId, ...receipt });
             broadcast(seat.room_id);
             return;
@@ -274,6 +464,7 @@ export async function startServer(
               message.expectedRevision,
               message.settings,
             );
+            recordGuestActivity();
             send(ws, { type: 'ack', commandId, ...receipt });
             broadcast(seat.room_id);
             return;
@@ -306,6 +497,7 @@ export async function startServer(
             message.type === 'action'
               ? store.action(seat, message.commandId, message.expectedRevision, message.action)
               : store.increment(seat, message.commandId, message.expectedRevision);
+          recordGuestActivity();
           // The database transaction has committed before any success reaches a client.
           send(ws, { type: 'ack', commandId: message.commandId, ...receipt });
           broadcast(seat.room_id);

@@ -1,40 +1,47 @@
-# Google authentication
+# Accounts, Google and guest authentication
 
-Catanova uses Supabase Auth with Google OAuth and PKCE. The integration is implemented; activation requires a project's public configuration, enabled Google provider and allowed redirects. Keep project-specific configuration outside the repository. A real account flow still needs the setup below and a live sign-in check.
+Catanova uses Supabase Auth with PKCE, plus Supabase Postgres for globally unique usernames, account portraits and private friend relationships. Game state, seats, move history and command receipts still use the game server's SQLite database. Account storage and the future hosted game-state adapter are separate concerns.
 
 ## Configure a project
 
-1. Choose the Supabase project and copy its project URL and **publishable** key from the Connect dialog. A legacy `anon` key also works. Never use a secret or `service_role` key in this configuration: the server sends these two public values to the browser through `/api/config`.
-2. In Google Cloud, configure the OAuth consent screen and a Web application OAuth client. Add the callback shown by Supabase (normally `https://PROJECT.supabase.co/auth/v1/callback`) to Google's authorized redirect URIs. Add the application's origin to Google's authorized JavaScript origins as described in the Supabase guide. Add test users if the Google app is in testing mode.
-3. Enable Google in Supabase Authentication → Sign In / Providers and enter Google's client ID and secret **there**. Catanova does not need Google's client secret.
-4. In Supabase Authentication → URL Configuration, set the application's Site URL and allow its exact callback URL. For the local server this is `http://127.0.0.1:3000/auth/callback`; for Vite it is `http://127.0.0.1:5173/auth/callback`. Add the actual production HTTPS callback when hosting. Keep the chosen hostname consistent between opening the app and configuring redirects.
-5. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `REQUIRE_AUTH=true` in the server environment. Build and restart. The menu now offers **Continue with Google**. No client rebuild is needed when changing these runtime values.
+1. Copy the Supabase project URL and **publishable** key. A legacy `anon` key also works. Never configure a secret or `service_role` key: `/api/config` supplies these two public values to the browser.
+2. Configure a Google OAuth Web client and enable Google under Supabase Authentication → Sign In / Providers. Store Google's client secret in Supabase, never this repository. Use the callback shown by Supabase in Google's allowed redirects. See the [official Google setup guide](https://supabase.com/docs/guides/auth/social-login/auth-google).
+3. Enable anonymous sign-ins for **Continue as guest**. Enable **manual identity linking** so an anonymous user can link Google to the same account. These are separate settings. See [anonymous sign-ins](https://supabase.com/docs/guides/auth/auth-anonymous) and [identity linking](https://supabase.com/docs/guides/auth/auth-identity-linking).
+4. Run the entire [accounts migration](../supabase/migrations/202609090001_accounts_and_friends.sql) in the Supabase SQL editor. It is safe to rerun. The app returns `ACCOUNT_SETUP_REQUIRED` with a retry message when the functions are absent; it never substitutes a local username reservation.
+5. In Supabase Authentication → URL Configuration, allow the exact application callback: `http://127.0.0.1:3000/auth/callback` for the local server, `http://127.0.0.1:5173/auth/callback` for Vite, and your production HTTPS callback when hosting. Set the Site URL and keep the hostname consistent.
+6. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `REQUIRE_AUTH=true` in the server environment, then build and restart. Changing these runtime values does not require rebuilding the client.
 
 ```sh
 npm run build
 node --env-file=.env dist/apps/server/src/index.js
 ```
 
-For Docker, supply the same variables to the container. The checked-in Compose file is a localhost-only unauthenticated playtest. Replace that explicit local setting with the Supabase variables before exposing a service publicly.
+The checked-in Compose file is an explicit loopback-only local playtest. Supply Supabase configuration before exposing an authenticated service publicly.
 
-Use [Supabase's Google setup guide](https://supabase.com/docs/guides/auth/social-login/auth-google) for provider settings and the consent/branding requirements that apply to your Google project.
+## Username and portrait ownership
 
-## Account and seat ownership
+Every new account completes onboarding before entering a room. Usernames use 3–20 ASCII letters, numbers or underscores. Their chosen capitalization is retained; a database unique index reserves each spelling case-insensitively. The availability check is guidance; the atomic save decides ownership and returns a friendly conflict if another account wins the name. Renaming releases the previous name.
 
-The browser retains its Supabase session and refreshes it with the official SDK. Invite context survives the OAuth redirect. On every WebSocket handshake, the server verifies the access token with Supabase's Auth user endpoint through `auth.getUser(token)`. It uses the verified user ID, requires a Google-linked non-anonymous account, and rejects another account's seat token. It never takes ownership from a browser-supplied ID or an unverified decoded JWT claim. Auth token expiry closes the socket so reconnection obtains a fresh token.
+Players choose one of twelve game portraits or their Google photo. The photo comes from the provider-owned `auth.identities` record, never editable user metadata or a supplied image URL. Only HTTPS `lh[number].googleusercontent.com` URLs are accepted. Avatar images use no-referrer and the app's CSP permits Google's image hosts. Public profile data contains the username and chosen cosmetics; it contains no email or auth credentials. Legacy accent/frame fields remain readable in old saves but are no longer customization controls.
 
-An account occupies one active seat per room. Signing in on another device and opening its invite offers Resume. Resuming rotates that seat's local token and revokes the old socket without creating an extra player. Google profile data only supplies a default name; users choose their portrait and display name. Portraits share a consistent border. Display names are not globally unique identities.
+The game server verifies every WebSocket handshake through `auth.getUser(token)` and the caller's scoped account RPC. Unregistered accounts, expired guests, mismatched IDs and invalid tokens cannot claim a seat. A valid public configuration alone does not grant access. Account outages fail the handshake closed; no replacement or unowned seat is created.
 
-Profiles and game saves are currently stored by the game server in **SQLite**, keyed by verified Supabase user ID. They are not yet in Supabase Postgres. They survive normal server restarts as long as the database volume survives. The hosted Postgres migration remains a separate milestone.
+An account occupies one active seat per room. A fresh device can use the same invite to resume its account-owned seat; the local seat token rotates and the previous socket loses authority immediately. Resuming a lobby refreshes the canonical username/portrait and clears that player's old Ready state if either changed. Once play starts, the match retains the names/cosmetics recorded at its start so a later account rename does not rewrite history. The host starts directly; the other players must be ready and everyone connected.
 
-Both Ready state and room cosmetic changes are durable. Customization is available before play; changing a lobby profile clears Ready in the interface. The game requires everyone to be connected and the other players to be ready before the host starts. The host has no separate Ready step. A network drop retains the seat and cosmetics.
+## RLS and friendship boundaries
 
-## Local development and guests
+The migration enables RLS and revokes all direct table access from `anon`, `authenticated` and `PUBLIC`. No table policy grants a public directory or cross-account access. Narrow `SECURITY DEFINER` RPCs use a fixed empty search path and derive their caller from `auth.uid()`. Private helper functions and the private schema have no client grants. Only authenticated-role RPC execution is granted; Supabase anonymous users still carry that role and are explicitly checked inside the functions.
 
-Without Supabase configuration, development keeps the existing token-based local playtest so four local tabs can be exercised. This is labeled **Local playtest**, not a published guest-account feature. `NODE_ENV=production` requires authentication unless `ALLOW_LOCAL_PLAYTEST=true` is explicitly set. `REQUIRE_AUTH=true` takes precedence over that exception. Partial auth configuration always fails startup.
+Both sides of a friendship must be registered Google accounts. Guest friend calls and requests targeting guests fail independently of the UI. A guest searching for friends is offered Link Google. Permanent users can search username prefixes of at least three characters; results expose at most ten public profiles, including a guest marker so those entries can show why they cannot be added. Pending requests are visible only to their two participants. Acceptance requires the recipient; an opposite request never silently accepts. Limits are 20 outgoing pending requests, 40 total pending requests at a recipient, and 100 accepted friends per account. Mutations are atomic and repeated request/accept/remove operations are safe. Durable SQL counters also cap successful friendship mutations at 12 per minute and 60 per hour, search at 30 per minute, username checks at 60 per minute, and profile saves at 20 per minute. Request/cancel cycling consumes the same friendship budget; clients cannot reset counters or call the private limit helper. Exceeding a budget returns a clear retry message and HTTP 429.
 
-The Google path deliberately rejects Supabase anonymous users. [Guest access](GUEST_ACCESS.md) is a proposal for review, not an enabled sign-in option.
+## Guests, activity and upgrades
 
-## Validation and remaining sign-in check
+See [the implemented guest policy](GUEST_ACCESS.md). Linking uses `linkIdentity` and keeps the exact Supabase account ID, username, avatar and room ownership. If the selected Google identity already belongs elsewhere, the guest session is retained and the UI explains the conflict. There is no automatic merge. Successful linking refreshes the JWT before enabling friendship calls. An expired guest starts a new Google sign-in instead of attaching Google to an expired identity.
 
-Automated tests cover calls through the Supabase SDK to a local Auth fixture, forged/expired credentials, required Google identity, cross-account takeover denial, profile ownership, same-account device recovery, and production configuration. A valid public key alone does not enable the Google provider or configure redirects. The configured local server has been checked in authenticated mode, the live Google provider is enabled, and OAuth initiation redirects to Google. The user-consent and callback round trip has not yet been verified. After configuration, check an invite → Google → same lobby round trip, profile persistence after logout/login, and resume on a second device before public hosting.
+## Local development and validation
+
+Without Supabase configuration, development retains an isolated seat-token playtest mode. It does not claim global username ownership. Production rejects absent auth unless `ALLOW_LOCAL_PLAYTEST=true` is explicitly set; `REQUIRE_AUTH=true` overrides that exception. Partial configuration always fails startup.
+
+Automated tests execute the migration in an actual embedded Postgres engine and verify RLS/default deny, helper grants, uniqueness conflicts, expiry, tombstones, identity upgrades, public search fields and friendship ownership. Auth/HTTP/socket fixtures cover verified-account admission, absent migrations, failed services, profile canonicalization, takeover prevention, resume and background activity behavior. Pure auth-flow tests cover successful same-ID linking, conflicting identity recovery, expired-guest sign-in and local-session cleanup.
+
+Applying this migration to a project and completing a real Google consent/callback round trip remain deployment checks. Local fixtures do not prove live provider configuration or internet availability. Before hosting, check invite → sign-in → onboarding → lobby, logout/login persistence, second-device resume, guest-to-Google linking and friend request/acceptance with separate real accounts.

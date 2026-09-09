@@ -1,6 +1,21 @@
-/* Keep assigned colors on the portrait outline; names remain quiet and readable. */
+/* A wider desktop caption keeps the name and all three counts beside the portrait. */
+.playing {
+  --hud-right: 258px;
+}
+.playing .player-rail {
+  width: 230px;
+}
+.playing .player-profile {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  min-height: 0;
+  gap: 5px 8px;
+  padding-bottom: 5px;
+}
 .player-profile .profile-caption {
+  display: block;
   min-width: 0;
+  padding: 0;
 }
 .player-profile .profile-name-banner,
 .player-profile.self .profile-name-banner,
@@ -18,62 +33,81 @@
   box-shadow: none;
   color: #f7ebd0;
   font:
-    650 15px/1.2 Barlow,
+    650 16px/1.2 Barlow,
     sans-serif;
   letter-spacing: 0;
   text-shadow: 0 1px 2px #15232bdd;
 }
-
-/* A score is a primary number in the caption, never an ornament over the face. */
-.player-profile .profile-caption .profile-score-plaque {
-  position: static;
-  inset: auto;
-  transform: none;
+.player-profile .profile-caption .profile-stats {
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  justify-content: center;
-  gap: 5px;
-  width: fit-content;
-  min-width: 0;
-  max-width: 100%;
-  height: auto;
-  margin: 5px 0 0;
-  padding: 3px 7px 4px;
-  border: 1px solid #fff5d5;
-  border-radius: 5px;
-  background: linear-gradient(#fbefd0, #e9d6a7);
-  box-shadow:
-    inset 0 1px #fffbed,
-    0 2px 3px #13202866;
-  color: #263741;
-  text-shadow: none;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  margin: 4px 0 0;
 }
-.player-profile .profile-caption .profile-score-plaque b {
-  min-width: 1ch;
-  color: #22333d;
+.player-profile .profile-stats > span {
+  position: static;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+.player-profile .profile-stats .game-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.player-profile .profile-stats b {
+  color: #f2e7ca;
   font:
-    750 27px/1 Barlow,
+    650 17px/1 Barlow,
     sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.025em;
-  text-align: center;
-  text-shadow: none;
+  text-shadow: 0 1px 2px #15232b;
 }
-.player-profile .profile-caption .profile-score-unit {
-  color: #56616a;
-  font:
-    750 10px/1 Barlow,
-    sans-serif;
-  letter-spacing: 0.055em;
+.player-profile .profile-stats .profile-score b {
+  font-size: 21px;
+  font-weight: 750;
+  color: #ffe8a7;
 }
-.player-profile .profile-stats {
-  margin-top: 6px;
+.player-profile .profile-stats .profile-score .game-icon {
+  width: 21px;
+  height: 21px;
+}
+.player-profile .profile-awards {
+  margin: 0;
+  padding-top: 0;
 }
 
-/* Lost presence is static: translucent red, interrupted scanlines and worn edges. */
+/* Activity belongs to the player who must act; multiple players can owe discards. */
+.player-profile .profile-turn {
+  z-index: 6;
+  top: -9px;
+  gap: 3px;
+  padding: 2px 4px;
+}
+.player-profile .profile-turn > .game-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+/* Keep the face visible: a quiet tint and one translucent red Wi-Fi-off symbol. */
 .player-profile.offline .profile-portrait .avatar-medallion svg {
-  filter: saturate(0.4) contrast(0.88) brightness(0.9);
+  filter: none;
 }
 .player-profile .profile-portrait .offline-mark {
   position: absolute;
@@ -86,100 +120,98 @@
   border: 0;
   border-radius: 9%;
   overflow: hidden;
-  isolation: isolate;
   z-index: 5;
-  background: linear-gradient(130deg, #b84d455f, #8f32315e 53%, #c964535f);
-  box-shadow:
-    inset 0 0 0 1px #eb907973,
-    inset 0 0 14px #742f325e;
+  background: #c7393510;
+  box-shadow: none;
+  pointer-events: none;
   animation: none;
   transition: none;
-}
-.player-profile .offline-mark .profile-offline-distress {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  opacity: 0.9;
-  pointer-events: none;
-}
-.player-profile .offline-mark .profile-offline-symbol {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 3px 7px 4px;
-  background: #48282abb;
-  clip-path: polygon(4% 0, 96% 3%, 100% 36%, 96% 98%, 6% 100%, 0 63%);
-  color: #ffe4cc;
-  filter: drop-shadow(0 1px 2px #3b202399);
 }
 .player-profile .profile-portrait .offline-mark .game-icon {
-  width: 35px;
-  height: 35px;
-  flex: none;
-  filter: drop-shadow(0 1px 1px #251b20);
-}
-.player-profile .offline-mark .profile-offline-symbol > span {
-  color: #ffe4cc;
-  font:
-    750 8px/1 Barlow,
-    sans-serif;
-  letter-spacing: 0.075em;
-  text-transform: uppercase;
-  text-shadow: 0 1px #44252a;
-}
-.player-profile .offline-mark * {
+  width: 38px;
+  height: 38px;
+  opacity: 0.52;
+  filter: none;
   animation: none;
   transition: none;
 }
+.player-profile .offline-mark .game-icon path {
+  stroke: #e65049;
+}
+.player-profile .offline-mark .game-icon circle {
+  fill: #e65049;
+  stroke: #e65049;
+}
 
-@media (max-width: 700px) {
-  .player-profile .profile-caption {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: center;
+@media (max-width: 1000px) and (min-width: 701px) {
+  .playing {
+    --hud-right: 242px;
+  }
+  .playing .player-rail {
+    width: 220px;
+  }
+  .playing .player-profile {
+    grid-template-columns: 62px minmax(0, 1fr);
+  }
+  .player-profile .profile-caption .profile-stats {
     gap: 5px;
+  }
+}
+@media (max-width: 700px) {
+  .playing {
+    --hud-right: 110px;
+  }
+  .playing .player-rail {
+    width: 94px;
+  }
+  .playing .player-profile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+  .player-profile .profile-portrait {
+    width: clamp(46px, 8.6vh, 62px);
   }
   .player-profile .profile-name-banner,
   .player-profile.self .profile-name-banner,
   .player-profile.active .profile-name-banner {
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.15;
     text-align: center;
-    grid-column: 1 / -1;
-  }
-  .player-profile .profile-caption .profile-score-plaque {
-    justify-self: end;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    margin: 0;
-    padding: 3px 4px;
-  }
-  .player-profile .profile-caption .profile-score-plaque b {
-    font-size: 25px;
-  }
-  .player-profile .profile-caption .profile-score-unit {
-    font-size: 8px;
   }
   .player-profile .profile-caption .profile-stats {
-    justify-self: start;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 3px;
-    margin: 0;
+    justify-content: center;
+    gap: 2px;
+    margin-top: 3px;
+  }
+  .player-profile .profile-stats > span {
+    gap: 1px;
+  }
+  .player-profile .profile-stats .game-icon {
+    width: 12px;
+    height: 12px;
+  }
+  .player-profile .profile-stats b {
+    font-size: 12px;
+  }
+  .player-profile .profile-stats .profile-score b {
+    font-size: 14px;
+  }
+  .player-profile .profile-stats .profile-score .game-icon {
+    width: 13px;
+    height: 15px;
+  }
+  .player-profile .profile-turn {
+    top: -8px;
+    padding: 1px 3px;
+  }
+  .player-profile .profile-turn > .game-icon {
+    width: 18px;
+    height: 18px;
   }
   .player-profile .profile-portrait .offline-mark .game-icon {
-    width: 28px;
-    height: 28px;
-  }
-  .player-profile .offline-mark .profile-offline-symbol {
-    gap: 1px;
-    padding: 2px 5px 3px;
-  }
-  .player-profile .offline-mark .profile-offline-symbol > span {
-    font-size: 7px;
+    width: 32px;
+    height: 32px;
   }
 }

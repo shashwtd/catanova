@@ -1,39 +1,86 @@
-import { Check, Copy, Crown, DoorOpen, Pencil, Plus, Sailboat, Settings2, WifiOff } from './GameIcons.js';
+import {
+  Check,
+  Clock3,
+  Copy,
+  Crown,
+  DoorOpen,
+  Link,
+  Plus,
+  Sailboat,
+  Settings2,
+  Share2,
+  Users,
+  WifiOff,
+} from './GameIcons.js';
 import { useEffect, useState } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-export function Invite({ code, copy }: { code: string; copy: () => void }) {
+import { roomPath } from './navigation.js';
+
+export function Invite({ code }: { code: string }) {
   const [feedback, setFeedback] = useState('');
+  const [showLink, setShowLink] = useState(false);
   useEffect(() => {
-    if (feedback) {
-      const timer = setTimeout(() => setFeedback(''), 2500);
-      return () => clearTimeout(timer);
-    }
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(''), 2500);
+    return () => clearTimeout(timer);
   }, [feedback]);
+  const url = () => `${location.origin}${roomPath(code)}`;
+  async function copy(value: string, message: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setFeedback(message);
+    } catch {
+      setShowLink(true);
+      setFeedback('Select the code or link to copy it');
+    }
+  }
+  async function share() {
+    if (!navigator.share) {
+      setShowLink((value) => !value);
+      return;
+    }
+    try {
+      await navigator.share({ title: 'Join my Catanova room', url: url() });
+    } catch (error) {
+      if (!(error instanceof Error && error.name === 'AbortError')) setShowLink(true);
+    }
+  }
   return (
-    <div className="invite-block">
-      <span className="field-caption">Invite friends</span>
-      <div className="invite-code">
-        <code>{code}</code>
+    <div className="room-share">
+      <span className="room-code-label">Room</span>
+      <code>{code}</code>
+      <div className="room-share-actions">
+        <button type="button" aria-label="Share room" title="Share room" onClick={() => void share()}>
+          <Share2 size={21} />
+        </button>
+        <button
+          type="button"
+          aria-label="Copy invite link"
+          title="Copy invite link"
+          onClick={() => void copy(url(), 'Link copied')}
+        >
+          <Link size={21} />
+        </button>
         <button
           type="button"
           aria-label="Copy room code"
           title="Copy room code"
-          onClick={() => {
-            void navigator.clipboard.writeText(code).then(
-              () => setFeedback('Code copied'),
-              () => setFeedback('Select and copy the code above'),
-            );
-          }}
+          onClick={() => void copy(code, 'Code copied')}
         >
-          {feedback === 'Code copied' ? <Check size={17} /> : <Copy size={17} />}
+          <Copy size={21} />
         </button>
       </div>
-      <button className="dark-button" onClick={copy}>
-        <Copy size={17} />
-        Copy invite link
-      </button>
+      {showLink && (
+        <input
+          className="share-link-field"
+          aria-label="Room invite link"
+          readOnly
+          value={typeof location === 'undefined' ? roomPath(code) : url()}
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      )}
       {feedback && (
         <span className="copy-feedback" role="status">
           {feedback}
@@ -53,6 +100,7 @@ export function Lobby({
   onLeave,
   onEdit,
   onSettings,
+  onFriends,
 }: {
   room: RoomState;
   me?: string;
@@ -64,20 +112,27 @@ export function Lobby({
   onLeave: () => void;
   onEdit: () => void;
   onSettings: () => void;
+  onFriends?: () => void;
 }) {
   const self = room.players.find((p) => p.id === me),
     host = room.players[0]?.id === me;
   const canStart =
-    room.players.length >= 3 && room.players.every((p, i) => p.connected && (i === 0 || p.ready));
+    room.players.length >= 2 && room.players.every((p, i) => p.connected && (i === 0 || p.ready));
   return (
-    <section className="lobby-screen" aria-label="Room lobby">
-      <div className="lobby-heading">
-        <div className="lobby-title">
-          <Sailboat />
-          <h1>Lobby</h1>
-          <span>{room.players.length}/4</span>
-        </div>
+    <section className="lobby-screen room-lobby" aria-label="Room lobby">
+      <header className="lobby-heading">
+        {self && (
+          <button className="lobby-self" onClick={onEdit} aria-label="Edit your profile">
+            <Avatar profile={self.profile ?? defaultProfile(self.name)} />
+            <strong>{self.name}</strong>
+          </button>
+        )}
         <div className="lobby-tools">
+          {onFriends && (
+            <button className="icon-button" title="Friends" aria-label="Friends" onClick={onFriends}>
+              <Users />
+            </button>
+          )}
           <button
             className="icon-button"
             title="Game settings"
@@ -96,46 +151,44 @@ export function Lobby({
             <DoorOpen />
           </button>
         </div>
-      </div>
-      <div className="lobby-content">
+      </header>
+      <div className="lobby-center">
+        <div className="lobby-caption">
+          <h1>Your crew</h1>
+          <span>{room.players.length}/4</span>
+        </div>
         <div className="lobby-seats">
           {Array.from({ length: 4 }, (_, i) => {
             const p = room.players[i];
             return p ? (
-              <article className={`lobby-seat ${p.id === me ? 'self' : ''}`} key={p.id}>
+              <article
+                className={`lobby-seat ${p.id === me ? 'self' : ''} ${!p.connected ? 'seat-offline' : ''}`}
+                key={p.id}
+              >
                 <div className="lobby-avatar">
                   <Avatar profile={p.profile ?? defaultProfile(p.name)} />
-                  {i === 0 && <Crown className="host-mark" size={19} />}
+                  {i === 0 && <Crown className="host-mark" size={23} />}
                   {!p.connected && (
                     <span className="offline-mark" title="Disconnected">
-                      <WifiOff size={19} />
+                      <WifiOff size={30} />
                     </span>
                   )}
                 </div>
                 <strong>{p.name}</strong>
                 <span className={`ready-status ${p.ready ? 'ready' : ''}`}>
                   {!p.connected ? (
-                    <>
-                      <WifiOff size={14} />
-                      Disconnected
-                    </>
+                    'Disconnected'
                   ) : i === 0 ? (
                     'Host'
                   ) : p.ready ? (
                     <>
-                      <Check size={14} />
+                      <Check size={16} />
                       Ready
                     </>
                   ) : (
-                    'Getting ready'
+                    'Not ready'
                   )}
                 </span>
-                {p.id === me && (
-                  <button className="edit-profile" onClick={onEdit} title="Customize your profile">
-                    <Pencil size={13} />
-                    Customize
-                  </button>
-                )}
               </article>
             ) : (
               <button
@@ -145,53 +198,44 @@ export function Lobby({
                 title="Invite player"
                 onClick={onInvite}
               >
-                <Plus size={32} />
+                <Plus size={36} />
               </button>
             );
           })}
         </div>
-        <aside className="lobby-invite">
-          <Invite code={room.roomId} copy={onInvite} />
-          <div className="lobby-options">
-            <span>Base game</span>
-            <b>3–4 players</b>
-            <span>Island</span>
-            <b>Balanced</b>
-            <span>Victory</span>
-            <b>10 points</b>
-            <span>Turn timer</span>
-            <b>{room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'Off'}</b>
-          </div>
-        </aside>
+        <button className="lobby-timer" onClick={onSettings}>
+          <Clock3 size={16} />
+          {room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'No timer'}
+        </button>
       </div>
       <footer className="lobby-footer">
-        <span>
-          {room.players.length < 3
-            ? '3 players minimum'
-            : !room.players.every((p) => p.connected)
-              ? 'Waiting for reconnection'
-              : canStart
-                ? host
-                  ? 'Everyone is ready'
-                  : 'Waiting for host'
-                : 'Waiting for players to ready up'}
-        </span>
-        <div>
-          {!host && (
+        <Invite code={room.roomId} />
+        <div className="lobby-launch">
+          <span role="status">
+            {room.players.length < 2
+              ? 'Invite another player'
+              : !room.players.every((p) => p.connected)
+                ? 'Waiting for reconnection'
+                : canStart
+                  ? host
+                    ? 'Everyone is ready'
+                    : 'Waiting for host'
+                  : 'Waiting for players'}
+          </span>
+          {host ? (
+            <button className="gold-button" disabled={busy || !connected || !canStart} onClick={onStart}>
+              Start game
+              <Sailboat size={21} />
+            </button>
+          ) : (
             <button
               className={self?.ready ? 'dark-button' : 'gold-button'}
               aria-pressed={!!self?.ready}
               disabled={busy || !connected}
               onClick={() => onReady(!self?.ready)}
             >
-              <Check size={18} />
+              <Check size={21} />
               {self?.ready ? 'Not ready' : 'Ready'}
-            </button>
-          )}
-          {host && (
-            <button className="gold-button" disabled={busy || !connected || !canStart} onClick={onStart}>
-              Start game
-              <Sailboat size={18} />
             </button>
           )}
         </div>

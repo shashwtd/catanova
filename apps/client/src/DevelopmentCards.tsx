@@ -289,28 +289,32 @@ export function DevelopmentCards({
           ) : null}
         </>
       ) : null}
-      {onBuy && (
-        <button
-          className="development-buy"
-          disabled={disabled || !canBuy}
-          aria-label="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
-          title="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
-          onClick={onBuy}
-        >
-          <span className="development-buy-mark" aria-hidden="true">
-            <ScrollText size={30} />
-            <Plus size={18} />
-          </span>
-          <span className="development-buy-label">Buy</span>
-          <span className="development-buy-cost" aria-hidden="true">
-            {(['sheep', 'wheat', 'ore'] as const).map((resource) => (
-              <span key={resource} data-cost-resource={resource}>
-                <ResourceIcon resource={resource} />
-              </span>
-            ))}
-          </span>
-        </button>
-      )}
+      {onBuy && <DevelopmentPurchase disabled={disabled || !canBuy} onBuy={onBuy} />}
     </section>
+  );
+}
+
+export function DevelopmentPurchase({ disabled, onBuy }: { disabled: boolean; onBuy: () => void }) {
+  return (
+    <button
+      className="development-buy"
+      disabled={disabled}
+      aria-label="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
+      title="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
+      onClick={onBuy}
+    >
+      <span className="development-buy-mark" aria-hidden="true">
+        <ScrollText size={30} />
+        <Plus size={18} />
+      </span>
+      <span className="development-buy-label">Buy</span>
+      <span className="development-buy-cost" aria-hidden="true">
+        {(['sheep', 'wheat', 'ore'] as const).map((resource) => (
+          <span key={resource} data-cost-resource={resource}>
+            <ResourceIcon resource={resource} />
+          </span>
+        ))}
+      </span>
+    </button>
   );
 }

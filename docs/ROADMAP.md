@@ -5,9 +5,11 @@
 - [x] Public Catanova repository, MIT license, independent rulebook and source ledger.
 - [x] Timber, Clay, Sheep, Hay and Rock; textured original terrain, environment and resource atlases.
 - [x] Reproducible balanced islands with inventory, geometry and fairness tests across 500 seeds.
-- [x] Three/four-player lobbies, direct invite previews, explicit Create/Join, lobby leave and host transfer.
+- [x] Two- to four-player invited lobbies, direct invite previews, explicit Create/Join, lobby leave and host transfer.
 - [x] Separate ready-up lobby; saved names and twelve fantasy portraits with a consistent rounded-square border.
-- [x] Supabase Google integration and verified account-owned seats; real project activation still pending.
+- [x] Supabase Google/anonymous authentication, unique-username onboarding, game/Google portraits and verified account-owned seats.
+- [x] Scoped account/friend Postgres migration with RLS, recipient-owned requests, private search and durable request limits.
+- [x] Seven-day inactive guest expiry, username release, protected match history and same-account Google linking; live migration/callback verification remains pending.
 - [x] Durable move history grouped by turn with action/resource icons, and rollback snapshot guards.
 - [x] Painted flat board, rugged continuous sea band, bright player pieces and two harbor bridges per port.
 - [x] Original SVG controls, thin portrait frames, player-color banners, stronger points/awards and offline overlays.
@@ -28,7 +30,7 @@
 
 ## Next: human playtests and rule conformance
 
-- [ ] Play full games with three and four people; record usability and rule discrepancies.
+- [ ] Play full games with two, three and four people; record usability, two-player balance and rule discrepancies.
 - [ ] Test desktop/mobile browsers, touch placement, accessibility and slow devices.
 - [ ] Resolve the two provisional rare-card decisions in the source ledger.
 - [ ] Turn every applicable source-ledger row into a reviewed fixture, including more award tie/split and piece-exhaustion cases.
@@ -38,7 +40,7 @@
 
 ## Hosted games
 
-Configure and exercise Google OAuth on the chosen Supabase project. Review the [guest proposal](GUEST_ACCESS.md) before adding anonymous accounts. Implement and test the production Postgres adapter, schema migrations, server ownership/fencing, deployment draining, invitation/account policy, expiration and recovery. Add telemetry without private hands or tokens. Choose regions and budgets using available Azure/Supabase credits, then deploy a controlled internet playtest. Test sleeping devices, mobile networks, database failure and backup restoration separately from normal restart.
+Apply the [account migration](AUTH.md) and exercise Google OAuth, anonymous onboarding, manual identity linking and private friend requests on the chosen project. Verify the [implemented guest policy](GUEST_ACCESS.md) against live sessions. Implement and test the production game-state Postgres adapter and its migrations, server ownership/fencing, deployment draining and recovery. Add telemetry without private hands or tokens. Choose regions and budgets using available Azure/Supabase credits, then deploy a controlled internet playtest. Test sleeping devices, mobile networks, database failure and backup restoration separately from normal restart.
 
 ## Visual and audio polish
 
@@ -48,4 +50,4 @@ Keep terrain instantly readable and playful. Evaluate the current flat board, co
 
 Complete compatibility review, full human games, supported-device checks, internet failure/load testing, operational monitoring/backups, self-hosting validation and naming/asset review before a stable release. Public GitHub source is already available; production hosting is a separate milestone.
 
-Expansions, two-player variants, ranked matchmaking, bots, spectators, replay sharing and native apps follow a dependable base game.
+The current two-player option uses the same base mechanics without neutral players. Official two-player variants, expansions, bots, spectators, replay sharing and native apps remain separate future work. Public matchmaking and solo play are outside the current invited-room scope.

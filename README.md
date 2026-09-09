@@ -1,8 +1,10 @@
 # Catanova
 
-An open-source Catan-style game for **three or four friends**, built around reliable multiplayer and a hand-painted island.
+An open-source Catan-style game for **two to four invited friends**, built around reliable multiplayer and a hand-painted island.
 
-Trade **Timber, Clay, Sheep, Hay, and Rock**. Build settlements and cities. Race to ten points. Resume your seat when your connection drops.
+Trade **Timber, Clay, Sheep, Hay, and Rock**. Build settlements and cities. Race to ten points. Resume your seat when your connection drops. Rooms are invite-only; there is no solo mode or public matchmaking.
+
+Two-player rooms use the same board, resource supply, building costs, turn flow and ten-point goal as our base mechanics. This is Catanova’s own two-player option, with no neutral players or special two-player rules; it is not an implementation of an official two-player variant. Three- and four-player games remain the base-game compatibility target.
 
 **Status: first playable local build.** The browser game supports setup, dice and production, discards and the robber, building, bank/port and player trades, development cards, Longest Road, Largest Army, and victory. This is an early playtest, not a production service or a certified rules implementation. [Current scope and differences](docs/PLAYTEST.md).
 
@@ -16,7 +18,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all three or four seats are connected and everyone else is ready. The host can configure an optional turn timer in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all two to four seats are connected and everyone else is ready. The host can configure an optional turn timer in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
 Game and construction tools sit at top left; settings and leave sit at bottom left during play. Player portraits on the right share the brighter piece colors through banners and edges, with prominent points, card counts, awards and a current-turn marker. An offline symbol covers a disconnected player's portrait. Glossy resource cards and the development hand share the bottom shelf, with Trade to the left of Roll/End. Both actions follow your turn; opponents answer live offers through a separate notice. Scroll/pinch to zoom the flat board, or drag to pan the island and wood table together. Each harbor has two bridges to its eligible coastal corners.
 
@@ -24,7 +26,7 @@ Two thrown dice settle on the accepted server result, pause for reading, and mov
 
 Trade uses clickable resource cards. Choose an exact return, or post an open **?** offer and accept one opponent's proposed return. Both sides must pay; the server rejects stale offers and commits a completed exchange together. Move history groups icon-based entries by turn. Original SVG controls include a rulebook, Wi-Fi status and distinct enter/exit fullscreen icons; thin rope texture remains on portraits only.
 
-The local URL works on this machine. Other devices need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
+The local URL works on this machine. Other devices currently need an HTTPS proxy/tunnel or the future hosted deployment. [LAN play is proposed](docs/LAN_PROPOSAL.md), with a packaged local host and durable saves; it is not implemented. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
 The same application serves the browser and WebSocket endpoint. No separate client deployment or paid cloud service is required for local play. SQLite uses Node's built-in module (experimental in Node 24) and saves into `data/probe.sqlite`, excluded from Git. A restart preserves accepted actions, the board, hands, deck, dice, phases and seats.
 
@@ -55,11 +57,11 @@ node --env-file=.env dist/apps/server/src/index.js
 
 Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits additional exact origins, useful during development.
 
-**Google login through Supabase is implemented; each deployment needs provider configuration.** Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google, and configure OAuth redirects as described in [authentication setup](docs/AUTH.md). Once configured, authenticated seats and saved cosmetics belong to the verified account; opening the same invite on another device can recover that account’s seat. A real Google sign-in round trip remains to be verified before public hosting.
+**Supabase Google/guest accounts, unique usernames and private friends are implemented.** Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google and anonymous sign-ins, enable manual identity linking, and apply the [account migration](supabase/migrations/202609090001_accounts_and_friends.sql) as described in [authentication setup](docs/AUTH.md). Players choose a unique username and a game portrait or verified Google photo before entering a room. Guests expire after seven days of inactivity and can link Google while retaining the same account and username; friends require Google. Opening the same invite can recover an account-owned seat. Applying the migration and completing a real Google sign-in round trip remain deployment checks.
 
-With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Public guest accounts are **not enabled**; [the proposed guest policy](docs/GUEST_ACCESS.md) awaits approval.
+With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Configured guests use Supabase anonymous accounts and the [implemented seven-day guest policy](docs/GUEST_ACCESS.md); local playtest tokens do not reserve global usernames.
 
-The planned hosted service uses one always-on Azure application with nearby Supabase Postgres. The production database adapter is not implemented and no cloud instance is deployed. Budget estimates remain **about $45–55/month lean, or $65–80/month with more headroom**, before credits and taxes; assumptions and source links are in [hosting and costs](docs/HOSTING.md).
+The planned hosted service uses one always-on Azure application with nearby Supabase Postgres. Account data uses Supabase Postgres; the production game-state database adapter is not implemented and no cloud instance is deployed. Budget estimates remain **about $45–55/month lean, or $65–80/month with more headroom**, before credits and taxes; assumptions and source links are in [hosting and costs](docs/HOSTING.md).
 
 ## Check the build
 
@@ -68,7 +70,7 @@ npm run check
 npm run probe
 ```
 
-`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, concurrent lobby readiness, account ownership, the Supabase verification contract, durable move history, invite previews, lobby departures, both harbor entrances, all 72 road orientations, bounded zoom/pan, correct die faces, resource-effect timing, optional server-owned turn/discard deadlines, rejected rollback snapshots, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
+`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, two-, three- and four-player setup, rule scenarios, resource conservation, real two- and four-client gameplay, concurrent lobby readiness, account ownership, Postgres RLS and username uniqueness, guest expiry and Google-link recovery, friendship permissions and rate limits, the Supabase verification contract, durable move history, invite previews, lobby departures, both harbor entrances, all 72 road orientations, bounded zoom/pan, correct die faces, resource-effect timing, optional server-owned turn/discard deadlines, rejected rollback snapshots, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
 
 Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
@@ -83,7 +85,7 @@ packages/
   rules/        Pure rules engine, board topology, seeded balanced generation
 docs/           Rulebook, source ledger, playtest, architecture, hosting, roadmap
 scripts/        Connectivity probe
-tests/          Rules, maps, four-client gameplay, recovery and HTTP checks
+tests/          Rules, maps, multiplayer gameplay, recovery and HTTP checks
 ```
 
 The client animates accepted state; the server owns randomness, hidden information and move validation. The rules engine stays independent of rendering and networking. One repository keeps those contracts reviewable together.

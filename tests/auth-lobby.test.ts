@@ -163,20 +163,42 @@ test('profile validation rejects unavailable cosmetic IDs and runtime config rej
   }
 });
 
-test('Supabase verifier calls the Auth user endpoint, requires Google, and rejects forged or expired tokens', async (t) => {
+test('Supabase verifier requires verified Auth identity and a live registered account, including guests', async (t) => {
   let anonymous = false,
     provider = 'google',
-    seen = '';
+    registered = true,
+    guestExpired = false;
+  const seen: string[] = [];
   const jwt = (exp: number) =>
     `eyJhbGciOiJSUzI1NiJ9.${Buffer.from(JSON.stringify({ sub: 'forged-client-id', exp })).toString('base64url')}.test`;
   const valid = jwt(Math.floor(Date.now() / 1000) + 3600);
   const expired = jwt(1);
   const api = createServer((req, res) => {
-    seen = req.url!;
+    seen.push(req.url!);
     assert.equal(req.headers.apikey, 'sb_publishable_test');
     res.setHeader('Content-Type', 'application/json');
     if (![valid, expired].includes(req.headers.authorization?.slice(7) ?? '')) {
       res.writeHead(401).end(JSON.stringify({ message: 'Invalid JWT', code: 'bad_jwt' }));
+      return;
+    }
+    if (req.url === '/rest/v1/rpc/catanova_account_get') {
+      const profile = {
+        ...defaultProfile('Verified_name'),
+        username: 'Verified_name',
+        avatarSource: 'generated',
+      };
+      res.end(
+        JSON.stringify({
+          id: 'verified-auth-id',
+          isGuest: anonymous,
+          registered,
+          username: registered ? 'Verified_name' : null,
+          profile: registered ? profile : null,
+          googleAvatarUrl: null,
+          lastActiveAt: new Date().toISOString(),
+          expiresAt: anonymous ? new Date(Date.now() + (guestExpired ? -1 : 86400000)).toISOString() : null,
+        }),
+      );
       return;
     }
     res.end(
@@ -198,13 +220,20 @@ test('Supabase verifier calls the Auth user endpoint, requires Google, and rejec
     publishableKey: 'sb_publishable_test',
   });
   const identity = await verify(valid);
-  assert.equal(seen, '/auth/v1/user');
+  assert.deepEqual(seen, ['/auth/v1/user', '/rest/v1/rpc/catanova_account_get']);
   assert.equal(identity.id, 'verified-auth-id');
-  assert.equal(identity.name, 'Verified name');
+  assert.equal(identity.name, 'Verified_name');
   await assert.rejects(verify('forged-token'), /sign in again/);
   await assert.rejects(verify(expired), /sign in again/);
   anonymous = true;
-  await assert.rejects(verify(valid), /Google/);
+  const guest = await verify(valid);
+  assert.equal(guest.isGuest, true);
+  assert.ok(guest.guestExpiresAt! > Date.now());
+  registered = false;
+  await assert.rejects(verify(valid), /username and avatar/);
+  registered = true;
+  guestExpired = true;
+  await assert.rejects(verify(valid), /expired/);
   anonymous = false;
   provider = 'email';
   await assert.rejects(verify(valid), /Google/);

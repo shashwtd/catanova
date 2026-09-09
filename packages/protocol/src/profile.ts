@@ -9,10 +9,36 @@ export const ACCENTS = {
 } as const;
 export type Profile = {
   name: string;
+  username?: string;
   avatar: number;
+  avatarSource?: 'generated' | 'google';
+  avatarUrl?: string;
   accent: keyof typeof ACCENTS;
   frame: 'rope' | 'brass' | 'plain';
 };
+export type Account = {
+  id: string;
+  username: string | null;
+  isGuest: boolean;
+  registered: boolean;
+  profile: Profile | null;
+  googleAvatarUrl: string | null;
+  lastActiveAt: string;
+  expiresAt: string | null;
+};
+export type PublicAccount = { id: string; username: string; isGuest: boolean; profile: Profile };
+export type FriendsState = { friends: PublicAccount[]; incoming: PublicAccount[]; outgoing: PublicAccount[] };
+export type UsernameAvailability = { available: boolean; reason?: string };
+export const emptyFriends = (): FriendsState => ({ friends: [], incoming: [], outgoing: [] });
+export const validUsername = (value: string) => /^[A-Za-z0-9_]{3,20}$/.test(value);
+/** Only verified provider URLs are accepted by the account service; this also blocks unsafe legacy URLs in the UI. */
+export function isGoogleAvatarUrl(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^https:\/\/lh[0-9]+\.googleusercontent\.com\//.test(value) &&
+    value.length <= 2048
+  );
+}
 export const defaultProfile = (name = 'Player'): Profile => ({
   name,
   avatar: 0,
@@ -29,10 +55,19 @@ export function parseProfile(value: unknown): Profile {
   if (typeof p.accent !== 'string' || !Object.hasOwn(ACCENTS, p.accent))
     throw new Error('Choose an available accent');
   if (!['rope', 'brass', 'plain'].includes(String(p.frame))) throw new Error('Choose an available frame');
+  if (p.username !== undefined && (typeof p.username !== 'string' || !validUsername(p.username.trim())))
+    throw new Error('Use 3–20 letters, numbers or underscores');
+  if (p.avatarSource !== undefined && !['generated', 'google'].includes(String(p.avatarSource)))
+    throw new Error('Choose an available avatar source');
+  if (p.avatarUrl !== undefined && !isGoogleAvatarUrl(p.avatarUrl))
+    throw new Error('Choose a verified Google photo');
   return {
     name: p.name.trim(),
     avatar: p.avatar as number,
     accent: p.accent as Profile['accent'],
     frame: p.frame as Profile['frame'],
+    ...(p.username === undefined ? {} : { username: (p.username as string).trim() }),
+    ...(p.avatarSource === undefined ? {} : { avatarSource: p.avatarSource as 'generated' | 'google' }),
+    ...(p.avatarUrl === undefined ? {} : { avatarUrl: p.avatarUrl as string }),
   };
 }

@@ -9,7 +9,7 @@ Label rows A through E from top to bottom, with 3, 4, 5, 4, and 3 point-up hexes
 ## Fixed beginner terrain and numbers
 
 | Row | Hex 1 | Hex 2 | Hex 3 | Hex 4 | Hex 5 |
-| --- | --- | --- | --- | --- | --- |
+| --- | -------------- | --------- | ----------- | ----------- | --------- |
 | A | Desert; robber | Fields 8 | Pasture 11 | — | — |
 | B | Hills 6 | Pasture 3 | Forest 4 | Mountains 9 | — |
 | C | Forest 10 | Fields 5 | Hills 12 | Forest 11 | Pasture 5 |
@@ -21,7 +21,7 @@ Label rows A through E from top to bottom, with 3, 4, 5, 4, and 3 point-up hexes
 The two roads listed for each player are independent starting roads. The second settlement is the one that supplies the starting resources. “First” and “second” here identify the fixed positions; players do not draft these positions.
 
 | Reference color | First settlement | First road | Second settlement | Second road | Starting resources |
-| --- | --- | --- | --- | --- | --- |
+| --------------- | ---------------- | ---------- | ----------------- | ----------- | ------------------ |
 | Red | D1/D2/E1 | D1/E1 | A2/A3/B3 | A2/B3 | Hay, sheep, Timber |
 | Blue | C4/C5/D4 | C4/D4 | D2/D3/E2 | D2/E2 | Clay, Rock, Hay |
 | Orange | B3/B4/C4 | B3/B4 | B1/B2/C2 | B1/C2 | Clay, sheep, Hay |
@@ -38,7 +38,7 @@ Nine ports exist, each granting access at the two ends of its designated coastal
 For point-up hexes, name the six **edges** NE, E, SE, SW, W, and NW by their outward-facing direction. For example, E is the vertical right edge; NW joins the top corner to the upper-left corner. The fixed port edges are:
 
 | Coastal hex | Edge | Port |
-| --- | --- | --- |
+| ----------- | ---- | ---------- |
 | A1 | NW | 3:1 |
 | A3 | NW | Sheep 2:1 |
 | B4 | NE | 3:1 |
@@ -49,7 +49,7 @@ For point-up hexes, name the six **edges** NE, E, SE, SW, W, and NW by their out
 | D1 | W | Hay 2:1 |
 | B1 | W | Rock 2:1 |
 
-Each port is usable from either endpoint of its edge. These configuration facts were transcribed by inspecting both pages of the fixed-setup diagram. Add a rendered fixture check when the geometry is implemented; there is no board generator in the initial repository.
+Each port is usable from either endpoint of its edge. These configuration facts were transcribed by inspecting both pages of the fixed-setup diagram. Add a rendered fixture check before exposing this fixed preset; the current generator implements the separate balanced preset.
 
 ## Variable setup
 
@@ -64,6 +64,6 @@ The current app uses the explicitly requested **balanced-v1** preset described i
 - Validate fixed starting intersections, road endpoints, distance legality, and second-settlement resources against this table.
 - Encode and visually check the exact six frame sections and nine port edges before offering the fixed preset.
 - Validate the counterclockwise inward spiral from each possible starting corner, skipping the desert exactly once.
-- Use 1–2–3–4–4–3–2–1 or 1–2–3–3–2–1 for variable initial placements.
+- Use 1–2–3–4–4–3–2–1 or 1–2–3–3–2–1 for variable initial placements. Catanova’s two-player house option uses 1–2–2–1 with the same island and supplies; it does not use neutral players. The fixed beginner reference above remains a three/four-player source reference.
 
-These are acceptance criteria for future board code, not tests already passing in this transport-only repository.
+The current engine tests topology, inventories and snake setup for two through four players. Exact fixed-board/frame fixtures and the classic spiral preset remain acceptance work before those presets become selectable.

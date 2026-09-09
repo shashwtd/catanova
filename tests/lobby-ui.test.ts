@@ -81,7 +81,7 @@ test('readiness, minimum seats, connection and pending commands all gate the hos
   const disconnectedSeat = structuredClone(room);
   disconnectedSeat.players[2]!.connected = false;
   const short = structuredClone(room);
-  short.players.pop();
+  short.players.splice(1);
   for (const html of [
     renderLobby(missingReady, 'p0'),
     renderLobby(disconnectedSeat, 'p0'),
@@ -194,14 +194,14 @@ test('game profiles retain turn, score, awards and disconnect status without con
   room.players[1]!.connected = false;
   const html = renderToStaticMarkup(createElement(PlayerRail, { room, game, me: 'p0' }));
   assert.equal([...html.matchAll(/data-player-profile=/g)].length, 3);
-  assert.equal([...html.matchAll(/aria-label="Current turn"/g)].length, 1);
+  assert.equal([...html.matchAll(/aria-label="Current turn: Place a starting settlement"/g)].length, 1);
   assert.match(html, /Longest Road, plus 2 victory points/);
   assert.match(html, /aria-label="Disconnected"/);
   assert.ok(!html.includes('profile-pieces'));
   assert.ok(!/>Connected<|>You<|>Playing</.test(html));
 });
 
-test('profile score plaques show only projected points and keep a long name available to assistive technology', () => {
+test('compact profile scores show only projected points and keep a long name available to assistive technology', () => {
   const room = lobby(),
     name = 'Alexandria of the Northern Isles';
   assert.equal(name.length, 32);
@@ -220,8 +220,61 @@ test('profile score plaques show only projected points and keep a long name avai
   assert.match(own, /aria-label="1 victory points"/);
   assert.match(opponent, /aria-label="0 victory points"/);
   assert.ok(own.includes(`title="${name}"`) && own.includes(`>${name}</strong>`));
-  assert.equal([...html.matchAll(/>VP<\/span>/g)].length, 3);
+  assert.ok(!html.includes('profile-score-plaque') && !html.includes('>VP</span>'));
+  assert.match(own, /class="profile-stats"><span class="profile-score"/);
+  assert.ok(own.indexOf('profile-score') < own.indexOf('profile-resource-count'));
+  assert.ok(own.indexOf('profile-resource-count') < own.indexOf('profile-development-count'));
   assert.match(opponent, /aria-label="Disconnected"/);
-  assert.match(opponent, />Offline<\/span>/);
+  assert.ok(!opponent.includes('>Offline</span>') && !opponent.includes('profile-offline-distress'));
   assert.ok(!html.includes('private-opponent-point'));
+});
+
+test('profiles display the current phase and preserve the active clock without a Turn text badge', () => {
+  const room = lobby(),
+    game = gameView(
+      createGame(room.players, 82, () => 0.34),
+      'p0',
+    );
+  const phases = [
+    ['setupSettlement', 'settlement', 'Place a starting settlement'],
+    ['setupRoad', 'road', 'Place a starting road'],
+    ['freeRoads', 'road', 'Place a free road'],
+    ['roll', 'dice', 'Roll the dice'],
+    ['robber', 'robber', 'Move the robber'],
+    ['actions', 'trade', 'Build, trade or play a development card'],
+  ] as const;
+  for (const [phase, icon, label] of phases) {
+    game.phase = phase;
+    const html = renderToStaticMarkup(
+      createElement(PlayerRail, { room, game, timer: createElement('span', {}, '42s') }),
+    );
+    assert.equal([...html.matchAll(/data-turn-activity=/g)].length, 1);
+    assert.ok(html.includes(`data-turn-activity="${icon}"`));
+    assert.ok(html.includes(`aria-label="Current turn: ${label}"`));
+    assert.equal([...html.matchAll(/>42s<\/span>/g)].length, 1);
+    assert.ok(!html.includes('profile-turn-label'));
+  }
+});
+
+test('each pending discard player gets an activity marker which clears independently', () => {
+  const room = lobby(),
+    game = gameView(
+      createGame(room.players, 82, () => 0.34),
+      'p0',
+    );
+  game.phase = 'discard';
+  game.discards = { p0: 4, p1: 5, p2: 0 };
+  const render = () => renderToStaticMarkup(createElement(PlayerRail, { room, game }));
+  let html = render();
+  assert.equal([...html.matchAll(/data-turn-activity="discard"/g)].length, 2);
+  assert.ok(html.includes('Current turn: Discard 4 resource cards'));
+  assert.ok(html.includes('aria-label="Discard 5 resource cards"'));
+  delete game.discards.p0;
+  html = render();
+  assert.equal([...html.matchAll(/data-turn-activity="discard"/g)].length, 1);
+  assert.ok(html.includes('Current turn: Waiting for players to discard'));
+  delete game.discards.p1;
+  assert.ok(!render().includes('data-turn-activity="discard"'));
+  game.winner = 'p0';
+  assert.ok(!render().includes('data-turn-activity='));
 });

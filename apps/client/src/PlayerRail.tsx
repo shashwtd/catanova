@@ -1,10 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { Layers, ScrollText, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
+import { GameIcon, Layers, ScrollText, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
+import { playerTurnActivity } from './turn-activity.js';
 export function PlayerRail({
   room,
   game,
@@ -21,6 +22,7 @@ export function PlayerRail({
       {game.players.map((p, i) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && !game.winner,
+          activity = playerTurnActivity(game, p.id),
           road = game.longestRoad === p.id,
           army = game.largestArmy === p.id;
         return (
@@ -35,34 +37,18 @@ export function PlayerRail({
               <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
               {!seat?.connected && (
                 <span className="offline-mark" role="img" title="Disconnected" aria-label="Disconnected">
-                  <svg
-                    className="profile-offline-distress"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M0 13h32v4H0Zm48-1h52v7H48ZM0 32h71v3H0Zm82-2h18v7H82ZM0 62h18v8H0Zm29 3h71v4H29ZM0 83h60v5H0Zm73-2h27v3H73Z"
-                      fill="#ec8c7952"
-                    />
-                    <path
-                      d="M0 22h49m18 0h33M0 52h24m51 0h25M0 76h37m29 0h34M17 0l-4 12m71 71-4 15M0 94h100"
-                      fill="none"
-                      stroke="#ffd6be8c"
-                      strokeWidth="1"
-                    />
-                    <path d="M0 43h18v3H0m81-19h19v4H81M0 71h9v5H0m83 17h17v5H83" fill="#682c2d99" />
-                  </svg>
-                  <span className="profile-offline-symbol" aria-hidden="true">
-                    <WifiOff size={38} />
-                    <span>Offline</span>
-                  </span>
+                  <WifiOff size={38} />
                 </span>
               )}
-              {active && (
-                <span className="profile-turn" aria-label="Current turn">
-                  <span className="profile-turn-label">Turn</span>
-                  {timer}
+              {activity && (
+                <span
+                  className="profile-turn"
+                  data-turn-activity={activity.icon}
+                  title={activity.label}
+                  aria-label={`${active ? 'Current turn: ' : ''}${activity.label}`}
+                >
+                  <GameIcon name={activity.icon} size={20} />
+                  {active && timer}
                 </span>
               )}
             </div>
@@ -70,18 +56,15 @@ export function PlayerRail({
               <strong className="profile-name-banner" title={p.name}>
                 {p.name}
               </strong>
-              <span
-                className="profile-score profile-score-plaque"
-                role="img"
-                title={`${p.points} victory points`}
-                aria-label={`${p.points} victory points`}
-              >
-                <b aria-hidden="true">{p.points}</b>
-                <span className="profile-score-unit" aria-hidden="true">
-                  VP
-                </span>
-              </span>
               <div className="profile-stats">
+                <span
+                  className="profile-score"
+                  title={`${p.points} victory points`}
+                  aria-label={`${p.points} victory points`}
+                >
+                  <Trophy size={23} />
+                  <b>{p.points}</b>
+                </span>
                 <span
                   className="profile-resource-count"
                   title={`${p.resourceCount} resource cards`}
