@@ -1,0 +1,82 @@
+name: catanova-production
+
+services:
+  game:
+    # Build a reviewed, detached checkout; the revision also identifies the local image.
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      labels:
+        org.opencontainers.image.source: https://github.com/shashwtd/catanova
+        org.opencontainers.image.revision: ${CATANOVA_REVISION:?Set the full deployed Git commit in .env}
+    image: catanova-local:${CATANOVA_REVISION:?Set the full deployed Git commit in .env}
+    pull_policy: never
+    # SQLite has one authoritative process. Compose must not scale this service.
+    container_name: catanova-game
+    init: true
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3000'
+      DATABASE_PATH: /app/data/probe.sqlite
+      REQUIRE_AUTH: 'true'
+      ALLOW_LOCAL_PLAYTEST: 'false'
+      SUPABASE_URL: ${SUPABASE_URL:?Set the HTTPS Supabase project URL in .env}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Set the public Supabase publishable key in .env}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?Set the public production Turnstile site key in .env}
+      ALLOWED_ORIGINS: https://${CATANOVA_DOMAIN:?Set one public hostname without scheme or path in .env}
+    # Port 3000 is reachable only on the Compose network, never published on the VM.
+    volumes:
+      - game-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    depends_on:
+      game:
+        condition: service_healthy
+    environment:
+      CATANOVA_DOMAIN: ${CATANOVA_DOMAIN:?Set one public hostname without scheme or path in .env}
+    ports:
+      - '80:80/tcp'
+      - '443:443/tcp'
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+configs:
+  caddyfile:
+    file: ./Caddyfile
+
+# Explicit names preserve storage across checkout-directory and image changes.
+volumes:
+  game-data:
+    name: catanova-game-data
+  caddy-data:
+    name: catanova-caddy-data
+  caddy-config:
+    name: catanova-caddy-config

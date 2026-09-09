@@ -1,0 +1,12 @@
+{
+	# Only TCP 80/443 are published; WebSocket upgrades use HTTP/1.1.
+	servers {
+		protocols h1 h2
+	}
+}
+
+https://{$CATANOVA_DOMAIN} {
+	encode zstd gzip
+	# One origin for pages, account API and /ws; preserve the incoming Host and Origin.
+	reverse_proxy game:3000
+}

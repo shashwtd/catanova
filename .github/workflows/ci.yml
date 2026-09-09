@@ -28,6 +28,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Validate authenticated production deployment
+        env:
+          CATANOVA_DOMAIN: catanova.example
+          CATANOVA_REVISION: ${{ github.sha }}
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_configuration_only
+          TURNSTILE_SITE_KEY: site_key_for_configuration_validation
+        run: docker compose --env-file deploy/single-vm/.env.example -f deploy/single-vm/compose.yaml config --quiet
       - run: docker compose up --build --wait
       - run: npm run probe
       - if: always()

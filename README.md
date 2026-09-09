@@ -67,7 +67,9 @@ Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits ad
 
 With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Configured guests use Supabase anonymous accounts and the [implemented seven-day guest policy](docs/GUEST_ACCESS.md); local playtest tokens do not reserve global usernames.
 
-The planned hosted service keeps the frontend and Node game server together on Azure Container Apps, with nearby Supabase Postgres. Account data uses Supabase; the production game-state Postgres adapter and safe multi-instance room ownership still need implementation. No cloud instance is deployed. Allow **about $90–105/month including a managed wiki**, before credits and taxes; see the [launch infrastructure, scaling and cost plan](docs/LAUNCH_INFRASTRUCTURE.md).
+The initial hosted playtest will keep the frontend and Node game server together on one Azure VM with persistent storage, using the existing SQLite game saves and Supabase accounts. A free wiki is planned. No cloud instance is deployed yet. The future Container Apps/Postgres adapter and safe multi-instance room ownership remain separate scaling work. See the [launch infrastructure and cost breakdown](docs/LAUNCH_INFRASTRUCTURE.md); the earlier $90–105 estimate included a paid wiki and is not a minimum launch cost.
+
+The [single-VM deployment bundle](deploy/single-vm/README.md) adds a production Compose configuration with Caddy HTTPS, required authentication and persistent game/certificate volumes. It keeps port 3000 private and serves the app and WebSockets through one hostname.
 
 The production build includes a public **`/guide/`** quick-start page, a pre-rendered welcome screen, canonical metadata, link previews, site icons and a sitemap for `catanova.io`. Private room and auth pages are excluded from indexing. [SEO and launch checks](docs/SEO.md).
 
