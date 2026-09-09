@@ -14,11 +14,19 @@ The actual game state already contains the new hand and determines legal actions
 
 ## Cards
 
-Resource cards are compact colored cards with artwork and a count. They have no visible names or tooltips; accessible labels retain each resource's name and quantity. Nonempty cards can lift slightly on hover, while empty cards use muted colors, hatching and desaturated artwork without hover movement or sound.
+Resource cards have a restrained glossy finish across the whole colored card, with artwork and a count. They have no visible names or tooltips; accessible labels retain each resource's name and quantity. The card lifts as one surface on hover, with no independent artwork shift. Positive resource counts allow hover audio even with reduced motion; empty cards remain muted and silent.
 
-Development cards sit inline beside the resource hand, with their purchase card at the end. Up to five illustrated stacks group identical cards and choose a playable copy first. Development-card tooltips retain the story, effect, total, playable and newly bought counts. Selecting a card opens a detail panel; a separate labeled Play button confirms it. Monopoly and Year of Plenty show resource choices in that panel. Newly bought cards explain the next-turn restriction; victory points explain that they already count.
+Development cards sit inline beside the resource hand. A distinct plus/development **Buy** slot displays its Sheep, Hay and Rock price. Up to five illustrated stacks group identical cards and choose a playable copy first. Tooltips retain the story, effect and availability counts. Selecting a card opens a detail panel; a separate labeled Play button confirms it. Monopoly and Year of Plenty show resource choices there. Newly bought cards explain the next-turn restriction; victory points explain that they already count.
 
-One square control switches from Roll to End after rolling; Trade sits beside it. Player portraits carry the current-turn marker, optional countdown, score and awards. [GameIcons.tsx](../apps/client/src/GameIcons.tsx) supplies the original editable SVG interface icons. Portraits and selected controls use a thin rope-and-wood border texture.
+Trade sits to the left of Roll/End, and these actions are enabled only in the local player's appropriate turn phase. Other players answer live offers through a separate notice. Player-color banners and portrait edges match the brighter board pieces; points, hand counts, awards and the current-turn ribbon remain prominent. Disconnections place a Wi-Fi-off overlay on the avatar. [GameIcons.tsx](../apps/client/src/GameIcons.tsx) supplies original SVG controls, including a rulebook and separate fullscreen entry/exit symbols. Only portraits retain the thin rope-and-wood texture.
+
+## Intent and history
+
+Affordable legal build sites reveal a piece on hover or focus. Clicking keeps a placement preview with its cost; **Build** submits it, while Cancel or Escape dismisses it. Setup and free-road placements use the same confirmation. A preview is checked again against the current room, turn, phase and legal sites before submission.
+
+Trade and discard quantities use clickable resource cards with a minus control. An open **?** offer invites nonempty return proposals; the active player selects one, and the server rechecks the offer and both hands before transferring cards together. Fixed offers retain direct opponent acceptance. Neither path permits free gifts or stale acceptance. [Trading rules](RULEBOOK.md#7-trading).
+
+[MoveHistory.tsx](../apps/client/src/MoveHistory.tsx) groups the durable public ledger by turn with action/resource icons and literal player names. Revision numbers remain internal pagination identifiers. Hidden resource and development-card identities are not added by the presentation.
 
 ## Sound
 
@@ -28,7 +36,7 @@ An AudioContext starts only after a trusted pointer or keyboard gesture. A cache
 
 ## Bounded rendering cost
 
-The flat terrain draws on loading, resize, board changes or graphics-context recovery. Roads and buildings use SVG shapes with static shadows. Panning and zooming move the island and tabletop together; the camera's short zoom glide stops when it reaches its target. Dice, trails, receipts and transitions have fixed durations. [Board, dice and camera details](3D_NOTES.md).
+The flat terrain draws on loading, resize, board changes or graphics-context recovery. Roads and buildings use bright SVG shapes with light static shadows. A smoother coast-following sea boundary retains the island shape; mirrored UV repeats and atlas gutters reduce material seams. Panning and zooming move the island and tabletop together, and the short zoom glide stops at its target. Dice, trails, receipts and transitions have fixed durations. [Board, dice and camera details](3D_NOTES.md).
 
 Settings expose volume and the optional host-owned turn timer. A volume of zero mutes sound. The host can change the timer before the game starts; it then locks for the match. The operating system's reduced-motion setting selects quieter presentation without another settings toggle. [Timer rules and persistence](TURN_CLOCK.md).
 

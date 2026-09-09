@@ -1,6 +1,6 @@
 # Google authentication
 
-Catanova uses Supabase Auth with Google OAuth and PKCE. The integration is implemented; this repository contains no configured Supabase project or Google credentials. A real Google account flow still needs the project setup below and a live sign-in check.
+Catanova uses Supabase Auth with Google OAuth and PKCE. The integration is implemented; activation requires a project's public configuration, enabled Google provider and allowed redirects. Keep project-specific configuration outside the repository. A real account flow still needs the setup below and a live sign-in check.
 
 ## Configure a project
 
@@ -27,7 +27,7 @@ An account occupies one active seat per room. Signing in on another device and o
 
 Profiles and game saves are currently stored by the game server in **SQLite**, keyed by verified Supabase user ID. They are not yet in Supabase Postgres. They survive normal server restarts as long as the database volume survives. The hosted Postgres migration remains a separate milestone.
 
-Both Ready state and room cosmetic changes are durable. Customization is available before play; changing a lobby profile clears Ready in the interface. The game requires all players to be connected and ready before the host starts. A network drop retains the seat and cosmetics.
+Both Ready state and room cosmetic changes are durable. Customization is available before play; changing a lobby profile clears Ready in the interface. The game requires everyone to be connected and the other players to be ready before the host starts. The host has no separate Ready step. A network drop retains the seat and cosmetics.
 
 ## Local development and guests
 
@@ -37,4 +37,4 @@ The Google path deliberately rejects Supabase anonymous users. [Guest access](GU
 
 ## Validation and remaining activation
 
-Automated tests cover calls through the real Supabase SDK to a local Auth fixture, forged/expired credentials, required Google identity, cross-account takeover denial, profile ownership, same-account device recovery, and production configuration. The OAuth browser redirect and real Google/Supabase service have not been exercised because no project has been supplied. After configuration, verify an invite → Google → same lobby round trip, profile persistence after logout/login, and resume on a second device before public hosting.
+Automated tests cover calls through the Supabase SDK to a local Auth fixture, forged/expired credentials, required Google identity, cross-account takeover denial, profile ownership, same-account device recovery, and production configuration. A valid public key alone does not enable the Google provider or configure redirects. The real Google/Supabase flow has not been verified. After configuration, check an invite → Google → same lobby round trip, profile persistence after logout/login, and resume on a second device before public hosting.

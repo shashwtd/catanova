@@ -3,6 +3,19 @@ import type { Board, Terrain } from '../../../packages/rules/src/board.js';
 export const HEX_SIZE = 64;
 export const WORLD = { x: -392, y: -368, width: 784, height: 736 };
 export const WATER_BAND = 90;
+export const WATER_EDGE_WAVES = [
+  { frequency: 5, phase: 0.35, amplitude: 1.7 },
+  { frequency: 9, phase: 1.7, amplitude: 0.65 },
+] as const;
+/** Keep neighboring atlas cells out of the sample, including linear-filter footprints. */
+export const MATERIAL_GUTTER = 4;
+/** Reflect the same cropped tile across both axes so all four repeat boundaries meet. */
+export const MATERIAL_QUADRANTS = [
+  { x: 0, y: 0, sx: 1, sy: 1 },
+  { x: 2, y: 0, sx: -1, sy: 1 },
+  { x: 0, y: 2, sx: 1, sy: -1 },
+  { x: 2, y: 2, sx: -1, sy: -1 },
+] as const;
 export const TERRAIN_INDEX: Record<Terrain, number> = {
   wood: 0,
   brick: 1,
@@ -70,14 +83,11 @@ export function coastDistance(points: readonly ShorePoint[], x: number, y: numbe
   }
   return inside ? -nearest : nearest;
 }
-/** The same four gentle irregularities are used by the shader's outer water edge. */
+/** Broad, low-amplitude curves keep the existing coast-following band calm. */
 export function waterWidth(angle: number) {
-  return (
-    WATER_BAND +
-    Math.sin(angle * 11 + 0.35) * 3.8 +
-    Math.sin(angle * 23 + 1.7) * 2.6 +
-    Math.sin(angle * 41 + 0.6) * 1.8 +
-    Math.sin(angle * 73) * 0.8
+  return WATER_EDGE_WAVES.reduce(
+    (width, wave) => width + Math.sin(angle * wave.frequency + wave.phase) * wave.amplitude,
+    WATER_BAND,
   );
 }
 /** One continuous offset coast, not an extra ring of board-game hexagons. */
@@ -119,11 +129,11 @@ export function portPlacement(board: Board, edgeId: number) {
     angle: (Math.atan2(nx, -ny) * 180) / Math.PI,
     bridges: [a, b].map((v) => ({
       from: { x: v.x * HEX_SIZE, y: v.y * HEX_SIZE },
-      to: { x: x + nx * 32, y: y + ny * 32 },
+      to: { x: x + nx * 34, y: y + ny * 34 },
     })),
-    boatX: x + nx * 49,
-    boatY: y + ny * 49,
-    markerX: x + nx * 52 + ny * 35,
-    markerY: y + ny * 52 - nx * 35,
+    boatX: x + nx * 61,
+    boatY: y + ny * 61,
+    markerX: x + nx * 61,
+    markerY: y + ny * 61,
   };
 }

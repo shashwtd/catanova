@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Board } from '../../../packages/rules/src/board.js';
-import { HEX_SIZE, WATER_BAND, TERRAIN_INDEX, WORLD } from './scene.js';
+import { HEX_SIZE, MATERIAL_GUTTER, WATER_BAND, WATER_EDGE_WAVES, TERRAIN_INDEX, WORLD } from './scene.js';
 
 const vertexSource = `#version 300 es
 in vec2 aPosition;
@@ -19,23 +19,29 @@ uniform vec4 uWorld;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
 float hex(vec2 p,float r){p=abs(p.yx);r*=0.8660254;vec3 k=vec3(-0.8660254,0.5,0.57735027);p-=2.0*min(dot(k.xy,p),0.0)*k.xy;p-=vec2(clamp(p.x,-k.z*r,k.z*r),r);return length(p)*sign(p.y);}
-vec3 environment(vec2 uv,vec2 cell){return texture(uEnvironment,(cell+clamp(uv,vec2(0.002),vec2(0.998)))*0.5).rgb;}
+// Mirrored repeats share the same edge samples; a gutter prevents neighboring atlas bleed.
+vec3 environment(vec2 uv,vec2 cell){
+  vec2 mirrored=1.0-abs(mod(uv,2.0)-1.0);
+  float gutter=${(MATERIAL_GUTTER / 512).toFixed(8)};
+  vec2 inset=mix(vec2(gutter),vec2(1.0-gutter),mirrored);
+  return texture(uEnvironment,(cell+inset)*0.5).rgb;
+}
 void main(){
   vec2 p=uWorld.xy+vec2(vUv.x,1.0-vUv.y)*uWorld.zw;
   float land=10000.0;int nearest=0;
   for(int i=0;i<19;i++){float d=hex(p-uLand[i].xy,64.0);if(d<land){land=d;nearest=i;}}
   float angle=atan(p.y,p.x);
-  float waterWidth=${WATER_BAND.toFixed(1)}+sin(angle*11.0+0.35)*3.8+sin(angle*23.0+1.7)*2.6+sin(angle*41.0+0.6)*1.8+sin(angle*73.0)*0.8;
+  float waterWidth=${WATER_BAND.toFixed(1)}${WATER_EDGE_WAVES.map((wave) => `+sin(angle*${wave.frequency.toFixed(1)}+${wave.phase.toFixed(2)})*${wave.amplitude.toFixed(2)}`).join('')};
   float outer=land-waterWidth;
   if(outer>3.0){outColor=vec4(0);return;}
   float rough=(noise(p*0.13)-0.5)*3.0+(noise(p*0.043)-0.5)*3.0;
-  vec2 waterUv=fract((p+vec2(470,430))/370.0);
+  vec2 waterUv=(p+vec2(470,430))/370.0;
   vec3 deep=environment(waterUv,vec2(0,0));
   vec3 shallow=environment(waterUv,vec2(1,0));
   vec3 color=mix(deep,shallow,1.0-smoothstep(10.0,69.0,land));
   float foam=(1.0-smoothstep(0.4,1.7,abs(land+rough-11.0)))*(0.35+noise(p*0.09)*0.4);
   color=mix(color,vec3(0.87,0.96,0.86),foam);
-  vec3 sand=environment(fract((p+vec2(600))/145.0),vec2(0,1));
+  vec3 sand=environment((p+vec2(600))/145.0,vec2(0,1));
   float coast=1.0-smoothstep(4.0,7.5,land+rough);
   float bankShade=mix(0.68,1.03,1.0-smoothstep(-2.0,6.0,land+rough));
   color=mix(color,sand*bankShade,coast);

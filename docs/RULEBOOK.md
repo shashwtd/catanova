@@ -155,6 +155,8 @@ Only resource cards can be traded. Both sides must give at least one resource im
 
 Negotiation does not reserve cards. Players may refuse offers. You can discuss future cooperation or bluff about your resources, but promises do not create enforceable future payments. You may trade and then play Monopoly, provided that card is eligible. Non-active players cannot trade with each other, including as one step of an arrangement that later benefits the active player.
 
+In the app, the active player opens Trade and selects resources by clicking cards. A fixed offer specifies both sides and can be accepted by an opponent who can pay. **? Open to offers** specifies the active player's contribution and invites return proposals. Each opponent may submit, replace or withdraw their proposal; the active player chooses one to complete. An empty return is never a gift. Acceptance rechecks the live offer and both hands, then commits both transfers together. Replacing or withdrawing the offer, ending the turn, or taking another active-player game action invalidates old replies; stale acceptance is rejected.
+
 ### 7.2 Bank trades
 
 On your action phase, you may always return **four matching resources** to the bank for **one different resource** available there. You need no port or coastal building.
@@ -180,6 +182,8 @@ Return the full cost to the bank for each action:
 | Development card | 0 | 0 | 1 | 1 | 1 |
 
 There is no general limit on the number of purchases during your action phase, provided you have the resources, legal locations, and remaining pieces/cards. Pieces stay where they are placed. You cannot relocate, sell, or demolish them. A city upgrade is the exception that returns a settlement piece to your personal supply.
+
+The app previews affordable legal pieces on hover or keyboard focus. Clicking a site opens a cost review; **Build** confirms it, while Cancel or Escape dismisses it. This confirmation also applies to setup pieces and Road Building's free roads. No resources move until the server accepts the confirmed action. The separate development-card purchase slot shows its Sheep, Hay and Rock cost and buys immediately when pressed.
 
 ### 8.1 Roads
 

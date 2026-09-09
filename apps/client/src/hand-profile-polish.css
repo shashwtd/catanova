@@ -1,0 +1,521 @@
+/* Portrait identity uses the same assigned colors as pieces on the island. */
+.playing .player-profile {
+  gap: 7px;
+  padding-bottom: 9px;
+}
+.player-profile .profile-portrait::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border: 2px solid var(--player-color);
+  border-radius: 12%;
+  background: color-mix(in srgb, var(--player-color), #29352f 55%);
+  box-shadow: 0 3px 6px #10171a99;
+}
+.player-profile .profile-caption {
+  padding-top: 0;
+}
+.player-profile .profile-name-banner,
+.player-profile.self .profile-name-banner {
+  position: relative;
+  padding: 5px 5px 5px 7px;
+  border-left: 3px solid var(--player-color);
+  border-radius: 2px 5px 5px 2px;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--player-color), #28302c 70%), #26342cd9);
+  color: #fff0cf;
+  font-size: 13px;
+  font-weight: 650;
+  text-shadow: 0 1px 2px #17251b;
+  box-shadow:
+    inset 0 1px #fff0cf20,
+    0 2px 3px #161d2066;
+}
+.player-profile .profile-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 7px;
+  margin-top: 7px;
+}
+.player-profile .profile-stats > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 34px;
+  color: #fff1ce;
+  line-height: 1;
+}
+.player-profile .profile-stats b {
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 2px #12201c;
+}
+.player-profile .profile-stats .game-icon {
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 1px 1px #101915aa);
+}
+.player-profile .profile-portrait .profile-score {
+  right: -4px;
+  bottom: -4px;
+  gap: 3px;
+  min-width: 46px;
+  padding: 2px 6px 3px 3px;
+  border: 1px solid #e5bf73;
+  border-radius: 7px 3px 7px 3px;
+  background: linear-gradient(145deg, #826039, #3d332a 70%);
+  box-shadow:
+    inset 0 1px #ffe6aa66,
+    0 3px 4px #12201ccc;
+}
+.player-profile .profile-score .game-icon {
+  width: 24px;
+  height: 24px;
+}
+.player-profile .profile-score b {
+  color: #fff0b7;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 1px #352816;
+}
+.player-profile.active .profile-portrait::before {
+  border-color: color-mix(in srgb, var(--player-color), #fff4c8 40%);
+  box-shadow:
+    0 0 0 2px #fff1ba50,
+    0 0 14px color-mix(in srgb, var(--player-color), transparent 35%),
+    0 3px 5px #152218bb;
+}
+.player-profile.active .avatar-medallion {
+  filter: none;
+}
+.player-profile.active .profile-name-banner {
+  background: linear-gradient(105deg, color-mix(in srgb, var(--player-color), #344233 40%), #324231ef);
+  box-shadow:
+    inset 0 1px #fff0cf50,
+    0 2px 3px #161d2066;
+}
+.player-profile .profile-turn {
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 5px;
+  padding: 3px 7px;
+  white-space: nowrap;
+  border: 1px solid #f4db9a;
+  border-radius: 4px;
+  background: linear-gradient(#d6bf78, #9b844d);
+  color: #28382c;
+  box-shadow:
+    inset 0 1px #fff0b999,
+    0 2px 4px #10201999;
+}
+.profile-turn-label {
+  font:
+    750 10px/1 Barlow,
+    sans-serif;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.player-profile .profile-turn .turn-timer {
+  color: #28382c;
+}
+.player-profile .profile-turn .turn-timer.running-low {
+  color: #8a271e;
+}
+.player-profile.offline .avatar-medallion svg {
+  filter: saturate(0.5) brightness(0.72);
+}
+.player-profile .profile-portrait .offline-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  z-index: 5;
+  border: 1px solid #efbc99b3;
+  border-radius: 50%;
+  background: #29332deb;
+  box-shadow:
+    0 2px 8px #111b20cc,
+    inset 0 1px #ffebc033;
+}
+.player-profile .profile-portrait .offline-mark .game-icon {
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 1px 1px #121711);
+}
+.player-profile .profile-awards {
+  position: static;
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 2px 0 0;
+  margin: 1px 0 0;
+}
+.player-profile .profile-awards .award-ribbon {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 5px;
+  border-color: #d1b379;
+  border-radius: 4px;
+  background: linear-gradient(145deg, #655942, #343b30);
+  box-shadow:
+    inset 0 1px #ffefc238,
+    0 2px 3px #12201988;
+}
+.player-profile .profile-awards .army-award {
+  background: linear-gradient(145deg, #59667a, #343b42);
+}
+.player-profile .profile-awards .game-icon {
+  width: 22px;
+  height: 22px;
+}
+.player-profile .profile-awards b {
+  display: inline;
+  font-size: 12px;
+  color: #ffe8a8;
+}
+
+/* The finish belongs to the whole card. Artwork and numbers never tilt separately. */
+.playing .hand-zone {
+  column-gap: clamp(18px, 2.3vw, 30px);
+}
+.playing .resource-card.card-finish {
+  isolation: isolate;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--resource-color), #f2d99d 24%),
+    var(--resource-color) 58%,
+    color-mix(in srgb, var(--resource-color), #1c3630 28%)
+  );
+  box-shadow:
+    0 3px 5px #111d2099,
+    inset 0 1px 1px #fff1bf88,
+    inset 0 -2px 3px #1a352c55;
+  transition: translate 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.playing .resource-card.card-finish::before,
+.development-hand-inline .card-sheen {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    125deg,
+    #fff9dc30,
+    #fff7d715 24%,
+    transparent 25%,
+    transparent 53%,
+    #fff6d80c 54%,
+    transparent 74%
+  );
+  box-shadow:
+    inset 0 1px #fff3cc55,
+    inset 1px 0 #fff3cc30,
+    inset 0 -1px #17342c40;
+}
+.playing .resource-card.card-finish:hover:not(.empty-card) {
+  transform: none;
+  translate: 0 -4px;
+  box-shadow:
+    0 5px 8px #10201caa,
+    inset 0 1px 1px #fff1bf88,
+    inset 0 -2px 3px #1a352c55;
+  transition-duration: 150ms;
+}
+.playing .resource-card.card-finish .resource-card-content,
+.playing .resource-card.card-finish:hover .resource-card-content {
+  transform: none;
+  translate: none;
+  animation: none;
+  transition: none;
+}
+.playing .resource-card.card-finish.card-arrival {
+  animation: hand-card-receipt 350ms ease-out;
+}
+@keyframes hand-card-receipt {
+  45% {
+    box-shadow:
+      0 0 13px #f6e3a488,
+      inset 0 1px 1px #fff1bf88;
+  }
+}
+.playing .resource-card.card-finish.empty-card,
+.playing .resource-card.card-finish.empty-card:hover {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--resource-color), #a3987b 58%),
+    color-mix(in srgb, var(--resource-color), #41483d 62%)
+  );
+  transform: none;
+  translate: none;
+  box-shadow:
+    0 2px 4px #12201c55,
+    inset 0 1px #cfc59b28;
+}
+.playing .resource-card.card-finish.empty-card::before {
+  opacity: 0.3;
+}
+.development-hand-inline {
+  gap: 13px;
+}
+.development-hand-inline .development-card.card-finish {
+  transform: none;
+  transform-style: flat;
+  transition: translate 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    0 3px 5px #13201db3,
+    inset 0 0 0 1px #f0d49b66;
+}
+.development-hand-inline .development-card.card-finish.playable-card:hover {
+  translate: 0 -3px;
+  transition-duration: 150ms;
+}
+.development-hand-inline .development-card .development-art {
+  transform: none;
+}
+.development-hand-inline .development-buy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 3px;
+  min-width: max(var(--dev-card-width), 51px);
+  border: 1px solid #b7b895;
+  border-radius: 6px;
+  transform: none;
+  background: linear-gradient(145deg, #667965, #394d40 60%, #31483d);
+  box-shadow:
+    inset 0 1px #f6eccd55,
+    inset 0 0 0 3px #253c3733,
+    0 3px 5px #14251e99;
+  transition: translate 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.development-hand-inline .development-buy-mark {
+  position: relative;
+  inset: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px 0 0;
+  width: 34px;
+  height: 30px;
+  background: none;
+}
+.development-hand-inline .development-buy-mark > .game-icon:first-child {
+  width: 29px;
+  height: 29px;
+}
+.development-hand-inline .development-buy-mark > .game-icon:last-child {
+  position: absolute;
+  right: -2px;
+  bottom: -1px;
+  width: 17px;
+  height: 17px;
+  filter: drop-shadow(0 1px 1px #1b3129);
+}
+.development-buy-label {
+  color: #f4e8bb;
+  font:
+    650 10px/1 Barlow,
+    sans-serif;
+  letter-spacing: 0.025em;
+}
+.development-buy-cost {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.development-buy-cost > span,
+.development-buy-cost .sprite {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.development-hand-inline .development-buy:disabled {
+  filter: saturate(0.6) brightness(0.88);
+}
+.development-hand-inline .development-buy:hover:not(:disabled) {
+  translate: 0 -3px;
+  transition-duration: 150ms;
+}
+
+@media (max-width: 1000px) {
+  .player-profile .profile-name-banner {
+    font-size: 12px;
+    padding-inline: 5px;
+  }
+  .player-profile .profile-stats {
+    gap: 4px;
+  }
+  .player-profile .profile-stats .game-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .player-profile .profile-stats b {
+    font-size: 16px;
+  }
+  .development-hand-inline .development-buy {
+    gap: 2px;
+    padding-block: 4px;
+  }
+  .development-hand-inline .development-buy-mark {
+    height: 26px;
+  }
+}
+@media (max-width: 700px) {
+  .playing .player-profile {
+    gap: 5px;
+    padding-bottom: 7px;
+  }
+  .player-profile .profile-caption {
+    width: 100%;
+  }
+  .player-profile .profile-name-banner {
+    font-size: 11px;
+    padding: 4px;
+  }
+  .player-profile .profile-stats {
+    justify-content: center;
+    margin-top: 5px;
+    gap: 5px;
+  }
+  .player-profile .profile-stats > span {
+    min-width: 32px;
+    gap: 1px;
+  }
+  .player-profile .profile-stats .game-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .player-profile .profile-stats b {
+    font-size: 15px;
+  }
+  .player-profile .profile-portrait .profile-score {
+    right: -3px;
+    bottom: -3px;
+    min-width: 37px;
+    gap: 1px;
+    padding: 1px 4px 2px 2px;
+  }
+  .player-profile .profile-score .game-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .player-profile .profile-score b {
+    font-size: 19px;
+  }
+  .player-profile .profile-turn {
+    top: -8px;
+    padding: 3px 5px;
+    gap: 3px;
+  }
+  .profile-turn-label {
+    font-size: 8px;
+  }
+  .player-profile .profile-portrait .offline-mark {
+    width: 39px;
+    height: 39px;
+  }
+  .player-profile .profile-portrait .offline-mark .game-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .player-profile .profile-awards {
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+  }
+  .player-profile .profile-awards .award-ribbon {
+    gap: 2px;
+    padding: 2px 3px;
+  }
+  .player-profile .profile-awards .game-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .player-profile .profile-awards b {
+    font-size: 10px;
+  }
+  .playing .hand-zone {
+    column-gap: 16px;
+  }
+  .development-hand-inline {
+    gap: 10px;
+  }
+  .development-hand-inline .development-buy {
+    min-width: 45px;
+    gap: 1px;
+    padding: 3px 1px;
+  }
+  .development-hand-inline .development-buy-mark {
+    height: 23px;
+    width: 29px;
+  }
+  .development-hand-inline .development-buy-mark > .game-icon:first-child {
+    width: 24px;
+    height: 24px;
+  }
+  .development-buy-label {
+    font-size: 9px;
+  }
+  .development-buy-cost > span,
+  .development-buy-cost .sprite {
+    width: 13px;
+    height: 13px;
+  }
+}
+@media (max-width: 380px) {
+  .playing .hand-zone {
+    column-gap: 12px;
+  }
+  .development-hand-inline .development-buy {
+    min-width: 41px;
+  }
+  .development-hand-inline {
+    gap: 8px;
+  }
+  .development-buy-cost > span,
+  .development-buy-cost .sprite {
+    width: 12px;
+    height: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playing .resource-card.card-finish,
+  .development-hand-inline .development-card.card-finish,
+  .development-hand-inline .development-buy {
+    animation: none;
+    transition: none;
+  }
+  .playing .resource-card.card-finish:hover:not(.empty-card),
+  .development-hand-inline .development-card.card-finish.playable-card:hover,
+  .development-hand-inline .development-buy:hover:not(:disabled) {
+    translate: none;
+  }
+}
+.game-world[data-motion='reduced'] .resource-card.card-finish,
+.game-world[data-motion='reduced'] .development-card.card-finish,
+.game-world[data-motion='reduced'] .development-buy {
+  animation: none;
+  transition: none;
+}
+.game-world[data-motion='reduced'] .resource-card.card-finish:hover:not(.empty-card),
+.game-world[data-motion='reduced'] .development-card.card-finish.playable-card:hover,
+.game-world[data-motion='reduced'] .development-buy:hover:not(:disabled) {
+  translate: none;
+}

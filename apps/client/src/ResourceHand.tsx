@@ -25,21 +25,15 @@ export function ResourceHand({
           data-resource-card={resource}
         >
           <div
-            className={`resource-card resource-${resource} ${hand[resource] === 0 ? 'empty-card' : ''}`}
+            key={pulse[resource] ?? resource}
+            className={`resource-card card-finish resource-${resource} ${hand[resource] === 0 ? 'empty-card' : ''} ${pulse[resource] && !reducedMotion ? 'card-arrival' : ''}`}
             role="img"
             aria-label={`${hand[resource]} ${RESOURCE_NAMES[resource]}`}
             onPointerEnter={(e) => {
-              if (e.pointerType === 'mouse' && hand[resource] > 0 && !reducedMotion) onHover();
+              if (e.pointerType === 'mouse' && hand[resource] > 0) onHover();
             }}
           >
-            <div
-              className={
-                pulse[resource] && !reducedMotion
-                  ? 'resource-card-content card-arrival'
-                  : 'resource-card-content'
-              }
-              key={pulse[resource] ?? resource}
-            >
+            <div className="resource-card-content">
               <span className="card-corner">
                 <span key={hand[resource]} className="t-digit-group is-animating">
                   <span className="t-digit">{hand[resource]}</span>

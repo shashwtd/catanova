@@ -115,7 +115,7 @@
       "savedPath": "apps/client/public/art/portrait-frame.png"
     }
   ],
-  "note": "The generated icon atlas was rejected and is not shipped. Runtime interface icons are original code-native vectors in GameIcons.tsx. The frame is retained only as a 3\u20134 pixel border-image, not the thick full-size overlay.",
+  "note": "The generated icon atlas was rejected and is not shipped. Runtime interface icons are original code-native vectors in GameIcons.tsx. The frame is retained only as a 3\u20134 pixel portrait border-image. Buttons use simple borders without scaled rope artwork.",
   "rejectedIconAtlas": {
     "name": "fantasy-ui-icon-atlas",
     "dimensions": [

@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, PointerEvent } from 'react';
 import { constrainCamera, fitBoard, pinchScale, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
-import { WORLD } from './scene.js';
+import { MATERIAL_GUTTER, MATERIAL_QUADRANTS, WORLD } from './scene.js';
 
 export function BoardViewport({
   seed,
@@ -227,14 +227,22 @@ export function BoardViewport({
         <defs>
           <pattern
             id={patternId}
-            width="360"
-            height="360"
+            width="720"
+            height="720"
             patternUnits="userSpaceOnUse"
             patternTransform={`translate(${origin.current.x + camera.x} ${origin.current.y + camera.y}) scale(${camera.scale})`}
           >
-            <svg width="360" height="360" viewBox="512 512 512 512">
-              <image href="/art/environment-dark.png" width="1024" height="1024" />
-            </svg>
+            {MATERIAL_QUADRANTS.map(({ x, y, sx, sy }, index) => (
+              <g key={index} transform={`translate(${x * 360} ${y * 360}) scale(${sx} ${sy})`}>
+                <svg
+                  width="360"
+                  height="360"
+                  viewBox={`${512 + MATERIAL_GUTTER} ${512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
+                >
+                  <image href="/art/environment-dark.png" width="1024" height="1024" />
+                </svg>
+              </g>
+            ))}
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill={`url(#${patternId})`} />

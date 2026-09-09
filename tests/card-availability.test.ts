@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
+import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from '../apps/client/src/cards.js';
 import { DevelopmentCards, developmentStacks } from '../apps/client/src/DevelopmentCards.js';
@@ -151,6 +152,54 @@ test('development spread displays local card art, playable/held status and reada
     assert.ok(CARD_LORE[kind].story.length > 20);
     assert.ok(DEVELOPMENT_ART_INDEX[kind] >= 0 && DEVELOPMENT_ART_INDEX[kind] < 5);
   }
+});
+
+test('resource hover audio works with reduced motion and stays silent for empty cards and touch', () => {
+  let sounds = 0;
+  const hand = { ...emptyHand(), wood: 2 };
+  for (const reducedMotion of [false, true]) {
+    const cards = ResourceHand({ hand, pulse: {}, reducedMotion, onHover: () => sounds++ }).props
+      .children as Array<
+      ReactElement<{ children: ReactElement<{ onPointerEnter: (event: { pointerType: string }) => void }> }>
+    >;
+    const wood = cards[0]!.props.children.props.onPointerEnter;
+    const clay = cards[1]!.props.children.props.onPointerEnter;
+    const before = sounds;
+    wood({ pointerType: 'mouse' });
+    assert.equal(sounds, before + 1, 'positive resource cards keep audio independent of motion');
+    clay({ pointerType: 'mouse' });
+    wood({ pointerType: 'touch' });
+    assert.equal(sounds, before + 1, 'empty cards and touch do not play a hover cue');
+  }
+});
+
+test('development purchase is a separate buy slot with a visible three-resource price and legal disabled state', () => {
+  const view = gameView(setup(), 'p0');
+  const render = (canBuy: boolean) =>
+    renderToStaticMarkup(
+      createElement(DevelopmentCards, {
+        game: view,
+        me: 'p0',
+        disabled: false,
+        reducedMotion: false,
+        onAction: () => {},
+        onHover: () => {},
+        onBuy: () => {},
+        canBuy,
+      }),
+    );
+  const enabled = render(true);
+  assert.match(enabled, /aria-label="Buy development card · 1 Sheep, 1 Hay, 1 Rock"/);
+  assert.match(enabled, /class="development-buy-label">Buy<\/span>/);
+  for (const resource of ['sheep', 'wheat', 'ore'])
+    assert.match(enabled, new RegExp(`data-cost-resource="${resource}"`));
+  assert.ok(
+    !enabled.includes('/art/development-cards.png'),
+    'the purchase slot cannot masquerade as a held illustrated card',
+  );
+  assert.ok(!enabled.includes('class="development-card '));
+  assert.ok(!/<button class="development-buy"[^>]*disabled/.test(enabled));
+  assert.match(render(false), /<button class="development-buy"[^>]*disabled/);
 });
 
 test('identical cards share a stack that chooses an eligible old copy before a fresh copy', () => {

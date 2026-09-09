@@ -53,7 +53,7 @@ export function soundScore(cue: SoundCue): SoundNote[] {
     case 'ui':
       return [tap(700, 0, 0.035)];
     case 'hover':
-      return [tone(760, 0, 0.055, 0.022)];
+      return [noise(0, 0.065, 0.035, 3200), tone(820, 0.015, 0.055, 0.025)];
     case 'road':
       return [tap(185, 0, 0.13), noise(0, 0.065, 0.065, 1050), tap(290, 0.065, 0.05)];
     case 'settlement':

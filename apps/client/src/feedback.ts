@@ -100,6 +100,19 @@ function traded(before: GameView, next: GameView, lines: string[]): boolean {
   if (before.trade?.player === actor.id && !next.trade) {
     const offer = before.trade;
     if (
+      offer.open &&
+      (offer.proposals ?? []).some((proposal) => {
+        const other = before.players.find((p) => p.id === proposal.player && p.id !== actor.id);
+        return (
+          other &&
+          lines.includes(
+            `${actor.name} traded ${resourceText(offer.give)} to ${other.name} for ${resourceText(proposal.give)}.`,
+          )
+        );
+      })
+    )
+      return true;
+    if (
       before.players.some(
         (p) =>
           p.id !== actor.id &&

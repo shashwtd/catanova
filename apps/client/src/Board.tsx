@@ -6,9 +6,12 @@ import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
 import { Terrain } from './Terrain.js';
 import { DICE_READABLE_MS } from './DiceThrow.js';
+import type { BuildAction } from './placement.js';
 import {
   coastline,
   HEX_SIZE as SIZE,
+  MATERIAL_GUTTER,
+  MATERIAL_QUADRANTS,
   hexPoints,
   waterOutline,
   portPlacement,
@@ -17,8 +20,54 @@ import {
   WORLD,
 } from './scene.js';
 
-export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#e2bd4c'];
+export const PLAYER_COLORS = ['#f6967c', '#79c9e7', '#c0a3ec', '#edcf69'] as const;
 export type BuildMode = 'road' | 'settlement' | 'city' | null;
+function roadGeometry(board: Island, id: number) {
+  const edge = board.edges[id]!,
+    a = board.vertices[edge.a]!,
+    b = board.vertices[edge.b]!;
+  return {
+    length: Math.hypot(b.x - a.x, b.y - a.y) * SIZE,
+    transform: `translate(${((a.x + b.x) * SIZE) / 2},${((a.y + b.y) * SIZE) / 2}) rotate(${(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI})`,
+  };
+}
+function RoadShape({ length, color }: { length: number; color: string }) {
+  return (
+    <>
+      <rect className="road-foundation" x={-length / 2 + 4} y="-3" width={length - 8} height="11" rx="4" />
+      <rect
+        className="road-body"
+        fill={color}
+        x={-length / 2 + 6}
+        y="-6"
+        width={length - 12}
+        height="12"
+        rx="2"
+      />
+      <path className="road-sheen" d={`M${-length / 2 + 8} -3H${length / 2 - 8}`} />
+    </>
+  );
+}
+function BuildingShape({ city, color }: { city: boolean; color: string }) {
+  return (
+    <>
+      <ellipse className="building-plinth" rx={city ? 23 : 18} ry="7" cy="10" />
+      <path
+        className="building"
+        fill={color}
+        d={city ? 'M-19 9V-10L-9-20L2-10V-2L11-12L21-2V9Z' : 'M-14 9V-6L0-20L14-6V9Z'}
+      />
+      <path className="roof-highlight" d={city ? 'M-19-10L-9-20L2-10M2-2L11-12L21-2' : 'M-14-6L0-20L14-6'} />
+      <path className="house-door" d="M-3 8V0H3V8" />
+      {city && (
+        <>
+          <path className="house-window" d="M-12-4H-8V0H-12ZM8 1H12V5H8Z" />
+          <path className="city-wing" d="M1-1V8" />
+        </>
+      )}
+    </>
+  );
+}
 export function Sprite({
   kind,
   className = '',
@@ -66,6 +115,7 @@ export function Board({
   onRobber,
   glowHexes = [],
   effectId,
+  pendingBuild = null,
 }: {
   board: Island;
   game?: GameView;
@@ -76,6 +126,7 @@ export function Board({
   onRobber: (hex: number) => void;
   glowHexes?: readonly number[];
   effectId?: string;
+  pendingBuild?: BuildAction | null;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
   const coast = useMemo(() => coastline(board), [board.seed]);
@@ -88,13 +139,37 @@ export function Board({
   );
   const color = (id: string) =>
     PLAYER_COLORS[game?.players.findIndex((p) => p.id === id) ?? 0] ?? PLAYER_COLORS[0];
+  const ownTurn = !!game && game.players[game.active]?.id === me && !game.winner;
+  const interactive = ownTurn && !disabled;
   const setupSettlement = game?.phase === 'setupSettlement',
-    setupRoad = game?.phase === 'setupRoad';
-  const robberMode = game?.phase === 'robber' && game.players[game.active]?.id === me;
-  const roadMode = setupRoad || game?.phase === 'freeRoads' || mode === 'road';
-  const vertexMode = setupSettlement || mode === 'settlement' || mode === 'city';
-  const vertices =
-    mode === 'city' && !setupSettlement ? (game?.legal.cities ?? []) : (game?.legal.settlements ?? []);
+    setupRoad = game?.phase === 'setupRoad',
+    actions = game?.phase === 'actions';
+  const robberMode = interactive && game?.phase === 'robber';
+  // The server's legal lists already include affordability, supply, and connection rules.
+  // A toolbar choice filters the sites; no choice still permits direct placement.
+  const roadSites =
+    interactive && (setupRoad || game?.phase === 'freeRoads' || (actions && (!mode || mode === 'road')))
+      ? game!.legal.roads
+      : [];
+  const settlementSites =
+    interactive && (setupSettlement || (actions && (!mode || mode === 'settlement')))
+      ? game!.legal.settlements
+      : [];
+  const citySites = interactive && actions && (!mode || mode === 'city') ? game!.legal.cities : [];
+  const vertices = [
+    ...settlementSites.map((vertex) => ({ kind: 'settlement' as const, vertex })),
+    ...citySites.map((vertex) => ({ kind: 'city' as const, vertex })),
+  ];
+  const pending =
+    ownTurn &&
+    pendingBuild &&
+    (pendingBuild.kind === 'road'
+      ? (setupRoad || game?.phase === 'freeRoads' || actions) && game!.legal.roads.includes(pendingBuild.edge)
+      : pendingBuild.kind === 'city'
+        ? actions && game!.legal.cities.includes(pendingBuild.vertex)
+        : (setupSettlement || actions) && game!.legal.settlements.includes(pendingBuild.vertex))
+      ? pendingBuild
+      : null;
   const keyActivate = (e: React.KeyboardEvent, run: () => void) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -128,16 +203,24 @@ export function Board({
             />
             <feGaussianBlur stdDeviation=".65" />
           </filter>
-          <pattern id="ocean-material" width="240" height="240" patternUnits="userSpaceOnUse">
-            <svg width="240" height="240" viewBox="0 0 512 512">
-              <image href="/art/environment-painted.png" width="1024" height="1024" />
-            </svg>
-          </pattern>
-          <pattern id="sand-material" width="150" height="150" patternUnits="userSpaceOnUse">
-            <svg width="150" height="150" viewBox="0 512 512 512">
-              <image href="/art/environment-painted.png" width="1024" height="1024" />
-            </svg>
-          </pattern>
+          {[
+            { id: 'ocean-material', size: 240, row: 0 },
+            { id: 'sand-material', size: 150, row: 1 },
+          ].map(({ id, size, row }) => (
+            <pattern key={id} id={id} width={size * 2} height={size * 2} patternUnits="userSpaceOnUse">
+              {MATERIAL_QUADRANTS.map(({ x, y, sx, sy }, index) => (
+                <g key={index} transform={`translate(${x * size} ${y * size}) scale(${sx} ${sy})`}>
+                  <svg
+                    width={size}
+                    height={size}
+                    viewBox={`${MATERIAL_GUTTER} ${row * 512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
+                  >
+                    <image href="/art/environment-painted.png" width="1024" height="1024" />
+                  </svg>
+                </g>
+              ))}
+            </pattern>
+          ))}
           {board.hexes.map((h) => (
             <mask
               key={h.id}
@@ -209,7 +292,7 @@ export function Board({
               className={`terrain-hit ${canMoveRobber ? 'robber-target' : ''}`}
               role={canMoveRobber ? 'button' : undefined}
               tabIndex={canMoveRobber ? 0 : undefined}
-              aria-label={`${name}${h.number ? `, ${h.number}` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
+              aria-label={`${name}${h.number ? `, ${h.number}, ${pips(h.number)} production pips` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
               onClick={() => canMoveRobber && onRobber(h.id)}
               onKeyDown={(e) =>
                 keyActivate(e, () => {
@@ -217,7 +300,6 @@ export function Board({
                 })
               }
             >
-              <title>{`${name}${h.number ? ` · ${h.number} · ${pips(h.number)} production pips` : ''}`}</title>
               <polygon className="hex-hit" points={hexPoints(x, y, 60)} />
               <circle
                 data-effect-hex={h.id}
@@ -245,11 +327,11 @@ export function Board({
                   className={`number-token ${[6, 8].includes(h.number) ? 'red-number' : ''}`}
                   transform={`translate(${x},${y + 14})`}
                 >
-                  <circle r="19" />
-                  <text textAnchor="middle" y="4">
+                  <circle r="20" />
+                  <text textAnchor="middle" y="5">
                     {h.number}
                   </text>
-                  <text className="pips" textAnchor="middle" y="13">
+                  <text className="pips" textAnchor="middle" y="14">
                     {'•'.repeat(pips(h.number))}
                   </text>
                 </g>
@@ -309,30 +391,29 @@ export function Board({
                   </g>
                 );
               })}
-              <g transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
-                <svg x="-22" y="-23" width="44" height="46" viewBox="1536 512 512 512">
+              <g className="port-boat" transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
+                <svg x="-35" y="-37" width="70" height="74" viewBox="1536 512 512 512">
                   <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
                 </svg>
               </g>
-              <g transform={`translate(${p.markerX},${p.markerY})`}>
-                <circle className="port-medallion" r="17" />
+              <g className="port-cargo" transform={`translate(${p.markerX},${p.markerY})`}>
+                <circle className="port-medallion" r="14" />
                 {port.resource === 'any' ? (
-                  <text className="port-any" textAnchor="middle" y="5">
+                  <text className="port-any" textAnchor="middle" y="1">
                     ?
                   </text>
                 ) : (
                   <svg
-                    x="-16"
-                    y="-20"
-                    width="32"
-                    height="32"
+                    x="-12"
+                    y="-15"
+                    width="24"
+                    height="24"
                     viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
                   >
                     <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
                   </svg>
                 )}
-                <rect className="port-rate-bg" x="-14" y="10" width="28" height="15" rx="5" />
-                <text className="port-rate" textAnchor="middle" y="21">
+                <text className="port-rate" textAnchor="middle" y="11">
                   {port.resource === 'any' ? '3:1' : '2:1'}
                 </text>
               </g>
@@ -341,10 +422,7 @@ export function Board({
         })}
         {game &&
           Object.entries(game.roads).map(([id, owner]) => {
-            const e = board.edges[Number(id)]!,
-              a = board.vertices[e.a]!,
-              b = board.vertices[e.b]!;
-            const length = Math.hypot(b.x - a.x, b.y - a.y) * SIZE;
+            const { length, transform } = roadGeometry(board, Number(id));
             return (
               <g
                 key={id}
@@ -352,27 +430,10 @@ export function Board({
                 role="img"
                 aria-label={`${game.players.find((p) => p.id === owner)?.name} · Road ${Number(id) + 1}`}
                 className={`built-piece road-piece ${owner === me ? 'own-piece' : ''}`}
-                transform={`translate(${((a.x + b.x) * SIZE) / 2},${((a.y + b.y) * SIZE) / 2}) rotate(${(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI})`}
+                transform={transform}
               >
                 <title>{`${game.players.find((p) => p.id === owner)?.name} · Road ${Number(id) + 1}`}</title>
-                <rect
-                  className="road-foundation"
-                  x={-length / 2 + 4}
-                  y="-4"
-                  width={length - 8}
-                  height="12"
-                  rx="4"
-                />
-                <rect
-                  className="road-body"
-                  fill={color(owner)}
-                  x={-length / 2 + 6}
-                  y="-6"
-                  width={length - 12}
-                  height="12"
-                  rx="2"
-                />
-                <path className="road-sheen" d={`M${-length / 2 + 8} -3H${length / 2 - 8}`} />
+                <RoadShape length={length} color={color(owner)} />
               </g>
             );
           })}
@@ -390,75 +451,75 @@ export function Board({
                 transform={`translate(${v.x * SIZE},${v.y * SIZE})`}
               >
                 <title>{`${game.players.find((p) => p.id === b.player)?.name} · ${b.kind}`}</title>
-                <ellipse className="building-plinth" rx={city ? 23 : 18} ry="8" cy="10" />
-                <path
-                  className="building"
-                  fill={color(b.player)}
-                  d={city ? 'M-19 9V-10L-9-20L2-10V-2L11-12L21-2V9Z' : 'M-14 9V-6L0-20L14-6V9Z'}
-                />
-                <path
-                  className="roof-highlight"
-                  d={city ? 'M-19-10L-9-20L2-10M2-2L11-12L21-2' : 'M-14-6L0-20L14-6'}
-                />
-                <path className="house-door" d="M-3 8V0H3V8" />
-                {city && (
-                  <>
-                    <path className="house-window" d="M-12-4H-8V0H-12ZM8 1H12V5H8Z" />
-                    <path className="city-wing" d="M1-1V8" />
-                  </>
+                <BuildingShape city={city} color={color(b.player)} />
+              </g>
+            );
+          })}
+        {roadSites.map((id) => {
+          const { length, transform } = roadGeometry(board, id);
+          return (
+            <g
+              key={id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Build road on edge ${id + 1}`}
+              className="legal-road"
+              data-build-site="road"
+              data-pending={pending?.kind === 'road' && pending.edge === id}
+              transform={transform}
+              onClick={() => onAction({ kind: 'road', edge: id })}
+              onKeyDown={(e) => keyActivate(e, () => onAction({ kind: 'road', edge: id }))}
+            >
+              <line className="road-hit" x1={-length / 2} y1="0" x2={length / 2} y2="0" />
+              <g className="build-site-preview" aria-hidden="true">
+                <RoadShape length={length} color={color(me!)} />
+              </g>
+            </g>
+          );
+        })}
+        {vertices.map(({ vertex: id, kind }) => {
+          const v = board.vertices[id]!;
+          return (
+            <g
+              key={id}
+              transform={`translate(${v.x * SIZE},${v.y * SIZE})`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Build ${kind} at corner ${id + 1}`}
+              className="legal-vertex"
+              data-build-site={kind}
+              data-pending={pending?.kind === kind && pending.vertex === id}
+              onClick={() => onAction({ kind, vertex: id })}
+              onKeyDown={(e) => keyActivate(e, () => onAction({ kind, vertex: id }))}
+            >
+              <circle className="vertex-hit" r="21" />
+              <g className="build-site-preview" aria-hidden="true">
+                <BuildingShape city={kind === 'city'} color={color(me!)} />
+              </g>
+            </g>
+          );
+        })}
+        {pending &&
+          (() => {
+            const road = pending.kind === 'road' ? roadGeometry(board, pending.edge) : null;
+            const vertex = pending.kind !== 'road' ? board.vertices[pending.vertex]! : null;
+            return (
+              <g
+                className={`build-ghost ${road ? 'road-piece' : 'house-piece'}`}
+                data-pending-build={pending.kind}
+                role="img"
+                aria-label={`${pending.kind === 'road' ? 'Road' : pending.kind === 'city' ? 'City' : 'Settlement'} placement preview`}
+                pointerEvents="none"
+                transform={road ? road.transform : `translate(${vertex!.x * SIZE},${vertex!.y * SIZE})`}
+              >
+                {road ? (
+                  <RoadShape length={road.length} color={color(me!)} />
+                ) : (
+                  <BuildingShape city={pending.kind === 'city'} color={color(me!)} />
                 )}
               </g>
             );
-          })}
-        {roadMode &&
-          !disabled &&
-          (game?.legal.roads ?? []).map((id) => {
-            const e = board.edges[id]!,
-              a = board.vertices[e.a]!,
-              b = board.vertices[e.b]!;
-            return (
-              <g
-                key={id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Build road on edge ${id + 1}`}
-                className="legal-road"
-                onClick={() => onAction({ kind: 'road', edge: id })}
-                onKeyDown={(e) => keyActivate(e, () => onAction({ kind: 'road', edge: id }))}
-              >
-                <line className="road-hit" x1={a.x * SIZE} y1={a.y * SIZE} x2={b.x * SIZE} y2={b.y * SIZE} />
-                <line
-                  className="road-guide"
-                  x1={a.x * SIZE}
-                  y1={a.y * SIZE}
-                  x2={b.x * SIZE}
-                  y2={b.y * SIZE}
-                />
-              </g>
-            );
-          })}
-        {vertexMode &&
-          !disabled &&
-          vertices.map((id) => {
-            const v = board.vertices[id]!,
-              kind = mode === 'city' && !setupSettlement ? 'city' : 'settlement';
-            return (
-              <g
-                key={id}
-                transform={`translate(${v.x * SIZE},${v.y * SIZE})`}
-                role="button"
-                tabIndex={0}
-                aria-label={`Build ${kind} at corner ${id + 1}`}
-                className="legal-vertex"
-                onClick={() => onAction({ kind, vertex: id })}
-                onKeyDown={(e) => keyActivate(e, () => onAction({ kind, vertex: id }))}
-              >
-                <circle className="vertex-hit" r="15" />
-                <circle className="vertex-guide" r="8" />
-                <path d="M-3 0h6M0-3v6" />
-              </g>
-            );
-          })}
+          })()}
         <circle
           data-effect-bank
           cx="0"

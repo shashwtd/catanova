@@ -285,6 +285,10 @@ test('overlapping events have a fixed voice budget and release it for later cues
   context.sources.forEach((source) => source.end());
   engine.play('hover');
   await flush();
-  assert.equal(context.sources.length, 49, 'released voices are available to a later cue');
+  assert.equal(
+    context.sources.length,
+    48 + soundScore('hover').length,
+    'released voices are available to every note of a later cue',
+  );
   assert.ok(context.sources.every((source) => source.stopAt! > source.startAt!));
 });

@@ -28,37 +28,51 @@ export function PlayerRail({
             key={p.id}
             data-player-profile={p.id}
             aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${active ? ', current turn' : ''}`}
-            className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''}`}
+            className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''} ${!seat?.connected ? 'offline' : ''}`}
             style={{ '--player-color': PLAYER_COLORS[i] } as CSSProperties}
           >
             <div className="profile-portrait">
               <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
               {!seat?.connected && (
                 <span className="offline-mark" title="Disconnected" aria-label="Disconnected">
-                  <WifiOff size={24} />
+                  <WifiOff size={38} />
                 </span>
               )}
               {active && (
                 <span className="profile-turn" aria-label="Current turn">
-                  <span className="turn-gem" />
+                  <span className="profile-turn-label">Turn</span>
                   {timer}
                 </span>
               )}
-              <span className="profile-score" title={`${p.points} victory points`}>
-                <Trophy size={22} />
+              <span
+                className="profile-score"
+                title={`${p.points} victory points`}
+                aria-label={`${p.points} victory points`}
+              >
+                <Trophy size={26} />
                 <b>{p.points}</b>
               </span>
             </div>
             <div className="profile-caption">
-              <strong title={p.name}>{p.name}</strong>
+              <strong className="profile-name-banner" title={p.name}>
+                {p.name}
+              </strong>
               <div className="profile-stats">
-                <span title={`${p.resourceCount} resource cards`}>
-                  <Layers size={20} />
-                  {p.resourceCount}
+                <span
+                  className="profile-resource-count"
+                  title={`${p.resourceCount} resource cards`}
+                  aria-label={`${p.resourceCount} resource cards`}
+                >
+                  <Layers size={23} />
+                  <b>{p.resourceCount}</b>
                 </span>
-                <span title={`${p.cardCount} development cards`}>
-                  <ScrollText size={20} />
-                  {p.cardCount}
+                <span
+                  className="profile-development-count"
+                  title={`${p.cardCount} development cards`}
+                  aria-label={`${p.cardCount} development cards`}
+                >
+                  <ScrollText size={23} />
+                  <b>{p.cardCount}</b>
                 </span>
               </div>
             </div>
@@ -67,7 +81,7 @@ export function PlayerRail({
                 {road && (
                   <span
                     key="road"
-                    className="award-ribbon"
+                    className="award-ribbon road-award"
                     aria-label="Longest Road, plus 2 victory points"
                     title="Longest Road · +2 points"
                   >
@@ -78,7 +92,7 @@ export function PlayerRail({
                 {army && (
                   <span
                     key="army"
-                    className="award-ribbon"
+                    className="award-ribbon army-award"
                     aria-label="Largest Army, plus 2 victory points"
                     title="Largest Army · +2 points"
                   >

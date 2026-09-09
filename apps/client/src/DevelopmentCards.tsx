@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Clock3, LockKeyhole, Play, ScrollText, X } from './GameIcons.js';
+import { Check, Clock3, LockKeyhole, Play, Plus, ScrollText, X } from './GameIcons.js';
 import type { CSSProperties } from 'react';
 import { CARD_NAMES, canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { Card, CardKind, GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
@@ -148,7 +148,7 @@ export function DevelopmentCards({
                     }
                   >
                     <button
-                      className={`development-card t-tilt-card ${lock ? 'resting-card' : 'playable-card'} ${c.kind === 'victoryPoint' ? 'victory-card' : ''}`}
+                      className={`development-card card-finish ${lock ? 'resting-card' : 'playable-card'} ${c.kind === 'victoryPoint' ? 'victory-card' : ''}`}
                       aria-pressed={selected === c.id}
                       aria-label={`${CARD_NAMES[c.kind]}${stack.count > 1 ? ` × ${stack.count}` : ''}. ${lock ?? 'Choose card to play'}`}
                       onClick={() => choose(c.id)}
@@ -174,7 +174,7 @@ export function DevelopmentCards({
                           </>
                         )}
                       </span>
-                      <span className="t-tilt-glare" />
+                      <span className="card-sheen" aria-hidden="true" />
                     </button>
                   </CardTooltip>
                 </div>
@@ -297,9 +297,17 @@ export function DevelopmentCards({
           title="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
           onClick={onBuy}
         >
-          <DevelopmentArt kind="back" />
-          <span className="development-buy-mark">
-            <ScrollText size={20} />
+          <span className="development-buy-mark" aria-hidden="true">
+            <ScrollText size={30} />
+            <Plus size={18} />
+          </span>
+          <span className="development-buy-label">Buy</span>
+          <span className="development-buy-cost" aria-hidden="true">
+            {(['sheep', 'wheat', 'ore'] as const).map((resource) => (
+              <span key={resource} data-cost-resource={resource}>
+                <ResourceIcon resource={resource} />
+              </span>
+            ))}
           </span>
         </button>
       )}

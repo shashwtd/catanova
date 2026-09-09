@@ -1,44 +1,49 @@
 /* Strong player color and a small ground shadow replace the pale piece halo. */
 .road-foundation,
 .own-piece .road-foundation {
-  fill: #293b3b79;
+  fill: #293b3b62;
   stroke: none;
 }
 .road-body {
-  stroke: #33463f;
-  stroke-width: 1.1;
+  stroke: #59604e;
+  stroke-width: 0.7;
 }
 .road-sheen {
-  stroke: #fff7d44d;
-  stroke-width: 1.5;
+  stroke: #fff5d75c;
+  stroke-width: 1.1;
 }
 .building-plinth,
 .own-piece .building-plinth {
-  fill: #26373170;
+  fill: #2637315c;
   stroke: none;
 }
-.building {
-  stroke: #31453e;
-  stroke-width: 1.7;
+.building,
+.legal-vertex .building {
+  stroke: #58604d;
+  stroke-width: 0.95;
   stroke-linejoin: round;
 }
-.roof-highlight {
-  stroke: #36463f88;
-  stroke-width: 1.4;
+.roof-highlight,
+.legal-vertex .roof-highlight {
+  stroke: #fff0ce70;
+  stroke-width: 1.15;
 }
-.house-door {
-  fill: #344b45;
-  stroke: #263831;
-  stroke-width: 0.65;
+.house-door,
+.legal-vertex .house-door {
+  fill: #596654;
+  stroke: #455744;
+  stroke-width: 0.35;
 }
-.house-window {
-  fill: #e4c783;
-  stroke: #5c704f;
-  stroke-width: 0.4;
+.house-window,
+.legal-vertex .house-window {
+  fill: #ffedb0;
+  stroke: #788563;
+  stroke-width: 0.3;
 }
-.city-wing {
-  stroke: #3e584e;
-  stroke-width: 1.4;
+.city-wing,
+.legal-vertex .city-wing {
+  stroke: #647359;
+  stroke-width: 0.85;
 }
 .road-piece,
 .house-piece {
@@ -46,4 +51,71 @@
 }
 .water-band {
   paint-order: stroke fill;
+}
+.number-token circle {
+  fill: #fff0cc;
+  stroke: #ac9162;
+  stroke-width: 1.1;
+  filter: drop-shadow(0 2px 1.5px #29372d70);
+}
+.number-token text {
+  font-family: 'Barlow', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  fill: #26392e;
+}
+.number-token .pips {
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+}
+.red-number text {
+  fill: #b23827;
+}
+.port-cargo .port-medallion {
+  fill: #f4e3bce8;
+  stroke: #967849;
+  stroke-width: 0.8;
+  filter: drop-shadow(0 1px 1px #203b3280);
+}
+.port-cargo .port-rate {
+  font-size: 9.5px;
+  font-weight: 800;
+  fill: #59482f;
+}
+.port-cargo .port-any {
+  font-family: 'Barlow', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  fill: #715837;
+}
+/* Empty, affordable locations reveal the actual piece only when approached. */
+.legal-road,
+.legal-vertex {
+  outline: none;
+}
+.build-site-preview {
+  opacity: 0;
+  pointer-events: none;
+}
+.legal-road:hover .build-site-preview,
+.legal-road:focus-visible .build-site-preview,
+.legal-vertex:hover .build-site-preview,
+.legal-vertex:focus-visible .build-site-preview {
+  opacity: 0.8;
+}
+.legal-road[data-pending='true'] .build-site-preview,
+.legal-vertex[data-pending='true'] .build-site-preview {
+  opacity: 0;
+}
+.build-ghost.road-piece,
+.build-ghost.house-piece {
+  opacity: 0.8;
+  pointer-events: none;
+}
+.build-ghost .building,
+.build-ghost .road-body {
+  stroke-dasharray: 3 2;
+  stroke-width: 1.4;
 }

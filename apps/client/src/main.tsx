@@ -1,3 +1,9 @@
+import { IncomingTrade, TradePanel } from './TradePanel.js';
+import { ResourcePicker, ResourceSummary } from './ResourcePicker.js';
+import { MoveHistory } from './MoveHistory.js';
+import { QuickRules } from './QuickRules.js';
+import { isBuildAction, placementValid } from './placement.js';
+import type { PlacementDraft } from './placement.js';
 import { usePreferences } from './preferences.js';
 import { useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
@@ -35,10 +41,9 @@ import {
   House,
   LoaderCircle,
   Maximize,
+  Minimize,
   Plus,
   Route,
-  ScrollText,
-  Trophy,
   Users,
   Wifi,
   WifiOff,
@@ -53,10 +58,9 @@ import '@fontsource/barlow/latin-600.css';
 import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
-import { canPay, emptyHand, robberVictims, total } from '../../../packages/rules/src/game.js';
+import { emptyHand, robberVictims, total } from '../../../packages/rules/src/game.js';
 import type { GameAction, Hand } from '../../../packages/rules/src/game.js';
 import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
-import type { Resource } from '../../../packages/rules/src/index.js';
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
 import { invitationCode, roomPath, shouldResume, validRoomCode } from './navigation.js';
@@ -68,6 +72,8 @@ import './board-camera.css';
 import './fantasy-transition.css';
 import './polish.css';
 import './board-polish.css';
+import './hand-profile-polish.css';
+import './interface-polish.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -145,80 +151,6 @@ function Dialog({
     </dialog>
   );
 }
-function ResourceSummary({ hand }: { hand: Hand }) {
-  return (
-    <span className="resource-summary">
-      {RESOURCES.filter((r) => hand[r]).map((r) => (
-        <span key={r} title={RESOURCE_NAMES[r]}>
-          <ResourceIcon resource={r} />
-          <b>{hand[r]}</b>
-        </span>
-      ))}
-    </span>
-  );
-}
-function ResourcePicker({
-  value,
-  onChange,
-  max,
-  label,
-}: {
-  value: Hand;
-  onChange: (h: Hand) => void;
-  max?: Hand;
-  label: string;
-}) {
-  return (
-    <fieldset className="resource-picker">
-      <legend>{label}</legend>
-      <div>
-        {RESOURCES.map((r) => (
-          <label key={r} title={RESOURCE_NAMES[r]}>
-            <ResourceIcon resource={r} />
-            <input
-              aria-label={`${label}: ${RESOURCE_NAMES[r]}`}
-              type="number"
-              inputMode="numeric"
-              min="0"
-              max={max?.[r] ?? 19}
-              value={value[r]}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  [r]: Math.max(0, Math.min(max?.[r] ?? 19, Math.floor(Number(e.target.value) || 0))),
-                })
-              }
-            />
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-function ResourceSelect({
-  value,
-  onChange,
-  label,
-}: {
-  value: Resource;
-  onChange: (r: Resource) => void;
-  label: string;
-}) {
-  return (
-    <label className="resource-select">
-      <span>{label}</span>
-      <ResourceIcon resource={value} />
-      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as Resource)}>
-        {RESOURCES.map((r) => (
-          <option key={r} value={r}>
-            {RESOURCE_NAMES[r]}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function App() {
   const auth = useAuth();
   const { preferences, update, reducedMotion } = usePreferences();
@@ -250,11 +182,9 @@ function App() {
       'settings' | 'trade' | 'rules' | 'journal' | 'leave' | 'profile' | 'network' | 'invite' | null
     >(null);
   const [robberHex, setRobberHex] = useState<number | null>(null),
-    [selected, setSelected] = useState<Hand>(emptyHand),
-    [give, setGive] = useState<Hand>(emptyHand),
-    [want, setWant] = useState<Hand>(emptyHand);
-  const [bankGive, setBankGive] = useState<Resource>('wood'),
-    [bankReceive, setBankReceive] = useState<Resource>('brick');
+    [selected, setSelected] = useState<Hand>(emptyHand);
+  const [placement, setPlacement] = useState<PlacementDraft | null>(null);
+  const [isFullscreen, setFullscreen] = useState(!!document.fullscreenElement);
 
   const g = room?.game,
     player = g?.players.find((p) => p.id === me),
@@ -265,6 +195,49 @@ function App() {
     hand = player?.hand ?? emptyHand();
   const actionPhase = myTurn && g?.phase === 'actions';
   const networkBusy = status === 'connecting' || status === 'reconnecting';
+  const placementReady = placementValid(placement, g, room?.roomId, me);
+  useEffect(() => {
+    const change = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', change);
+    return () => document.removeEventListener('fullscreenchange', change);
+  }, []);
+  useEffect(() => {
+    if (placement && (!placementValid(placement, g, room?.roomId, me) || !connected)) setPlacement(null);
+  }, [placement, g, room?.roomId, me, connected]);
+  useEffect(() => {
+    if (panel) setPlacement(null);
+  }, [panel]);
+  useEffect(() => {
+    if (!placement) return;
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPlacement(null);
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [placement]);
+  function previewPlacement(action: GameAction) {
+    if (disabled || !g || !room || !me) return;
+    if (!isBuildAction(action)) {
+      void act(action);
+      return;
+    }
+    const draft: PlacementDraft = {
+      action,
+      roomId: room.roomId,
+      player: me,
+      turn: g.turn,
+      phase: g.phase,
+      setupIndex: g.setupIndex,
+    };
+    if (placementValid(draft, g, room.roomId, me)) {
+      setPlacement(draft);
+      setPanel(null);
+    }
+  }
+
   function home(released = false) {
     const old = connection.current;
     connection.current = null;
@@ -612,7 +585,8 @@ function App() {
               me={me}
               mode={mode}
               disabled={disabled}
-              onAction={(a) => void act(a)}
+              pendingBuild={placementReady ? placement?.action : null}
+              onAction={previewPlacement}
               onRobber={chooseRobber}
             />
           </BoardViewport>
@@ -646,8 +620,11 @@ function App() {
           <CircleHelp />
         </IconButton>
         {g && (
-          <IconButton label="Fullscreen" onClick={() => void fullscreen()}>
-            <Maximize />
+          <IconButton
+            label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            onClick={() => void fullscreen()}
+          >
+            {isFullscreen ? <Minimize /> : <Maximize />}
           </IconButton>
         )}
         {g && (
@@ -666,6 +643,7 @@ function App() {
                   active={mode === kind}
                   disabled={disabled || !actionPhase || !sites.length}
                   onClick={() => {
+                    setPlacement(null);
                     setMode(mode === kind ? null : kind);
                     setPanel(null);
                   }}
@@ -950,7 +928,13 @@ function App() {
             <div className="action-prompt" role="status" key={`${g.turn}:${g.phase}:${mode}`}>
               <span>{phaseText}</span>
               {mode && (
-                <IconButton label="Cancel placement" onClick={() => setMode(null)}>
+                <IconButton
+                  label="Cancel placement"
+                  onClick={() => {
+                    setMode(null);
+                    setPlacement(null);
+                  }}
+                >
                   <X />
                 </IconButton>
               )}
@@ -972,8 +956,11 @@ function App() {
                   reducedMotion={reducedMotion}
                   onAction={(a) => void act(a)}
                   onHover={() => feedback.sound.play('hover')}
-                  obscured={panel !== null}
-                  onSelect={() => setPanel(null)}
+                  obscured={panel !== null || placementReady}
+                  onSelect={() => {
+                    setPanel(null);
+                    setPlacement(null);
+                  }}
                   canBuy={g.legal.canBuyCard}
                   onBuy={() => void act({ kind: 'buyCard' })}
                 />
@@ -981,6 +968,19 @@ function App() {
             </div>
             <div className="table-actions">
               <div className="dice-dock" data-dice-dock aria-hidden="true" />
+              <button
+                className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
+                aria-label="Trade"
+                title="Trade"
+                disabled={disabled || !actionPhase}
+                onClick={() => {
+                  setPanel(panel === 'trade' ? null : 'trade');
+                  setMode(null);
+                }}
+              >
+                <ArrowLeftRight size={33} />
+                <span>Trade</span>
+              </button>
               <button
                 className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
                 aria-label={actionPhase ? 'End turn' : 'Roll dice'}
@@ -991,131 +991,76 @@ function App() {
                 {actionPhase ? <ArrowRight size={36} /> : <Dices size={38} />}
                 <span>{actionPhase ? 'End' : 'Roll'}</span>
               </button>
-              <button
-                className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
-                aria-label="Trade"
-                title="Trade"
-                disabled={disabled || g.phase !== 'actions'}
-                onClick={() => {
-                  setPanel(panel === 'trade' ? null : 'trade');
-                  setMode(null);
-                }}
-              >
-                <ArrowLeftRight size={33} />
-                <span>Trade</span>
-              </button>
             </div>
           </div>
-          {g.trade && !myTurn && (
-            <div className="incoming-trade floating-panel">
-              <div className="panel-heading">
-                <h2>{active?.name}</h2>
-                <ArrowLeftRight />
-              </div>
-              <div className="trade-summary">
-                <ResourceSummary hand={g.trade.give} />
-                <ArrowLeftRight />
-                <ResourceSummary hand={g.trade.want} />
-              </div>
-              <button
-                className="gold-button"
-                disabled={disabled || !canPay(hand, g.trade.want)}
-                onClick={() => act({ kind: 'acceptTrade', tradeId: g.trade!.id })}
-              >
-                Accept trade
-              </button>
-            </div>
-          )}
+          {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => void act(a)} />}
           {(panel === 'trade' || panel === 'journal') && (
-            <aside className="game-panel floating-panel" aria-label={panel}>
+            <aside
+              className={`game-panel floating-panel ${panel === 'trade' ? 'trade-panel' : 'journal-panel'}`}
+              aria-label={panel === 'trade' ? 'Trade' : 'Move history'}
+            >
               <div className="panel-heading">
                 <h2>{panel === 'trade' ? 'Trade' : 'Move history'}</h2>
                 <IconButton label="Close panel" onClick={() => setPanel(null)}>
                   <X />
                 </IconButton>
               </div>
-              {panel === 'journal' && (
-                <>
-                  <ol className="event-log">
-                    {historyEntries.length
-                      ? historyEntries.map((e) => (
-                          <li key={e.revision}>
-                            <span className="event-meta">
-                              {e.turn ? 'Turn ' + e.turn : 'Setup'} · #{e.revision}
-                            </span>
-                            {e.lines.map((line, i) => (
-                              <p key={i}>{line}</p>
-                            ))}
-                          </li>
-                        ))
-                      : g.log
-                          .slice()
-                          .reverse()
-                          .map((e) => <li key={e.id}>{e.text}</li>)}
-                  </ol>
-                  {historyHasMore && (
-                    <button
-                      className="dark-button history-more"
-                      onClick={() => connection.current?.history(historyEntries.at(-1)?.revision)}
-                    >
-                      Earlier moves
-                    </button>
-                  )}
-                </>
+              {panel === 'trade' && me && (
+                <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => void act(a)} />
               )}
-              {panel === 'trade' &&
-                (actionPhase ? (
-                  <>
-                    <div className="trade-selects">
-                      <ResourceSelect
-                        label={`Give ${g.legal.rates[bankGive]}`}
-                        value={bankGive}
-                        onChange={setBankGive}
-                      />
-                      <ArrowRight />
-                      <ResourceSelect label="Get 1" value={bankReceive} onChange={setBankReceive} />
-                    </div>
-                    <button
-                      className="dark-button"
-                      disabled={
-                        disabled ||
-                        bankGive === bankReceive ||
-                        hand[bankGive] < g.legal.rates[bankGive] ||
-                        !g.bank[bankReceive]
-                      }
-                      onClick={() => act({ kind: 'bankTrade', give: bankGive, receive: bankReceive })}
-                    >
-                      Bank trade · {g.legal.rates[bankGive]}:1
-                    </button>
-                    <hr />
-                    <ResourcePicker label="Offer" value={give} onChange={setGive} max={hand} />
-                    <ResourcePicker label="Request" value={want} onChange={setWant} />
-                    <button
-                      className="gold-button"
-                      disabled={
-                        disabled ||
-                        !total(give) ||
-                        !canPay(hand, give) ||
-                        !total(want) ||
-                        RESOURCES.some((r) => !!give[r] && !!want[r])
-                      }
-                      onClick={() => act({ kind: 'offerTrade', give, want })}
-                    >
-                      Offer trade
-                    </button>
-                    {g.trade && (
-                      <button
-                        className="text-button"
-                        disabled={disabled}
-                        onClick={() => act({ kind: 'cancelTrade' })}
-                      >
-                        Withdraw offer
-                      </button>
-                    )}
-                  </>
+              {panel === 'journal' && (
+                <MoveHistory
+                  entries={historyEntries}
+                  game={g}
+                  hasMore={historyHasMore}
+                  onEarlier={() => connection.current?.history(historyEntries.at(-1)?.revision)}
+                />
+              )}
+            </aside>
+          )}
+          {placementReady && placement && (
+            <aside className="build-confirmation" aria-label="Confirm placement">
+              <div className="build-confirmation-title">
+                {placement.action.kind === 'road' ? (
+                  <Route />
+                ) : placement.action.kind === 'city' ? (
+                  <Castle />
                 ) : (
-                  <p className="muted">Wait for a trade offer.</p>
-                ))}
+                  <House />
+                )}
+                <strong>
+                  {placement.action.kind === 'city' ? 'Upgrade to city' : `Place ${placement.action.kind}`}
+                </strong>
+              </div>
+              {g.phase === 'actions' ? (
+                <ResourceSummary hand={COSTS[placement.action.kind]} />
+              ) : (
+                <span className="free-placement">
+                  {g.phase === 'freeRoads' ? 'Free road' : 'Starting piece'}
+                </span>
+              )}
+              <div className="build-confirmation-actions">
+                <button
+                  className="text-button"
+                  aria-label="Cancel placement"
+                  onClick={() => setPlacement(null)}
+                >
+                  <X />
+                </button>
+                <button
+                  className="gold-button"
+                  disabled={disabled || !placementReady}
+                  onClick={() => {
+                    if (!placementValid(placement, g, room?.roomId, me)) return;
+                    const action = placement.action;
+                    setPlacement(null);
+                    void act(action);
+                  }}
+                >
+                  <Check />
+                  Build
+                </button>
+              </div>
             </aside>
           )}
           {g.phase === 'discard' && !!g.discards[me ?? ''] && (
@@ -1244,27 +1189,7 @@ function App() {
       )}
       {panel === 'rules' && (
         <Dialog title="Rules" onClose={() => setPanel(null)}>
-          <ul className="quick-rules">
-            <li>
-              <b>10 points</b> wins on your turn.
-            </li>
-            <li>
-              Settlement <b>1</b> · City <b>2</b> · Each award <b>2</b>.
-            </li>
-            <li>Roll, collect, then trade and build.</li>
-            <li>
-              On <b>7</b>, hands over 7 discard half; move the robber and steal.
-            </li>
-            <li>Play one development card per turn, starting a turn after buying it.</li>
-          </ul>
-          <a
-            className="dark-button"
-            href="https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Full rulebook <ArrowRight />
-          </a>
+          <QuickRules />
         </Dialog>
       )}
     </main>

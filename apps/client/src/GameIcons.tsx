@@ -23,6 +23,7 @@ export const GAME_ICON_NAMES = [
   'back',
   'help',
   'fullscreen',
+  'minimize',
   'crown',
   'trophy',
   'shield',
@@ -136,15 +137,38 @@ const paths: Record<GameIconName, ReactNode> = {
   ),
   connection: (
     <>
-      <path d="M5 20h5v8H5Zm9-7h5v15h-5Zm9-8h5v23h-5Z" fill={c.green} />
-      <path d="M7 7q7-5 13-4" stroke={c.paper} fill="none" strokeWidth="1.5" />
+      <path
+        d="M3 10a20 20 0 0 1 26 0M7 16a13.5 13.5 0 0 1 18 0M11.5 22a7 7 0 0 1 9 0"
+        fill="none"
+        stroke={c.ink}
+        strokeWidth="6"
+      />
+      <path
+        d="M3 10a20 20 0 0 1 26 0M7 16a13.5 13.5 0 0 1 18 0M11.5 22a7 7 0 0 1 9 0"
+        fill="none"
+        stroke={c.blue}
+        strokeWidth="3.5"
+      />
+      <circle cx="16" cy="27" r="2.8" fill={c.paper} />
     </>
   ),
   disconnected: (
     <>
-      <path d="M5 20h5v8H5Zm9-7h5v15h-5Zm9-8h5v23h-5Z" fill="#787e79" />
-      <path d="m7 5 21 22m-1-21L8 27" stroke={c.ink} strokeWidth="6" />
-      <path d="m7 5 21 22m-1-21L8 27" stroke={c.red} strokeWidth="3" />
+      <path
+        d="M3 10a20 20 0 0 1 26 0M7 16a13.5 13.5 0 0 1 18 0M11.5 22a7 7 0 0 1 9 0"
+        fill="none"
+        stroke={c.ink}
+        strokeWidth="6"
+      />
+      <path
+        d="M3 10a20 20 0 0 1 26 0M7 16a13.5 13.5 0 0 1 18 0M11.5 22a7 7 0 0 1 9 0"
+        fill="none"
+        stroke={c.paper}
+        strokeWidth="3.5"
+      />
+      <circle cx="16" cy="27" r="2.8" fill={c.paper} />
+      <path d="M5 4 28 28" stroke={c.ink} strokeWidth="6.5" />
+      <path d="M5 4 28 28" stroke={c.red} strokeWidth="3.5" />
     </>
   ),
   leave: (
@@ -175,15 +199,29 @@ const paths: Record<GameIconName, ReactNode> = {
   plus: <path fill={c.green} d="M13 3h6l-.2 10 10-.2v6l-10-.1.2 10h-6l.2-10L3 19v-6l10.2.2Z" />,
   help: (
     <>
-      <path fill={c.paper} d="M7 3q10-2 18 1l-2 24q-9 2-18-1Z" />
-      <path d="M11 10c0-7 14-6 10 1-1 2-5 2-5 6" fill="none" stroke={c.ink} strokeWidth="3" />
-      <circle cx="15.5" cy="22" r="1.7" fill={c.red} stroke="none" />
+      <path fill={c.blue} d="M3 5q6-2 13 1 7-3 13-1v24q-7-2-13 0-6-2-13 0Z" />
+      <path fill={c.paper} d="M5 3q6-1 11 3 5-4 11-3v21q-6-2-11 1-5-3-11-1Z" />
+      <path
+        d="M16 7v18M8 8l5 1M8 13l5 1M8 18l4 .8M19 10l5-1M19 15l5-1"
+        fill="none"
+        stroke={c.wood}
+        strokeWidth="1.5"
+      />
+      <path fill={c.red} d="M22 18h4v11l-2-2-2 2Z" strokeWidth="1" />
     </>
   ),
   fullscreen: (
     <>
-      <path d="M12 4H4v9m16-9h8v9M4 20v8h8m8 0h8v-8" fill="none" stroke={c.blue} strokeWidth="4" />
-      <path d="m5 5 7 7m15-7-7 7m-8 8-7 7m15-7 7 7" stroke={c.paper} strokeWidth="2" />
+      <path d="M12 3H3v9M20 3h9v9M3 20v9h9M20 29h9v-9" fill="none" stroke={c.ink} strokeWidth="6" />
+      <path d="M12 3H3v9M20 3h9v9M3 20v9h9M20 29h9v-9" fill="none" stroke={c.blue} strokeWidth="3.5" />
+      <path d="m4 4 6 6m18-6-6 6M4 28l6-6m18 6-6-6" stroke={c.paper} strokeWidth="2" />
+    </>
+  ),
+  minimize: (
+    <>
+      <path d="M3 12h9V3m8 0v9h9M3 20h9v9m8 0v-9h9" fill="none" stroke={c.ink} strokeWidth="6" />
+      <path d="M3 12h9V3m8 0v9h9M3 20h9v9m8 0v-9h9" fill="none" stroke={c.blue} strokeWidth="3.5" />
+      <path d="m5 5 6 6m16-6-6 6M5 27l6-6m16 6-6-6" stroke={c.paper} strokeWidth="2" />
     </>
   ),
   crown: (
@@ -324,6 +362,7 @@ export const Dices = icon('dice'),
   ArrowLeft = icon('back'),
   CircleHelp = icon('help'),
   Maximize = icon('fullscreen'),
+  Minimize = icon('minimize'),
   Crown = icon('crown'),
   Trophy = icon('trophy'),
   Shield = icon('shield'),
