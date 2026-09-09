@@ -1,0 +1,35 @@
+'''Accounts''' give your username, avatar, and room seats a persistent identity. Catanova supports Google sign-in and temporary guest accounts.
+
+{| class="wikitable"
+! Feature !! Guest !! Google-linked account
+|-
+| Join and create rooms || Yes || Yes
+| Choose a game avatar || Yes || Yes
+| Use a verified Google photo || No || Yes
+| Send and receive friend requests || No || Yes
+| Keep a guest username when linking || Yes, link before expiry || Same identity is retained
+|}
+
+== Your name and avatar ==
+Usernames contain 3–20 letters, numbers, or underscores, using A–Z and a–z. They are unique without regard to capitalization: River and river cannot belong to different accounts. Your chosen capitalization is kept.
+
+Choose from twelve game avatars. A Google-linked player may also use their verified Google photo.
+
+== Guest expiry ==
+A guest identity expires after '''seven days without confirmed account activity'''. Closing a tab does not immediately erase it. Clearing browser storage or signing out can lose access to that anonymous identity sooner, so link Google before relying on access from another device.
+
+Linking Google before expiry retains your username, avatar, and ownership of your room seats. If that Google account already belongs to a different account, linking is refused rather than silently merging them or replacing the guest.
+
+Expiry releases the username and removes access to the guest's old seats. It does not erase pieces or history from a saved game.
+
+== Friends ==
+Both players must link Google before they can become friends. Guests cannot send, receive, or accept friend requests; the app prompts them to connect an account.
+
+Search with at least three characters from the beginning of a username. A request becomes a friendship only when the recipient accepts it.
+
+== Leaving and reconnecting ==
+Leaving a lobby frees the seat. If the host leaves, another remaining player becomes host. Leaving or disconnecting during a started game preserves the player's seat, pieces, and history.
+
+Return with the same identity and room invitation to resume. A Google-linked identity can resume on another device; the newer connection replaces the older one. After an interrupted action, let the room synchronize before attempting it again.
+
+[[Category:Guides]]

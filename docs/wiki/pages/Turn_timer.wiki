@@ -1,0 +1,28 @@
+The '''turn timer''' is an optional Catanova house rule. It is '''off by default'''. The host may enable it before the game begins; setup placements remain untimed.
+
+{| class="wikitable"
+! Available durations
+|-
+| 40 · 65 · 90 · 115 · 140 seconds
+|}
+
+The initial enabled value is 90 seconds. Rolling, trading, buying, playing a development card, or reconnecting does not restart the normal turn's countdown.
+
+== When time runs out ==
+The server finishes compulsory steps with legal defaults, then ends the turn:
+* Roll if the player has not rolled.
+* Complete a required robber move using a random different legal hex and a legal victim when one exists.
+* Finish free roads from a Road Building card that was already played, using random legal sites as needed.
+* Withdraw the open trade and end the turn.
+
+It does '''not''' buy optional pieces or cards, spend resources on optional purchases, accept a trade, play an unchosen development card, or forfeit the player's seat. Automatic actions appear in move history.
+
+== Discarding after a seven ==
+The active player's clock pauses while required [[Resources|discards]] are outstanding. Every player who must discard gets the full configured duration for that decision. If a player runs out of time, the server discards the required number of random resource cards from that player's actual hand. Other players see the count, not the private selection.
+
+Once all discards finish, the active clock resumes with its remaining time. If time had already expired before the seven was automatically rolled, the server finishes the robber step and ends the turn after discards resolve.
+
+== Disconnects and restarts ==
+Deadlines survive refreshes, reconnects, and server restarts. The timer keeps running even if every player is offline. After a long server outage, the current expired turn can finish automatically, but the next player receives a fresh full turn; the server does not fast-forward through many missed turns.
+
+[[Category:Game rules]]

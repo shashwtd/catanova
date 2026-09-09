@@ -1,0 +1,37 @@
+'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. Rooms support two to four invited players. There is no solo mode or public matchmaking.
+
+== Gather your players ==
+# Continue with Google or as a guest, then choose your username and avatar when prompted. See [[Accounts and friends]].
+# Create a room, or join a friend's room using its code or invitation. An invitation lets you inspect the room before joining.
+# The host chooses the settings. Other players mark themselves ready; the host starts once everyone is present and ready. The host does not need a separate ready check.
+
+Settings lock when the game starts. Changing them beforehand clears the other players' ready status. New players cannot take a seat after the game has begun, but an existing player can reconnect.
+
+== Place your first pieces ==
+The server shuffles player order. Each player places a settlement and an attached road, then everyone takes a second placement in reverse order.
+
+{| class="wikitable"
+! Players !! Placement order
+|-
+| 2 || 1, 2, 2, 1
+|-
+| 3 || 1, 2, 3, 3, 2, 1
+|-
+| 4 || 1, 2, 3, 4, 4, 3, 2, 1
+|}
+
+These pieces are free. Keep at least two edges between buildings, including your own. Your second settlement does not need to connect to the first. You receive one resource from each producing hex touching your '''second''' settlement.
+
+Choose sites with useful resource variety and dice numbers. [[Map generation|Dots under numbers]] indicate how often those numbers can occur; they are probabilities, not promised production.
+
+== Take a turn ==
+# Roll the dice. Everyone may collect resources; a seven starts the [[Resources|discard and robber sequence]].
+# Trade and build in any order, as often as your resources and legal locations allow.
+# End your turn when finished.
+
+You may also play one eligible [[Development cards|development card]] before rolling or during your action phase. Select a building site to preview it, then confirm '''Build'''. A preview does not spend cards.
+
+== Playing with two ==
+The two-player option keeps the same island, bank, costs, piece limits, normal turns, and ten-point goal. It adds no neutral players. This is a Catanova variant, not an official two-player ruleset; its balance still needs human playtesting.
+
+[[Category:Guides]]

@@ -1,0 +1,34 @@
+== How many people can play? ==
+Two to four invited players. There is no solo mode, bot opponent, or public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players.
+
+== Are Timber and Clay different from wood and brick? ==
+Only the names differ. [[Resources|Timber, Clay, Sheep, Hay, and Rock]] correspond to wood, brick, wool, wheat, and ore.
+
+== Why did my settlement receive nothing? ==
+Its hex may not have rolled, may contain the robber, or may be the desert. A [[Resources|bank shortage]] can also prevent production. The dots under a number indicate probability, not guaranteed future cards.
+
+== Do I discard whenever I have eight cards? ==
+No. The check happens only when a seven is rolled. Count resource cards, excluding development cards, and discard half rounded down if you have more than seven.
+
+== Why can I not build here? ==
+Check the [[Buildings|distance and connection rules]], your available pieces, and your resources. Ordinary paid building starts after the roll resolves. Selecting a site previews it; '''Build''' confirms it.
+
+== What does the question mark at a port mean? ==
+A 3:1 question-mark port accepts any one matching resource type. It is not an unknown reward. Build on either of its two coastal corners to use it; a road alone is insufficient. See [[Trading and ports]].
+
+== Why can I not play the development card I just bought? ==
+It must wait until your next turn. You can play at most one non-Victory-Point card per turn. Hidden Victory Point cards count immediately toward winning and do not need a Play action. See [[Development cards]].
+
+== Why did my tied road not take the award? ==
+An eligible holder keeps [[Awards|Longest Road]] on a tie. You need a strictly longer route to take it. Branches are not automatically one continuous road.
+
+== Can time running out buy something or accept a trade for me? ==
+No. The optional [[Turn timer|timer]] completes compulsory steps and ends the turn. It does not make optional purchases or accept trades.
+
+== Will refreshing delete my roads? ==
+A reconnect should restore the server's saved game for the same identity and room. Wait for synchronization before repeating an uncertain action. Guest access depends on keeping that temporary identity; [[Accounts and friends|link Google]] for recovery across devices. Persistence still depends on the server's storage and backups—it is not a promise that a damaged server disk can never lose data.
+
+== Is this an official CATAN release? ==
+No. Catanova is an independent, open-source project. Its current balanced maps, optional timer, and two-player option are identified separately; two rare development-card cases remain provisional. The [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md full rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes] explain the target and differences.
+
+[[Category:Guides]]

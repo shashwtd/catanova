@@ -1,0 +1,30 @@
+'''Trading''' exchanges [[Resources|resources]] during the active player's action phase. You can trade before or after building, and make several exchanges in one turn.
+
+== Trade with players ==
+Every completed player trade must include the active player. Both sides must give at least one resource, and the same resource type cannot appear on both sides. Development cards, buildings, gifts, loans, and future payments are not tradeable.
+
+In '''Trade''', select cards for what you give and what you want. A fixed offer specifies both sides. '''? Open to offers''' specifies your contribution and lets opponents propose a return. They may change or withdraw proposals; you choose which one to accept.
+
+Offers do not reserve cards. A trade completes only if both players can still pay. Changing or withdrawing an offer, ending the turn, or taking another active-player game action invalidates its old replies. Opponents may reply to your offer, but cannot trade with each other during your turn.
+
+== Trade with the bank ==
+{| class="wikitable"
+! Access !! You pay !! You receive
+|-
+| No port required || 4 matching resources || 1 different resource
+|-
+| General port || 3 matching resources || 1 different resource
+|-
+| Specialized port || 2 of the depicted resource || 1 different resource
+|}
+
+The requested card must be available in the bank. Each received card needs a complete matching payment; mixed resources do not form one payment group.
+
+== Which corner gives a port? ==
+A settlement or city on '''either of the port's two coastal corners''' grants its ratio. A road alone does not. A city gives the same ratio as a settlement, and a newly occupied port is immediately usable in that action phase.
+
+The pictured resource tells you what to '''pay'''. A Sheep port accepts two Sheep for one Timber, Clay, Hay, or Rock. It does not restrict you to receiving Sheep.
+
+There are nine ports: five specialized 2:1 ports, one per resource, and four general 3:1 ports. A question mark beside 3:1 means a general port, not a hidden reward. The robber never disables a port.
+
+[[Category:Game rules]]

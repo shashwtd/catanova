@@ -1,0 +1,34 @@
+'''Resources''' pay for [[Buildings|building]] and [[Development cards|development cards]]. There are 19 cards of each type in the bank. Spent, discarded, and bank-traded resources return there.
+
+{| class="wikitable"
+! Resource !! Terrain !! Familiar names !! Main uses
+|-
+| '''Timber''' || Forest || Wood, lumber || Roads and settlements
+|-
+| '''Clay''' || Hills || Brick || Roads and settlements
+|-
+| '''Sheep''' || Pasture || Wool || Settlements and development cards
+|-
+| '''Hay''' || Fields || Wheat, grain || Settlements, cities, and development cards
+|-
+| '''Rock''' || Mountains || Ore || Cities and development cards
+|}
+
+The desert produces nothing. The names above change the labels, not how the resources work.
+
+== Production ==
+When the dice total matches a hex's number, every adjacent settlement receives one matching resource and every adjacent city receives two. This happens on other players' turns too. The robber blocks production from its current hex.
+
+If the bank cannot cover a resource's production for several players, nobody receives that resource from the roll. If only one player is entitled to it, that player receives as many as remain, up to their entitlement. Other resource types still produce normally. Missing cards are not owed later.
+
+== Seven and the robber ==
+A seven produces no resources. Each player with '''more than seven resource cards''' discards half, rounded down. With eleven, discard five; with seven, discard none. Development cards do not count. There is no permanent seven-card hand limit.
+
+After every required discard, the roller moves the robber to a '''different land hex''', then chooses one adjacent opponent and steals one random resource. An empty-handed adjacent opponent is a legal choice, but yields nothing. No adjacent opponent means no theft. The robber cannot steal development cards.
+
+The robber blocks its hex's future production. It does not prevent building, trading, using ports, or producing from other hexes. A [[Development cards|Knight]] moves and steals in the same way, without causing discards.
+
+== Reading the numbers ==
+[[Map generation|Production dots]] show the number of ways two dice can make a total. Six and eight each have five combinations; two and twelve each have one. A high-probability number is useful, but repeated production is never guaranteed.
+
+[[Category:Game rules]]

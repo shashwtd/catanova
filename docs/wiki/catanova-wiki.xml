@@ -1,0 +1,683 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="0.11" xml:lang="en" xsi:schemaLocation="http://www.mediawiki.org/xml/export-0.11/ https://www.mediawiki.org/xml/export-0.11.xsd">
+  <siteinfo>
+    <sitename>Catanova Wiki</sitename>
+    <dbname>catanova_wiki_starter</dbname>
+    <base>https://wiki.catanova.io/wiki/Main_Page</base>
+    <generator>Catanova original starter pack</generator>
+    <case>first-letter</case>
+    <namespaces>
+      <namespace key="0" case="first-letter" />
+      <namespace key="4" case="first-letter">Project</namespace>
+      <namespace key="14" case="first-letter">Category</namespace>
+    </namespaces>
+  </siteinfo>
+  <page>
+    <title>Main Page</title>
+    <ns>0</ns>
+    <id>1</id>
+    <revision>
+      <id>1</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>1</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2122" sha1="smoq09t0qirb8bq19s8iy6sj0x33ag6">__NOTOC__
+{| class="wikitable" style="float:right; margin:0 0 1em 1em; max-width:22em;"
+|+ Catanova at a glance
+|-
+! Players
+| 2–4 invited friends
+|-
+! Goal
+| 10 points on your own turn
+|-
+! Island
+| 19 land hexes · 5 resources
+|-
+! Play
+| Browser · Google or guest account
+|}
+Welcome to the '''Catanova Wiki''': a guide to the island, its resources, and the decisions that turn a small settlement into a winning network.
+
+'''New to the game?''' Begin with [[Getting started]]. Looking up a particular rule? Choose a topic below.
+
+== Explore the island ==
+{| class="wikitable"
+! Topic !! What you will find
+|-
+| [[Resources]] || Production, dice numbers, the bank, and the robber
+|-
+| [[Buildings]] || Costs, placement, roads, settlements, and cities
+|-
+| [[Trading and ports]] || Player offers, bank exchanges, and coastal trading
+|-
+| [[Development cards]] || Knights, special actions, and hidden points
+|-
+| [[Awards]] || Longest Road, Largest Army, and the race to ten points
+|-
+| [[Map generation]] || How Catanova balances a new island
+|}
+
+== Play together ==
+* [[Getting started]] — create a room, invite friends, and place your first buildings.
+* [[Accounts and friends]] — usernames, guest expiry, Google linking, and reconnecting.
+* [[Turn timer]] — the optional clock and what happens when time runs out.
+* [[FAQ]] — quick answers to common surprises.
+
+== About these guides ==
+Catanova is an independently developed, open-source game inspired by CATAN. These are original Catanova guides, not an official CATAN publication. Three- and four-player games follow the base-game target; the [[Getting started|two-player option]], [[Map generation|balanced map preset]], and [[Turn timer|timer]] are Catanova choices. Rare development-card cases are marked where their rulings remain provisional.
+
+For the complete specification, use the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes]. See [[Project:Copyrights]] for reuse of this wiki's starter text.
+
+[[Category:Guides]]
+</text>
+      <sha1>smoq09t0qirb8bq19s8iy6sj0x33ag6</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Getting started</title>
+    <ns>0</ns>
+    <id>2</id>
+    <revision>
+      <id>2</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>2</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2345" sha1="3q6gcrzjabujgp31nutmp8mfz3m1hji">'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. Rooms support two to four invited players. There is no solo mode or public matchmaking.
+
+== Gather your players ==
+# Continue with Google or as a guest, then choose your username and avatar when prompted. See [[Accounts and friends]].
+# Create a room, or join a friend's room using its code or invitation. An invitation lets you inspect the room before joining.
+# The host chooses the settings. Other players mark themselves ready; the host starts once everyone is present and ready. The host does not need a separate ready check.
+
+Settings lock when the game starts. Changing them beforehand clears the other players' ready status. New players cannot take a seat after the game has begun, but an existing player can reconnect.
+
+== Place your first pieces ==
+The server shuffles player order. Each player places a settlement and an attached road, then everyone takes a second placement in reverse order.
+
+{| class="wikitable"
+! Players !! Placement order
+|-
+| 2 || 1, 2, 2, 1
+|-
+| 3 || 1, 2, 3, 3, 2, 1
+|-
+| 4 || 1, 2, 3, 4, 4, 3, 2, 1
+|}
+
+These pieces are free. Keep at least two edges between buildings, including your own. Your second settlement does not need to connect to the first. You receive one resource from each producing hex touching your '''second''' settlement.
+
+Choose sites with useful resource variety and dice numbers. [[Map generation|Dots under numbers]] indicate how often those numbers can occur; they are probabilities, not promised production.
+
+== Take a turn ==
+# Roll the dice. Everyone may collect resources; a seven starts the [[Resources|discard and robber sequence]].
+# Trade and build in any order, as often as your resources and legal locations allow.
+# End your turn when finished.
+
+You may also play one eligible [[Development cards|development card]] before rolling or during your action phase. Select a building site to preview it, then confirm '''Build'''. A preview does not spend cards.
+
+== Playing with two ==
+The two-player option keeps the same island, bank, costs, piece limits, normal turns, and ten-point goal. It adds no neutral players. This is a Catanova variant, not an official two-player ruleset; its balance still needs human playtesting.
+
+[[Category:Guides]]
+</text>
+      <sha1>3q6gcrzjabujgp31nutmp8mfz3m1hji</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Resources</title>
+    <ns>0</ns>
+    <id>3</id>
+    <revision>
+      <id>3</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>3</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2367" sha1="fdsjpy77xu6shcq1hxhmf5rk4wnsncd">'''Resources''' pay for [[Buildings|building]] and [[Development cards|development cards]]. There are 19 cards of each type in the bank. Spent, discarded, and bank-traded resources return there.
+
+{| class="wikitable"
+! Resource !! Terrain !! Familiar names !! Main uses
+|-
+| '''Timber''' || Forest || Wood, lumber || Roads and settlements
+|-
+| '''Clay''' || Hills || Brick || Roads and settlements
+|-
+| '''Sheep''' || Pasture || Wool || Settlements and development cards
+|-
+| '''Hay''' || Fields || Wheat, grain || Settlements, cities, and development cards
+|-
+| '''Rock''' || Mountains || Ore || Cities and development cards
+|}
+
+The desert produces nothing. The names above change the labels, not how the resources work.
+
+== Production ==
+When the dice total matches a hex's number, every adjacent settlement receives one matching resource and every adjacent city receives two. This happens on other players' turns too. The robber blocks production from its current hex.
+
+If the bank cannot cover a resource's production for several players, nobody receives that resource from the roll. If only one player is entitled to it, that player receives as many as remain, up to their entitlement. Other resource types still produce normally. Missing cards are not owed later.
+
+== Seven and the robber ==
+A seven produces no resources. Each player with '''more than seven resource cards''' discards half, rounded down. With eleven, discard five; with seven, discard none. Development cards do not count. There is no permanent seven-card hand limit.
+
+After every required discard, the roller moves the robber to a '''different land hex''', then chooses one adjacent opponent and steals one random resource. An empty-handed adjacent opponent is a legal choice, but yields nothing. No adjacent opponent means no theft. The robber cannot steal development cards.
+
+The robber blocks its hex's future production. It does not prevent building, trading, using ports, or producing from other hexes. A [[Development cards|Knight]] moves and steals in the same way, without causing discards.
+
+== Reading the numbers ==
+[[Map generation|Production dots]] show the number of ways two dice can make a total. Six and eight each have five combinations; two and twelve each have one. A high-probability number is useful, but repeated production is never guaranteed.
+
+[[Category:Game rules]]
+</text>
+      <sha1>fdsjpy77xu6shcq1hxhmf5rk4wnsncd</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Buildings</title>
+    <ns>0</ns>
+    <id>4</id>
+    <revision>
+      <id>4</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>4</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2173" sha1="3db6wu0xmoi6qcxv90v8wpglej1v7h6">'''Roads, settlements, and cities''' occupy the island's edges and corners. Ordinary purchases happen after your roll has finished resolving. Setup placements and [[Development cards|Road Building]] have their own free-placement steps.
+
+{| class="wikitable"
+! Piece !! Cost !! Supply per player !! Points
+|-
+| '''Road''' || 1 Timber + 1 Clay || 15 || 0 by itself
+|-
+| '''Settlement''' || 1 Timber + 1 Clay + 1 Sheep + 1 Hay || 5 || 1
+|-
+| '''City upgrade''' || 2 Hay + 3 Rock || 4 || 2 total
+|}
+
+== Roads ==
+A road needs an empty land edge connected to your own road or building. Coastal edges are legal. You cannot extend through another player's building.
+
+Roads can branch or form loops. If an opponent builds across your network, your existing roads remain yours; you may still extend an isolated section under the normal attachment rules. [[Awards|Longest Road]] measures a continuous route, not simply every road you own.
+
+== Settlements ==
+Place a settlement on an empty intersection touching one of your roads. The opening draft is the exception to the road requirement.
+
+The '''distance rule''' always applies: no directly neighboring intersection may contain any settlement or city, even your own. There must be at least two edges between buildings.
+
+A settlement receives one resource from each adjacent hex that produces. A settlement on either marked corner of a [[Trading and ports|port]] also gives its trading ratio.
+
+== Cities ==
+A city replaces one of your own settlements. It is worth two points total and receives two resources per adjacent producing hex. The replaced settlement returns to your supply and can be built elsewhere later at its normal cost.
+
+You cannot put a city directly on an empty corner. You do not need to use all five settlements before upgrading.
+
+== Confirming a placement ==
+Choose a legal site to review the piece and its cost, then confirm '''Build'''. Cancel or Escape dismisses the preview. A confirmed move accepted by the server is permanent; pieces cannot be moved, sold, or demolished. Having enough resources alone is not enough: you also need a legal location and a piece left in your supply.
+
+[[Category:Game rules]]
+</text>
+      <sha1>3db6wu0xmoi6qcxv90v8wpglej1v7h6</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Trading and ports</title>
+    <ns>0</ns>
+    <id>5</id>
+    <revision>
+      <id>5</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>5</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2096" sha1="lao4vltjisg92pdf46pdu9w2sstg2a6">'''Trading''' exchanges [[Resources|resources]] during the active player's action phase. You can trade before or after building, and make several exchanges in one turn.
+
+== Trade with players ==
+Every completed player trade must include the active player. Both sides must give at least one resource, and the same resource type cannot appear on both sides. Development cards, buildings, gifts, loans, and future payments are not tradeable.
+
+In '''Trade''', select cards for what you give and what you want. A fixed offer specifies both sides. '''? Open to offers''' specifies your contribution and lets opponents propose a return. They may change or withdraw proposals; you choose which one to accept.
+
+Offers do not reserve cards. A trade completes only if both players can still pay. Changing or withdrawing an offer, ending the turn, or taking another active-player game action invalidates its old replies. Opponents may reply to your offer, but cannot trade with each other during your turn.
+
+== Trade with the bank ==
+{| class="wikitable"
+! Access !! You pay !! You receive
+|-
+| No port required || 4 matching resources || 1 different resource
+|-
+| General port || 3 matching resources || 1 different resource
+|-
+| Specialized port || 2 of the depicted resource || 1 different resource
+|}
+
+The requested card must be available in the bank. Each received card needs a complete matching payment; mixed resources do not form one payment group.
+
+== Which corner gives a port? ==
+A settlement or city on '''either of the port's two coastal corners''' grants its ratio. A road alone does not. A city gives the same ratio as a settlement, and a newly occupied port is immediately usable in that action phase.
+
+The pictured resource tells you what to '''pay'''. A Sheep port accepts two Sheep for one Timber, Clay, Hay, or Rock. It does not restrict you to receiving Sheep.
+
+There are nine ports: five specialized 2:1 ports, one per resource, and four general 3:1 ports. A question mark beside 3:1 means a general port, not a hidden reward. The robber never disables a port.
+
+[[Category:Game rules]]
+</text>
+      <sha1>lao4vltjisg92pdf46pdu9w2sstg2a6</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Development cards</title>
+    <ns>0</ns>
+    <id>6</id>
+    <revision>
+      <id>6</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>6</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2563" sha1="f4u4glcx9kunqyiib2tsrq60bnzzjvy">'''Development cards''' provide special actions or hidden points. Buying one costs '''1 Sheep + 1 Hay + 1 Rock''' and draws privately from the shuffled deck. You do not choose its type.
+
+{| class="wikitable"
+! Card !! Copies !! Effect
+|-
+| '''Knight''' || 14 || Move the robber and steal one random resource from an adjacent opponent; no discards.
+|-
+| '''Road Building''' || 2 || Place two legal roads without paying resources, using your remaining road pieces.
+|-
+| '''Year of Plenty''' || 2 || Take two available resources from the bank, either matching or different.
+|-
+| '''Monopoly''' || 2 || Name a resource and take every card of that type from all opponents.
+|-
+| '''Victory Point''' || 5 || One hidden point, counted automatically toward victory.
+|}
+
+== When can I play one? ==
+You may play '''one non-Victory-Point development card per turn''', before rolling or during your action phase. A card bought this turn must wait until your next turn. An older copy of the same card remains eligible.
+
+Select a held card to review its effect and use its '''Play''' action. Finish that effect before trading or building normally. You may buy several cards in a turn if you can pay and the deck is not empty. Played cards never return to it.
+
+Victory Point cards are different: they count without being played, including on the turn they are bought. They do not use your one-card allowance. They can bring you to ten points and win immediately on your own turn.
+
+== Useful distinctions ==
+* Knights count toward [[Awards|Largest Army]] only after being played. A Knight can move the robber before you roll.
+* Road Building places roads one at a time. The second may connect to the first; [[Awards|Longest Road]] and victory are checked after each.
+* Year of Plenty takes cards from the bank; Monopoly takes them from opponents. Monopoly may legally collect nothing.
+* Unplayed cards are private. They cannot be traded, stolen, or discarded as resources.
+
+== Provisional rare cases ==
+Catanova currently requires a legal first road to play Road Building. It takes a second road whenever a piece and legal site remain; otherwise it finishes with one. It does not allow a zero-road play or voluntarily declining a legal second road.
+
+Year of Plenty takes one card if that is all the bank contains, and cannot be played into a completely empty bank. These rare-case decisions remain provisional pending further primary-source confirmation; see the [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility ledger].
+
+[[Category:Game rules]]
+</text>
+      <sha1>f4u4glcx9kunqyiib2tsrq60bnzzjvy</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Awards</title>
+    <ns>0</ns>
+    <id>7</id>
+    <revision>
+      <id>7</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>7</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2008" sha1="mykidbcv7f2joh3z17duwa64nl63uuj">'''Longest Road''' and '''Largest Army''' are each worth '''two points''' to their current holder. Their badges appear with the player's profile. You may hold both; losing an award also loses its points.
+
+{| class="wikitable"
+! Award !! First claim !! Taking it from the holder
+|-
+| '''Longest Road''' || A continuous route of at least 5 roads || Build a strictly longer qualifying route
+|-
+| '''Largest Army''' || Play at least 3 Knights || Play strictly more Knights than the holder
+|}
+
+== Longest Road ==
+Count one continuous route without using any road twice. Loops can count, but branches cannot simply be added together. Your own buildings do not interrupt the route; an opponent's settlement or city does. Separate road networks are measured separately.
+
+A tie does not displace a holder whose route still qualifies. If their road is broken, they keep the award only if they still have at least five and tie for the greatest length. Otherwise, the unique longest qualifying player receives it. If nobody qualifies, or the greatest eligible length is tied without a qualifying holder, the award has no owner.
+
+For example, five roads plus a two-road side branch do not automatically make a seven-road route. Trace the actual path through the junction.
+
+== Largest Army ==
+Count Knights you have '''played''', not Knights waiting in your hand. Played Knights remain part of your army for the rest of the game. A tie leaves the award with its holder.
+
+== Winning ==
+{| class="wikitable"
+! What you have !! Points
+|-
+| Settlement || 1
+|-
+| City || 2 total, replacing its settlement
+|-
+| Victory Point development card || 1
+|-
+| Either award || 2
+|}
+
+Reach '''10 or more points during your own turn''' to win immediately. Hidden [[Development cards|Victory Point cards]] count, so the visible public score may not tell the whole story. Reaching ten during somebody else's turn is not enough: you must still have ten when your own turn arrives. There is no equalizing final round.
+
+[[Category:Game rules]]
+</text>
+      <sha1>mykidbcv7f2joh3z17duwa64nl63uuj</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Map generation</title>
+    <ns>0</ns>
+    <id>8</id>
+    <revision>
+      <id>8</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>8</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2043" sha1="c770fhhm85wwkvy5x2ubveedry0jo6t">'''Balanced islands''' are Catanova's current map preset. Every island has 19 land hexes arranged in rows of 3, 4, 5, 4, and 3, with nine [[Trading and ports|ports]]. The goal is useful variety without making every starting spot equal.
+
+{| class="wikitable"
+! Terrain !! Hexes
+|-
+| Forest || 4
+|-
+| Hills || 3
+|-
+| Pasture || 4
+|-
+| Fields || 4
+|-
+| Mountains || 3
+|-
+| Desert || 1
+|}
+
+== What the generator avoids ==
+* More than two connected hexes of the same resource.
+* A resource being entirely confined to one small area: each type has at least two hexes separated by three or more hex steps.
+* A 6 or 8 touching another 6 or 8.
+* An intersection exceeding eleven production dots across its adjacent hexes.
+* Resource types with average production outside the preset's range of 2.5–4 dots per hex. The lower total is rounded up when a type has three hexes.
+
+The four general ports and five specialized ports are shuffled independently over nine separated coastal edges. A corner can still touch three different resources, and some locations remain stronger than others. The [[Getting started|reverse second placement]] matters; this preset does not guarantee equal outcomes or equal seats.
+
+== What are production dots? ==
+{| class="wikitable"
+! Dice total !! Ways to roll it !! Dots
+|-
+| 2 or 12 || 1 out of 36 || 1
+|-
+| 3 or 11 || 2 out of 36 || 2
+|-
+| 4 or 10 || 3 out of 36 || 3
+|-
+| 5 or 9 || 4 out of 36 || 4
+|-
+| 6 or 8 || 5 out of 36 || 5
+|}
+
+Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. There is no forced dice balancing or catch-up production bonus.
+
+== Preset status ==
+This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.
+
+[[Category:Game rules]]
+</text>
+      <sha1>c770fhhm85wwkvy5x2ubveedry0jo6t</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Turn timer</title>
+    <ns>0</ns>
+    <id>9</id>
+    <revision>
+      <id>9</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>9</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="1995" sha1="5h2xjy434sjz16wqiinwzm3csic5vjj">The '''turn timer''' is an optional Catanova house rule. It is '''off by default'''. The host may enable it before the game begins; setup placements remain untimed.
+
+{| class="wikitable"
+! Available durations
+|-
+| 40 · 65 · 90 · 115 · 140 seconds
+|}
+
+The initial enabled value is 90 seconds. Rolling, trading, buying, playing a development card, or reconnecting does not restart the normal turn's countdown.
+
+== When time runs out ==
+The server finishes compulsory steps with legal defaults, then ends the turn:
+* Roll if the player has not rolled.
+* Complete a required robber move using a random different legal hex and a legal victim when one exists.
+* Finish free roads from a Road Building card that was already played, using random legal sites as needed.
+* Withdraw the open trade and end the turn.
+
+It does '''not''' buy optional pieces or cards, spend resources on optional purchases, accept a trade, play an unchosen development card, or forfeit the player's seat. Automatic actions appear in move history.
+
+== Discarding after a seven ==
+The active player's clock pauses while required [[Resources|discards]] are outstanding. Every player who must discard gets the full configured duration for that decision. If a player runs out of time, the server discards the required number of random resource cards from that player's actual hand. Other players see the count, not the private selection.
+
+Once all discards finish, the active clock resumes with its remaining time. If time had already expired before the seven was automatically rolled, the server finishes the robber step and ends the turn after discards resolve.
+
+== Disconnects and restarts ==
+Deadlines survive refreshes, reconnects, and server restarts. The timer keeps running even if every player is offline. After a long server outage, the current expired turn can finish automatically, but the next player receives a fresh full turn; the server does not fast-forward through many missed turns.
+
+[[Category:Game rules]]
+</text>
+      <sha1>5h2xjy434sjz16wqiinwzm3csic5vjj</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Accounts and friends</title>
+    <ns>0</ns>
+    <id>10</id>
+    <revision>
+      <id>10</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>10</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2291" sha1="nrhk6xrhndmyblncm0gf4n6cb9iejmm">'''Accounts''' give your username, avatar, and room seats a persistent identity. Catanova supports Google sign-in and temporary guest accounts.
+
+{| class="wikitable"
+! Feature !! Guest !! Google-linked account
+|-
+| Join and create rooms || Yes || Yes
+| Choose a game avatar || Yes || Yes
+| Use a verified Google photo || No || Yes
+| Send and receive friend requests || No || Yes
+| Keep a guest username when linking || Yes, link before expiry || Same identity is retained
+|}
+
+== Your name and avatar ==
+Usernames contain 3–20 letters, numbers, or underscores, using A–Z and a–z. They are unique without regard to capitalization: River and river cannot belong to different accounts. Your chosen capitalization is kept.
+
+Choose from twelve game avatars. A Google-linked player may also use their verified Google photo.
+
+== Guest expiry ==
+A guest identity expires after '''seven days without confirmed account activity'''. Closing a tab does not immediately erase it. Clearing browser storage or signing out can lose access to that anonymous identity sooner, so link Google before relying on access from another device.
+
+Linking Google before expiry retains your username, avatar, and ownership of your room seats. If that Google account already belongs to a different account, linking is refused rather than silently merging them or replacing the guest.
+
+Expiry releases the username and removes access to the guest's old seats. It does not erase pieces or history from a saved game.
+
+== Friends ==
+Both players must link Google before they can become friends. Guests cannot send, receive, or accept friend requests; the app prompts them to connect an account.
+
+Search with at least three characters from the beginning of a username. A request becomes a friendship only when the recipient accepts it.
+
+== Leaving and reconnecting ==
+Leaving a lobby frees the seat. If the host leaves, another remaining player becomes host. Leaving or disconnecting during a started game preserves the player's seat, pieces, and history.
+
+Return with the same identity and room invitation to resume. A Google-linked identity can resume on another device; the newer connection replaces the older one. After an interrupted action, let the room synchronize before attempting it again.
+
+[[Category:Guides]]
+</text>
+      <sha1>nrhk6xrhndmyblncm0gf4n6cb9iejmm</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>FAQ</title>
+    <ns>0</ns>
+    <id>11</id>
+    <revision>
+      <id>11</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>11</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="2991" sha1="0an4j982znuvx2gpaib2yo3762ydjul">== How many people can play? ==
+Two to four invited players. There is no solo mode, bot opponent, or public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players.
+
+== Are Timber and Clay different from wood and brick? ==
+Only the names differ. [[Resources|Timber, Clay, Sheep, Hay, and Rock]] correspond to wood, brick, wool, wheat, and ore.
+
+== Why did my settlement receive nothing? ==
+Its hex may not have rolled, may contain the robber, or may be the desert. A [[Resources|bank shortage]] can also prevent production. The dots under a number indicate probability, not guaranteed future cards.
+
+== Do I discard whenever I have eight cards? ==
+No. The check happens only when a seven is rolled. Count resource cards, excluding development cards, and discard half rounded down if you have more than seven.
+
+== Why can I not build here? ==
+Check the [[Buildings|distance and connection rules]], your available pieces, and your resources. Ordinary paid building starts after the roll resolves. Selecting a site previews it; '''Build''' confirms it.
+
+== What does the question mark at a port mean? ==
+A 3:1 question-mark port accepts any one matching resource type. It is not an unknown reward. Build on either of its two coastal corners to use it; a road alone is insufficient. See [[Trading and ports]].
+
+== Why can I not play the development card I just bought? ==
+It must wait until your next turn. You can play at most one non-Victory-Point card per turn. Hidden Victory Point cards count immediately toward winning and do not need a Play action. See [[Development cards]].
+
+== Why did my tied road not take the award? ==
+An eligible holder keeps [[Awards|Longest Road]] on a tie. You need a strictly longer route to take it. Branches are not automatically one continuous road.
+
+== Can time running out buy something or accept a trade for me? ==
+No. The optional [[Turn timer|timer]] completes compulsory steps and ends the turn. It does not make optional purchases or accept trades.
+
+== Will refreshing delete my roads? ==
+A reconnect should restore the server's saved game for the same identity and room. Wait for synchronization before repeating an uncertain action. Guest access depends on keeping that temporary identity; [[Accounts and friends|link Google]] for recovery across devices. Persistence still depends on the server's storage and backups—it is not a promise that a damaged server disk can never lose data.
+
+== Is this an official CATAN release? ==
+No. Catanova is an independent, open-source project. Its current balanced maps, optional timer, and two-player option are identified separately; two rare development-card cases remain provisional. The [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md full rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes] explain the target and differences.
+
+[[Category:Guides]]
+</text>
+      <sha1>0an4j982znuvx2gpaib2yo3762ydjul</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Category:Guides</title>
+    <ns>14</ns>
+    <id>12</id>
+    <revision>
+      <id>12</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>12</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="176" sha1="sztdkabd5nhfpw8qbq4z6l0zlnv6rl4">Guides to getting into a Catanova room, keeping an account, and finding answers. Start at [[Main Page]] or [[Getting started]]. For mechanics, browse [[:Category:Game rules]].
+</text>
+      <sha1>sztdkabd5nhfpw8qbq4z6l0zlnv6rl4</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Category:Game rules</title>
+    <ns>14</ns>
+    <id>13</id>
+    <revision>
+      <id>13</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>13</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="269" sha1="cbaxcogr0czl2wm7o4sd58exso31nqc">Reference articles for Catanova's resources, building, trading, cards, awards, and optional settings. New players can begin with [[Getting started]]. The complete specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook].
+</text>
+      <sha1>cbaxcogr0czl2wm7o4sd58exso31nqc</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Project:Copyrights</title>
+    <ns>4</ns>
+    <id>14</id>
+    <revision>
+      <id>14</id>
+      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>14</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="1823" sha1="owuvij3o29apm7z7uxsytdpi271vb5o">== Starter text ==
+The original starter articles in this wiki were prepared for the [https://github.com/shashwtd/catanova Catanova repository] on 9 September 2026. They summarize that project's rulebook and implemented game behavior. They were not copied from CATAN rulebooks, Fandom articles, or another game's wiki.
+
+The repository's MIT license permits reuse and modification of this starter text when the copyright and permission notice are retained. This notice covers the imported starter material; a host's terms and the wiki's chosen contribution license govern subsequent contributions as applicable. Brand names do not imply endorsement. No official CATAN artwork is included in this pack.
+
+== MIT License ==
+Copyright (c) 2026 shashwtd and Catanova contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Return to [[Main Page]].
+</text>
+      <sha1>owuvij3o29apm7z7uxsytdpi271vb5o</sha1>
+    </revision>
+  </page>
+</mediawiki>

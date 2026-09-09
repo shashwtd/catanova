@@ -1,0 +1,36 @@
+'''Longest Road''' and '''Largest Army''' are each worth '''two points''' to their current holder. Their badges appear with the player's profile. You may hold both; losing an award also loses its points.
+
+{| class="wikitable"
+! Award !! First claim !! Taking it from the holder
+|-
+| '''Longest Road''' || A continuous route of at least 5 roads || Build a strictly longer qualifying route
+|-
+| '''Largest Army''' || Play at least 3 Knights || Play strictly more Knights than the holder
+|}
+
+== Longest Road ==
+Count one continuous route without using any road twice. Loops can count, but branches cannot simply be added together. Your own buildings do not interrupt the route; an opponent's settlement or city does. Separate road networks are measured separately.
+
+A tie does not displace a holder whose route still qualifies. If their road is broken, they keep the award only if they still have at least five and tie for the greatest length. Otherwise, the unique longest qualifying player receives it. If nobody qualifies, or the greatest eligible length is tied without a qualifying holder, the award has no owner.
+
+For example, five roads plus a two-road side branch do not automatically make a seven-road route. Trace the actual path through the junction.
+
+== Largest Army ==
+Count Knights you have '''played''', not Knights waiting in your hand. Played Knights remain part of your army for the rest of the game. A tie leaves the award with its holder.
+
+== Winning ==
+{| class="wikitable"
+! What you have !! Points
+|-
+| Settlement || 1
+|-
+| City || 2 total, replacing its settlement
+|-
+| Victory Point development card || 1
+|-
+| Either award || 2
+|}
+
+Reach '''10 or more points during your own turn''' to win immediately. Hidden [[Development cards|Victory Point cards]] count, so the visible public score may not tell the whole story. Reaching ten during somebody else's turn is not enough: you must still have ten when your own turn arrives. There is no equalizing final round.
+
+[[Category:Game rules]]

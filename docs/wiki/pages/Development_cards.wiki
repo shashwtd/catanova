@@ -1,0 +1,35 @@
+'''Development cards''' provide special actions or hidden points. Buying one costs '''1 Sheep + 1 Hay + 1 Rock''' and draws privately from the shuffled deck. You do not choose its type.
+
+{| class="wikitable"
+! Card !! Copies !! Effect
+|-
+| '''Knight''' || 14 || Move the robber and steal one random resource from an adjacent opponent; no discards.
+|-
+| '''Road Building''' || 2 || Place two legal roads without paying resources, using your remaining road pieces.
+|-
+| '''Year of Plenty''' || 2 || Take two available resources from the bank, either matching or different.
+|-
+| '''Monopoly''' || 2 || Name a resource and take every card of that type from all opponents.
+|-
+| '''Victory Point''' || 5 || One hidden point, counted automatically toward victory.
+|}
+
+== When can I play one? ==
+You may play '''one non-Victory-Point development card per turn''', before rolling or during your action phase. A card bought this turn must wait until your next turn. An older copy of the same card remains eligible.
+
+Select a held card to review its effect and use its '''Play''' action. Finish that effect before trading or building normally. You may buy several cards in a turn if you can pay and the deck is not empty. Played cards never return to it.
+
+Victory Point cards are different: they count without being played, including on the turn they are bought. They do not use your one-card allowance. They can bring you to ten points and win immediately on your own turn.
+
+== Useful distinctions ==
+* Knights count toward [[Awards|Largest Army]] only after being played. A Knight can move the robber before you roll.
+* Road Building places roads one at a time. The second may connect to the first; [[Awards|Longest Road]] and victory are checked after each.
+* Year of Plenty takes cards from the bank; Monopoly takes them from opponents. Monopoly may legally collect nothing.
+* Unplayed cards are private. They cannot be traded, stolen, or discarded as resources.
+
+== Provisional rare cases ==
+Catanova currently requires a legal first road to play Road Building. It takes a second road whenever a piece and legal site remain; otherwise it finishes with one. It does not allow a zero-road play or voluntarily declining a legal second road.
+
+Year of Plenty takes one card if that is all the bank contains, and cannot be played into a completely empty bank. These rare-case decisions remain provisional pending further primary-source confirmation; see the [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility ledger].
+
+[[Category:Game rules]]

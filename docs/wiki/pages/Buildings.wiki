@@ -1,0 +1,33 @@
+'''Roads, settlements, and cities''' occupy the island's edges and corners. Ordinary purchases happen after your roll has finished resolving. Setup placements and [[Development cards|Road Building]] have their own free-placement steps.
+
+{| class="wikitable"
+! Piece !! Cost !! Supply per player !! Points
+|-
+| '''Road''' || 1 Timber + 1 Clay || 15 || 0 by itself
+|-
+| '''Settlement''' || 1 Timber + 1 Clay + 1 Sheep + 1 Hay || 5 || 1
+|-
+| '''City upgrade''' || 2 Hay + 3 Rock || 4 || 2 total
+|}
+
+== Roads ==
+A road needs an empty land edge connected to your own road or building. Coastal edges are legal. You cannot extend through another player's building.
+
+Roads can branch or form loops. If an opponent builds across your network, your existing roads remain yours; you may still extend an isolated section under the normal attachment rules. [[Awards|Longest Road]] measures a continuous route, not simply every road you own.
+
+== Settlements ==
+Place a settlement on an empty intersection touching one of your roads. The opening draft is the exception to the road requirement.
+
+The '''distance rule''' always applies: no directly neighboring intersection may contain any settlement or city, even your own. There must be at least two edges between buildings.
+
+A settlement receives one resource from each adjacent hex that produces. A settlement on either marked corner of a [[Trading and ports|port]] also gives its trading ratio.
+
+== Cities ==
+A city replaces one of your own settlements. It is worth two points total and receives two resources per adjacent producing hex. The replaced settlement returns to your supply and can be built elsewhere later at its normal cost.
+
+You cannot put a city directly on an empty corner. You do not need to use all five settlements before upgrading.
+
+== Confirming a placement ==
+Choose a legal site to review the piece and its cost, then confirm '''Build'''. Cancel or Escape dismisses the preview. A confirmed move accepted by the server is permanent; pieces cannot be moved, sold, or demolished. Having enough resources alone is not enough: you also need a legal location and a piece left in your supply.
+
+[[Category:Game rules]]

@@ -2,6 +2,8 @@
 
 An open-source Catan-style game for **two to four invited friends**, built around reliable multiplayer and a hand-painted island.
 
+**Home: [catanova.io](https://catanova.io)** — domain secured; public hosting is being prepared. The game currently runs as the local playtest below.
+
 Trade **Timber, Clay, Sheep, Hay, and Rock**. Build settlements and cities. Race to ten points. Resume your seat when your connection drops. Rooms are invite-only; there is no solo mode or public matchmaking.
 
 Two-player rooms use the same board, resource supply, building costs, turn flow and ten-point goal as our base mechanics. This is Catanova’s own two-player option, with no neutral players or special two-player rules; it is not an implementation of an official two-player variant. Three- and four-player games remain the base-game compatibility target.
@@ -65,7 +67,9 @@ Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits ad
 
 With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Configured guests use Supabase anonymous accounts and the [implemented seven-day guest policy](docs/GUEST_ACCESS.md); local playtest tokens do not reserve global usernames.
 
-The planned hosted service uses one always-on Azure application with nearby Supabase Postgres. Account data uses Supabase Postgres; the production game-state database adapter is not implemented and no cloud instance is deployed. Budget estimates remain **about $45–55/month lean, or $65–80/month with more headroom**, before credits and taxes; assumptions and source links are in [hosting and costs](docs/HOSTING.md).
+The planned hosted service keeps the frontend and Node game server together on Azure Container Apps, with nearby Supabase Postgres. Account data uses Supabase; the production game-state Postgres adapter and safe multi-instance room ownership still need implementation. No cloud instance is deployed. Allow **about $90–105/month including a managed wiki**, before credits and taxes; see the [launch infrastructure, scaling and cost plan](docs/LAUNCH_INFRASTRUCTURE.md).
+
+The production build includes a public **`/guide/`** quick-start page, a pre-rendered welcome screen, canonical metadata, link previews, site icons and a sitemap for `catanova.io`. Private room and auth pages are excluded from indexing. [SEO and launch checks](docs/SEO.md).
 
 ## Check the build
 
@@ -97,10 +101,12 @@ The client animates accepted state; the server owns randomness, hidden informati
 ## Rules and contributing
 
 - [Base-game rulebook](docs/RULEBOOK.md) and [source/compatibility ledger](docs/RULE_SOURCES.md).
+- [Player wiki starter pack](docs/wiki/README.md), ready for import into a chosen MediaWiki host; no wiki has been published yet.
+- [Launch and growth plan](docs/GROWTH.md): 42 relevant distribution channels, eligibility notes and useful article ideas.
 - [Fixed and classic setup reference](docs/SETUP.md); these presets are not in the UI yet.
 - [Architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md), and [art provenance](docs/ART.md).
 - [Contributing](CONTRIBUTING.md) and [security](SECURITY.md).
 
-Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). Terrain, environment, resource, avatar and development-card atlases, plus the portrait border texture, are original AI-generated art with recorded prompts and provenance. Interface icons are original editable SVG artwork. Bundled fonts retain their own licenses, listed in the art documentation. Do not contribute official game artwork or copied rulebook passages.
+Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). Terrain, environment, resource, avatar and development-card atlases, plus the portrait border texture, are original AI-generated art with recorded prompts and provenance. Interface icons are original editable SVG artwork. Bundled fonts and the official Google/GitHub marks retain their own licenses and brand restrictions, listed in the [art documentation](docs/ART.md). Do not contribute official game artwork or copied rulebook passages.
 
 Catanova is an independent, unofficial project. It is not affiliated with, endorsed by, or licensed by CATAN GmbH or CATAN Studio. CATAN is a trademark of its respective owners. The original game was designed by Klaus Teuber. The MIT license applies to our contributions and grants no rights to third-party trademarks or assets. Public source availability does not establish legal clearance for the name or a finished release.

@@ -1,0 +1,49 @@
+__NOTOC__
+{| class="wikitable" style="float:right; margin:0 0 1em 1em; max-width:22em;"
+|+ Catanova at a glance
+|-
+! Players
+| 2–4 invited friends
+|-
+! Goal
+| 10 points on your own turn
+|-
+! Island
+| 19 land hexes · 5 resources
+|-
+! Play
+| Browser · Google or guest account
+|}
+Welcome to the '''Catanova Wiki''': a guide to the island, its resources, and the decisions that turn a small settlement into a winning network.
+
+'''New to the game?''' Begin with [[Getting started]]. Looking up a particular rule? Choose a topic below.
+
+== Explore the island ==
+{| class="wikitable"
+! Topic !! What you will find
+|-
+| [[Resources]] || Production, dice numbers, the bank, and the robber
+|-
+| [[Buildings]] || Costs, placement, roads, settlements, and cities
+|-
+| [[Trading and ports]] || Player offers, bank exchanges, and coastal trading
+|-
+| [[Development cards]] || Knights, special actions, and hidden points
+|-
+| [[Awards]] || Longest Road, Largest Army, and the race to ten points
+|-
+| [[Map generation]] || How Catanova balances a new island
+|}
+
+== Play together ==
+* [[Getting started]] — create a room, invite friends, and place your first buildings.
+* [[Accounts and friends]] — usernames, guest expiry, Google linking, and reconnecting.
+* [[Turn timer]] — the optional clock and what happens when time runs out.
+* [[FAQ]] — quick answers to common surprises.
+
+== About these guides ==
+Catanova is an independently developed, open-source game inspired by CATAN. These are original Catanova guides, not an official CATAN publication. Three- and four-player games follow the base-game target; the [[Getting started|two-player option]], [[Map generation|balanced map preset]], and [[Turn timer|timer]] are Catanova choices. Rare development-card cases are marked where their rulings remain provisional.
+
+For the complete specification, use the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes]. See [[Project:Copyrights]] for reuse of this wiki's starter text.
+
+[[Category:Guides]]

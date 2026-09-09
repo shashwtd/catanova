@@ -1,0 +1,1 @@
+Reference articles for Catanova's resources, building, trading, cards, awards, and optional settings. New players can begin with [[Getting started]]. The complete specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook].

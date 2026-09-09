@@ -1,0 +1,48 @@
+'''Balanced islands''' are Catanova's current map preset. Every island has 19 land hexes arranged in rows of 3, 4, 5, 4, and 3, with nine [[Trading and ports|ports]]. The goal is useful variety without making every starting spot equal.
+
+{| class="wikitable"
+! Terrain !! Hexes
+|-
+| Forest || 4
+|-
+| Hills || 3
+|-
+| Pasture || 4
+|-
+| Fields || 4
+|-
+| Mountains || 3
+|-
+| Desert || 1
+|}
+
+== What the generator avoids ==
+* More than two connected hexes of the same resource.
+* A resource being entirely confined to one small area: each type has at least two hexes separated by three or more hex steps.
+* A 6 or 8 touching another 6 or 8.
+* An intersection exceeding eleven production dots across its adjacent hexes.
+* Resource types with average production outside the preset's range of 2.5–4 dots per hex. The lower total is rounded up when a type has three hexes.
+
+The four general ports and five specialized ports are shuffled independently over nine separated coastal edges. A corner can still touch three different resources, and some locations remain stronger than others. The [[Getting started|reverse second placement]] matters; this preset does not guarantee equal outcomes or equal seats.
+
+== What are production dots? ==
+{| class="wikitable"
+! Dice total !! Ways to roll it !! Dots
+|-
+| 2 or 12 || 1 out of 36 || 1
+|-
+| 3 or 11 || 2 out of 36 || 2
+|-
+| 4 or 10 || 3 out of 36 || 3
+|-
+| 5 or 9 || 4 out of 36 || 4
+|-
+| 6 or 8 || 5 out of 36 || 5
+|}
+
+Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. There is no forced dice balancing or catch-up production bonus.
+
+== Preset status ==
+This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.
+
+[[Category:Game rules]]
