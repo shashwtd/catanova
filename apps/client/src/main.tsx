@@ -77,6 +77,7 @@ import './account-panels.css';
 import './room-experience.css';
 import './landing.css';
 import './hud-layout.css';
+import './settings.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',

@@ -1,0 +1,274 @@
+/* A small parchment menu; game controls stay separate from the darker HUD panels. */
+.game-dialog:has(.settings-menu) {
+  width: 410px;
+  border: 1px solid #af915d;
+  border-radius: 18px;
+  background: #f4ecd7;
+  color: #304b42;
+  box-shadow:
+    0 18px 70px #081b2366,
+    inset 0 0 0 4px #e1d2ad;
+}
+.game-dialog:has(.settings-menu) .dialog-surface {
+  padding: 24px;
+  background: radial-gradient(ellipse at top left, #fffbeb, transparent 80%);
+  color: inherit;
+}
+.game-dialog:has(.settings-menu) .panel-heading {
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #a88d5b40;
+}
+.game-dialog:has(.settings-menu) .panel-heading h2 {
+  color: #315447;
+  font-size: 22px;
+}
+.game-dialog:has(.settings-menu) .panel-heading .icon-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #b39b7140;
+  background: #e8ddc1;
+  border-radius: 10px;
+}
+.game-dialog:has(.settings-menu) .panel-heading .icon-button:hover {
+  background: #dfcfaa;
+}
+.settings-menu {
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  --settings-ink: #385e50;
+  --settings-track: #d8ccb0;
+}
+.settings-row-heading,
+.settings-row-heading > label {
+  display: flex;
+  align-items: center;
+}
+.settings-row-heading {
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  font-weight: 600;
+  font-size: 17px;
+}
+.settings-row-heading > label {
+  gap: 9px;
+}
+.settings-row-heading output {
+  min-width: 57px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #486953;
+  font-size: 17px;
+}
+.settings-volume-control {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.settings-mute {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border: 1px solid #416d58;
+  border-radius: 12px;
+  background: linear-gradient(#51775f, #385d4c);
+  box-shadow:
+    inset 0 1px #b7d09966,
+    0 3px 0 #2f4b3e;
+}
+.settings-mute[aria-pressed='true'] {
+  border-color: #be9d70;
+  background: #e5d7b8;
+  box-shadow:
+    inset 0 1px #fff7df,
+    0 3px 0 #c1ac83;
+}
+.settings-mute .game-icon {
+  width: 27px;
+  height: 27px;
+}
+.settings-mute:hover {
+  filter: brightness(1.08);
+}
+.settings-menu .settings-range {
+  --range-track: linear-gradient(
+    to right,
+    var(--settings-ink) 0 var(--range-fill),
+    var(--settings-track) var(--range-fill) 100%
+  );
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.settings-menu .settings-range::-webkit-slider-runnable-track {
+  height: 9px;
+  border-radius: 9px;
+  background: var(--range-track);
+  box-shadow: inset 0 1px 2px #283b342e;
+}
+.settings-menu .settings-range::-moz-range-track {
+  height: 9px;
+  border-radius: 9px;
+  background: var(--range-track);
+  box-shadow: inset 0 1px 2px #283b342e;
+}
+.settings-menu .settings-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 25px;
+  height: 25px;
+  margin-top: -8px;
+  border: 2px solid #53725a;
+  border-radius: 50%;
+  background: #fff6db;
+  box-shadow:
+    inset 0 0 0 5px #e6c989,
+    0 2px 4px #30453538;
+}
+.settings-menu .settings-range::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 25px;
+  height: 25px;
+  border: 2px solid #53725a;
+  border-radius: 50%;
+  background: #fff6db;
+  box-shadow:
+    inset 0 0 0 5px #e6c989,
+    0 2px 4px #30453538;
+}
+.settings-menu .settings-range:disabled {
+  --settings-ink: #8c957d;
+  cursor: default;
+}
+.game-dialog:has(.settings-menu) :is(button, input):focus-visible {
+  outline: 2px solid #287569;
+  outline-offset: 4px;
+}
+.settings-room {
+  border-top: 1px solid #a88d5b40;
+  margin-top: 26px;
+  padding-top: 20px;
+}
+.settings-row-heading .settings-switch {
+  gap: 8px;
+  font-size: 14px;
+  color: #65765e;
+  cursor: pointer;
+  min-height: 44px;
+}
+.settings-switch input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 42px;
+  height: 25px;
+  position: relative;
+  margin: 0;
+  border: 1px solid #aa9c7c;
+  border-radius: 20px;
+  background: #d7ccb1;
+  cursor: inherit;
+}
+.settings-switch input::before {
+  content: '';
+  position: absolute;
+  width: 17px;
+  height: 17px;
+  top: 3px;
+  left: 3px;
+  border-radius: 50%;
+  background: #fff6db;
+  box-shadow: 0 1px 3px #263e353d;
+}
+.settings-switch input:checked {
+  background: #52775c;
+  border-color: #47674f;
+}
+.settings-switch input:checked::before {
+  transform: translateX(17px);
+}
+.settings-switch:has(input:disabled) {
+  cursor: default;
+}
+.settings-duration {
+  margin-top: 14px;
+  padding: 14px 15px 12px;
+  border: 1px solid #d6c8a766;
+  border-radius: 12px;
+  background: #e9dfc780;
+}
+.settings-duration output {
+  display: block;
+  margin-bottom: 4px;
+  text-align: center;
+  color: #65715b;
+  font-size: 14px;
+}
+.settings-duration output strong {
+  color: #355749;
+  font-size: 29px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.settings-timer-stops {
+  display: flex;
+  justify-content: space-between;
+  padding-inline: 5px;
+  color: #70735d;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.settings-timer-stops [data-selected='true'] {
+  color: #2f5747;
+  font-weight: 600;
+}
+.settings-caption {
+  margin: 12px 0 0;
+  color: #66705a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.settings-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 18px;
+  border: 1px solid #416749;
+  border-radius: 10px;
+  background: linear-gradient(#557d5e, #3d604b);
+  box-shadow:
+    inset 0 1px #ccdeb266,
+    0 3px 0 #2f4b3c;
+  color: #fff5da;
+  font-weight: 600;
+}
+.settings-save:hover:not(:disabled) {
+  background: #4f765b;
+}
+.settings-menu .entry-error {
+  color: #943f32;
+  background: #ead4bb;
+  border-color: #b66c554d;
+}
+@media (max-width: 420px) {
+  .game-dialog:has(.settings-menu) .dialog-surface {
+    padding: 20px;
+  }
+}

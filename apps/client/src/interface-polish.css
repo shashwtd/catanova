@@ -172,8 +172,7 @@
 .game-dialog.compact {
   width: 335px;
 }
-.game-dialog .dialog-surface,
-.game-dialog:has(.compact-settings) .dialog-surface {
+.game-dialog .dialog-surface {
   padding: 24px;
   background: transparent;
   color: #e9e4d1;
@@ -191,7 +190,6 @@
   border-bottom: 1px solid #adbfaa2c;
 }
 .game-dialog .panel-heading h2,
-.game-dialog:has(.compact-settings) .panel-heading h2,
 .playing .game-panel h2,
 .playing .required-action h2 {
   font:
@@ -275,96 +273,6 @@
   color: #b0c2bd;
   font-size: 12px;
   line-height: 1.5;
-}
-
-.compact-settings {
-  width: 100%;
-  max-height: 66dvh;
-  padding: 1px;
-}
-.compact-settings .volume-heading,
-.compact-timer-settings .settings-toggle {
-  color: #e3e2ca;
-  font-size: 15px;
-}
-.volume-heading output {
-  color: #ecce8e;
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-}
-.compact-settings > input[type='range'],
-.compact-timer-settings > input[type='range'] {
-  appearance: none;
-  height: 8px;
-  border: 1px solid #b5cab443;
-  border-radius: 6px;
-  background: #142c368f;
-  box-shadow: inset 0 1px 4px #101c2966;
-  margin: 20px 0 17px;
-  cursor: pointer;
-}
-.compact-settings input[type='range']::-webkit-slider-thumb {
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: linear-gradient(#f0dba9, #b6a171);
-  border: 2px solid #e6d5a1;
-  box-shadow: 0 2px 4px #12202d77;
-}
-.compact-settings input[type='range']::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  background: #d6be87;
-  border: 2px solid #e6d5a1;
-  box-shadow: 0 2px 4px #12202d77;
-}
-.compact-timer-settings {
-  margin-top: 10px;
-  padding-top: 19px;
-  border-color: #a7c0b230;
-}
-.compact-timer-settings .settings-toggle input {
-  appearance: none;
-  width: 40px;
-  height: 23px;
-  border-radius: 13px;
-  background: #192d37;
-  border: 1px solid #8fa79c70;
-  position: relative;
-  box-shadow: inset 0 2px 3px #16253066;
-}
-.compact-timer-settings .settings-toggle input::before {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 3px;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #849c99;
-  transition: transform 150ms ease-out;
-}
-.compact-timer-settings .settings-toggle input:checked {
-  background: #758d66;
-}
-.compact-timer-settings .settings-toggle input:checked::before {
-  transform: translateX(17px);
-  background: #f0dfb1;
-}
-.compact-timer-settings .timer-value strong {
-  font:
-    650 28px/1.2 Barlow,
-    sans-serif;
-  color: #ead59f;
-}
-.compact-timer-settings .timer-stops,
-.compact-timer-settings .settings-note {
-  color: #b5c5bc;
-}
-.compact-timer-settings .settings-note {
-  margin-top: 15px;
 }
 
 /* Card-based trading: five tactile choices, no native number steppers. */
@@ -1077,8 +985,7 @@
   .trade-action > span {
     font-size: 9px;
   }
-  .game-dialog .dialog-surface,
-  .game-dialog:has(.compact-settings) .dialog-surface {
+  .game-dialog .dialog-surface {
     padding: 20px;
   }
   .picker-cards {
@@ -1196,10 +1103,5 @@
   .rules-scores .game-icon {
     width: 23px;
     height: 23px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .compact-timer-settings .settings-toggle input::before {
-    transition: none;
   }
 }
