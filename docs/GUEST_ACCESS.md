@@ -1,6 +1,6 @@
 # Guest access
 
-Guest accounts are implemented using Supabase anonymous authentication. The provider setting and [account migration](AUTH.md) must be enabled on the deployment. Guests choose the same globally unique 3–20 character username and game portrait as permanent players; their reservation is temporary.
+Guest accounts are implemented using Supabase anonymous authentication. Enable the provider and set up the [account schema](AUTH.md) on the deployment. Guests choose the same globally unique 3–20 character username and game portrait as permanent players; their reservation is temporary.
 
 | Event                                              | Behavior                                                                                                     |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |

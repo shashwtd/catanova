@@ -17,6 +17,7 @@ import { useAuth, entryLocation } from './auth.js';
 import { Avatar, ProfileEditor } from './Profile.js';
 import { Lobby, Invite } from './Lobby.js';
 import { EntryScreen } from './EntryScreen.js';
+import { takeEntryIntent } from './entry-intent.js';
 import { FriendsPanel } from './FriendsPanel.js';
 import { PlayerRail } from './PlayerRail.js';
 import { ConnectionPanel } from './ConnectionPanel.js';
@@ -74,11 +75,16 @@ import './profile-presence.css';
 import './compact-panels.css';
 import './account-panels.css';
 import './room-experience.css';
+import './landing.css';
 import './hud-layout.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
   LAST_SEAT_KEY = 'catanova.last-seat.v1';
+// Consume the OAuth choice once per page load, outside React renders (including StrictMode).
+const arrivalLocation = entryLocation();
+const arrivalInvite = invitationCode(arrivalLocation.pathname, arrivalLocation.search);
+const arrivalIntent = takeEntryIntent(sessionStorage);
 function readJSON<T>(storage: Storage, key: string): T | undefined {
   try {
     const value = storage.getItem(key);
@@ -162,9 +168,9 @@ function App() {
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
     [historyHasMore, setHistoryHasMore] = useState(false);
   const historyLoaded = useRef(false);
-  const initialInvite = useRef(invitationCode(entryLocation().pathname, entryLocation().search));
+  const initialInvite = useRef(arrivalInvite);
   const [entry, setEntry] = useState<'home' | 'create' | 'join' | 'invite'>(
-    initialInvite.current ? 'invite' : 'home',
+    initialInvite.current ? 'invite' : arrivalIntent,
   );
   const [invite, setInvite] = useState<string | null>(initialInvite.current);
   const [previewRoom, setPreviewRoom] = useState<RoomPreview | null>(null),
@@ -466,12 +472,16 @@ function App() {
   }
   async function enter(e: FormEvent, kind: 'create' | 'join') {
     e.preventDefault();
+    await enterRoom(kind);
+  }
+  async function enterRoom(kind: 'create' | 'join') {
     setError('');
     if (!auth.canPlay) {
       await auth.signIn(invite ? roomPath(invite) : '/');
       return;
     }
-    if (!name.trim()) {
+    const chosenName = auth.config?.mode === 'authenticated' ? auth.profile.name : name.trim();
+    if (!chosenName) {
       setError('Enter your name');
       return;
     }
@@ -481,10 +491,13 @@ function App() {
       return;
     }
     sessionStorage.removeItem(OUTBOX_KEY);
-    localStorage.setItem('catanova.name', name.trim());
+    localStorage.setItem('catanova.name', chosenName);
     setBusy(true);
     try {
-      const profile = await auth.saveProfile({ ...auth.profile, name: name.trim() });
+      const profile =
+        auth.config?.mode === 'authenticated'
+          ? auth.profile
+          : await auth.saveProfile({ ...auth.profile, name: chosenName });
       connect(newSession(profile.name, kind === 'join' ? target : undefined, profile));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save profile');
@@ -717,6 +730,7 @@ function App() {
           last={last}
           busy={busy || networkBusy}
           onEnter={(event, kind) => void enter(event, kind)}
+          onCreate={() => void enterRoom('create')}
           onResume={() => {
             const seat =
               entry === 'invite'
@@ -731,6 +745,7 @@ function App() {
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
           onSignOut={() => void signOut()}
+          onRules={() => setPanel('rules')}
         />
       )}
       {room && !g && (

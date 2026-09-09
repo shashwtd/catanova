@@ -1,5 +1,6 @@
 -- Catanova accounts, seven-day guest profiles and private friend relationships.
--- Run the entire migration in the Supabase SQL editor. No service-role key is used by the app.
+-- Fresh-project schema: run this file in the Supabase SQL editor.
+-- No service-role key is used by the app. This defines accounts; it does not import old users.
 begin;
 create schema if not exists catanova_private;
 revoke all on schema catanova_private from public, anon, authenticated;

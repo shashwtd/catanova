@@ -16,7 +16,7 @@ Open `http://127.0.0.1:3000`. Choose **Create room**, then enter your name. Meet
 
 For a single-machine connectivity playtest, open the URL in two to four **independently opened tabs** and join the same room. Refreshing a tab resumes its own seat. Duplicating a tab may copy its session storage; that resumes the existing seat instead of creating a new player. A seat opened elsewhere closes the old connection.
 
-`127.0.0.1` links only work on the server machine. For friends on other devices, use an HTTPS reverse proxy/tunnel to this process, or the eventual hosted deployment. The current client uses secure-context APIs such as `crypto.randomUUID()` for command IDs. An ordinary HTTP LAN address is not yet supported; the [LAN proposal](LAN_PROPOSAL.md) describes the packaging and compatibility work needed. No public game server has been deployed yet.
+`127.0.0.1` links only work on the server machine. For friends on other devices, use an HTTPS reverse proxy/tunnel to this process, or the eventual hosted deployment. The current client uses secure-context APIs such as `crypto.randomUUID()` for command IDs. An ordinary HTTP LAN address is not supported. No public game server has been deployed yet.
 
 ## Playing
 

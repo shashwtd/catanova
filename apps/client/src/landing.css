@@ -1,0 +1,350 @@
+/* The entry is a small play menu set into our own illustrated island. */
+.entry-world .title-scenery {
+  background:
+    linear-gradient(180deg, #f7e6b57a 0%, #f7e6b526 48%, #193f3766 100%),
+    url('/art/title-landscape.png') center / cover;
+}
+.entry-world .landing-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 26px;
+  min-height: 100dvh;
+  padding: 108px 24px 88px;
+}
+.landing-screen .lobby-self {
+  min-width: 0;
+  flex: 1;
+}
+.landing-screen .title-tools {
+  flex-shrink: 0;
+}
+/* One paper surface carries the cream-backed wordmark and the play controls. */
+.landing-welcome {
+  width: min(650px, 100%);
+  padding: 25px 27px 26px;
+  border: 1px solid #fff6d9b8;
+  border-radius: 17px;
+  background: #f5ebd0;
+  box-shadow:
+    0 18px 45px #25453b40,
+    inset 0 1px #fff9e7;
+}
+.landing-brand {
+  width: 100%;
+  text-align: center;
+}
+.landing-brand h1 {
+  margin: 0;
+  line-height: 0;
+}
+.landing-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.landing-brand p {
+  margin: 19px 0 0;
+  color: #52634b;
+  font:
+    500 clamp(16px, 2vw, 21px)/1.35 Barlow,
+    sans-serif;
+}
+.landing-screen .landing-panel {
+  width: 100%;
+  max-width: none;
+  padding: 25px 0 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: #324638;
+}
+.landing-screen .landing-panel.home-menu .entry-actions {
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.landing-screen .landing-panel h2 {
+  color: #324638;
+  font:
+    600 24px/1.25 Barlow,
+    sans-serif;
+  margin: 0;
+}
+.landing-panel .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.landing-screen .landing-panel .gold-button,
+.landing-screen .landing-panel .dark-button,
+.landing-screen .landing-panel .google-button {
+  border-radius: 9px;
+  min-height: 54px;
+  font:
+    600 17px Barlow,
+    sans-serif;
+  gap: 9px;
+}
+.landing-screen .landing-panel .gold-button {
+  background: linear-gradient(#eaba61, #d89f43);
+  border: 1px solid #b98940;
+  color: #3c3927;
+  box-shadow:
+    inset 0 1px #ffe5a2,
+    0 3px 0 #976f37,
+    0 5px 8px #99794326;
+}
+.landing-screen .landing-panel .dark-button {
+  background: linear-gradient(#547d63, #38604c);
+  border: 1px solid #315542;
+  color: #fff0cc;
+  box-shadow:
+    inset 0 1px #99ae7966,
+    0 3px 0 #254332,
+    0 5px 8px #42604326;
+}
+.landing-screen .landing-panel .google-button {
+  background: #fffdf4;
+  border: 1px solid #b8b59d;
+  color: #364a3c;
+  box-shadow: 0 2px 0 #b7b8a2;
+}
+.landing-screen .landing-panel button:focus-visible,
+.landing-sign-in:focus-visible {
+  outline: 3px solid #184b46;
+  outline-offset: 4px;
+}
+.landing-footer :focus-visible {
+  outline: 3px solid #fff2ca;
+  outline-offset: 4px;
+}
+.landing-screen .landing-panel .gold-button:hover:not(:disabled) {
+  background: linear-gradient(#f4cc79, #e3af54);
+}
+.landing-screen .landing-panel .dark-button:hover:not(:disabled) {
+  background: linear-gradient(#658d70, #497258);
+}
+.landing-screen .landing-panel .resume-button {
+  color: #425b45;
+  margin-top: 17px;
+  font-size: 14px;
+}
+.landing-panel .landing-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  color: #667158;
+  margin-top: 15px;
+  font-size: 13px;
+}
+.landing-screen .landing-panel .entry-heading {
+  margin: 0 0 23px;
+}
+.landing-screen .landing-panel .entry-heading .icon-button {
+  width: 35px;
+  height: 35px;
+  min-height: 35px;
+  flex: none;
+  padding: 6px;
+  border: 1px solid #8c9d7a50;
+  border-radius: 7px;
+  color: #51634c;
+  background: #e7e5ca;
+  box-shadow: none;
+}
+.landing-screen .landing-panel .field {
+  color: #4c634f;
+  font-size: 14px;
+}
+.landing-screen .landing-panel .field input {
+  background: #fff9e9;
+  color: #304937;
+  border: 1px solid #9fab876e;
+  box-shadow: inset 0 1px 3px #75805f12;
+}
+.landing-screen .landing-panel .guest-policy,
+.landing-screen .landing-panel .local-mode {
+  color: #66725b;
+}
+.landing-screen .landing-panel .menu-loading {
+  color: #58694e;
+  min-height: 90px;
+}
+.landing-screen .landing-panel .entry-error {
+  color: #a44732;
+}
+.landing-screen .landing-panel .entry-invite-caption,
+.landing-screen .landing-panel .invite-room-code {
+  color: #6d764e;
+}
+.landing-screen .landing-panel .invite-roster {
+  margin-bottom: 18px;
+}
+.landing-screen .landing-panel .invite-roster span {
+  color: #526748;
+}
+.landing-sign-in {
+  padding: 9px 15px;
+  min-height: 40px;
+  border: 1px solid #fff4d499;
+  border-radius: 8px;
+  background: #fff4d4ed;
+  color: #36503f;
+  font:
+    600 15px Barlow,
+    sans-serif;
+  box-shadow: 0 2px 5px #314d3330;
+}
+.landing-sign-in:hover:not(:disabled) {
+  background: #fff9e5;
+}
+.landing-footer {
+  position: absolute;
+  bottom: 25px;
+  display: flex;
+  gap: 25px;
+  align-items: center;
+  padding: 8px 17px;
+  border-radius: 8px;
+  background: #193c37c9;
+}
+.landing-footer button,
+.landing-footer a {
+  padding: 3px 0;
+  background: none;
+  border: none;
+  color: #f0e7bf;
+  font:
+    500 13px Barlow,
+    sans-serif;
+  text-decoration: none;
+}
+.landing-footer button:hover,
+.landing-footer a:hover {
+  color: #fff9dd;
+  text-decoration: underline;
+}
+.landing-flow .landing-welcome {
+  width: min(490px, 100%);
+  padding: 22px 28px 28px;
+}
+.landing-flow .landing-brand {
+  width: min(335px, 100%);
+  margin: 0 auto;
+}
+.landing-flow .landing-welcome:has(.onboarding-panel) {
+  width: min(540px, 100%);
+}
+.landing-panel .account-setup {
+  color: #3b5140;
+}
+.landing-panel .account-setup h2 {
+  margin-bottom: 9px;
+}
+.landing-panel .account-intro,
+.landing-panel .account-note {
+  color: #62735b;
+}
+.landing-panel .username-feedback {
+  color: #667358;
+}
+.landing-panel .username-feedback[data-status='available'] {
+  color: #477449;
+}
+.landing-panel .username-feedback[data-status='unavailable'],
+.landing-panel .username-feedback[data-status='error'] {
+  color: #a34735;
+}
+.landing-panel .google-photo-choice {
+  color: #45583f;
+  background: #e7e6ce;
+  border-color: #9cab897a;
+}
+.landing-panel .google-photo-choice[aria-pressed='true'] {
+  background: #d6dfbd;
+  border-color: #6b8c58;
+}
+@media (max-width: 650px) {
+  .entry-world .landing-screen {
+    padding: 94px 18px 78px;
+    gap: 22px;
+  }
+  .landing-welcome {
+    padding: 20px 18px 23px;
+  }
+  .landing-flow .landing-welcome {
+    padding: 20px;
+  }
+  .landing-brand p {
+    font-size: 16px;
+    margin-top: 16px;
+  }
+  .landing-screen .landing-panel.home-menu .entry-actions {
+    gap: 10px;
+  }
+  .landing-screen .landing-panel {
+    padding: 23px 0 0;
+  }
+  .landing-screen .landing-panel .gold-button,
+  .landing-screen .landing-panel .dark-button {
+    font-size: 15px;
+    gap: 5px;
+  }
+  .landing-screen .landing-panel.home-menu .game-icon {
+    width: 21px;
+    height: 21px;
+  }
+  .landing-screen .landing-panel.home-menu .gold-button,
+  .landing-screen .landing-panel.home-menu .dark-button {
+    padding-inline: 8px;
+  }
+  .landing-footer {
+    bottom: 18px;
+  }
+}
+@media (max-width: 360px) {
+  .entry-world .landing-screen {
+    padding-inline: 12px;
+  }
+  .landing-welcome,
+  .landing-flow .landing-welcome {
+    padding-inline: 14px;
+  }
+  .landing-screen .landing-panel.home-menu .entry-actions {
+    gap: 8px;
+  }
+  .landing-screen .landing-panel.home-menu .game-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .landing-brand p {
+    font-size: 15px;
+  }
+}
+@media (max-height: 650px) and (min-width: 651px) {
+  .entry-world .landing-screen {
+    padding-top: 86px;
+    padding-bottom: 75px;
+    gap: 17px;
+  }
+  .landing-home .landing-welcome {
+    width: min(580px, 100%);
+  }
+  .landing-flow .landing-brand {
+    width: 300px;
+  }
+  .landing-brand p {
+    margin-top: 15px;
+  }
+}

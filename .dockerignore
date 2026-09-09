@@ -12,3 +12,14 @@ output
 *.db*
 *.pem
 *.key
+
+*.p12
+*.pfx
+.azure
+.supabase
+test-results
+playwright-report
+.DS_Store
+.idea
+.vscode
+*.tsbuildinfo

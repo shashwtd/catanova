@@ -8,9 +8,7 @@ const ids = [
   '00000000-0000-4000-8000-000000000003',
   '00000000-0000-4000-8000-000000000004',
 ];
-const migration = ['202609090001_accounts_and_friends.sql']
-  .map((name) => readFileSync(new URL('../supabase/migrations/' + name, import.meta.url), 'utf8'))
-  .join('\n');
+const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
 async function fixture(t: { after: (run: () => Promise<void>) => void }) {
   const db = new PGlite();
   t.after(() => db.close());
@@ -19,7 +17,7 @@ async function fixture(t: { after: (run: () => Promise<void>) => void }) {
     create table auth.identities(user_id uuid references auth.users(id),provider text,identity_data jsonb,created_at timestamptz default now());
     create function auth.uid() returns uuid language sql as 'select nullif(current_setting(''request.jwt.claim.sub'',true),'''')::uuid';
     create function auth.jwt() returns jsonb language sql as 'select coalesce(nullif(current_setting(''request.jwt.claims'',true),''''),''{}'')::jsonb';`);
-  await db.exec(migration);
+  await db.exec(schema);
   for (const [i, id] of ids.entries()) {
     await db.query('insert into auth.users(id,is_anonymous) values($1,$2)', [id, i === 3]);
     if (i !== 3)
@@ -67,7 +65,7 @@ async function save(db: PGlite, id: string, name: string, source = 'generated') 
   return rpc(db, id, 'catanova_profile_save', [name, 3, source]);
 }
 
-test('migration creates private RLS tables, scoped authenticated RPCs, and no anonymous or cross-account direct access', async (t) => {
+test('fresh schema creates private RLS tables, scoped authenticated RPCs, and no anonymous or cross-account direct access', async (t) => {
   const db = await fixture(t);
   await save(db, ids[0]!, 'Captain');
   await save(db, ids[1]!, 'Builder');
@@ -296,7 +294,7 @@ test('scoped durable request budgets bound friend request/cancel cycling and use
   await rpc(db, ids[0]!, 'catanova_friend_action', ['request', ids[1]]);
   assert.equal((await rpc(db, ids[1]!, 'catanova_friends')).incoming.length, 1);
   assert.equal((await rpc(db, ids[0]!, 'catanova_friend_search', ['Bui'])).length, 1);
-  await db.exec(migration);
+  await db.exec(schema);
   assert.equal(
     (await rpc(db, ids[0]!, 'catanova_friends')).outgoing.length,
     1,

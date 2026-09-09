@@ -1,13 +1,14 @@
-# Catanova logo concept
+# Catanova identity
 
-An open hexagonal **C** surrounds green island forms and a warm red settlement roof. The small gold spark gives “nova” a visible counterpart. Large color areas and a simple outer silhouette connect the mark to the game without copying CATAN branding.
+The open hexagonal **C**, green island forms, coral settlement roof and small nova spark remain the identity. The second version lifts the shadows and uses sunlit honey gold, fresh green and jade. Its full logo adds matching painted **Catanova** lettering.
 
-![Catanova app icon](catanova-app-icon-v1.png)
+![Full Catanova logo](../../../apps/client/public/art/branding/catanova-logo-v2.png)
 
-- [App icon](catanova-app-icon-v1.png): opaque dark teal square, 1254 × 1254. Recommended source for app launchers after review. Let each platform apply its own corner mask.
-- [Standalone mark](catanova-mark-v1.png): 1254 × 1254 with real transparency, for the lobby or a future wordmark lockup. Use a dark background so the pale gold remains clear.
-- [Size preview](preview.html): the unchanged app-icon source at 32, 48, 64 and 128 pixels, plus a larger preview. No raster resizing or repainting was applied to these source files.
+- [Standalone mark](../../../apps/client/public/art/branding/catanova-mark-v2.png): 1254 × 1254, with real transparent alpha. Meaningful alpha ≥ 8 bounds are `[156, 116, 1116, 1206]`; a display viewBox of `145 105 983 1113` avoids unnecessary margins without modifying the source PNG.
+- [Full logo](../../../apps/client/public/art/branding/catanova-logo-v2.png): 2172 × 724, **opaque warm cream background**, approximately `#f5ebd0`. It is suited to a warm cream brand area. Background extraction attempts returned baked checkerboards, so those variants are excluded. Do not treat this file as transparent.
+- [Size and background preview](preview.html): selected source files shown through CSS/SVG sizing only.
+- [Current provenance](provenance-v2.json): exact prompts, references, hashes, inspection and generation history.
 
-The C silhouette is the small-size identifier; the roof and painted texture are secondary details. For a future 16-pixel favicon, a simplified vector adaptation may be clearer than the full painted asset. This concept does not replace the current application icon, UI icons or board pieces.
+The selected source files are copied unchanged from the built-in image generation tool. No raster cropping, recoloring or alpha processing was applied. “Painted” describes the appearance of this **AI-generated** artwork, not human authorship.
 
-These are **AI-generated** bitmap concepts made with the built-in image generation tool. “Painted” refers to the visual finish. [Provenance](provenance.json) contains the exact generation/edit prompts, output hashes, transparency inspection and usage limits. No existing game characters or logo references were supplied to the tool.
+The darker v1 mark and launcher icon have been removed from the current tree to avoid storing duplicate superseded artwork. Their [historical provenance](provenance.json) remains, and the images are recoverable from commit `7c1f97db51de676e16aaebb79bed6ed0abf89267` under `docs/art/logo-concepts/`. These assets do not change board pieces or the separate in-game icon system.

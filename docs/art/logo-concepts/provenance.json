@@ -1,7 +1,7 @@
 {
   "created": "2026-09-09",
   "project": "Catanova",
-  "status": "Concept for review; not wired into app UI",
+  "status": "Historical v1 concept; replaced by v2 selected assets. Source PNGs removed from HEAD to avoid duplicate raster bulk.",
   "generator": "Built-in image_gen tool",
   "mode": "Built-in, not CLI/API fallback",
   "direction": "An open hexagonal C, green island forms, a vermilion settlement roof and a gold nova spark. Painted appearance describes AI-generated artwork, not human authorship.",
@@ -44,5 +44,6 @@
     }
   ],
   "validation": "Both outputs viewed at source resolution; PNG dimensions, alpha/mode and SHA-256 verified. preview.html displays the unchanged source PNG at 32, 48, 64 and 128 CSS pixels for human review. No browser inspection performed. No production favicon, app manifest or UI changed.",
-  "rightsNote": "Original generation requested; no assertion of exclusive rights or third-party trademark rights."
+  "rightsNote": "Original generation requested; no assertion of exclusive rights or third-party trademark rights.",
+  "historicalCommit": "7c1f97db51de676e16aaebb79bed6ed0abf89267"
 }

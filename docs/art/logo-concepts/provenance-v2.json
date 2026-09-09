@@ -1,0 +1,102 @@
+{
+  "created": "2026-09-09",
+  "project": "Catanova",
+  "status": "Selected bright logo assets for the landing page",
+  "generator": "Built-in image_gen tool",
+  "mode": "Built-in; no CLI/API fallback or local raster editing",
+  "direction": "Sunny honey gold, fresh meadow and jade greens, warm coral roof, open hexagonal C and nova spark. The full logo adds matching painted Catanova lettering.",
+  "authorship": "AI-generated artwork. Painted describes its visual finish, not human authorship.",
+  "referenceImages": [
+    {
+      "file": "catanova-mark-v1.png",
+      "role": "Edit target for brighter mark",
+      "historicalCommit": "7c1f97db51de676e16aaebb79bed6ed0abf89267",
+      "historicalPath": "docs/art/logo-concepts/catanova-mark-v1.png"
+    },
+    {
+      "file": "catanova-app-icon-v1.png",
+      "role": "Supporting original identity reference only",
+      "historicalCommit": "7c1f97db51de676e16aaebb79bed6ed0abf89267",
+      "historicalPath": "docs/art/logo-concepts/catanova-app-icon-v1.png"
+    }
+  ],
+  "outputs": [
+    {
+      "file": "../../../apps/client/public/art/branding/catanova-mark-v2.png",
+      "source": "exec-4e318237-ba44-4e40-9278-abfe9142a69d.png",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGBA",
+      "sha256": "d759b095210d615840f56b14ba68bf0e5ff84ea3f620c07e9b6ae1d58666c1ef",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "meaningfulAlphaBounds": {
+        "threshold": 8,
+        "xyxy": [
+          156,
+          116,
+          1116,
+          1206
+        ]
+      },
+      "suggestedViewBox": "145 105 983 1113",
+      "transparentPixels": 969433,
+      "prompt": "Use case: lighting-weather.\nAsset type: Catanova standalone painted logo mark, updated production game asset.\nInput images: Image 1 is the existing transparent mark and edit target. Image 2 is the same identity on a dark teal launcher background for context only.\nPrimary request: brighten the existing Catanova mark so it feels sunny, friendly, positive and inviting. Preserve exactly its recognizable open hexagonal C shape, two rolling green island forms, one small settlement roof and small four-point nova spark. Keep their basic arrangement and broad silhouettes.\nChanges: the gold C is warm sunlit honey with pale golden highlights; the hills are lively fresh meadow green and clear jade green with softly lifted shadows; the roof is welcoming warm coral red and the house face a light creamy peach. Remove the muddy very dark forest-green shading. Keep enough tonal variation to read crisply.\nStyle/medium: confident hand-painted fantasy board-game logo, gouache-like broad strokes, restrained texture with clear art-directed shapes. It should feel painted and welcoming, not glossy molded 3D, not plastic, not metallic, not neon.\nComposition/framing: single square mark, comfortably filling the canvas with a small even transparent margin, no added objects or tiny details.\nBackground: genuinely transparent alpha behind the complete mark AND inside the open C. Do not bake in a dark background, checkerboard, paper, glow rectangle, or backdrop.\nConstraints: no text, no new symbols, no thick outline, no decorative plaque, no border, no shadows outside the mark, no extra sparkles, no watermarks. Keep the original identity and silhouette.",
+      "postProcessing": "None. Copied unchanged from generated output."
+    },
+    {
+      "file": "../../../apps/client/public/art/branding/catanova-logo-v2.png",
+      "source": "exec-7936c393-8983-4096-9407-ccfbc1e5014b.png",
+      "dimensions": [
+        2172,
+        724
+      ],
+      "mode": "RGB",
+      "sha256": "6dbcb01c27f7940249326666eda05f498acac5601b61734c02e422cf7e10b301",
+      "background": "Opaque warm cream, approximately #f5ebd0 with small generated color variation. This asset does not have transparency.",
+      "approximateArtworkBounds": [
+        57,
+        72,
+        2140,
+        684
+      ],
+      "suggestedViewBox": "40 55 2115 640",
+      "prompt": "Use case: precise-object-edit.\nPreserve this exact finished horizontal Catanova logo, including spelling, all letter shapes, painted colors, left mark, size, layout and proportions.\nChange only its background: replace ALL gray checkerboard with a completely solid warm pale cream color, hexadecimal #f8efd8, including gaps inside letters and inside the mark. Flat uniform opaque background, no texture, no checkerboard, no transparency, no gradient, no shadows on the background.\nDo not change the logo artwork. Keep the entire original 3:1 horizontal logo with small even margins.",
+      "inputSource": "exec-2aec992d-89bf-475b-b7b1-a761d5394cf8.png",
+      "postProcessing": "None. Copied unchanged from generated output."
+    }
+  ],
+  "generationHistory": [
+    {
+      "source": "exec-245bde99-1ae5-4253-9542-3f158ab87eef.png",
+      "inputSource": "exec-4e318237-ba44-4e40-9278-abfe9142a69d.png",
+      "prompt": "Use case: logo-brand.\nAsset type: finished full horizontal Catanova logo, transparent raster asset for the game's title screen.\nInput image: the attached bright Catanova mark is the exact existing identity and painterly style reference.\nPrimary request: create a complete logo lockup with that mark on the LEFT and the exact word \"Catanova\" on the RIGHT in matching bespoke friendly fantasy lettering.\nText (verbatim): \"Catanova\". Spell C-a-t-a-n-o-v-a. Exactly eight letters, capital C followed by lowercase atanova, no other text.\nLettering: large, very readable, lively confident letterforms with gently flared terminals and soft organic curves; each letter individually hand-painted, warm sunlit ivory-gold faces and a restrained clear teal-green painted edge/shadow for separation. Lettering feels like a thoughtful fantasy game title, joyful, graceful and sturdy rather than spiky, gothic, corporate or inflated plastic. Moderate painterly texture, subtly varied strokes, consistent baseline, calm spacing. The C in Catanova must be a real letter, do not substitute the mark for the C.\nMark: retain the open honey-gold hexagonal C, fresh meadow/jade hills, coral-red settlement roof and four-point nova spark from the reference. The entire mark should be about 1.4 times the lettering height, not enormous. Keep a clear modest gap between the mark and first letter.\nComposition: one complete horizontal logo, approximately 3:1 landscape, centered and filling the canvas closely with even small transparent margins. One continuous word, all letters clearly visible. Keep it compact enough for a landing page header.\nBackground: REAL transparent alpha. Empty transparent background behind logo and between all letters; no colored rectangle, no white background, no checkerboard or paper.\nConstraints: only mark and the word Catanova. No subtitle, tagline, plaque, wooden sign, ribbon, box, outer border, duplicated mark, extra decorative objects, resource icons or extra stars. No existing game branding. No huge outline, chrome, glossy extrusion, or fake 3D bevel. The lettering and mark should look painted by the same artist.",
+      "result": "Correct lettering; RGB image with baked checkerboard. Not retained in repository."
+    },
+    {
+      "source": "exec-38565f23-2886-4f37-9a5a-4de754ae5ca3.png",
+      "inputSource": "exec-245bde99-1ae5-4253-9542-3f158ab87eef.png",
+      "prompt": "Use case: background-extraction.\nAsset type: production transparent Catanova full logo.\nInput image is the exact finished logo to preserve. Remove ONLY the gray checkerboard background completely and produce a genuinely transparent PNG with a real alpha channel. Make every background pixel transparent, including gaps inside the letter a, o, and C and the opening inside the mark.\nPreserve the honey-gold hand-painted Catanova lettering exactly: same shape, spelling, baseline, size, green edge and paint texture. Preserve the mark exactly: gold open hexagonal C, green and jade hills, coral roof, nova spark.\nDo not redraw or restyle the logo. Do not add any backdrop or checkerboard pattern. No white, gray, black, colored, paper or textured background. Only the logo artwork should be visible, with actual transparency everywhere else. Keep horizontal 3:1 layout and close crop.",
+      "result": "Alpha extraction request returned RGB with checkerboard. Not retained in repository."
+    },
+    {
+      "source": "exec-2aec992d-89bf-475b-b7b1-a761d5394cf8.png",
+      "inputSource": "exec-4e318237-ba44-4e40-9278-abfe9142a69d.png",
+      "prompt": "Edit this transparent Catanova mark into a complete logo by expanding the canvas horizontally and adding the word Catanova on the right.\nKeep the original transparent alpha background. This must be a cutout logo PNG, with alpha 0 in all empty space, including inside letters. Keep the canvas transparent exactly as in the supplied image.\nThe original mark stays on the left. Add the exact eight-letter word \"Catanova\" beside it: capital C then atanova. The word must have all eight letters and be easy to read.\nPaint the lettering in the same confident sunny fantasy style: broad friendly ivory-gold brush-painted forms, soft flared serifs, gentle organic curves, modest teal-green edge for definition. Joyful and graceful without thick 3D extrusion. The mark is just slightly taller than the text. One line, calm letter spacing. No signboard, subtitle or additional icons.\nOverall composition: horizontal 3:1 logo, with a small even transparent margin. Preserve the clear open gold hexagonal C, coral roof, meadow-green hills, jade foreground and nova spark. Return only this cutout mark-and-word logo with an actual transparent alpha channel.",
+      "result": "Selected lettering design; RGB with checkerboard. Used as edit reference for opaque cream final, not retained in repository."
+    },
+    {
+      "source": "exec-75e6664a-453c-4612-ae2f-c7a10aeb3607.png",
+      "inputSource": "exec-2aec992d-89bf-475b-b7b1-a761d5394cf8.png",
+      "prompt": "Create a transparent-background cutout of the attached Catanova logo. Use a SQUARE canvas. Keep the entire horizontal logo centered within that square canvas, with generous empty transparent space above and below.\nThe image background must be actual transparent alpha, not a drawing of transparency. Remove the gray checkerboard pattern fully from behind the mark, behind the letters, between the letters, and from the holes inside the letters.\nKeep the logo's exact shapes, colors, gold painterly lettering spelling Catanova, left mark, layout and texture intact. Do not change the design. The result is the complete logo on a transparent square canvas.",
+      "result": "Square alpha extraction request also returned RGB with checkerboard. Not retained in repository."
+    }
+  ],
+  "validation": "Viewed generated outputs; confirmed Catanova spelling, PNG modes, dimensions, mark alpha histogram and SHA-256 through read-only Pillow inspection. No browser inspection or raster resizing/repainting was performed. No competitor logos or screenshots were supplied to the generator.",
+  "storage": "Only the two selected source images are retained in app assets. Superseded v1 PNGs remain recoverable from the historical Git commit; failed variants remain outside the repository.",
+  "rightsNote": "Original Catanova identity generation requested; no assertion of exclusive rights or third-party trademark rights."
+}

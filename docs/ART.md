@@ -8,6 +8,8 @@ The current direction is expressive fantasy: exaggerated silhouettes, crooked or
 
 [Title landscape provenance](art/title-provenance.json) records the exact text-only generation prompt, unchanged source filename, dimensions and hash for the coastal title/lobby painting. No reference images were supplied. The saved RGB PNG is byte-for-byte identical to the generated output; titles and controls are separate code-rendered layers.
 
+[Catanova identity](art/logo-concepts/README.md) contains the brighter standalone mark and matching full wordmark, with exact generation prompts and hashes. The landing menu places the cream-backed wordmark on a matching paper surface over the title landscape; the separate mark has transparent alpha.
+
 [Interface provenance](art/interface-provenance.json) records the generated rope-and-wood frame and a rejected icon-atlas experiment. Only the frame is shipped from that generation, as a 3–4 pixel portrait border. Buttons use simple borders and original editable SVG icons in [GameIcons.tsx](../apps/client/src/GameIcons.tsx), without scaled rope artwork. The rejected icon atlas is not part of the browser's assets.
 
 | Current asset                                                        | Dimensions and layout             | Content and use                                                                                                        |
@@ -49,8 +51,8 @@ Resource hand cards combine transparent art, distinct material colors and counts
 
 ## Fonts, icons, and licenses
 
-Interface icons are original SVG shapes in [GameIcons.tsx](../apps/client/src/GameIcons.tsx), with filled silhouettes, ink edges and a shared palette. Rules uses a book; connection uses Wi-Fi arcs with a slashed offline variant; fullscreen has distinct enter and exit shapes. Turn-grouped history reuses action and resource icons. The SVGs are editable repository contributions with no Lucide runtime dependency. Cinzel supplies titles; Barlow supplies controls and number tokens. Both fonts use SIL Open Font License 1.1 and are bundled locally through Fontsource.
+Interface icons are original SVG shapes in [GameIcons.tsx](../apps/client/src/GameIcons.tsx), with filled silhouettes, ink edges and a shared palette. Rules uses a book; connection uses Wi-Fi arcs with a slashed offline variant; fullscreen has distinct enter and exit shapes. Turn-grouped history reuses action and resource icons. Cinzel supplies titles; Barlow supplies controls and number tokens.
 
-Font notices ship with the browser distribution: [Cinzel](../apps/client/public/licenses/cinzel.txt) and [Barlow](../apps/client/public/licenses/barlow.txt). These fonts retain their own licenses. The retained [Lucide notice](../apps/client/public/licenses/lucide.txt) documents the earlier icon set; it does not describe the current interface artwork.
+Font notices ship with the browser distribution: [Cinzel](../apps/client/public/licenses/cinzel.txt) and [Barlow](../apps/client/public/licenses/barlow.txt). Both fonts retain their SIL Open Font License 1.1.
 
 Original repository contributions are distributed under MIT to the extent rights apply. This provenance record asserts no third-party trademark rights or exclusive ownership of generated imagery.

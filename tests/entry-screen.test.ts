@@ -69,19 +69,30 @@ function preview(overrides: Partial<RoomPreview> = {}): RoomPreview {
   return { roomId: 'ABCDEFG2', board: generateBoard(82), players: members, started: false, ...overrides };
 }
 
-test('signed-out entry offers separate Google and guest access before room creation or joining', () => {
+test('the landing menu makes Create and Join the first choices, with authentication after that choice', () => {
   const html = renderEntry();
-  assert.ok(buttonWith(html, 'Continue with Google'));
-  assert.ok(buttonWith(html, 'Play as guest'));
-  assert.ok(!buttonWith(html, 'Create room') && !buttonWith(html, 'Join room'));
+  assert.ok(buttonWith(html, 'Create room') && buttonWith(html, 'Join room'));
+  assert.ok(buttonWith(html, 'Sign in'));
+  assert.ok(!buttonWith(html, 'Continue with Google') && !buttonWith(html, 'Play as guest'));
+  assert.ok(html.includes('aria-label="Catanova"'));
   assert.ok(!html.includes('type="submit"'));
-  const unavailable = renderEntry({ auth: authState({ config: { mode: 'authenticated', auth: null } }) });
+  for (const entry of ['create', 'join'] as const) {
+    const gate = renderEntry({ entry });
+    assert.ok(buttonWith(gate, 'Continue with Google') && buttonWith(gate, 'Play as guest'));
+    assert.ok(!gate.includes('type="submit"'));
+    assert.ok(gate.includes(`<h2>${entry === 'create' ? 'Create room' : 'Join room'}</h2>`));
+  }
+  const unavailable = renderEntry({
+    entry: 'create',
+    auth: authState({ config: { mode: 'authenticated', auth: null } }),
+  });
   assert.ok(buttonWith(unavailable, 'Play as guest')?.includes('disabled=""'));
   assert.ok(buttonWith(unavailable, 'Continue with Google')?.includes('disabled=""'));
 });
 
 test('expired guests get fresh entry choices instead of the unusable retry-account branch', () => {
   const html = renderEntry({
+    entry: 'create',
     auth: authState({ guestExpired: true, user: { id: 'expired' } as Auth['user'] }),
   });
   assert.ok(html.includes('Your guest profile expired.'));

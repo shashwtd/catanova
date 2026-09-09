@@ -32,7 +32,7 @@ export function accountFailure(
   if (['PGRST202', '42883', '42P01', '3F000'].includes(code))
     return new ProtocolError(
       'ACCOUNT_SETUP_REQUIRED',
-      'Apply the Catanova Supabase account migrations, then retry.',
+      'Set up Supabase with supabase/schema.sql, then retry.',
     );
   if (['PGRST301', 'PGRST302', 'bad_jwt'].includes(code))
     return new ProtocolError('AUTH_REQUIRED', messages.AUTH_REQUIRED!);

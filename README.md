@@ -8,6 +8,8 @@ Two-player rooms use the same board, resource supply, building costs, turn flow 
 
 **Status: first playable local build.** The browser game supports setup, dice and production, discards and the robber, building, bank/port and player trades, development cards, Longest Road, Largest Army, and victory. This is an early playtest, not a production service or a certified rules implementation. [Current scope and differences](docs/PLAYTEST.md).
 
+The welcome screen leads with **Create room** and **Join room**, followed by Google or guest access when needed. A brighter [Catanova mark and full wordmark](docs/art/logo-concepts/README.md) sit over the game's own coastal scenery.
+
 ## Play locally
 
 Use **Node.js 24 LTS** or Node 26:
@@ -26,7 +28,7 @@ Two thrown dice settle on the accepted server result, pause for reading, and mov
 
 Trade uses clickable resource cards. Choose an exact return, or post an open **?** offer and accept one opponent's proposed return. Both sides must pay; the server rejects stale offers and commits a completed exchange together. Move history groups icon-based entries by turn. Original SVG controls include a rulebook, Wi-Fi status and distinct enter/exit fullscreen icons; thin rope texture remains on portraits only.
 
-The local URL works on this machine. Other devices currently need an HTTPS proxy/tunnel or the future hosted deployment. [LAN play is proposed](docs/LAN_PROPOSAL.md), with a packaged local host and durable saves; it is not implemented. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
+The local URL works on this machine. Other devices currently need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
 The same application serves the browser and WebSocket endpoint. No separate client deployment or paid cloud service is required for local play. SQLite uses Node's built-in module (experimental in Node 24) and saves into `data/probe.sqlite`, excluded from Git. A restart preserves accepted actions, the board, hands, deck, dice, phases and seats.
 
@@ -57,7 +59,7 @@ node --env-file=.env dist/apps/server/src/index.js
 
 Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits additional exact origins, useful during development.
 
-**Supabase Google/guest accounts, unique usernames and private friends are implemented.** Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google and anonymous sign-ins, enable manual identity linking, and apply the [account migration](supabase/migrations/202609090001_accounts_and_friends.sql) as described in [authentication setup](docs/AUTH.md). Players choose a unique username and a game portrait or verified Google photo before entering a room. Guests expire after seven days of inactivity and can link Google while retaining the same account and username; friends require Google. Opening the same invite can recover an account-owned seat. Applying the migration and completing a real Google sign-in round trip remain deployment checks.
+**Supabase Google/guest accounts, unique usernames and private friends are implemented.** Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google and anonymous sign-ins, enable manual identity linking, and run the [fresh-project account schema](supabase/schema.sql) as described in [authentication setup](docs/AUTH.md). Players choose a unique username and a game portrait or verified Google photo before entering a room. Guests expire after seven days of inactivity and can link Google while retaining the same account and username; friends require Google. Opening the same invite can recover an account-owned seat. Setting up the account schema and completing a real Google sign-in round trip remain deployment checks.
 
 With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Configured guests use Supabase anonymous accounts and the [implemented seven-day guest policy](docs/GUEST_ACCESS.md); local playtest tokens do not reserve global usernames.
 

@@ -8,8 +8,8 @@
 - [x] Two- to four-player invited lobbies, direct invite previews, explicit Create/Join, lobby leave and host transfer.
 - [x] Separate ready-up lobby; saved names and twelve fantasy portraits with a consistent rounded-square border.
 - [x] Supabase Google/anonymous authentication, unique-username onboarding, game/Google portraits and verified account-owned seats.
-- [x] Scoped account/friend Postgres migration with RLS, recipient-owned requests, private search and durable request limits.
-- [x] Seven-day inactive guest expiry, username release, protected match history and same-account Google linking; live migration/callback verification remains pending.
+- [x] Fresh-project account/friend Postgres schema with RLS, recipient-owned requests, private search and durable request limits.
+- [x] Seven-day inactive guest expiry, username release, protected match history and same-account Google linking; live schema/callback verification remains pending.
 - [x] Durable move history grouped by turn with action/resource icons, and rollback snapshot guards.
 - [x] Painted flat board, rugged continuous sea band, bright player pieces and two harbor bridges per port.
 - [x] Original SVG controls, thin portrait frames, player-color banners, stronger points/awards and offline overlays.
@@ -40,7 +40,7 @@
 
 ## Hosted games
 
-Apply the [account migration](AUTH.md) and exercise Google OAuth, anonymous onboarding, manual identity linking and private friend requests on the chosen project. Verify the [implemented guest policy](GUEST_ACCESS.md) against live sessions. Implement and test the production game-state Postgres adapter and its migrations, server ownership/fencing, deployment draining and recovery. Add telemetry without private hands or tokens. Choose regions and budgets using available Azure/Supabase credits, then deploy a controlled internet playtest. Test sleeping devices, mobile networks, database failure and backup restoration separately from normal restart.
+Set up the [account schema](AUTH.md) and exercise Google OAuth, anonymous onboarding, manual identity linking and private friend requests on the chosen project. Verify the [implemented guest policy](GUEST_ACCESS.md) against live sessions. Implement and test the production game-state Postgres adapter and its migrations, server ownership/fencing, deployment draining and recovery. Add telemetry without private hands or tokens. Choose regions and budgets using available Azure/Supabase credits, then deploy a controlled internet playtest. Test sleeping devices, mobile networks, database failure and backup restoration separately from normal restart.
 
 ## Visual and audio polish
 

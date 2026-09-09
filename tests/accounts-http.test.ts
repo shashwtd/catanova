@@ -106,7 +106,7 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   }
   return { server, state, account, headers, request, handshake };
 }
-test('account HTTP API reports missing migrations and denies unregistered/expired admission without creating fallback seats', async (t) => {
+test('account HTTP API reports missing account schema and denies unregistered/expired admission without creating fallback seats', async (t) => {
   const f = await fixture(t);
   f.state.error = 'PGRST202';
   const unavailable = await f.request('/api/account');
