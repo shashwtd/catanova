@@ -15,10 +15,13 @@ test('the production entry is readable before JavaScript and only public pages e
   const guide = await readFile(join(directory, 'guide', 'index.html'), 'utf8');
   const shell = await readFile(join(directory, 'app.html'), 'utf8');
   assert.equal((home.match(/<title>/g) ?? []).length, 1);
-  assert.ok(home.includes('Open-Source Catan Alternative'));
+  assert.ok(home.includes('<title>Catanova — Catan Alternative for Friends</title>'));
+  assert.ok(home.includes('property="og:title" content="Catanova — Catan Alternative for Friends"'));
+  assert.ok(home.includes('name="twitter:title" content="Catanova — Catan Alternative for Friends"'));
   assert.ok(home.includes('Create room') && home.includes('Join room'));
   assert.ok(home.includes('<a href="/guide/">How to play</a>'));
-  assert.ok(home.includes('Catanova is open source.') && home.includes('<noscript>'));
+  assert.ok(home.includes('Open on GitHub') && home.includes('<noscript>'));
+  assert.ok(!home.includes('Catanova is open source.'));
   assert.ok(home.includes('<script type="module" src="/src/main.tsx"></script>'));
   assert.ok(shell.includes('<div id="root"></div>'));
   assert.ok(!shell.includes('Create room') && !shell.includes('Connecting…'));

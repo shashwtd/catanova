@@ -17,6 +17,7 @@ import { useAuth, entryLocation } from './auth.js';
 import { Avatar, ProfileEditor } from './Profile.js';
 import { Lobby, Invite } from './Lobby.js';
 import { EntryScreen } from './EntryScreen.js';
+import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
 import { FriendsPanel } from './FriendsPanel.js';
 import { PlayerRail } from './PlayerRail.js';
@@ -38,7 +39,6 @@ import {
   DoorOpen,
   Dices,
   House,
-  LoaderCircle,
   Maximize,
   Minimize,
   Route,
@@ -623,7 +623,7 @@ function App() {
             className={connected ? 'connected' : 'disconnected'}
             onClick={() => setPanel(panel === 'network' ? null : 'network')}
           >
-            {networkBusy ? <LoaderCircle className="spin" /> : connected ? <Wifi /> : <WifiOff />}
+            {networkBusy ? <GameLoader compact label="Reconnecting…" /> : connected ? <Wifi /> : <WifiOff />}
           </IconButton>
           <IconButton
             label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
@@ -694,8 +694,7 @@ function App() {
         <div className="reconnect-banner" role="status">
           {networkBusy ? (
             <>
-              <LoaderCircle className="spin" />
-              Reconnecting…
+              <GameLoader label="Reconnecting…" />
             </>
           ) : (
             <>

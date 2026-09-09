@@ -90,7 +90,7 @@ test('the landing menu makes Create and Join the first choices, with authenticat
   assert.ok(buttonWith(unavailable, 'Continue with Google')?.includes('disabled=""'));
 });
 
-test('entry offers a branded Google sign-in with its benefit while keeping a full guest action', () => {
+test('entry keeps branded Google and full guest actions without extra login copy', () => {
   const html = renderEntry({
     entry: 'create',
     auth: authState({
@@ -104,10 +104,10 @@ test('entry offers a branded Google sign-in with its benefit while keeping a ful
   const google = buttonWith(html, 'Continue with Google')!;
   const guest = buttonWith(html, 'Play as guest')!;
   assert.ok(google.includes('src="/art/providers/google-g.png"'));
-  assert.ok(google.includes('aria-describedby="google-benefits"'));
-  assert.ok(html.includes('Keep your profile and add friends.'));
+  assert.ok(!google.includes('aria-describedby="google-benefits"'));
+  assert.ok(!html.includes('Keep your profile and add friends.'));
   assert.ok(!google.includes('disabled=""') && !guest.includes('disabled=""'));
-  assert.ok(guest.includes('guest-button'));
+  assert.ok(guest.includes('dark-button guest-button'));
   assert.ok(html.indexOf(google) < html.indexOf(guest));
   assert.ok(!html.includes('google-letter') && !html.includes('captcha-check-widget'));
   assert.ok(html.includes('Guests expire after 7 days of inactivity.'));
@@ -116,13 +116,35 @@ test('entry offers a branded Google sign-in with its benefit while keeping a ful
 test('the landing footer provides crawlable guidance and an explicit external GitHub repository link', () => {
   const html = renderEntry();
   assert.ok(html.includes('<a href="/guide/">How to play</a>'));
-  assert.ok(html.includes('Catanova is open source.'));
+  assert.ok(!html.includes('Catanova is open source.'));
   assert.match(
     html,
     /<a href="https:\/\/github\.com\/shashwtd\/catanova" target="_blank" rel="noopener noreferrer">/,
   );
   assert.ok(html.includes('src="/art/providers/github-invertocat-white.svg"'));
-  assert.ok(html.includes('Explore on GitHub'));
+  assert.ok(html.includes('Open on GitHub'));
+});
+
+test('the small island loader appears only for pending connection or room work and exposes its status', () => {
+  assert.ok(!renderEntry().includes('game-loader'));
+  for (const entry of ['home', 'create'] as const) {
+    const html = renderEntry({ entry, auth: authState({ loading: true }) });
+    assert.ok(html.includes('game-loader-island'));
+    assert.ok(html.includes('role="status" aria-label="Connecting…" aria-atomic="true"'));
+    assert.ok(!html.includes('class="spin"'));
+  }
+  const opening = renderEntry({ busy: true, auth: authState({ canPlay: true }) });
+  assert.ok(opening.includes('aria-label="Opening room…"'));
+  const creating = renderEntry({ entry: 'create', busy: true, auth: authState({ canPlay: true }) });
+  assert.ok(buttonWith(creating, 'Create room')?.includes('aria-label="Creating room…"'));
+  const waiting = renderEntry({
+    entry: 'invite',
+    previewLoading: true,
+    auth: authState({ canPlay: true }),
+  });
+  assert.ok(buttonWith(waiting, 'Join room')?.includes('aria-label="Loading room…"'));
+  const ready = renderEntry({ entry: 'create', auth: authState({ canPlay: true }) });
+  assert.ok(!ready.includes('game-loader'));
 });
 
 test('expired guests get fresh entry choices instead of the unusable retry-account branch', () => {

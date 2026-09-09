@@ -428,6 +428,5 @@ export const Dices = icon('dice'),
   Share2 = icon('share'),
   RefreshCw = icon('refresh'),
   Activity = icon('activity'),
-  LoaderCircle = icon('timer'),
   Sparkles = icon('spark'),
   Sailboat = icon('boat');

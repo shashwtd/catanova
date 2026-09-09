@@ -2,10 +2,11 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { BrandLogo } from './BrandLogo.js';
 import { GitHubMark, GoogleMark } from './ProviderMarks.js';
+import { GameLoader } from './GameLoader.js';
 import { rememberEntryIntent } from './entry-intent.js';
 import { Turnstile } from './Turnstile.js';
 import type { RoomPreview, Session } from '../../../packages/protocol/src/index.js';
-import { ArrowLeft, ArrowRight, LoaderCircle, LogOut, Plus, Settings2, Users } from './GameIcons.js';
+import { ArrowLeft, ArrowRight, LogOut, Plus, Settings2, Users } from './GameIcons.js';
 import { Avatar } from './Profile.js';
 import { AccountSetup } from './AccountSetup.js';
 import { InviteRoster } from './Lobby.js';
@@ -161,18 +162,17 @@ export function EntryScreen({
                   <ArrowRight size={17} />
                 </button>
               )}
-              {auth.loading && (
-                <span className="landing-loading" role="status">
-                  <LoaderCircle className="spin" size={15} />
-                  Connecting…
-                </span>
+              {(auth.loading || busy) && (
+                <GameLoader
+                  className="landing-loading"
+                  label={auth.loading ? 'Connecting…' : 'Opening room…'}
+                />
               )}
               {local && <span className="local-mode">Local playtest</span>}
             </>
           ) : auth.loading ? (
-            <div className="menu-loading" role="status">
-              <LoaderCircle className="spin" />
-              <span>Connecting…</span>
+            <div className="menu-loading">
+              <GameLoader />
             </div>
           ) : auth.needsOnboarding ? (
             <AccountSetup auth={auth} />
@@ -194,7 +194,7 @@ export function EntryScreen({
               )}
               {guestCheck && (!auth.user || auth.guestExpired) && auth.config?.captcha?.siteKey ? (
                 <div className="guest-check">
-                  <p>One quick check to play as a guest.</p>
+                  <p>Verify to play as a guest.</p>
                   {auth.error ? (
                     <button className="dark-button" onClick={auth.clearError}>
                       Retry check
@@ -213,21 +213,11 @@ export function EntryScreen({
                 </button>
               ) : (
                 <>
-                  {auth.guestExpired && (
-                    <p className="account-note">Your guest profile expired. Start fresh or sign in.</p>
-                  )}
-                  <button
-                    className="google-button"
-                    disabled={!auth.config?.auth}
-                    onClick={googleSignIn}
-                    aria-describedby="google-benefits"
-                  >
+                  {auth.guestExpired && <p className="account-note">Your guest profile expired.</p>}
+                  <button className="google-button" disabled={!auth.config?.auth} onClick={googleSignIn}>
                     <GoogleMark />
                     Continue with Google
                   </button>
-                  <p className="google-benefits" id="google-benefits">
-                    Keep your profile and add friends.
-                  </p>
                   <button
                     className="dark-button guest-button"
                     disabled={!auth.config?.auth}
@@ -306,7 +296,16 @@ export function EntryScreen({
                       disabled={busy || (entry === 'invite' && (previewLoading || !previewRoom))}
                     >
                       {busy || (entry === 'invite' && previewLoading) ? (
-                        <LoaderCircle className="spin" />
+                        <GameLoader
+                          compact
+                          label={
+                            previewLoading
+                              ? 'Loading room…'
+                              : entry === 'create'
+                                ? 'Creating room…'
+                                : 'Joining room…'
+                          }
+                        />
                       ) : entry === 'create' ? (
                         <Plus />
                       ) : (
@@ -323,13 +322,10 @@ export function EntryScreen({
       </div>
       <footer className="landing-footer">
         <a href="/guide/">How to play</a>
-        <p>
-          <span>Catanova is open source.</span>
-          <a href="https://github.com/shashwtd/catanova" target="_blank" rel="noopener noreferrer">
-            <GitHubMark />
-            Explore on GitHub
-          </a>
-        </p>
+        <a href="https://github.com/shashwtd/catanova" target="_blank" rel="noopener noreferrer">
+          <GitHubMark />
+          Open on GitHub
+        </a>
       </footer>
     </div>
   );

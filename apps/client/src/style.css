@@ -1331,9 +1331,6 @@ svg.game-icon {
 .game-dialog .dark-button {
   font-size: 12px;
 }
-.spin {
-  animation: spin 1s linear infinite;
-}
 .producing .number-token circle {
   animation: harvest-glow 700ms ease-out 2;
 }
@@ -1342,11 +1339,6 @@ svg.game-icon {
 }
 .die.rolled {
   animation: dice-arrive 500ms var(--ease-smooth-out);
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 @keyframes harvest-glow {
   0%,
@@ -1853,9 +1845,6 @@ svg.game-icon {
   .die.rolled,
   .producing .number-token circle {
     animation: none !important;
-  }
-  .spin {
-    animation: none;
   }
   .game-dialog::backdrop {
     backdrop-filter: none;

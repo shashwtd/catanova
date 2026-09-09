@@ -10,7 +10,7 @@ export const REPOSITORY_URL = 'https://github.com/shashwtd/catanova';
 export const PUBLIC_PAGES = [
   {
     path: '/',
-    title: 'Catanova — Open-Source Catan Alternative for Friends',
+    title: 'Catanova — Catan Alternative for Friends',
     description:
       'Build, trade and settle an island with friends. Catanova is an open-source Catan-style browser game for 2–4 players, with private rooms and recoverable multiplayer.',
   },
@@ -340,7 +340,7 @@ export function PublicGuide() {
           </section>
           <footer className="guide-footer">
             <p>
-              Made for playing together. <a href={REPOSITORY_URL}>Explore Catanova on GitHub</a>.
+              Made for playing together. <a href={REPOSITORY_URL}>Open on GitHub</a>.
             </p>
             <small>
               Catanova is an independent, unofficial project, unaffiliated with CATAN’s owners. CATAN is a

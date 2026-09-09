@@ -24,6 +24,80 @@
     sans-serif;
 }
 
+/* Compact matrix-loader motion from transitions-dev, with a small island treatment below. */
+:root {
+  --matrix-cycle: 1200ms;
+  --matrix-base: #d9d9d9;
+  --matrix-active: #85858f;
+  --matrix-ease: ease-in-out;
+}
+.t-matrix {
+  display: grid;
+  grid-template-columns: repeat(4, 2px);
+  grid-auto-rows: 2px;
+  gap: 2px;
+}
+.t-matrix i {
+  display: block;
+  background: var(--matrix-base);
+  animation: t-matrix-pulse var(--matrix-cycle) var(--matrix-ease) infinite;
+  animation-delay: calc(var(--d, 0) * 1ms);
+}
+/* Hole positions (rounded variants) render nothing. */
+.t-matrix i.is-gap {
+  visibility: hidden;
+  animation: none;
+}
+@keyframes t-matrix-pulse {
+  0%,
+  45%,
+  100% {
+    background-color: var(--matrix-base);
+  }
+  15% {
+    background-color: var(--matrix-active);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-matrix i {
+    animation: none !important;
+  }
+}
+
+.game-loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  vertical-align: middle;
+}
+.game-loader-island.t-matrix {
+  flex: none;
+  grid-template-columns: repeat(4, 5px);
+  grid-auto-rows: 6px;
+  gap: 1px;
+  --matrix-base: #709463;
+  --matrix-active: #f5d391;
+}
+.game-loader-island i {
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  /* Three short scans, then rest. No timers, request loops or permanent spinning. */
+  animation-iteration-count: 3;
+  animation-delay: calc(var(--column) * var(--matrix-cycle) / 10);
+}
+.game-loader-island i:nth-child(3n) {
+  --matrix-base: #d3a355;
+}
+.game-loader-island i:nth-child(4n) {
+  --matrix-base: #c47c57;
+}
+.game-loader-island i:nth-child(5n) {
+  --matrix-base: #688f94;
+}
+[data-motion='reduced'] .game-loader-island i {
+  animation: none;
+}
+
 /* The entry is a small play menu set into our own illustrated island. */
 .entry-world .title-scenery {
   background:
@@ -162,7 +236,7 @@
     0 5px 8px #42604326;
 }
 .landing-screen .landing-panel .google-button {
-  min-height: 56px;
+  min-height: 54px;
   padding: 12px;
   gap: 10px;
   background: #fff;
@@ -171,30 +245,17 @@
   font:
     500 16px/20px 'Google Sans',
     sans-serif;
-  box-shadow: 0 2px 6px #3846361a;
+  box-shadow:
+    0 3px 0 #ac884b,
+    0 5px 8px #99794326;
 }
 .landing-screen .landing-panel .google-button:hover:not(:disabled),
 .friends-panel .google-button:hover:not(:disabled) {
   background: #f8faff;
   border-color: #4a5a6b;
 }
-.landing-panel .google-benefits {
-  margin: 10px 0 22px;
-  color: #52634b;
-  text-align: center;
-  font-size: 14px;
-}
 .landing-screen .landing-panel .dark-button.guest-button {
-  min-height: 52px;
-  margin-top: 0;
-  color: #43553e;
-  border: 1px solid #8a977b;
-  background: #eee7d0;
-  box-shadow: inset 0 1px #fff7e4;
-}
-.landing-screen .landing-panel .dark-button.guest-button:hover:not(:disabled) {
-  background: #e3e1c6;
-  border-color: #677f61;
+  margin-top: 14px;
 }
 .landing-screen .landing-panel button:focus-visible,
 .landing-sign-in:focus-visible {
@@ -314,15 +375,6 @@
   backdrop-filter: blur(8px);
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 48%);
   mask-image: linear-gradient(180deg, transparent, #000 48%);
-}
-.landing-footer p {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 4px 8px;
-  margin: 0;
-  font: inherit;
 }
 .landing-footer a {
   display: inline-flex;

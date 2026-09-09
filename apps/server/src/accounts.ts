@@ -30,10 +30,7 @@ export function accountFailure(
   fallback = 'Account service unavailable; try again',
 ): ProtocolError {
   if (['PGRST202', '42883', '42P01', '3F000'].includes(code))
-    return new ProtocolError(
-      'ACCOUNT_SETUP_REQUIRED',
-      'Set up Supabase with supabase/schema.sql, then retry.',
-    );
+    return new ProtocolError('ACCOUNT_SETUP_REQUIRED', 'Accounts are not ready yet. Please try again later.');
   if (['PGRST301', 'PGRST302', 'bad_jwt'].includes(code))
     return new ProtocolError('AUTH_REQUIRED', messages.AUTH_REQUIRED!);
   return new ProtocolError(messages[code] ? code : 'ACCOUNT_UNAVAILABLE', messages[code] ?? fallback);

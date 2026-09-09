@@ -111,7 +111,9 @@ test('account HTTP API reports missing account schema and denies unregistered/ex
   f.state.error = 'PGRST202';
   const unavailable = await f.request('/api/account');
   assert.equal(unavailable.status, 503);
-  assert.equal((await unavailable.json()).code, 'ACCOUNT_SETUP_REQUIRED');
+  const failure = await unavailable.json();
+  assert.equal(failure.code, 'ACCOUNT_SETUP_REQUIRED');
+  assert.ok(!JSON.stringify(failure).includes('schema.sql'));
   assert.equal((await f.handshake()).code, 'ACCOUNT_SETUP_REQUIRED');
   f.state.error = '';
   f.account.registered = false;
