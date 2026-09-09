@@ -1,3 +1,4 @@
+import { readyLobby } from './helpers.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -54,12 +55,12 @@ test('invite previews expose the exact persisted board without private game stat
   assert.equal(before.started, false);
   assert.equal(before.players.length, 3);
   assert.deepEqual(Object.keys(before).sort(), ['board', 'players', 'roomId', 'started']);
-  assert.deepEqual(Object.keys(before.players[0]!).sort(), ['id', 'name']);
+  assert.deepEqual(Object.keys(before.players[0]!).sort(), ['id', 'name', 'profile', 'ready']);
   assert.ok(!JSON.stringify(before).includes(s.token));
   await server.close();
   server = await startServer({ port: 0, databasePath: path });
   assert.deepEqual(await preview(), before);
-  server.store.action(host, 'start-from-preview', 0, { kind: 'start' });
+  server.store.action(host, 'start-from-preview', readyLobby(server.store, host.room_id), { kind: 'start' });
   const game = server.store.loadGame(host.room_id)!;
   assert.deepEqual(game.board, before.board);
   const during = await preview();
@@ -102,7 +103,7 @@ test('lobby leave frees capacity, transfers hosting and revokes the old seat wit
   const newSeat = newSession('Replacement');
   store.enter('join', newSeat.token, newSeat.name, host.room_id);
   assert.equal(store.snapshot(host.room_id).players.length, 4);
-  store.action(seats[1]!, 'new-host-starts', 2, { kind: 'start' });
+  store.action(seats[1]!, 'new-host-starts', readyLobby(store, host.room_id), { kind: 'start' });
   assert.deepEqual(store.loadGame(host.room_id)!.board, board);
   assert.equal(
     store.loadGame(host.room_id)!.players.some((p) => p.id === host.id),
@@ -152,6 +153,8 @@ test('intentional leave stops reconnecting; active-game seats and state remain r
   await connect('Second', host.session.roomId);
   await connect('Third', host.session.roomId);
   await until(() => host.state?.players.length === 3);
+  for (const c of clients.filter((c) => c.session.roomId === host.session.roomId)) await c.lobby(true);
+  await until(() => host.state!.players.every((p) => p.ready));
   await host.action({ kind: 'start' });
   await until(() => !!host.state?.game);
   const saved = structuredClone(server.store.loadGame(host.session.roomId!)!);

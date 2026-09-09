@@ -1,3 +1,6 @@
+import { createVerifier, readAuthConfig } from './auth.js';
+import type { AuthConfig, Identity, VerifyIdentity } from './auth.js';
+import { parseProfile } from '../../../packages/protocol/src/profile.js';
 import { createServer } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseClientMessage, PROTOCOL_VERSION } from '../../../packages/protocol/src/index.js';
@@ -15,14 +18,45 @@ export async function startServer(
     allowedOrigins?: string[];
     heartbeatMs?: number;
     clientDirectory?: string;
+    auth?: AuthConfig | null;
+    verifyIdentity?: VerifyIdentity;
   } = {},
 ) {
+  const auth = options.auth === null ? undefined : (options.auth ?? readAuthConfig());
+  const verify = options.verifyIdentity ?? (auth ? createVerifier(auth) : undefined);
   const store = new Store(options.databasePath ?? 'data/probe.sqlite');
   let closing = false;
-  const http = createServer((request, response) => {
+  const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
     response.setHeader('Cache-Control', 'no-store');
-    if (request.method === 'GET' && request.url === '/healthz') {
+    if (request.method === 'GET' && request.url === '/api/config') {
+      response
+        .writeHead(200)
+        .end(JSON.stringify({ auth: auth ?? null, mode: verify ? 'authenticated' : 'local' }));
+    } else if (request.url === '/api/profile') {
+      try {
+        if (!verify) throw new ProtocolError('AUTH_REQUIRED', 'Google sign-in is not configured');
+        const authorization = request.headers.authorization;
+        const identity = await verify(
+          authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined,
+        );
+        if (request.method === 'GET')
+          response.writeHead(200).end(JSON.stringify(store.profile(identity.id, identity.name)));
+        else if (request.method === 'PUT') {
+          let body = '';
+          for await (const chunk of request) {
+            body += String(chunk);
+            if (body.length > 4096) throw new Error('Profile too large');
+          }
+          const profile = store.saveProfile(identity.id, parseProfile(JSON.parse(body)));
+          response.writeHead(200).end(JSON.stringify(profile));
+        } else response.writeHead(405).end();
+      } catch (error) {
+        response
+          .writeHead(error instanceof ProtocolError ? (error.code === 'AUTH_UNAVAILABLE' ? 503 : 401) : 400)
+          .end(JSON.stringify({ error: error instanceof ProtocolError ? error.message : 'Invalid profile' }));
+      }
+    } else if (request.method === 'GET' && request.url === '/healthz') {
       try {
         store.db.prepare('SELECT 1').get();
         response.writeHead(closing ? 503 : 200).end(
@@ -38,7 +72,17 @@ export async function startServer(
     } else if (request.method === 'GET' && /^\/api\/rooms\/[A-Z2-9]{8}$/.test(request.url ?? '')) {
       try {
         const preview = store.preview(request.url!.split('/').pop()!);
-        response.writeHead(200).end(JSON.stringify(preview));
+        const authorization = request.headers.authorization;
+        const identity =
+          verify && authorization?.startsWith('Bearer ') ? await verify(authorization.slice(7)) : undefined;
+        response
+          .writeHead(200)
+          .end(
+            JSON.stringify({
+              ...preview,
+              ...(identity ? { canResume: store.hasAccountSeat(preview.roomId, identity.id) } : {}),
+            }),
+          );
       } catch (error) {
         response
           .writeHead(error instanceof ProtocolError && error.code === 'ROOM_NOT_FOUND' ? 404 : 503)
@@ -47,10 +91,10 @@ export async function startServer(
           );
       }
     } else {
-      void serveClient(request, response, options.clientDirectory ?? 'dist/client');
+      void serveClient(request, response, options.clientDirectory ?? 'dist/client', auth?.url);
     }
   });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, perMessageDeflate: false });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 24576, perMessageDeflate: false });
   const sessions = new Map<WebSocket, Seat>();
   const activeSeats = new Map<string, WebSocket>();
   const alive = new Set<WebSocket>();
@@ -74,8 +118,18 @@ export async function startServer(
   }
   function broadcast(roomId: string) {
     if (closing) return;
-    for (const [ws, seat] of sessions)
-      if (seat.room_id === roomId) send(ws, { type: 'state', state: snapshot(roomId, seat.id) });
+    for (const [ws, seat] of sessions) {
+      if (seat.room_id !== roomId) continue;
+      try {
+        send(ws, { type: 'state', state: snapshot(roomId, seat.id) });
+      } catch (error) {
+        send(ws, {
+          type: 'error',
+          code: error instanceof ProtocolError ? error.code : 'STORAGE_ERROR',
+          message: 'Saved game unavailable; reconnect after recovery',
+        });
+      }
+    }
   }
   http.on('upgrade', (request, socket, head) => {
     const origin = request.headers.origin;
@@ -99,11 +153,13 @@ export async function startServer(
     ws.on('pong', () => alive.add(ws));
     const handshakeTimeout = setTimeout(() => {
       if (!sessions.has(ws)) ws.close(1008, 'Join a room first');
-    }, 5000);
+    }, 12000);
     handshakeTimeout.unref();
     let windowStart = Date.now();
     let messages = 0;
-    ws.on('message', (data, isBinary) => {
+    let authenticating = false;
+    let authExpiry: ReturnType<typeof setTimeout> | undefined;
+    ws.on('message', async (data, isBinary) => {
       let commandId: string | undefined;
       try {
         if (Date.now() - windowStart > 1000) {
@@ -118,7 +174,30 @@ export async function startServer(
         const message = parseClientMessage(data.toString());
         if (message.type === 'create' || message.type === 'join' || message.type === 'resume') {
           if (sessions.has(ws)) throw new ProtocolError('ALREADY_JOINED', 'Socket already has a seat');
-          const seat = store.enter(message.type, message.token, message.name, message.roomId);
+          if (authenticating) throw new ProtocolError('ALREADY_JOINING', 'Joining is already in progress');
+          authenticating = true;
+          let identity: Identity | undefined;
+          try {
+            identity = verify ? await verify(message.accessToken) : undefined;
+          } finally {
+            authenticating = false;
+          }
+          if (ws.readyState !== WebSocket.OPEN) return;
+          const seat = store.enter(
+            message.type,
+            message.token,
+            message.name,
+            message.roomId,
+            identity,
+            message.profile,
+          );
+          if (identity) {
+            authExpiry = setTimeout(
+              () => ws.close(4003, 'Refresh account session'),
+              Math.max(1, Math.min(2147483647, identity.expiresAt - Date.now())),
+            );
+            authExpiry.unref();
+          }
           const oldSocket = activeSeats.get(seat.id);
           if (oldSocket && oldSocket !== ws) {
             // Revoke immediately, before asynchronous close, so the replaced socket cannot act.
@@ -139,7 +218,34 @@ export async function startServer(
           const seat = sessions.get(ws);
           if (!seat) throw new ProtocolError('NOT_JOINED', 'Join or resume before sending actions');
           if (message.type === 'ping') {
-            send(ws, { type: 'pong', nonce: message.nonce });
+            const revision = store.db.prepare('SELECT revision FROM rooms WHERE id = ?').get(seat.room_id)!
+              .revision as number;
+            send(ws, { type: 'pong', nonce: message.nonce, revision });
+            return;
+          }
+          if (message.type === 'sync') {
+            send(ws, { type: 'state', state: snapshot(seat.room_id, seat.id) });
+            return;
+          }
+          if (message.type === 'history') {
+            send(ws, {
+              type: 'history',
+              ...store.history(seat.room_id, message.before),
+              ...(message.before === undefined ? {} : { before: message.before }),
+            });
+            return;
+          }
+          if (message.type === 'lobby') {
+            commandId = message.commandId;
+            const receipt = store.lobby(
+              seat,
+              commandId,
+              message.expectedRevision,
+              message.ready,
+              message.profile,
+            );
+            send(ws, { type: 'ack', commandId, ...receipt });
+            broadcast(seat.room_id);
             return;
           }
           if (message.type === 'leave') {
@@ -155,6 +261,15 @@ export async function startServer(
           if (message.type !== 'increment' && message.type !== 'action')
             throw new ProtocolError('INVALID_MESSAGE', 'Unknown action');
           commandId = message.commandId;
+          if (
+            message.type === 'action' &&
+            message.action.kind === 'start' &&
+            !store.loadGame(seat.room_id) &&
+            !store
+              .snapshot(seat.room_id)
+              .players.every((p) => activeSeats.get(p.id)?.readyState === WebSocket.OPEN)
+          )
+            throw new ProtocolError('NOT_CONNECTED', 'Wait for every player to reconnect');
           const receipt =
             message.type === 'action'
               ? store.action(seat, message.commandId, message.expectedRevision, message.action)
@@ -188,6 +303,7 @@ export async function startServer(
     });
     ws.on('close', () => {
       clearTimeout(handshakeTimeout);
+      clearTimeout(authExpiry);
       alive.delete(ws);
       const seat = sessions.get(ws);
       sessions.delete(ws);

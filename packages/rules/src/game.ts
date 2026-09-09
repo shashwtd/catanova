@@ -183,10 +183,11 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       const resource = g.board.hexes[id]!.terrain;
       if (resource !== 'desert') { p.hand[resource]++; g.bank[resource]--; }
     }
-    log(g, `${p.name} placed a starting settlement.`); return g;
+    log(g, `${p.name} placed a starting settlement at corner ${a.vertex + 1}.`); return g;
   }
   if (g.phase === 'setupRoad') {
     requireRule(a.kind === 'road' && roadSites(g, p.id, g.setupVertex).includes(a.edge), 'Place a road touching your new settlement');
+    log(g, `${p.name} placed a starting road on edge ${a.edge + 1}.`);
     g.roads[a.edge] = p.id; g.setupIndex++; g.setupVertex = null;
     if (g.setupIndex === g.players.length * 2) { g.phase = 'roll'; g.active = 0; g.turn = 1; log(g, 'Setup complete. Roll the dice to begin.'); }
     else { g.active = g.setupIndex < g.players.length ? g.setupIndex : g.players.length * 2 - 1 - g.setupIndex; g.phase = 'setupSettlement'; }
@@ -207,7 +208,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   }
   if (a.kind === 'road' && g.phase === 'freeRoads') {
     requireRule(owned.roads < 15 && roadSites(g, p.id).includes(a.edge), 'Choose a legal road site');
-    g.roads[a.edge] = p.id; g.freeRoads--; finishFreeRoads(g); updateAwards(g); checkWin(g); log(g, `${p.name} built a free road.`); return g;
+    g.roads[a.edge] = p.id; g.freeRoads--; finishFreeRoads(g); updateAwards(g); checkWin(g); log(g, `${p.name} built a free road on edge ${a.edge + 1}.`); return g;
   }
   if (a.kind === 'playCard') {
     requireRule(g.phase === 'roll' || g.phase === 'actions', 'Finish the current action first');
@@ -235,7 +236,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   if (a.kind === 'roll') {
     requireRule(g.phase === 'roll', 'You have already rolled or must finish the current action');
     g.dice = [1 + Math.floor(random() * 6), 1 + Math.floor(random() * 6)];
-    const sum = g.dice[0] + g.dice[1]; log(g, `${p.name} rolled ${sum}.`);
+    const sum = g.dice[0] + g.dice[1]; log(g, `${p.name} rolled ${g.dice[0]} + ${g.dice[1]} = ${sum}.`);
     if (sum === 7) {
       g.discards = Object.fromEntries(g.players.filter(other => total(other.hand) > 7).map(other => [other.id, Math.floor(total(other.hand) / 2)]));
       g.returnPhase = 'actions'; g.phase = Object.keys(g.discards).length ? 'discard' : 'robber';
@@ -247,11 +248,11 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   if (a.kind !== 'offerTrade') g.trade = null;
   switch (a.kind) {
     case 'road':
-      requireRule(owned.roads < 15 && roadSites(g, p.id).includes(a.edge), 'Choose a legal road site'); transfer(p.hand, g.bank, COSTS.road); g.roads[a.edge] = p.id; log(g, `${p.name} built a road.`); break;
+      requireRule(owned.roads < 15 && roadSites(g, p.id).includes(a.edge), 'Choose a legal road site'); transfer(p.hand, g.bank, COSTS.road); g.roads[a.edge] = p.id; log(g, `${p.name} built a road on edge ${a.edge + 1}.`); break;
     case 'settlement':
-      requireRule(owned.settlements < 5 && settlementSites(g, p.id).includes(a.vertex), 'Choose a legal settlement site'); transfer(p.hand, g.bank, COSTS.settlement); g.buildings[a.vertex] = { player: p.id, kind: 'settlement' }; log(g, `${p.name} built a settlement.`); break;
+      requireRule(owned.settlements < 5 && settlementSites(g, p.id).includes(a.vertex), 'Choose a legal settlement site'); transfer(p.hand, g.bank, COSTS.settlement); g.buildings[a.vertex] = { player: p.id, kind: 'settlement' }; log(g, `${p.name} built a settlement at corner ${a.vertex + 1}.`); break;
     case 'city':
-      requireRule(owned.cities < 4 && g.buildings[a.vertex]?.player === p.id && g.buildings[a.vertex]?.kind === 'settlement', 'Upgrade one of your settlements'); transfer(p.hand, g.bank, COSTS.city); g.buildings[a.vertex]!.kind = 'city'; log(g, `${p.name} built a city.`); break;
+      requireRule(owned.cities < 4 && g.buildings[a.vertex]?.player === p.id && g.buildings[a.vertex]?.kind === 'settlement', 'Upgrade one of your settlements'); transfer(p.hand, g.bank, COSTS.city); g.buildings[a.vertex]!.kind = 'city'; log(g, `${p.name} built a city at corner ${a.vertex + 1}.`); break;
     case 'buyCard':
       requireRule(g.deck.length > 0, 'The development deck is empty'); transfer(p.hand, g.bank, COSTS.developmentCard); p.cards.push({ id: `card-${g.nextCard++}`, kind: g.deck.pop()!, boughtTurn: g.turn }); log(g, `${p.name} bought a development card.`); break;
     case 'bankTrade': {
@@ -263,8 +264,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     case 'offerTrade':
       requireRule(total(a.give) > 0 && total(a.want) > 0 && RESOURCES.every(r => !a.give[r] || !a.want[r]), 'Both sides must offer cards, with no resource on both sides');
       requireRule(canPay(p.hand, a.give), 'You do not have the offered cards');
-      g.trade = { id: g.nextTrade++, player: p.id, give: a.give, want: a.want }; break;
-    case 'cancelTrade': break;
+      g.trade = { id: g.nextTrade++, player: p.id, give: a.give, want: a.want }; log(g, `${p.name} offered ${resourceText(a.give)} for ${resourceText(a.want)}.`); break;
+    case 'cancelTrade': log(g, `${p.name} withdrew the trade offer.`); break;
     case 'endTurn':
       g.active = (g.active + 1) % g.players.length; g.turn++; g.phase = 'roll'; g.dice = null; g.playedCard = false; log(g, `${activePlayer(g).name}'s turn.`); break;
     default: throw new RuleError('That action is unavailable');

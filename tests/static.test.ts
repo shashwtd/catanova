@@ -15,7 +15,8 @@ test('one server serves client assets and same-origin WebSockets without exposin
   await writeFile(join(client, 'assets', 'game-123.js'), 'export const game = true;');
   await writeFile(join(client, 'assets', 'font-123.woff2'), 'test font');
   await writeFile(join(dir, 'private.txt'), 'must remain private');
-  const server = await startServer({ port: 0, databasePath: ':memory:', clientDirectory: client });
+  const auth = { url: 'https://configured-project.supabase.co', publishableKey: 'sb_publishable_test' };
+  const server = await startServer({ port: 0, databasePath: ':memory:', clientDirectory: client, auth });
   t.after(async () => {
     await server.close();
     await rm(dir, { recursive: true, force: true });
@@ -25,8 +26,11 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Catanova/);
   assert.match(response.headers.get('content-security-policy')!, /frame-ancestors 'none'/);
+  assert.ok(response.headers.get('content-security-policy')!.includes(auth.url));
+  const config = await fetch(origin + '/api/config');
+  assert.deepEqual(await config.json(), { auth, mode: 'authenticated' });
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-  for (const path of ['/room/ABCD2345', '/room/abcd2345/']) {
+  for (const path of ['/room/ABCD2345', '/room/abcd2345/', '/auth/callback']) {
     const invitation = await fetch(origin + path);
     assert.equal(invitation.status, 200);
     assert.match(await invitation.text(), /Catanova/);
@@ -37,6 +41,9 @@ test('one server serves client assets and same-origin WebSockets without exposin
   const asset = await fetch(`${origin}/assets/game-123.js`);
   assert.match(asset.headers.get('cache-control')!, /immutable/);
   assert.match(asset.headers.get('content-type')!, /javascript/);
+  const cached = await fetch(origin, { headers: { 'If-None-Match': response.headers.get('etag')! } });
+  assert.equal(cached.status, 304);
+  assert.equal(await cached.text(), '');
   for (const path of [
     '/..%2fprivate.txt',
     '/%2e%2e/private.txt',

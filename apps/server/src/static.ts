@@ -11,11 +11,17 @@ const types: Record<string, string> = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
 };
 /** Same-origin distribution. Only the built client directory is ever exposed. */
-export async function serveClient(request: IncomingMessage, response: ServerResponse, directory: string) {
+export async function serveClient(
+  request: IncomingMessage,
+  response: ServerResponse,
+  directory: string,
+  authOrigin?: string,
+) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     response.writeHead(405).end();
     return;
@@ -28,7 +34,10 @@ export async function serveClient(request: IncomingMessage, response: ServerResp
     return;
   }
   const root = resolve(directory),
-    file = resolve(root, `.${path === '/' || /^\/room\/[A-Z2-9]{8}\/?$/i.test(path) ? '/index.html' : path}`);
+    file = resolve(
+      root,
+      `.${path === '/' || path === '/auth/callback' || /^\/room\/[A-Z2-9]{8}\/?$/i.test(path) ? '/index.html' : path}`,
+    );
   if (!file.startsWith(root + sep)) {
     response.writeHead(403).end();
     return;
@@ -45,12 +54,24 @@ export async function serveClient(request: IncomingMessage, response: ServerResp
     response.setHeader('Referrer-Policy', 'same-origin');
     response.setHeader(
       'Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:${authOrigin ? ' ' + new URL(authOrigin).origin : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
     );
     response.setHeader(
       'Cache-Control',
       path.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
     );
+    const etag = `W/"${info.size.toString(16)}-${info.mtimeMs.toString(16)}"`;
+    response.setHeader('ETag', etag);
+    if (
+      request.headers['if-none-match']
+        ?.split(',')
+        .map((tag) => tag.trim())
+        .includes(etag)
+    ) {
+      response.removeHeader('Content-Length');
+      response.writeHead(304).end();
+      return;
+    }
     response.writeHead(200);
     if (request.method === 'HEAD') {
       response.end();

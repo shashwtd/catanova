@@ -7,6 +7,8 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       DATABASE_PATH: /app/data/probe.sqlite
+      # Loopback-only development. Public hosts must configure Supabase instead.
+      ALLOW_LOCAL_PLAYTEST: "true"
     volumes:
       - catanova-data:/app/data
     restart: unless-stopped
