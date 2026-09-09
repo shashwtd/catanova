@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { BrandLogo } from './BrandLogo.js';
+import { GitHubMark, GoogleMark } from './ProviderMarks.js';
 import { rememberEntryIntent } from './entry-intent.js';
 import { Turnstile } from './Turnstile.js';
 import type { RoomPreview, Session } from '../../../packages/protocol/src/index.js';
@@ -35,7 +36,6 @@ export function EntryScreen({
   onFriends,
   onSettings,
   onSignOut,
-  onRules,
 }: {
   auth: Auth;
   entry: 'home' | 'create' | 'join' | 'invite';
@@ -59,7 +59,6 @@ export function EntryScreen({
   onFriends: () => void;
   onSettings: () => void;
   onSignOut: () => void;
-  onRules?: () => void;
 }) {
   const [signInOpen, setSignInOpen] = useState(false);
   const [guestCheck, setGuestCheck] = useState(false);
@@ -217,9 +216,18 @@ export function EntryScreen({
                   {auth.guestExpired && (
                     <p className="account-note">Your guest profile expired. Start fresh or sign in.</p>
                   )}
-                  <button className="google-button" disabled={!auth.config?.auth} onClick={googleSignIn}>
-                    <span className="google-letter">G</span>Continue with Google
+                  <button
+                    className="google-button"
+                    disabled={!auth.config?.auth}
+                    onClick={googleSignIn}
+                    aria-describedby="google-benefits"
+                  >
+                    <GoogleMark />
+                    Continue with Google
                   </button>
+                  <p className="google-benefits" id="google-benefits">
+                    Keep your profile and add friends.
+                  </p>
                   <button
                     className="dark-button guest-button"
                     disabled={!auth.config?.auth}
@@ -314,10 +322,14 @@ export function EntryScreen({
         </section>
       </div>
       <footer className="landing-footer">
-        {onRules && <button onClick={onRules}>How to play</button>}
-        <a href="https://github.com/shashwtd/catanova" target="_blank" rel="noreferrer">
-          Open source
-        </a>
+        <a href="/guide/">How to play</a>
+        <p>
+          Catanova is open source.{' '}
+          <a href="https://github.com/shashwtd/catanova" target="_blank" rel="noopener noreferrer">
+            <GitHubMark />
+            Explore on GitHub
+          </a>
+        </p>
       </footer>
     </div>
   );

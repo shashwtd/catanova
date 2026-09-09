@@ -13,7 +13,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && vite build apps/client --outDir ../../dist/client --emptyOutDir",
+    "build": "tsc -p tsconfig.json && vite build apps/client --outDir ../../dist/client --emptyOutDir && node dist/scripts/render-public-pages.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "npm run build && tsx watch apps/server/src/index.ts",
     "dev:client": "vite apps/client --host 127.0.0.1 --port 5173 --strictPort",

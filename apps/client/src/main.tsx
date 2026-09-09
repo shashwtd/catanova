@@ -745,7 +745,6 @@ function App() {
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
           onSignOut={() => void signOut()}
-          onRules={() => setPanel('rules')}
         />
       )}
       {room && !g && (

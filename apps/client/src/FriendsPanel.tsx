@@ -3,6 +3,7 @@ import type { FriendsState, PublicAccount } from '../../../packages/protocol/src
 import type { useAuth } from './auth.js';
 import { Check, Plus, Users, X } from './GameIcons.js';
 import { Avatar } from './Profile.js';
+import { GoogleMark } from './ProviderMarks.js';
 
 type Auth = ReturnType<typeof useAuth>;
 const failure = (error: unknown) => (error instanceof Error ? error.message : 'Please try again.');
@@ -139,10 +140,11 @@ export function FriendsPanel({ auth }: { auth: Auth }) {
         </div>
         <p className="account-intro">Link Google to add friends and keep your username.</p>
         <button
-          className="gold-button"
+          className="google-button"
           disabled={!!busy || auth.loading}
           onClick={() => void perform('link', () => auth.signIn(), '')}
         >
+          <GoogleMark />
           {busy === 'link' ? 'Opening Google…' : 'Link Google'}
         </button>
         {message}

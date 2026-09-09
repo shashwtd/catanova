@@ -90,6 +90,41 @@ test('the landing menu makes Create and Join the first choices, with authenticat
   assert.ok(buttonWith(unavailable, 'Continue with Google')?.includes('disabled=""'));
 });
 
+test('entry offers a branded Google sign-in with its benefit while keeping a full guest action', () => {
+  const html = renderEntry({
+    entry: 'create',
+    auth: authState({
+      config: {
+        mode: 'authenticated',
+        auth: { url: 'https://example.supabase.co', publishableKey: 'public' },
+        captcha: { siteKey: 'public-site-key' },
+      },
+    }),
+  });
+  const google = buttonWith(html, 'Continue with Google')!;
+  const guest = buttonWith(html, 'Play as guest')!;
+  assert.ok(google.includes('src="/art/providers/google-g.png"'));
+  assert.ok(google.includes('aria-describedby="google-benefits"'));
+  assert.ok(html.includes('Keep your profile and add friends.'));
+  assert.ok(!google.includes('disabled=""') && !guest.includes('disabled=""'));
+  assert.ok(guest.includes('guest-button'));
+  assert.ok(html.indexOf(google) < html.indexOf(guest));
+  assert.ok(!html.includes('google-letter') && !html.includes('captcha-check-widget'));
+  assert.ok(html.includes('Guests expire after 7 days of inactivity.'));
+});
+
+test('the landing footer provides crawlable guidance and an explicit external GitHub repository link', () => {
+  const html = renderEntry();
+  assert.ok(html.includes('<a href="/guide/">How to play</a>'));
+  assert.ok(html.includes('Catanova is open source.'));
+  assert.match(
+    html,
+    /<a href="https:\/\/github\.com\/shashwtd\/catanova" target="_blank" rel="noopener noreferrer">/,
+  );
+  assert.ok(html.includes('src="/art/providers/github-invertocat-white.svg"'));
+  assert.ok(html.includes('Explore on GitHub'));
+});
+
 test('expired guests get fresh entry choices instead of the unusable retry-account branch', () => {
   const html = renderEntry({
     entry: 'create',

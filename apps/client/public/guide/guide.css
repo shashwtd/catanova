@@ -1,0 +1,285 @@
+/* The guide is static HTML: no game bundle, auth requests or animation loop. */
+:root {
+  color-scheme: light;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #304338;
+  background: #133e39;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-padding-top: 24px;
+}
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at top, #37766a, transparent 900px);
+}
+a {
+  color: #176c68;
+  text-underline-offset: 0.2em;
+}
+a:hover {
+  color: #93431d;
+}
+a:focus-visible {
+  outline: 3px solid #d88b27;
+  outline-offset: 5px;
+  border-radius: 2px;
+}
+.guide-header {
+  max-width: 1176px;
+  margin: auto;
+  padding: 28px 28px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.guide-header > a:first-child {
+  display: block;
+  width: min(300px, 58%);
+  line-height: 0;
+  background: #f5ebd0;
+  border-radius: 10px;
+  padding: 5px 12px;
+}
+.landing-logo {
+  width: 100%;
+  height: auto;
+}
+.guide-play {
+  color: #fff5d6;
+  font:
+    700 17px/1.4 system-ui,
+    sans-serif;
+  text-decoration: none;
+  border-bottom: 1px solid #f4d78788;
+  padding: 10px 0;
+}
+.guide-play:hover {
+  color: white;
+}
+.guide-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 32px;
+  max-width: 1176px;
+  padding: 0 28px 60px;
+  margin: auto;
+  align-items: start;
+}
+.guide-nav {
+  position: sticky;
+  top: 28px;
+  display: grid;
+  gap: 5px;
+  padding-top: 25px;
+  font:
+    15px/1.45 system-ui,
+    sans-serif;
+}
+.guide-nav strong {
+  color: #f4d592;
+  margin-bottom: 13px;
+  letter-spacing: 0.04em;
+}
+.guide-nav a {
+  color: #e5f0e6;
+  padding: 7px 0;
+  text-decoration: none;
+}
+.guide-nav a:hover {
+  color: #ffda8a;
+  text-decoration: underline;
+}
+.guide-paper {
+  padding: 44px clamp(24px, 4vw, 52px);
+  border: 1px solid #d9c59d;
+  border-radius: 14px;
+  background: linear-gradient(140deg, #fcf5e3, #f3e8cd);
+  box-shadow: 0 15px 40px #061f273d;
+}
+.guide-eyebrow {
+  margin: 0 0 16px;
+  font:
+    700 12px/1.4 system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: #8b6232;
+}
+h1 {
+  margin: 0 0 20px;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.13;
+  letter-spacing: -0.03em;
+  color: #23483e;
+}
+h2 {
+  font-size: 26px;
+  line-height: 1.25;
+  margin: 0 0 18px;
+  color: #295c4d;
+}
+p,
+li,
+dd {
+  font-size: 17px;
+  line-height: 1.7;
+}
+p {
+  margin: 0 0 16px;
+}
+.guide-lead {
+  font-size: 21px;
+  color: #7b5832;
+  line-height: 1.5;
+}
+section {
+  padding-top: 32px;
+  margin-top: 26px;
+  border-top: 1px solid #cbb99080;
+}
+ol {
+  padding-left: 24px;
+}
+li {
+  padding-left: 5px;
+  margin-bottom: 12px;
+}
+aside {
+  padding: 14px 17px;
+  background: #e8d9b373;
+  border-left: 3px solid #bd9b54;
+  font-size: 15px;
+  line-height: 1.6;
+  border-radius: 0 7px 7px 0;
+}
+.guide-resources {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 14px;
+  margin: 24px 0;
+}
+.guide-resources > div {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  font:
+    600 14px/1.4 system-ui,
+    sans-serif;
+}
+.guide-resources svg {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 3px 2px #726a4820);
+}
+.guide-table-scroll {
+  overflow-x: auto;
+  margin: 20px 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font:
+    14px/1.6 system-ui,
+    sans-serif;
+}
+caption {
+  text-align: left;
+  font-weight: 600;
+  color: #8b6232;
+  padding-bottom: 10px;
+}
+th,
+td {
+  padding: 13px 12px;
+  border-bottom: 1px solid #d7c5a0;
+  vertical-align: top;
+}
+thead {
+  background: #eadbbc;
+}
+tbody th {
+  min-width: 112px;
+}
+td:nth-child(2) {
+  min-width: 145px;
+}
+.guide-effects {
+  display: grid;
+  gap: 17px;
+}
+.guide-effects dt {
+  font-weight: 700;
+  color: #7b5832;
+}
+.guide-effects dd {
+  margin: 5px 0 0;
+}
+.guide-footer {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid #cbb99080;
+}
+.guide-footer p {
+  font-size: 15px;
+}
+.guide-footer small {
+  display: block;
+  line-height: 1.6;
+  color: #6c7260;
+}
+.guide-skip {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  transform: translateY(-160%);
+  background: #fff5d6;
+  padding: 14px;
+  z-index: 5;
+}
+.guide-skip:focus {
+  transform: none;
+}
+@media (max-width: 800px) {
+  .guide-layout {
+    display: block;
+    padding: 0 16px 32px;
+  }
+  .guide-header {
+    padding: 22px 18px;
+  }
+  .guide-nav {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    padding: 0 8px 22px;
+  }
+  .guide-nav strong {
+    width: 100%;
+    margin-bottom: 0;
+  }
+  .guide-nav a {
+    font-size: 14px;
+  }
+  .guide-paper {
+    padding: 32px 22px;
+  }
+}
+@media (max-width: 420px) {
+  .guide-play {
+    font-size: 14px;
+  }
+  .guide-resources {
+    gap: 14px 9px;
+  }
+  .guide-resources svg {
+    width: 49px;
+    height: 49px;
+  }
+}

@@ -12,6 +12,9 @@ const types: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+  '.jpg': 'image/jpeg',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
 };
@@ -28,17 +31,37 @@ export async function serveClient(
     return;
   }
   let path: string;
+  let search = '';
+  let privateEntry = false;
   try {
-    path = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname);
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    path = decodeURIComponent(url.pathname);
+    search = url.search;
+    privateEntry = path === '/auth/callback' || /^\/room\//i.test(path) || url.searchParams.has('room');
   } catch {
     response.writeHead(400).end();
     return;
   }
+  if (privateEntry) response.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  if (path === '/guide' || path === '/index.html' || path === '/guide/index.html') {
+    response.writeHead(308, { Location: `${path === '/index.html' ? '/' : '/guide/'}${search}` }).end();
+    return;
+  }
+  // Internal app shell keeps invite/OAuth entry free of a misleading home-menu flash.
+  if (path === '/app.html') {
+    response.writeHead(404).end();
+    return;
+  }
+  const isAppRoute = path === '/' || path === '/auth/callback' || /^\/room\/[A-Z2-9]{8}\/?$/i.test(path);
+  const assetPath = isAppRoute
+    ? privateEntry
+      ? '/app.html'
+      : '/index.html'
+    : path === '/guide/'
+      ? '/guide/index.html'
+      : path;
   const root = resolve(directory),
-    file = resolve(
-      root,
-      `.${path === '/' || path === '/auth/callback' || /^\/room\/[A-Z2-9]{8}\/?$/i.test(path) ? '/index.html' : path}`,
-    );
+    file = resolve(root, `.${assetPath}`);
   if (!file.startsWith(root + sep)) {
     response.writeHead(403).end();
     return;

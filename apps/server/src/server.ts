@@ -51,6 +51,8 @@ export async function startServer(
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
     response.setHeader('Cache-Control', 'no-store');
+    if (/^\/(?:api(?:\/|\?|$)|healthz(?:\?|$))/.test(request.url ?? ''))
+      response.setHeader('X-Robots-Tag', 'noindex, nofollow');
     if (request.method === 'GET' && request.url === '/api/config') {
       response.writeHead(200).end(
         JSON.stringify({

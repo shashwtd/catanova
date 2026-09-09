@@ -1,3 +1,29 @@
+@font-face {
+  font-family: 'Google Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/google-sans-medium-latin.woff2') format('woff2');
+}
+
+/* Provider marks are served locally, with their original colors and proportions. */
+.provider-mark {
+  display: inline-block;
+  flex: none;
+  object-fit: contain;
+}
+.google-button:has(.provider-mark-google) {
+  min-height: 54px;
+  padding: 12px;
+  gap: 10px;
+  border: 1px solid #747775;
+  background: #fff;
+  color: #1f1f1f;
+  font:
+    500 16px/20px 'Google Sans',
+    sans-serif;
+}
+
 /* The entry is a small play menu set into our own illustrated island. */
 .entry-world .title-scenery {
   background:
@@ -11,7 +37,7 @@
   align-items: center;
   gap: 26px;
   min-height: 100dvh;
-  padding: 108px 24px 88px;
+  padding: 108px 24px 100px;
 }
 .landing-screen .lobby-self {
   min-width: 0;
@@ -39,6 +65,15 @@
   margin: 0;
   line-height: 0;
 }
+.landing-home .landing-brand h1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 2115 / 640;
+}
+.landing-home .landing-brand .landing-logo {
+  width: 88%;
+}
 .landing-logo {
   display: block;
   width: 100%;
@@ -52,6 +87,19 @@
   font:
     500 clamp(16px, 2vw, 21px)/1.35 Barlow,
     sans-serif;
+}
+.no-script-note {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 20;
+  margin: 0;
+  padding: 12px 20px;
+  background: #173e38;
+  color: #fff5da;
+  text-align: center;
+}
+.no-script-note a {
+  color: inherit;
 }
 .landing-screen .landing-panel {
   width: 100%;
@@ -114,10 +162,39 @@
     0 5px 8px #42604326;
 }
 .landing-screen .landing-panel .google-button {
-  background: #fffdf4;
-  border: 1px solid #b8b59d;
-  color: #364a3c;
-  box-shadow: 0 2px 0 #b7b8a2;
+  min-height: 56px;
+  padding: 12px;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #747775;
+  color: #1f1f1f;
+  font:
+    500 16px/20px 'Google Sans',
+    sans-serif;
+  box-shadow: 0 2px 6px #3846361a;
+}
+.landing-screen .landing-panel .google-button:hover:not(:disabled),
+.friends-panel .google-button:hover:not(:disabled) {
+  background: #f8faff;
+  border-color: #4a5a6b;
+}
+.landing-panel .google-benefits {
+  margin: 10px 0 22px;
+  color: #52634b;
+  text-align: center;
+  font-size: 14px;
+}
+.landing-screen .landing-panel .dark-button.guest-button {
+  min-height: 52px;
+  margin-top: 0;
+  color: #43553e;
+  border: 1px solid #8a977b;
+  background: #eee7d0;
+  box-shadow: inset 0 1px #fff7e4;
+}
+.landing-screen .landing-panel .dark-button.guest-button:hover:not(:disabled) {
+  background: #e3e1c6;
+  border-color: #677f61;
 }
 .landing-screen .landing-panel button:focus-visible,
 .landing-sign-in:focus-visible {
@@ -211,29 +288,50 @@
 }
 .landing-footer {
   position: absolute;
-  bottom: 25px;
+  inset: auto 0 0;
+  isolation: isolate;
   display: flex;
-  gap: 25px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 30px;
   align-items: center;
-  padding: 8px 17px;
-  border-radius: 8px;
-  background: #193c37c9;
-}
-.landing-footer button,
-.landing-footer a {
-  padding: 3px 0;
-  background: none;
-  border: none;
-  color: #f0e7bf;
+  min-height: 84px;
+  padding: 24px 24px 22px;
+  color: #fff;
+  text-align: center;
   font:
-    500 13px Barlow,
+    500 14px/1.45 Barlow,
     sans-serif;
-  text-decoration: none;
 }
-.landing-footer button:hover,
+.landing-footer::before {
+  content: '';
+  position: absolute;
+  inset: -28px 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #173c2d00, #143425c4 60%, #112e24ed);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 48%);
+  mask-image: linear-gradient(180deg, transparent, #000 48%);
+}
+.landing-footer p {
+  margin: 0;
+}
+.landing-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin-inline: 3px;
+  color: #fff;
+  font: inherit;
+  text-decoration: none;
+  vertical-align: middle;
+}
 .landing-footer a:hover {
-  color: #fff9dd;
   text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .landing-flow .landing-welcome {
   width: min(490px, 100%);
@@ -305,7 +403,7 @@
 }
 @media (max-width: 650px) {
   .entry-world .landing-screen {
-    padding: 94px 18px 78px;
+    padding: 94px 18px 116px;
     gap: 22px;
   }
   .landing-welcome {
@@ -338,7 +436,10 @@
     padding-inline: 8px;
   }
   .landing-footer {
-    bottom: 18px;
+    flex-direction: column;
+    gap: 6px;
+    padding: 22px 16px 16px;
+    font-size: 13px;
   }
 }
 @media (max-width: 360px) {
@@ -363,7 +464,7 @@
 @media (max-height: 650px) and (min-width: 651px) {
   .entry-world .landing-screen {
     padding-top: 86px;
-    padding-bottom: 75px;
+    padding-bottom: 100px;
     gap: 17px;
   }
   .landing-home .landing-welcome {

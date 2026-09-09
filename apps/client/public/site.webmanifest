@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Catanova",
+  "short_name": "Catanova",
+  "description": "An open-source island game for two to four friends.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5ebd0",
+  "theme_color": "#245348",
+  "icons": [
+    { "src": "/branding/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/branding/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

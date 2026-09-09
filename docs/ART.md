@@ -10,6 +10,8 @@ The current direction is expressive fantasy: exaggerated silhouettes, crooked or
 
 [Catanova identity](art/logo-concepts/README.md) contains the brighter standalone mark and matching full wordmark, with exact generation prompts and hashes. The landing menu places the cream-backed wordmark on a matching paper surface over the title landscape; the separate mark has transparent alpha.
 
+[Branding exports](BRANDING_EXPORTS.md) records the optimized favicon/app-icon sizes and social-preview composition made from those approved originals. The source PNGs remain unchanged; the technical crop, resizing and encoding steps are reproducible.
+
 [Interface provenance](art/interface-provenance.json) records the generated rope-and-wood frame and a rejected icon-atlas experiment. Only the frame is shipped from that generation, as a 3–4 pixel portrait border. Buttons use simple borders and original editable SVG icons in [GameIcons.tsx](../apps/client/src/GameIcons.tsx), without scaled rope artwork. The rejected icon atlas is not part of the browser's assets.
 
 | Current asset                                                        | Dimensions and layout             | Content and use                                                                                                        |
@@ -54,5 +56,7 @@ Resource hand cards combine transparent art, distinct material colors and counts
 Interface icons are original SVG shapes in [GameIcons.tsx](../apps/client/src/GameIcons.tsx), with filled silhouettes, ink edges and a shared palette. Rules uses a book; connection uses Wi-Fi arcs with a slashed offline variant; fullscreen has distinct enter and exit shapes. Turn-grouped history reuses action and resource icons. Cinzel supplies titles; Barlow supplies controls and number tokens.
 
 Font notices ship with the browser distribution: [Cinzel](../apps/client/public/licenses/cinzel.txt) and [Barlow](../apps/client/public/licenses/barlow.txt). Both fonts retain their SIL Open Font License 1.1.
+
+Google sign-in uses Google's official unmodified mark and locally served Google Sans. The external repository link uses GitHub's official Invertocat. These are third-party provider assets, excluded from claims about original MIT-licensed Catanova artwork. Their sources, usage terms and the Google Sans OFL notice are recorded in [provider marks](PROVIDER_MARKS.md).
 
 Original repository contributions are distributed under MIT to the extent rights apply. This provenance record asserts no third-party trademark rights or exclusive ownership of generated imagery.
