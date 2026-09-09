@@ -1,0 +1,48 @@
+{
+  "created": "2026-09-09",
+  "project": "Catanova",
+  "status": "Concept for review; not wired into app UI",
+  "generator": "Built-in image_gen tool",
+  "mode": "Built-in, not CLI/API fallback",
+  "direction": "An open hexagonal C, green island forms, a vermilion settlement roof and a gold nova spark. Painted appearance describes AI-generated artwork, not human authorship.",
+  "referenceImages": [],
+  "inspiration": "Existing Catanova fantasy game direction. User's prior game images informed general stylistic discussion only; no reference images were sent in this generation call and no existing game characters or brand logos were requested.",
+  "outputs": [
+    {
+      "file": "catanova-mark-v1.png",
+      "useCase": "logo-brand",
+      "source": "exec-7c6fd436-7014-4336-89ca-9c6f50da4c71.png",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGBA",
+      "alphaRange": [
+        0,
+        255
+      ],
+      "sha256": "ad66bde53439448323058010fd40625c7bb2289f22b4c04c7d4d71bcad986b85",
+      "postProcessing": "None. Copied unchanged from generated output.",
+      "prompt": "Use case: logo-brand.\nAsset type: a finished square app-icon mark for the original game CATANOVA; this is a logo, not a miniature landscape illustration.\nPrimary request: design one memorable original emblem that combines a hexagonal island, a settlement roof, and the letter C through intentional negative space. A broad, open hexagonal C silhouette wraps around one tiny warm vermilion gable roof; the open upper-right side of the C terminates in a small integrated four-point golden spark, subtly suggesting \"nova.\" Make the C/hex silhouette dominant and readable at 32 pixels. No need for window or brick detail.\nStyle/medium: polished hand-painted fantasy identity, shaped like a careful designer's gouache cutout. Confident large shapes, pleasing subtle asymmetry, delicate dry-brush texture confined within shapes, crisp contour. Restrained dimensional shading only; mostly graphic, not rendered 3D.\nColor palette: moss/sea-green lower land shape, warm wheat-gold upper shape, one rich vermilion roof, pale warm glint. Distinct meaningful color areas rather than one monochrome treatment. Keep strong light/dark contrast.\nScene/backdrop: full-bleed solid deep midnight teal background, intentionally opaque; no checkerboard and no transparency simulation.\nComposition/framing: exactly ONE centered symbol on a square canvas, occupying about 75 percent of the width and height, generous balanced safe margins. No enclosing border, frame, shield, rope, circle, button chrome, or drop-shadow plaque.\nText: no lettering or words, only the visual C may be suggested by the silhouette.\nConstraints: fresh Catanova identity, no existing CATAN logo or other brand imagery, no copied game characters. Elegant clear hierarchy. Avoid elaborate scenery, mountains, piles of resources, dice, generic mobile-game gloss, excessive gold trim, vector clip-art outlines, random scratches, fiddly decoration, multiple concepts, watermarks, mockups.",
+      "inspection": "Actual transparency despite the opaque-background instruction. A few alpha=1 pixels extend outside the main emblem; alpha>8 content bounds are [234, 173, 1020, 1068]. The mark has a transparent canvas, not a checkerboard image."
+    },
+    {
+      "file": "catanova-app-icon-v1.png",
+      "useCase": "precise-object-edit",
+      "source": "exec-37cf2bc1-53b1-4196-83af-75e8010c1aa0.png",
+      "inputImage": "catanova-mark-v1.png",
+      "inputRole": "Edit target; preserve mark and add opaque background",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "sha256": "339312f2c572921a658080510a13fdfb3708d7f09e9e2269b34b550ceb24bc23",
+      "postProcessing": "None. Copied unchanged from generated output.",
+      "prompt": "Use case: precise-object-edit.\nAsset type: Catanova square app icon.\nInput image: the Catanova mark is the edit target, preserve the mark.\nChange only the background: replace all transparent space with one perfectly uniform opaque very dark midnight teal, hex #102C32, to make a finished full-bleed square app icon. Preserve the exact symbol's scale, position, original hexagonal C silhouette, golden upper stroke, green/teal lower island shapes, little vermilion settlement roof, separate golden spark, painted surface texture and color. Do not add, remove, redraw, or redesign any logo elements. Background must reach all four square edges. Real opaque RGB/RGBA background, every background pixel fully opaque, no transparency, no checkerboard. No borders, no button frame, no shadows or lighting on the background, no words, no rounded outer corners; the operating system supplies corner masks.",
+      "inspection": "Opaque dark teal square. The edit retains composition and silhouette with small generated texture/background variations; it is not a pixel-identical mathematical composite. Corners are square so the destination platform can apply its own icon mask."
+    }
+  ],
+  "validation": "Both outputs viewed at source resolution; PNG dimensions, alpha/mode and SHA-256 verified. preview.html displays the unchanged source PNG at 32, 48, 64 and 128 CSS pixels for human review. No browser inspection performed. No production favicon, app manifest or UI changed.",
+  "rightsNote": "Original generation requested; no assertion of exclusive rights or third-party trademark rights."
+}
