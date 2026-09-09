@@ -25,3 +25,6 @@ playwright-report
 *.tsbuildinfo
 __pycache__
 *.pyc
+
+# Original art masters are for editing/export, not the runtime image.
+assets/source-art

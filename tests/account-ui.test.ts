@@ -47,7 +47,7 @@ test('Google avatars use the verified HTTPS image with no referrer and unsafe UR
   assert.match(html, /class="avatar-photo"/);
   assert.match(html, /referrerPolicy="no-referrer"/i);
   assert.ok(html.includes(photo));
-  assert.ok(!html.includes('<image href="/art/avatars-fantasy.png"'));
+  assert.ok(!html.includes('<image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp"'));
   for (const avatarUrl of [
     'http://lh3.googleusercontent.com/a/photo',
     'javascript:alert(1)',
@@ -55,7 +55,7 @@ test('Google avatars use the verified HTTPS image with no referrer and unsafe UR
     'https://lh3.googleusercontent.com.evil.example/photo',
   ]) {
     const fallback = renderToStaticMarkup(createElement(Avatar, { profile: { ...profile, avatarUrl } }));
-    assert.ok(fallback.includes('<image href="/art/avatars-fantasy.png"'));
+    assert.ok(fallback.includes('<image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp"'));
     assert.ok(!fallback.includes('class="avatar-photo"'));
   }
 });

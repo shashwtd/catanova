@@ -15,9 +15,9 @@ const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const publicDir = path.join(project, 'apps/client/public');
 const destination = path.join(publicDir, 'branding');
 const inputs = {
-  mark: path.join(publicDir, 'art/branding/catanova-mark-v2.png'),
-  logo: path.join(publicDir, 'art/branding/catanova-logo-v2.png'),
-  scenery: path.join(publicDir, 'art/title-landscape.png'),
+  mark: path.join(project, 'assets/source-art/branding/catanova-mark-v2.png'),
+  logo: path.join(project, 'assets/source-art/branding/catanova-logo-v2.png'),
+  scenery: path.join(project, 'assets/source-art/title-landscape.png'),
 };
 const cream = '#f5ebd0';
 const transparent = { r: 0, g: 0, b: 0, alpha: 0 };

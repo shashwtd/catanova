@@ -144,7 +144,7 @@ test('development spread displays local card art, playable/held status and reada
   assert.ok(html.includes('You can play this on your next turn.'));
   assert.ok(html.includes('Already counts toward your victory points.'));
   assert.ok(html.includes('+1 point'));
-  assert.ok(html.includes('/art/development-cards.png'));
+  assert.ok(html.includes('/art/optimized/development-cards.d7fcdf84252a.webp'));
   assert.ok(!html.includes('Monopoly') && !html.includes('private-other-card'));
   assert.equal(new Set(Object.values(DEVELOPMENT_ART_INDEX)).size, 5);
   for (const kind of Object.keys(DEVELOPMENT_DECK) as (keyof typeof DEVELOPMENT_DECK)[]) {
@@ -194,7 +194,7 @@ test('development purchase is a separate buy slot with a visible three-resource 
   for (const resource of ['sheep', 'wheat', 'ore'])
     assert.match(enabled, new RegExp(`data-cost-resource="${resource}"`));
   assert.ok(
-    !enabled.includes('/art/development-cards.png'),
+    !enabled.includes('/art/optimized/development-cards.d7fcdf84252a.webp'),
     'the purchase slot cannot masquerade as a held illustrated card',
   );
   assert.ok(!enabled.includes('class="development-card '));

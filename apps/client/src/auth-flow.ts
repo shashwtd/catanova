@@ -1,9 +1,10 @@
-import type { SupabaseClient, Session } from '@supabase/supabase-js';
+import type { Session } from '@supabase/auth-js';
+import type { BrowserAuthClient } from './auth-client.js';
 
 export const LINK_KEY = 'catanova.auth.link';
 type GuestLink = { id: string; access_token: string; refresh_token: string };
 export async function beginGuestSignIn(
-  client: SupabaseClient,
+  client: BrowserAuthClient,
   captchaRequired: boolean,
   captchaToken?: string,
   expiredGuest = false,
@@ -20,7 +21,7 @@ export async function beginGuestSignIn(
   if (error) throw error;
 }
 export async function beginGoogleSignIn(
-  client: SupabaseClient,
+  client: BrowserAuthClient,
   storage: Storage,
   redirectTo: string,
   expiredGuest = false,
@@ -49,7 +50,7 @@ export async function beginGoogleSignIn(
   }
 }
 export async function completeGoogleLink(
-  client: SupabaseClient,
+  client: BrowserAuthClient,
   storage: Storage,
   session: Session | null,
   callbackError: boolean,

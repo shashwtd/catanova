@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { User } from '@supabase/auth-js';
+import type { BrowserAuthClient } from './auth-client.js';
 import {
   defaultProfile,
   emptyFriends,
@@ -33,7 +34,7 @@ export function entryLocation() {
 }
 export function useAuth() {
   const signingIn = useRef(false);
-  const client = useRef<SupabaseClient | null>(null),
+  const client = useRef<BrowserAuthClient | null>(null),
     currentUser = useRef<User | null>(null);
   const mounted = useRef(true),
     version = useRef(0),
@@ -144,11 +145,9 @@ export function useAuth() {
         setLoading(false);
         return;
       }
-      const { createClient } = await import('@supabase/supabase-js');
+      const { createBrowserAuthClient } = await import('./auth-client.js');
       if (!active) return;
-      const supabase = createClient(config.auth.url, config.auth.publishableKey, {
-        auth: { flowType: 'pkce', autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
-      });
+      const supabase = createBrowserAuthClient(config.auth);
       client.current = supabase;
       async function updateUser(nextUser: User | null) {
         if (!active) return;

@@ -1,7 +1,8 @@
 /* Game feedback remains finite. Only transform/opacity travel with resource cards. */
 .game-world {
   background-image:
-    radial-gradient(ellipse at 47% 38%, #473d2222 15%, #0b121bcc 100%), url('/art/environment-dark.png');
+    radial-gradient(ellipse at 47% 38%, #473d2222 15%, #0b121bcc 100%),
+    url('/art/optimized/environment-dark.c55c6de597e4.webp');
   background-position:
     center,
     right bottom;
@@ -12,7 +13,7 @@
 .card-table::before {
   background:
     linear-gradient(#5c42382b, #231a27aa),
-    url('/art/environment-dark.png') right bottom/200% 200%;
+    url('/art/optimized/environment-dark.c55c6de597e4.webp') right bottom/200% 200%;
   border-top-color: #94714f;
   box-shadow:
     0 -5px 12px #120f1744,

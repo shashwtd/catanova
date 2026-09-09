@@ -148,3 +148,13 @@ test('terrain retains accessible production odds without native title popups', (
   assert.equal([...html.matchAll(/viewBox="1536 512 512 512"/g)].length, 9);
   assert.ok(!html.includes('class="ship-hull"'));
 });
+
+test('the initial board stays readable and exposes legal sites before any texture downloads', () => {
+  const view = gameView(game(), 'a');
+  const html = render(view).replace(/<image\b[^>]*\/>/g, '');
+  assert.equal([...html.matchAll(/class="terrain-base"/g)].length, 19);
+  const labels = [...html.matchAll(/class="terrain-base-label"[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]);
+  assert.equal(labels.length, 19);
+  assert.deepEqual(new Set(labels), new Set(['Timber', 'Clay', 'Sheep', 'Hay', 'Rock', 'Desert']));
+  assert.equal(siteCount(html, 'settlement'), view.legal.settlements.length);
+});

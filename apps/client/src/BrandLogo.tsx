@@ -1,4 +1,4 @@
-/** Display the selected original PNGs without changing their embedded artwork or provenance. */
+/** Display optimized artwork with the original canvas and composition. */
 export function BrandLogo({ mark = false, className = '' }: { mark?: boolean; className?: string }) {
   return (
     <svg
@@ -9,7 +9,11 @@ export function BrandLogo({ mark = false, className = '' }: { mark?: boolean; cl
       preserveAspectRatio="xMidYMid meet"
     >
       <image
-        href={mark ? '/art/branding/catanova-mark-v2.png' : '/art/branding/catanova-logo-v2.png'}
+        href={
+          mark
+            ? '/art/optimized/catanova-mark-v2.77f0ea5ff580.webp'
+            : '/art/optimized/catanova-logo-v2.a161a887edbc.webp'
+        }
         width={mark ? 1254 : 2172}
         height={mark ? 1254 : 724}
       />

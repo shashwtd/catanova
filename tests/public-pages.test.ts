@@ -24,6 +24,9 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.ok(!home.includes('Catanova is open source.'));
   assert.ok(home.includes('<script type="module" src="/src/main.tsx"></script>'));
   assert.ok(shell.includes('<div id="root"></div>'));
+  assert.match(home, /rel="preload" as="image" type="image\/webp"/);
+  assert.match(guide, /rel="preload" as="image" type="image\/webp"/);
+  assert.ok(!shell.includes('as="image"'), 'private game routes must not prefetch the welcome scenery');
   assert.ok(!shell.includes('Create room') && !shell.includes('Connecting…'));
   assert.ok(guide.includes('How to Play Catanova') && guide.includes('City upgrade'));
   assert.ok(guide.includes('3 Rock') && guide.includes('2 Hay'));

@@ -102,7 +102,7 @@
 .entry-world .title-scenery {
   background:
     linear-gradient(180deg, #f7e6b57a 0%, #f7e6b526 48%, #193f3766 100%),
-    url('/art/title-landscape.png') center / cover;
+    url('/art/optimized/title-landscape.05db8101ac33.webp') center / cover;
 }
 .entry-world .landing-screen {
   display: flex;

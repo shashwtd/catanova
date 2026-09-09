@@ -6,7 +6,7 @@
   pointer-events: none;
   background:
     linear-gradient(90deg, #172c2d05 30%, #132b3b66),
-    url('/art/title-landscape.png') center / cover;
+    url('/art/optimized/title-landscape.05db8101ac33.webp') center / cover;
 }
 .game-world.entry-world,
 .game-world.lobby {

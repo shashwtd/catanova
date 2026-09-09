@@ -7,6 +7,7 @@ import {
   PublicGuide,
   PublicLanding,
   PublicMetadata,
+  PublicArtPreloads,
   PUBLIC_PAGES,
   SITE_URL,
 } from '../apps/client/src/PublicPages.js';
@@ -20,20 +21,23 @@ export async function renderPublicPages(directory: string) {
   const app = template
     .replace(/<title>[\s\S]*?<\/title>/, '')
     .replace('<!-- public-metadata -->', metadata(0));
+  const artPreloads = renderToStaticMarkup(createElement(PublicArtPreloads));
   // Keep room entry and OAuth callback free of the public home-menu prerender.
   await writeFile(join(directory, 'app.html'), app);
   await writeFile(
     join(directory, 'index.html'),
-    app.replace(
-      '<div id="root"></div>',
-      `<div id="root">${renderToStaticMarkup(createElement(PublicLanding))}</div>`,
-    ),
+    app
+      .replace('</head>', `${artPreloads}</head>`)
+      .replace(
+        '<div id="root"></div>',
+        `<div id="root">${renderToStaticMarkup(createElement(PublicLanding))}</div>`,
+      ),
   );
   await mkdir(join(directory, 'guide'), { recursive: true });
   await writeFile(
     join(directory, 'guide', 'index.html'),
     `<!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#123d43">${metadata(1)}<link rel="stylesheet" href="/guide/guide.css"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#123d43">${metadata(1)}${artPreloads}<link rel="stylesheet" href="/guide/guide.css"></head>
 <body>${renderToStaticMarkup(createElement(PublicGuide))}</body></html>\n`,
   );
   await writeFile(

@@ -151,7 +151,7 @@ strong {
   border-radius: 23px;
   background:
     linear-gradient(90deg, #fbf1dbef 0, #fbf1dbef 33%, #fbf1db95 52%, #fbf1db00 72%),
-    url('/art/title-landscape.png') center 47% / cover;
+    url('/art/optimized/title-landscape.05db8101ac33.webp') center 47% / cover;
   box-shadow: 0 9px 25px #536c4910;
 }
 .guide-hero-copy {
@@ -918,7 +918,7 @@ strong {
     border-radius: 16px;
     background:
       linear-gradient(180deg, #fbf1dbfa 0, #fbf1dbea 57%, #fbf1db65 100%),
-      url('/art/title-landscape.png') 59% center / cover;
+      url('/art/optimized/title-landscape.05db8101ac33.webp') 59% center / cover;
   }
   .guide-hero-copy {
     width: 100%;

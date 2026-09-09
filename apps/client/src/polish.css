@@ -56,7 +56,7 @@
   content: '';
   position: absolute;
   inset: -2px;
-  background: url('/art/portrait-frame.png') center/100% 100%;
+  background: url('/art/optimized/portrait-frame.de152d0c9426.webp') center/100% 100%;
   pointer-events: none;
 }
 .side-controls .icon-button .game-icon {
@@ -126,7 +126,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: url('/art/portrait-frame.png') center/100% 100%;
+  background: url('/art/optimized/portrait-frame.de152d0c9426.webp') center/100% 100%;
   pointer-events: none;
 }
 .avatar-choices .avatar-medallion {
@@ -409,7 +409,7 @@
   border-top: 3px solid #8b6039;
   background:
     linear-gradient(#3c291b22, #17151988),
-    url('/art/environment-dark.png') right bottom/200% 200%;
+    url('/art/optimized/environment-dark.c55c6de597e4.webp') right bottom/200% 200%;
   box-shadow:
     0 -2px 4px #110f1699,
     inset 0 2px 1px #e8b77a44;
@@ -751,7 +751,7 @@
   content: '';
   position: absolute;
   inset: -3px;
-  background: url('/art/portrait-frame.png') center/100% 100%;
+  background: url('/art/optimized/portrait-frame.de152d0c9426.webp') center/100% 100%;
   pointer-events: none;
 }
 .turn-action .game-icon,
@@ -1191,7 +1191,7 @@
 .avatar-medallion {
   box-sizing: border-box;
   border: 4px solid transparent !important;
-  border-image: url('/art/portrait-frame.png') 205 / 4px / 0 stretch;
+  border-image: url('/art/optimized/portrait-frame.de152d0c9426.webp') 205 / 4px / 0 stretch;
   background: #354948;
   border-radius: 11%;
 }
@@ -1206,7 +1206,7 @@
 }
 .side-controls .icon-button {
   border: 3px solid transparent;
-  border-image: url('/art/portrait-frame.png') 205 / 3px / 0 stretch;
+  border-image: url('/art/optimized/portrait-frame.de152d0c9426.webp') 205 / 3px / 0 stretch;
   background: linear-gradient(145deg, #59615a, #2b3534);
   padding: 6px;
 }
@@ -1230,7 +1230,7 @@
 .turn-action,
 .trade-action {
   border: 3px solid transparent;
-  border-image: url('/art/portrait-frame.png') 205 / 3px / 0 stretch;
+  border-image: url('/art/optimized/portrait-frame.de152d0c9426.webp') 205 / 3px / 0 stretch;
   background: linear-gradient(145deg, #526a69, #293f44);
 }
 .turn-action:not(:disabled) {

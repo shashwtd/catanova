@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "encoding": {
+    "format": "webp",
+    "alphaQuality": 100,
+    "effort": 6,
+    "smartSubsample": true,
+    "resized": false
+  },
+  "images": [
+    {
+      "source": "assets/source-art/avatars-fantasy.png",
+      "legacyUrl": "/art/avatars-fantasy.png",
+      "url": "/art/optimized/avatars-fantasy.6bf04e83341a.webp",
+      "sha256": "6bf04e83341a6771423645040172a171a0b40c4fef9e74141f08a9d5b900e51a",
+      "sourceSha256": "56b28bdb8119a008f160c33a9efc20b1d1991b8ac73edddd50e02146e7b4e220",
+      "width": 1448,
+      "height": 1086,
+      "quality": 88,
+      "originalBytes": 2823576,
+      "bytes": 417902
+    },
+    {
+      "source": "assets/source-art/branding/catanova-logo-v2.png",
+      "legacyUrl": "/art/branding/catanova-logo-v2.png",
+      "url": "/art/optimized/catanova-logo-v2.a161a887edbc.webp",
+      "sha256": "a161a887edbc32d887f43a9a84c6bdcef2a2ad62362acf76a32bdb2c5e38d577",
+      "sourceSha256": "6dbcb01c27f7940249326666eda05f498acac5601b61734c02e422cf7e10b301",
+      "width": 2172,
+      "height": 724,
+      "quality": 90,
+      "originalBytes": 1443888,
+      "bytes": 138182
+    },
+    {
+      "source": "assets/source-art/branding/catanova-mark-v2.png",
+      "legacyUrl": "/art/branding/catanova-mark-v2.png",
+      "url": "/art/optimized/catanova-mark-v2.77f0ea5ff580.webp",
+      "sha256": "77f0ea5ff58089cce2a02a1288f3a118d0d457ddb7562d278090d7b2b2b927cc",
+      "sourceSha256": "d759b095210d615840f56b14ba68bf0e5ff84ea3f620c07e9b6ae1d58666c1ef",
+      "width": 1254,
+      "height": 1254,
+      "quality": 90,
+      "originalBytes": 1326323,
+      "bytes": 277638
+    },
+    {
+      "source": "assets/source-art/development-cards.png",
+      "legacyUrl": "/art/development-cards.png",
+      "url": "/art/optimized/development-cards.d7fcdf84252a.webp",
+      "sha256": "d7fcdf84252aac304f66644595146dc5b804e0eb7064e64b5d0697731575acca",
+      "sourceSha256": "679dde0cf277d9ab77dfdf6df633044321ba1f6dfe5d15d941a23b584d5aa208",
+      "width": 1254,
+      "height": 1254,
+      "quality": 88,
+      "originalBytes": 2938577,
+      "bytes": 454162
+    },
+    {
+      "source": "assets/source-art/environment-dark.png",
+      "legacyUrl": "/art/environment-dark.png",
+      "url": "/art/optimized/environment-dark.c55c6de597e4.webp",
+      "sha256": "c55c6de597e49b6cdcb4d089b6005f08489f0627b8799fddb335603a0c128548",
+      "sourceSha256": "63b2b58042a16e5eb7e718e0701d895f9588e3736224c3f4b006da8c85906260",
+      "width": 1254,
+      "height": 1254,
+      "quality": 88,
+      "originalBytes": 2985679,
+      "bytes": 465438
+    },
+    {
+      "source": "assets/source-art/environment-painted.png",
+      "legacyUrl": "/art/environment-painted.png",
+      "url": "/art/optimized/environment-painted.00c506c983c0.webp",
+      "sha256": "00c506c983c02803b5858aa29cc1b7a566517669aa7a112f1ba775513de4c237",
+      "sourceSha256": "9b2d36f82514b2ac2929ace704ea1c6904c52b345ce74aa7733cf2e90dac73c9",
+      "width": 1254,
+      "height": 1254,
+      "quality": 88,
+      "originalBytes": 2903217,
+      "bytes": 417002
+    },
+    {
+      "source": "assets/source-art/portrait-frame.png",
+      "legacyUrl": "/art/portrait-frame.png",
+      "url": "/art/optimized/portrait-frame.de152d0c9426.webp",
+      "sha256": "de152d0c9426d31df742fad51f2405c2dad982244160f4bcde027abe74bc9599",
+      "sourceSha256": "b7acb41f49aa9496b52af9e886aedbaca78232400606ce31713d2b66da15b40f",
+      "width": 1254,
+      "height": 1254,
+      "quality": 90,
+      "originalBytes": 1449067,
+      "bytes": 337102
+    },
+    {
+      "source": "assets/source-art/sprites-fantasy.png",
+      "legacyUrl": "/art/sprites-fantasy.png",
+      "url": "/art/optimized/sprites-fantasy.3aaf69915ec6.webp",
+      "sha256": "3aaf69915ec666ac70b3b20073f559a8bd940666530c5ad9f0ad2799d8ea2562",
+      "sourceSha256": "80eef5ae75f32efb1da2af7cbd89f5b47f7692c895e920b08095798579e4adcf",
+      "width": 1774,
+      "height": 887,
+      "quality": 90,
+      "originalBytes": 1819242,
+      "bytes": 445462
+    },
+    {
+      "source": "assets/source-art/terrain-fantasy.png",
+      "legacyUrl": "/art/terrain-fantasy.png",
+      "url": "/art/optimized/terrain-fantasy.777e0ac07117.webp",
+      "sha256": "777e0ac071178d28b39aa868b35f289657b8135ff24e6735c32b0cea633b2a8d",
+      "sourceSha256": "29af3d0997b9996b62706e0c76c1ed97493ad818ba513a5f96b9e4d2deecf0a2",
+      "width": 1536,
+      "height": 1024,
+      "quality": 88,
+      "originalBytes": 2858277,
+      "bytes": 405252
+    },
+    {
+      "source": "assets/source-art/title-landscape.png",
+      "legacyUrl": "/art/title-landscape.png",
+      "url": "/art/optimized/title-landscape.05db8101ac33.webp",
+      "sha256": "05db8101ac33bfd5fef96c366fe288b877de38fbabb90efcc89d18208ea8d87d",
+      "sourceSha256": "bde5b239acc08862f627cc08a07ab5c9a10d349de1e5974fc273254329aecabc",
+      "width": 1672,
+      "height": 941,
+      "quality": 88,
+      "originalBytes": 2414627,
+      "bytes": 305772
+    }
+  ]
+}

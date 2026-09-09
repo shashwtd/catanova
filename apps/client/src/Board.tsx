@@ -24,6 +24,15 @@ import {
 } from './scene.js';
 
 export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#e2bd4c'] as const;
+// Visible immediately, underneath the artwork, even when a texture is still downloading.
+const TERRAIN_BASE = {
+  wood: '#57815a',
+  brick: '#c57d59',
+  sheep: '#a0b767',
+  wheat: '#dcb95f',
+  ore: '#8998a5',
+  desert: '#e3c589',
+} as const;
 export type BuildMode = 'road' | 'settlement' | 'city' | null;
 function roadGeometry(board: Island, id: number) {
   const edge = board.edges[id]!,
@@ -89,7 +98,7 @@ export function Sprite({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
+      <image href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp" width="2048" height="1024" />
     </svg>
   );
 }
@@ -243,7 +252,11 @@ export function Board({
                     height={size}
                     viewBox={`${MATERIAL_GUTTER} ${row * 512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
                   >
-                    <image href="/art/environment-painted.png" width="1024" height="1024" />
+                    <image
+                      href="/art/optimized/environment-painted.00c506c983c0.webp"
+                      width="1024"
+                      height="1024"
+                    />
                   </svg>
                 </g>
               ))}
@@ -297,6 +310,23 @@ export function Board({
             const n = TERRAIN_INDEX[h.terrain];
             return (
               <g key={h.id} mask={`url(#terrain-${h.id})`}>
+                <polygon
+                  className="terrain-base"
+                  points={hexPoints(h.x * SIZE, h.y * SIZE, 63)}
+                  fill={TERRAIN_BASE[h.terrain]}
+                />
+                <text
+                  className="terrain-base-label"
+                  x={h.x * SIZE}
+                  y={h.y * SIZE + 34}
+                  textAnchor="middle"
+                  fontFamily="Barlow, sans-serif"
+                  fontSize="12"
+                  fontWeight="600"
+                  fill="#172d25"
+                >
+                  {h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain]}
+                </text>
                 <svg
                   x={h.x * SIZE - SIZE}
                   y={h.y * SIZE - SIZE}
@@ -304,7 +334,7 @@ export function Board({
                   height={SIZE * 2}
                   viewBox={`${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
                 >
-                  <image href="/art/terrain-fantasy.png" width="1536" height="1024" />
+                  <image href="/art/optimized/terrain-fantasy.777e0ac07117.webp" width="1536" height="1024" />
                 </svg>
               </g>
             );
@@ -428,7 +458,7 @@ export function Board({
                   height={SHIP_SIZE}
                   viewBox="1536 512 512 512"
                 >
-                  <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
+                  <image href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp" width="2048" height="1024" />
                 </svg>
               </g>
               <g
@@ -449,7 +479,11 @@ export function Board({
                     height="20"
                     viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
                   >
-                    <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
+                    <image
+                      href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp"
+                      width="2048"
+                      height="1024"
+                    />
                   </svg>
                 )}
                 <text className="port-rate" textAnchor="middle" x="10" y="4">

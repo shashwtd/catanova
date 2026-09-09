@@ -67,7 +67,7 @@ export function Avatar({
           role="img"
           aria-label={`${profile.name}'s avatar`}
         >
-          <image href="/art/avatars-fantasy.png" width="1448" height="1086" />
+          <image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp" width="1448" height="1086" />
         </svg>
       )}
     </span>

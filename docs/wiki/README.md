@@ -70,7 +70,7 @@ For Fandom or another managed service, ask its administrator to use the supporte
 
 ## Logo, navigation, and editing
 
-Upload the existing [Catanova full logo](../../apps/client/public/art/branding/catanova-logo-v2.png) separately, under a clear filename such as `Catanova-logo.png`. Use the host's supported logo/theme settings; self-hosted MediaWiki exposes the logo through its [logo configuration](https://www.mediawiki.org/wiki/Manual:$wgLogos). Keep the existing [art provenance](../art/logo-concepts/provenance-v2.json) with any distribution of the asset. The XML intentionally has no missing image links.
+Upload the existing [Catanova full logo](../../assets/source-art/branding/catanova-logo-v2.png) separately, under a clear filename such as `Catanova-logo.png`. Use the host's supported logo/theme settings; self-hosted MediaWiki exposes the logo through its [logo configuration](https://www.mediawiki.org/wiki/Manual:$wgLogos). Keep the existing [art provenance](../art/logo-concepts/provenance-v2.json) with any distribution of the asset. The XML intentionally has no missing image links.
 
 Use a readable encyclopedia skin, the Catanova logo, warm paper surfaces, restrained teal links, and the existing resource colors. Keep article text on a quiet background. No game login, OAuth secret, or Supabase key belongs in the wiki theme. Set the site's project/copyright link to the imported `Project:Copyrights` page as appropriate to its contribution license.
 

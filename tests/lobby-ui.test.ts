@@ -151,7 +151,7 @@ test('profile editing presents names and twelve fantasy portraits without the re
   assert.equal([...html.matchAll(/<input\b/g)].length, 1);
   assert.ok(html.includes('Display name'));
   assert.ok(html.includes('Fox cartographer') && html.includes('Mushroom wanderer'));
-  assert.ok(html.includes('/art/avatars-fantasy.png'));
+  assert.ok(html.includes('/art/optimized/avatars-fantasy.6bf04e83341a.webp'));
   assert.ok(!/aria-label="(?:Accent|Frame|Choose accent|Choose frame)"/.test(html));
   assert.ok(!html.includes('frame-brass') && !html.includes('--avatar-accent'));
   assert.deepEqual(profile, saved, 'legacy cosmetic data remains compatible while its controls are removed');

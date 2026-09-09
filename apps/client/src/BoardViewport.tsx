@@ -239,7 +239,11 @@ export function BoardViewport({
                   height="360"
                   viewBox={`${512 + MATERIAL_GUTTER} ${512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
                 >
-                  <image href="/art/environment-dark.png" width="1024" height="1024" />
+                  <image
+                    href="/art/optimized/environment-dark.c55c6de597e4.webp"
+                    width="1024"
+                    height="1024"
+                  />
                 </svg>
               </g>
             ))}

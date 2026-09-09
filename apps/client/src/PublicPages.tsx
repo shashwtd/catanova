@@ -61,6 +61,27 @@ export function PublicMetadata({ page }: { page: (typeof PUBLIC_PAGES)[number] }
 }
 
 const noop = () => {};
+/** Discover the welcome artwork before CSS, without preloading it on private game routes. */
+export function PublicArtPreloads() {
+  return (
+    <>
+      <link
+        rel="preload"
+        as="image"
+        type="image/webp"
+        href="/art/optimized/catanova-logo-v2.a161a887edbc.webp"
+        fetchPriority="high"
+      />
+      <link
+        rel="preload"
+        as="image"
+        type="image/webp"
+        href="/art/optimized/title-landscape.05db8101ac33.webp"
+        fetchPriority="low"
+      />
+    </>
+  );
+}
 /** Render the same public entry UI before React loads, without reading account/session data. */
 export function PublicLanding() {
   const auth = {

@@ -94,7 +94,8 @@ svg.game-icon {
   isolation: isolate;
   overflow: hidden;
   background-image:
-    radial-gradient(ellipse at 50% 42%, #17191422 15%, #060d13cc 100%), url('/art/environment-painted.png');
+    radial-gradient(ellipse at 50% 42%, #17191422 15%, #060d13cc 100%),
+    url('/art/optimized/environment-painted.00c506c983c0.webp');
   background-size:
     100% 100%,
     200% 200%;
@@ -1860,7 +1861,7 @@ svg.game-icon {
 .game-world {
   background-image:
     radial-gradient(ellipse at 46% 36%, #eadbbe55, #8b76542b 70%, #5b574e55),
-    url('/art/environment-painted.png');
+    url('/art/optimized/environment-painted.00c506c983c0.webp');
   background-size:
     100% 100%,
     200% 200%;
@@ -2498,7 +2499,7 @@ svg.game-icon {
   border-radius: 48% 48% 0 0 / 24px 24px 0 0;
   background:
     linear-gradient(#d1b98b77, #72593877),
-    url('/art/environment-painted.png') right bottom/200% 200%;
+    url('/art/optimized/environment-painted.00c506c983c0.webp') right bottom/200% 200%;
   border-top: 5px solid #ceb98ee0;
   box-shadow:
     0 -4px 8px #64523233,

@@ -102,7 +102,10 @@ export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boo
       });
       if (!gl) return;
       const images = await Promise.all(
-        ['/art/terrain-fantasy.png', '/art/environment-painted.png'].map(async (src) => {
+        [
+          '/art/optimized/terrain-fantasy.777e0ac07117.webp',
+          '/art/optimized/environment-painted.00c506c983c0.webp',
+        ].map(async (src) => {
           const image = new Image();
           image.src = src;
           await image.decode();

@@ -1,6 +1,6 @@
 # Initial Azure deployment
 
-Deployment record updated **10 September 2026**. Release **`8741e4459853277b41547e8cdc2d0a5c0d689eee`** is running on the Azure VM below, using [the single-VM bundle](README.md). The app and authoritative game server share one origin; Supabase handles accounts and friends. See [Operations](OPERATIONS.md) for the deployed paths, safe updates and recovery commands.
+Deployment record updated **10 September 2026**. The initial release was **`8741e4459853277b41547e8cdc2d0a5c0d689eee`**, using [the single-VM bundle](README.md). The current pinned release is recorded on the VM in `/etc/catanova/production.env` as `CATANOVA_REVISION` and in the game image's revision label. The app and authoritative game server share one origin; Supabase handles accounts and friends. See [Operations](OPERATIONS.md) for the deployed paths, safe updates and recovery commands.
 
 ## Deployed resources
 

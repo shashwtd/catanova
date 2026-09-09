@@ -22,7 +22,7 @@ export function DevelopmentArt({ kind }: { kind: CardKind | 'back' }) {
       viewBox={`${x} ${y} ${ART_COLUMNS[col + 1]! - x} ${ART_ROWS[row + 1]! - y}`}
       aria-hidden="true"
     >
-      <image href="/art/development-cards.png" width="1254" height="1254" />
+      <image href="/art/optimized/development-cards.d7fcdf84252a.webp" width="1254" height="1254" />
     </svg>
   );
 }
