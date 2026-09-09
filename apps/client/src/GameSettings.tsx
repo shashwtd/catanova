@@ -59,7 +59,7 @@ export function GameSettings({
           <button
             type="button"
             className="settings-mute"
-            aria-label={muted ? 'Unmute sound' : 'Mute sound'}
+            aria-label="Mute sound"
             aria-pressed={muted}
             onClick={() =>
               update(
