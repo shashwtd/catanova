@@ -13,6 +13,7 @@ test('one server serves client assets and same-origin WebSockets without exposin
   await mkdir(join(client, 'assets'), { recursive: true });
   await writeFile(join(client, 'index.html'), '<!doctype html><title>Catanova</title>');
   await writeFile(join(client, 'assets', 'game-123.js'), 'export const game = true;');
+  await writeFile(join(client, 'assets', 'font-123.woff2'), 'test font');
   await writeFile(join(dir, 'private.txt'), 'must remain private');
   const server = await startServer({ port: 0, databasePath: ':memory:', clientDirectory: client });
   t.after(async () => {
@@ -25,6 +26,14 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.match(await response.text(), /Catanova/);
   assert.match(response.headers.get('content-security-policy')!, /frame-ancestors 'none'/);
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  for (const path of ['/room/ABCD2345', '/room/abcd2345/']) {
+    const invitation = await fetch(origin + path);
+    assert.equal(invitation.status, 200);
+    assert.match(await invitation.text(), /Catanova/);
+    assert.equal(invitation.headers.get('cache-control'), 'no-cache');
+  }
+  const font = await fetch(`${origin}/assets/font-123.woff2`);
+  assert.equal(font.headers.get('content-type'), 'font/woff2');
   const asset = await fetch(`${origin}/assets/game-123.js`);
   assert.match(asset.headers.get('cache-control')!, /immutable/);
   assert.match(asset.headers.get('content-type')!, /javascript/);

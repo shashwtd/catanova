@@ -11,6 +11,8 @@ const types: Record<string, string> = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
 };
 /** Same-origin distribution. Only the built client directory is ever exposed. */
 export async function serveClient(request: IncomingMessage, response: ServerResponse, directory: string) {
@@ -26,7 +28,7 @@ export async function serveClient(request: IncomingMessage, response: ServerResp
     return;
   }
   const root = resolve(directory),
-    file = resolve(root, `.${path === '/' ? '/index.html' : path}`);
+    file = resolve(root, `.${path === '/' || /^\/room\/[A-Z2-9]{8}\/?$/i.test(path) ? '/index.html' : path}`);
   if (!file.startsWith(root + sep)) {
     response.writeHead(403).end();
     return;
