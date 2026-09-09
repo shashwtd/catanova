@@ -1,13 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode, PointerEvent } from 'react';
-import { Focus, Minus, Plus } from 'lucide-react';
-import { constrainCamera, MAX_ZOOM, MIN_ZOOM, pinchScale, wheelScale, zoomAt } from './camera.js';
-import type { Bounds, Camera } from './camera.js';
-export function BoardViewport({ seed, children }: { seed: number; children: ReactNode }) {
+import { Focus } from 'lucide-react';
+import { constrainCamera, dragTilt, REST_PITCH, pinchScale, wheelScale, zoomAt } from './camera.js';
+import type { Bounds, BoardTilt, Camera } from './camera.js';
+export function BoardViewport({
+  seed,
+  children,
+  depth = true,
+  tilt = true,
+  reducedMotion = false,
+}: {
+  seed: number;
+  children: ReactNode;
+  depth?: boolean;
+  tilt?: boolean;
+  reducedMotion?: boolean;
+}) {
   const viewport = useRef<HTMLDivElement>(null),
     current = useRef<Camera>({ scale: 1, x: 0, y: 0 }),
     bounds = useRef<Bounds>({ width: 1, height: 1 });
   const [camera, setCamera] = useState(current.current);
+  const [systemReduced, setSystemReduced] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+  const allowTilt = depth && tilt && !reducedMotion && !systemReduced;
+  const inclination = useRef<BoardTilt>({ pitch: REST_PITCH, yaw: 0 });
+  const [angle, setAngle] = useState(inclination.current);
+  const [dragging, setDragging] = useState(false);
   const pointers = useRef(new Map<number, { x: number; y: number; startX: number; startY: number }>());
   const suppressClick = useRef(false),
     pinch = useRef<{ distance: number; middle: { x: number; y: number } } | null>(null);
@@ -17,8 +36,22 @@ export function BoardViewport({ seed, children }: { seed: number; children: Reac
   }
   function reset() {
     move({ scale: 1, x: 0, y: 0 });
+    inclination.current = { pitch: REST_PITCH, yaw: 0 };
+    setAngle(inclination.current);
   }
   useEffect(reset, [seed]);
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const change = () => setSystemReduced(query.matches);
+    query.addEventListener('change', change);
+    return () => query.removeEventListener('change', change);
+  }, []);
+  useEffect(() => {
+    if (!allowTilt) {
+      inclination.current = { pitch: REST_PITCH, yaw: 0 };
+      setAngle(inclination.current);
+    }
+  }, [allowTilt]);
   useEffect(() => {
     const element = viewport.current!;
     const observer = new ResizeObserver(() => {
@@ -95,8 +128,13 @@ export function BoardViewport({ seed, children }: { seed: number; children: Reac
     } else if (dragged || suppressClick.current) {
       suppressClick.current = true;
       move({ ...current.current, x: current.current.x + dx, y: current.current.y + dy });
+      if (allowTilt) {
+        inclination.current = dragTilt(inclination.current, dx, dy);
+        setAngle(inclination.current);
+      }
     }
     if (suppressClick.current) {
+      setDragging(true);
       e.currentTarget.setPointerCapture(e.pointerId);
       e.preventDefault();
     }
@@ -104,18 +142,22 @@ export function BoardViewport({ seed, children }: { seed: number; children: Reac
   function release(e: PointerEvent<HTMLDivElement>) {
     pointers.current.delete(e.pointerId);
     pinch.current = null;
+    if (!pointers.current.size) setDragging(false);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   }
   return (
     <div
       ref={viewport}
       className="board-viewport"
+      data-depth={depth}
+      data-dragging={dragging}
       tabIndex={0}
-      aria-label="Board. Scroll or pinch to zoom; drag to pan; zero resets."
+      aria-label={`Board. Scroll or pinch to zoom; drag to pan${allowTilt ? ' and gently tilt' : ''}; zero fits the view.`}
       onPointerDown={pointerDown}
       onPointerMove={pointerMove}
       onPointerUp={release}
       onPointerCancel={release}
+      onLostPointerCapture={release}
       onClickCapture={(e) => {
         if (suppressClick.current && !(e.target as Element).closest('button')) {
           e.preventDefault();
@@ -144,35 +186,19 @@ export function BoardViewport({ seed, children }: { seed: number; children: Reac
         className="board-camera"
         style={{
           width: Math.min(bounds.current.width, (bounds.current.height * 880) / 804),
-          transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
+          transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})${depth ? ` rotateX(${angle.pitch}deg) rotateY(${angle.yaw}deg)` : ''}`,
         }}
       >
         {children}
       </div>
-      <div className="zoom-controls" aria-label="Board zoom">
-        <button
-          aria-label="Zoom out"
-          disabled={camera.scale <= MIN_ZOOM}
-          onClick={() =>
-            move(zoomAt(current.current, current.current.scale - 0.1, { x: 0, y: 0 }, bounds.current))
-          }
-        >
-          <Minus size={16} />
-        </button>
-        <button aria-label="Reset board view" title="Reset board view" onClick={reset}>
-          <Focus size={14} />
-          {Math.round(camera.scale * 100)}%
-        </button>
-        <button
-          aria-label="Zoom in"
-          disabled={camera.scale >= MAX_ZOOM}
-          onClick={() =>
-            move(zoomAt(current.current, current.current.scale + 0.1, { x: 0, y: 0 }, bounds.current))
-          }
-        >
-          <Plus size={16} />
-        </button>
-      </div>
+      <button
+        className="board-fit-view"
+        aria-label="Fit board view"
+        title="Fit view · Scroll or pinch to zoom · 0 to reset"
+        onClick={reset}
+      >
+        <Focus size={17} />
+      </button>
     </div>
   );
 }

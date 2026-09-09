@@ -1,0 +1,127 @@
+:root {
+  --tt-in-dur: 150ms;
+  --tt-out-dur: 50ms;
+  --tt-scale: 0.98;
+  --tt-delay: 80ms;
+  --tt-in-ease: ease-out;
+  --tt-out-ease: ease-out;
+  --tt-bg: #ffffff;
+  --tt-fg: #2f2f2f;
+}
+
+.t-tt-wrap {
+  position: relative;
+  display: inline-block;
+}
+.t-tt {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, 0) scale(var(--tt-scale));
+  transform-origin: 50% 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--tt-bg);
+  color: var(--tt-fg);
+  white-space: nowrap;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 2px 6px 0 rgba(0, 0, 0, 0.05),
+    0 4px 42px 0 rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  pointer-events: none;
+  /* Default rule controls the LEAVE state. transition-delay
+     stays unset so leaving plays without delay. */
+  transition:
+    opacity var(--tt-out-dur) var(--tt-out-ease),
+    transform var(--tt-out-dur) var(--tt-out-ease);
+}
+/* The 50ms delay belongs ONLY to the hover rule so leaving
+   the trigger snaps the delay back to 0 and the disappear
+   plays immediately. */
+.t-tt-wrap:hover .t-tt,
+.t-tt-trigger:focus-visible + .t-tt {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  transition-duration: var(--tt-in-dur);
+  transition-timing-function: var(--tt-in-ease);
+  transition-delay: var(--tt-delay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-tt {
+    transition: none !important;
+  }
+}
+
+:root {
+  --tilt-perspective: 1000px;
+  --tilt-return: 1000ms;
+  --tilt-return-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tilt-follow: 400ms;
+  --tilt-follow-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tilt-glare-opacity: 0.32;
+  --tilt-glare-fade: 300ms;
+  --tilt-glare-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The outer wrapper is the flat hit area; touch-action:none
+   lets a finger drag tilt the card instead of scrolling the
+   page, so tap-hold-drag works on mobile. */
+.t-tilt {
+  touch-action: none;
+}
+/* The card tilts toward the pointer via rotateX/rotateY fed
+   from JS; on leave it eases back to flat. A separate
+   .is-tilting class swaps in a short linear follow while the
+   pointer moves so the tilt tracks the cursor 1:1. */
+.t-tilt-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  transform: perspective(var(--tilt-perspective)) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg));
+  transform-style: preserve-3d;
+  transition: transform var(--tilt-return) var(--tilt-return-ease);
+  will-change: transform;
+}
+.t-tilt-card.is-tilting {
+  transition: transform var(--tilt-follow) var(--tilt-follow-ease);
+}
+/* Cursor-tracked glare: layered soft circles that add like
+   light (screen blend) at the pointer position. */
+.t-tilt-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(
+      circle 95px at var(--tilt-gx, 50%) var(--tilt-gy, 50%),
+      rgba(255, 255, 255, 0.48),
+      rgba(255, 255, 255, 0.06) 52%,
+      rgba(255, 255, 255, 0) 84%
+    ),
+    radial-gradient(
+      circle 200px at var(--tilt-gx, 50%) var(--tilt-gy, 50%),
+      rgba(255, 255, 255, 0.22),
+      rgba(255, 255, 255, 0.04) 58%,
+      rgba(255, 255, 255, 0) 78%
+    ),
+    radial-gradient(
+      circle 360px at var(--tilt-gx, 50%) var(--tilt-gy, 50%),
+      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0) 88%
+    );
+  transition: opacity var(--tilt-glare-fade) var(--tilt-glare-ease);
+}
+.t-tilt.is-hover .t-tilt-glare {
+  opacity: var(--tilt-glare-opacity);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-tilt-card {
+    transform: none !important;
+    transition: none !important;
+  }
+}

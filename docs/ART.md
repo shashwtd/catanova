@@ -1,38 +1,50 @@
 # Game art
 
-The current art is detailed, softly lit gouache-style terrain: distinct natural biomes, restrained saturation and lifted shadows. The table is lighter honey-walnut. Resource illustrations and twelve selectable portraits share the painted direction. These are original **AI-generated** assets, not human-painted commissions or official game art.
+The current direction is expressive fantasy: exaggerated silhouettes, crooked organic forms, tactile painted surfaces, and warm light against cooler shadows. Original creature portraits and whimsical terrain share this direction. Dark walnut surrounds the brighter island and hand cards. The bitmap illustrations are original **AI-generated assets** made with the built-in image generation tool; “painted” describes their appearance, not a human commission.
 
-## Saved assets and prompts
+## Current atlases and provenance
 
-An asset-only agent used the **built-in image generation tool** on 9 September 2026. Terrain and environment are edits of our previous original atlases; sprites and portraits are fresh generations. Accepted outputs were inspected and copied unchanged into the project. Sprites have verified real transparency. [Exact prompts, dimensions, references and SHA-256 provenance](art/painted-provenance.json).
+[Fantasy provenance](art/fantasy-provenance.json) records the exact source prompts, reference roles, accepted output filenames, dimensions, crop bounds, and SHA-256 hashes. Three user-provided images informed style only; their characters and scenes were not reproduced. Avatars, terrain, and development cards were fresh generations using those style references. Resource sprites were generated fresh without image references and have verified real alpha. Accepted PNGs were inspected and copied unchanged.
 
-| Saved asset                                                      | Dimensions and layout         | Row-major cell order                                                         |
-| ---------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| [Terrain](../apps/client/public/art/terrain-painted.png)         | 1536 × 1024; 3 × 2            | Timber forest, Clay quarry, Sheep meadow, Hay fields, Rock mountains, Desert |
-| [Environment](../apps/client/public/art/environment-painted.png) | 1254 × 1254; 2 × 2            | Deep ocean, shallow water, sandy ground, wood table                          |
-| [Sprites](../apps/client/public/art/sprites-painted.png)         | 1774 × 887; 4 × 2; real alpha | Logs, clay, sheep, hay, rocks, mixed-resource crate, T-pier, sailboat        |
-| [Avatars](../apps/client/public/art/avatars.png)                 | 1448 × 1086; 4 × 3            | Twelve distinct illustrated sailors, explorers and traders                   |
+| Current atlas                                                        | Dimensions and layout             | Content and use                                                                                                        |
+| -------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [Terrain](../apps/client/public/art/terrain-fantasy.png)             | 1536 × 1024; 3 × 2                | Timber, Clay, Sheep, Hay, Rock, Desert, in row-major order                                                             |
+| [Sprites](../apps/client/public/art/sprites-fantasy.png)             | 1774 × 887; 4 × 2; real alpha     | Logs, clay, sheep, hay, rocks, mixed-resource crate, T-pier, sailboat                                                  |
+| [Avatars](../apps/client/public/art/avatars-fantasy.png)             | 1448 × 1086; 4 × 3                | Twelve original fantasy personalities, from fox cartographer and pebble golem to witch herbalist and mushroom wanderer |
+| [Development cards](../apps/client/public/art/development-cards.png) | 1254 × 1254; 3 × 2 portrait cells | Knight, Road Building, Year of Plenty, Monopoly, Victory Point, card back                                              |
+| [Water and sand](../apps/client/public/art/environment-painted.png)  | 1254 × 1254; 2 × 2                | Deep ocean, shallow water, sand, lighter wood; the board uses the water and sand cells                                 |
+| [Dark tabletop](../apps/client/public/art/environment-dark.png)      | 1254 × 1254; 2 × 2                | Historical environment atlas restored unchanged; the table uses its bottom-right walnut cell                           |
 
-Environment and sprite outputs retain the requested grid proportions at different pixel dimensions. SVG view boxes and normalized shader coordinates select cells without editing the raster output. Portraits are offered with six accents and rope, brass or plain frames. Both the selected portrait and styling are saved; frame color is separate from the player's assigned road/house color.
+The avatar artwork has uneven row heights. [Profile.tsx](../apps/client/src/Profile.tsx) uses the measured row boundaries `0, 350, 698, 1086` and 362-pixel columns, with centered circular crops. Other measured boundaries and nominal atlas grids are recorded in the fantasy provenance. SVG view boxes and normalized shader coordinates select artwork without editing the source PNGs.
 
-## Rendering and readability
+Profiles offer a display name and one of twelve portraits. Portraits use a consistent frame; there are no accent or frame choices. Assigned player colors still identify roads and buildings.
 
-A static WebGL 2 layer samples the terrain and environment atlases. Inset hex masks with subtle noise feather each biome into shared sandy ground. A textured beach, shallow water and foam follow the coast. Eighteen ocean hexes form one outer ring, with a restrained physical rim at its exposed boundary.
+The painted environment is a built-in image-tool edit documented in [painted provenance](art/painted-provenance.json). The dark tabletop is byte-for-byte identical to `apps/client/public/art/environment.png` at Git revision `e7d567a649b3bf059cdaf12018e5843b91650483`; its original built-in generation prompt is in [vibrant provenance](art/vibrant-provenance.json). The fantasy provenance also records both currently used environment assets and the dark atlas's restoration source.
 
-The GPU layer draws on asset load, context recovery and resize, not on an idle animation loop. Device pixel ratio is capped at two. The SVG fallback displays the same atlas with displaced, feathered masks; its shoreline is simpler. Zoom transforms the board and is bounded between 85% and 220%; wheel/pinch deltas are capped, focal points are preserved, and panning keeps the board reachable. Dragging suppresses accidental placement clicks.
+Only the active atlases belong in the browser's art directory. Superseded bitmap variants are retained in Git history. Earlier provenance records remain for traceability; [development provenance](art/development-provenance.json) is explicitly historical, and fantasy provenance is authoritative for the current development-card image.
 
-Each harbor has **two planked bridges**, one beginning at each eligible coastal corner, converging toward its boat. Resource medallions identify 2:1 ports; a question mark identifies a general 3:1 port. The mix remains four general and five specific harbors. Bridges are procedural SVG geometry so they stay aligned to actual rules-engine vertices.
+## Terrain, pieces, and camera
 
-Roads use solid rotated rectangles and a contrasting foundation. They avoid SVG filters on zero-width vertical line bounds, which could make vertical roads disappear. Houses and cities have larger silhouettes, roof highlights, windows and visible bases; the local player's pieces receive an extra pale outline. Number tokens and placement targets remain above terrain, with keyboard-accessible actions.
+[Terrain.tsx](../apps/client/src/Terrain.tsx) draws a static WebGL 2 terrain plane from the terrain and environment atlases. Inset hex masks feather biomes into shared sand. Shallow water, textured beach and foam follow the coast; eighteen ocean hexes form the outer ring. The SVG fallback uses the same art with a simpler shoreline.
 
-Hand cards use paper borders, stacked edges, counts, resource art and a slight fan above the bottom UI table edge. Awards live on player profiles. Finite feedback and notification motion honor reduced-motion preferences.
+Terrain redraws on load, resize, board changes and context recovery, with no idle render loop. Device pixel ratio is capped at two. The WebGL low-power preference is an advisory request. Graphics-driver behavior, touch handling and performance on lower-powered devices still require device testing.
 
-Images are served locally and revalidated with ETags; unchanged refreshes can reuse cached atlases. Slow-network image delivery, mobile graphics-driver behavior and real touch handling still require device testing. Optimized delivery formats can be added without replacing the source art.
+[Pieces3D.tsx](../apps/client/src/Pieces3D.tsx) builds roads, settlements and cities from positioned CSS planes: solid road blocks, wall faces, pitched roofs, gables and foundations. These are code-built dimensional pieces, separate from the generated bitmap art. Their coordinates match the rules-engine edges and vertices. The 2D SVG pieces remain available when **3D pieces** is disabled; interaction targets and accessible labels stay in the board layer.
 
-## Fonts, icons and licenses
+[BoardViewport.tsx](../apps/client/src/BoardViewport.tsx) places the scene in CSS perspective. With depth enabled it rests at a 12-degree pitch. Dragging pans and, when **Board movement** is enabled, gently tilts within 8–16 degrees of pitch and ±5 degrees of yaw. Tilt has no inertia or idle orbit. Reduced-motion preferences disable drag-induced tilt. Scroll, pinch and keyboard controls zoom between 85% and 220%; the fit button or `0` restores the view. Panning is bounded, and dragging suppresses accidental placement clicks.
+
+Each harbor has two procedural planked bridges anchored to its eligible coastal corners and converging toward the boat. Specific ports use resource medallions; general ports use a question mark. The nine harbors retain four general and five specific trades. Procedural bridge geometry keeps the piers aligned with the actual rules-engine vertices.
+
+## Cards and visual feedback
+
+[DevelopmentCards.tsx](../apps/client/src/DevelopmentCards.tsx) composes the fantasy card illustrations with readable titles, counts, availability states and tooltips. The atlas contains artwork only; rules text and labels are rendered by the interface. Duplicate development cards share stacks, and the navy compass-and-leaf cell supplies the card back. The six current scenes and their exact generation prompt are recorded in fantasy provenance.
+
+Resource hand cards combine the transparent resource art with paper edges, counts and a slight fan above the dark table. Dice throws, resource trails, card feedback and the cloud-and-compass scene transition are finite visual effects. The visual-effects preference and system reduced-motion setting select quieter presentation; depth and board movement have separate controls. Awards remain attached to player profiles.
+
+## Fonts, icons, and licenses
 
 [Lucide](https://lucide.dev/) supplies interface icons under ISC, including the listed Feather-derived icons under MIT. Cinzel supplies compact game titles and number tokens; Barlow supplies controls. Both fonts use SIL Open Font License 1.1 and are bundled locally through Fontsource.
 
 Full notices ship with the browser distribution: [Lucide](../apps/client/public/licenses/lucide.txt), [Cinzel](../apps/client/public/licenses/cinzel.txt), [Barlow](../apps/client/public/licenses/barlow.txt). These assets retain their own licenses.
 
-Original repository contributions are distributed under MIT to the extent rights apply. This provenance record asserts no third-party trademark rights or exclusive ownership of generated imagery. Previous art and prompt sets remain available in Git history.
+Original repository contributions are distributed under MIT to the extent rights apply. This provenance record asserts no third-party trademark rights or exclusive ownership of generated imagery.

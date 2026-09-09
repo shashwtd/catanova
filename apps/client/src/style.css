@@ -2099,7 +2099,7 @@ svg.lucide {
   display: block;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid var(--accent);
+  border: 2px solid #b3a47f;
   background: #efe3c6;
   box-shadow: 0 2px 4px #3a2b202c;
   flex: none;
@@ -2110,18 +2110,6 @@ svg.lucide {
   height: 100%;
   overflow: hidden;
   border-radius: 50%;
-}
-.avatar-medallion.frame-rope {
-  border-style: double;
-  border-width: 5px;
-}
-.avatar-medallion.frame-brass {
-  border-color: #b59454;
-  outline: 1px solid var(--accent);
-  outline-offset: 2px;
-}
-.avatar-medallion.frame-plain {
-  border-width: 2px;
 }
 .lobby-screen {
   position: relative;
@@ -2801,46 +2789,6 @@ svg.lucide {
 .avatar-choices button.selected {
   border-color: #eed6a0;
   background: #b3ab6744;
-}
-.cosmetic-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 17px;
-  gap: 12px;
-  font-size: 12px;
-  color: #c5b996;
-}
-.accent-choices,
-.frame-choices {
-  display: flex;
-  gap: 8px;
-}
-.accent-choices button {
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  border: 2px solid #e2cda644;
-  display: grid;
-  place-items: center;
-  color: #fff7dd;
-}
-.accent-choices button[aria-pressed='true'] {
-  outline: 1px solid #f3dba7;
-  outline-offset: 3px;
-}
-.frame-choices button {
-  border-radius: 4px;
-  background: #7c7e5e55;
-  color: #ccc4a5;
-  padding: 6px 8px;
-  border: 1px solid #a9a27d55;
-  text-transform: capitalize;
-  font-size: 11px;
-}
-.frame-choices button[aria-pressed='true'] {
-  border-color: #d9c783;
-  color: #f3dba7;
 }
 .connection-quality {
   display: flex;

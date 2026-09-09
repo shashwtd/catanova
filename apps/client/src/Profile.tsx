@@ -1,8 +1,22 @@
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
 import { Check } from 'lucide-react';
-import { ACCENTS, AVATAR_COUNT, defaultProfile } from '../../../packages/protocol/src/profile.js';
+import { AVATAR_COUNT, defaultProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
+const AVATAR_NAMES = [
+  'Fox cartographer',
+  'Pebble golem',
+  'Woodland sprite',
+  'Owl alchemist',
+  'Pirate captain',
+  'Badger mason',
+  'Ram shepherd',
+  'Goblin merchant',
+  'Witch herbalist',
+  'Tide trader',
+  'Jolly builder',
+  'Mushroom wanderer',
+];
+const AVATAR_ROWS = [0, 350, 698, 1086];
 export function Avatar({
   profile = defaultProfile(),
   className = '',
@@ -10,17 +24,18 @@ export function Avatar({
   profile?: Profile;
   className?: string;
 }) {
+  const row = Math.floor(profile.avatar / 4),
+    top = AVATAR_ROWS[row]!,
+    height = AVATAR_ROWS[row + 1]! - top;
   return (
-    <span
-      className={`avatar-medallion frame-${profile.frame} ${className}`}
-      style={{ '--accent': ACCENTS[profile.accent] } as CSSProperties}
-    >
+    <span className={`avatar-medallion ${className}`}>
       <svg
-        viewBox={`${(profile.avatar % 4) * 362} ${Math.floor(profile.avatar / 4) * 362} 362 362`}
+        viewBox={`${(profile.avatar % 4) * 362} ${top} 362 ${height}`}
+        preserveAspectRatio="xMidYMid slice"
         role="img"
         aria-label={`${profile.name}'s avatar`}
       >
-        <image href="/art/avatars.png" width="1448" height="1086" />
+        <image href="/art/avatars-fantasy.png" width="1448" height="1086" />
       </svg>
     </span>
   );
@@ -71,45 +86,13 @@ export function ProfileEditor({
             type="button"
             key={i}
             className={i === draft.avatar ? 'selected' : ''}
-            aria-label={`Avatar ${i + 1}`}
+            aria-label={AVATAR_NAMES[i]}
             aria-pressed={i === draft.avatar}
             onClick={() => setDraft({ ...draft, avatar: i })}
           >
             <Avatar profile={{ ...draft, avatar: i, frame: 'plain' }} />
           </button>
         ))}
-      </div>
-      <div className="cosmetic-row">
-        <span>Accent</span>
-        <div className="accent-choices">
-          {Object.entries(ACCENTS).map(([key, color]) => (
-            <button
-              type="button"
-              key={key}
-              style={{ background: color }}
-              aria-label={`${key} accent`}
-              aria-pressed={key === draft.accent}
-              onClick={() => setDraft({ ...draft, accent: key as Profile['accent'] })}
-            >
-              {key === draft.accent && <Check size={15} />}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="cosmetic-row">
-        <span>Frame</span>
-        <div className="frame-choices">
-          {(['rope', 'brass', 'plain'] as const).map((frame) => (
-            <button
-              type="button"
-              key={frame}
-              aria-pressed={frame === draft.frame}
-              onClick={() => setDraft({ ...draft, frame })}
-            >
-              {frame}
-            </button>
-          ))}
-        </div>
       </div>
       {error && (
         <p role="alert" className="entry-error">

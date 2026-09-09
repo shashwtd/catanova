@@ -5,6 +5,8 @@ import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
 import { Terrain } from './Terrain.js';
+import { Pieces3D } from './Pieces3D.js';
+import { DICE_ROLL_MS } from './DiceThrow.js';
 import {
   coastline,
   HEX_SIZE as SIZE,
@@ -36,7 +38,7 @@ export function Sprite({
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <image href="/art/sprites-painted.png" width="2048" height="1024" />
+      <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
     </svg>
   );
 }
@@ -63,6 +65,9 @@ export function Board({
   disabled,
   onAction,
   onRobber,
+  depth = true,
+  glowHexes = [],
+  effectId,
 }: {
   board: Island;
   game?: GameView;
@@ -71,6 +76,9 @@ export function Board({
   disabled: boolean;
   onAction: (action: GameAction) => void;
   onRobber: (hex: number) => void;
+  depth?: boolean;
+  glowHexes?: readonly number[];
+  effectId?: string;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
   const coast = useMemo(() => coastline(board), [board.seed]);
@@ -91,7 +99,7 @@ export function Board({
     }
   };
   return (
-    <div className={`island-stage ${gpuReady ? 'gpu-ready' : ''}`}>
+    <div className={`island-stage ${gpuReady ? 'gpu-ready' : ''} ${depth ? 'has-depth' : ''}`}>
       <Terrain board={board} onReady={setGpuReady} />
       <svg
         className="island"
@@ -179,7 +187,7 @@ export function Board({
                   height={SIZE * 2}
                   viewBox={`${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
                 >
-                  <image href="/art/terrain-painted.png" width="1536" height="1024" />
+                  <image href="/art/terrain-fantasy.png" width="1536" height="1024" />
                 </svg>
               </g>
             );
@@ -187,14 +195,13 @@ export function Board({
         </g>
         {board.hexes.map((h) => {
           const x = h.x * SIZE,
-            y = h.y * SIZE,
-            producing = !!game?.dice && game.dice[0] + game.dice[1] === h.number && h.id !== game.robber;
+            y = h.y * SIZE;
           const canMoveRobber = robberMode && h.id !== game?.robber && !disabled;
           const name = h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain];
           return (
             <g
-              key={`${h.id}-${producing ? game?.turn : 'idle'}`}
-              className={`terrain-hit ${producing ? 'producing' : ''} ${canMoveRobber ? 'robber-target' : ''}`}
+              key={h.id}
+              className={`terrain-hit ${canMoveRobber ? 'robber-target' : ''}`}
               role={canMoveRobber ? 'button' : undefined}
               tabIndex={canMoveRobber ? 0 : undefined}
               aria-label={`${name}${h.number ? `, ${h.number}` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
@@ -207,6 +214,24 @@ export function Board({
             >
               <title>{`${name}${h.number ? ` · ${h.number} · ${pips(h.number)} production pips` : ''}`}</title>
               <polygon className="hex-hit" points={hexPoints(x, y, 60)} />
+              <circle
+                data-effect-hex={h.id}
+                cx={x}
+                cy={y}
+                r="2"
+                fill="transparent"
+                pointerEvents="none"
+                aria-hidden="true"
+              />
+              {effectId && glowHexes.includes(h.id) && (
+                <polygon
+                  key={`${effectId}-${h.id}`}
+                  className="production-bloom"
+                  points={hexPoints(x, y, 57)}
+                  style={{ animationDelay: `${DICE_ROLL_MS}ms` }}
+                  aria-hidden="true"
+                />
+              )}
               {h.id === game?.robber && (
                 <polygon points={hexPoints(x, y, 57)} fill="#101b26" opacity=".28" pointerEvents="none" />
               )}
@@ -281,7 +306,7 @@ export function Board({
               })}
               <g transform={`translate(${p.x + p.nx * 70},${p.y + p.ny * 70}) rotate(${p.angle})`}>
                 <svg x="-26" y="-28" width="52" height="56" viewBox="1536 512 512 512">
-                  <image href="/art/sprites-painted.png" width="2048" height="1024" />
+                  <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
                 </svg>
               </g>
               <g transform={`translate(${p.markerX},${p.markerY})`}>
@@ -298,7 +323,7 @@ export function Board({
                     height="32"
                     viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
                   >
-                    <image href="/art/sprites-painted.png" width="2048" height="1024" />
+                    <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
                   </svg>
                 )}
                 <rect className="port-rate-bg" x="-14" y="10" width="28" height="15" rx="5" />
@@ -319,6 +344,8 @@ export function Board({
               <g
                 key={id}
                 data-road-id={id}
+                role="img"
+                aria-label={`${game.players.find((p) => p.id === owner)?.name} · Road ${Number(id) + 1}`}
                 className={`built-piece road-piece ${owner === me ? 'own-piece' : ''}`}
                 transform={`translate(${((a.x + b.x) * SIZE) / 2},${((a.y + b.y) * SIZE) / 2}) rotate(${(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI})`}
               >
@@ -352,6 +379,8 @@ export function Board({
               <g
                 key={`${id}-${b.kind}`}
                 data-building-id={id}
+                role="img"
+                aria-label={`${game.players.find((p) => p.id === b.player)?.name} · ${b.kind}`}
                 className={`built-piece house-piece ${b.player === me ? 'own-piece' : ''}`}
                 transform={`translate(${v.x * SIZE},${v.y * SIZE})`}
               >
@@ -425,7 +454,17 @@ export function Board({
               </g>
             );
           })}
+        <circle
+          data-effect-bank
+          cx="0"
+          cy="0"
+          r="2"
+          fill="transparent"
+          pointerEvents="none"
+          aria-hidden="true"
+        />
       </svg>
+      {depth && game && <Pieces3D board={board} game={game} me={me} colors={PLAYER_COLORS} />}
     </div>
   );
 }

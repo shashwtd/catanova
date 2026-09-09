@@ -1,0 +1,101 @@
+.fantasy-transition {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 75;
+  pointer-events: auto;
+}
+.fantasy-mist {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 46%, #f8efd9, #d9e4dc);
+  animation: fantasy-mist-lift var(--fantasy-duration) linear both;
+}
+.fantasy-clouds {
+  position: absolute;
+  top: -8%;
+  bottom: -8%;
+  width: 61%;
+  height: 116%;
+  animation: fantasy-cloud-part var(--fantasy-duration) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.fantasy-clouds-0 {
+  left: -3%;
+  --cloud-direction: -1;
+}
+.fantasy-clouds-1 {
+  right: -3%;
+  --cloud-direction: 1;
+}
+.fantasy-cloud-stroke {
+  fill: none;
+  stroke: #fff9e9;
+  stroke-width: 17;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+.fantasy-cloud-brush {
+  fill: none;
+  stroke: #aabcb824;
+  stroke-width: 30;
+  stroke-linecap: round;
+}
+.fantasy-compass {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  left: calc(50% - 36px);
+  top: calc(48% - 36px);
+  fill: #c5a76c;
+  stroke: #a18755;
+  stroke-width: 0.7px;
+  animation: fantasy-compass-lift var(--fantasy-duration) ease-out both;
+}
+.fantasy-compass circle {
+  fill: #fbf0d5;
+}
+@keyframes fantasy-cloud-part {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(var(--cloud-direction) * 110%));
+  }
+}
+@keyframes fantasy-mist-lift {
+  0%,
+  10% {
+    opacity: 1;
+  }
+  52%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes fantasy-compass-lift {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.85) rotate(-12deg);
+  }
+  44%,
+  100% {
+    opacity: 0;
+    transform: scale(1.16) rotate(8deg);
+  }
+}
+.fantasy-transition-reduced .fantasy-clouds,
+.fantasy-transition-reduced .fantasy-compass {
+  display: none;
+}
+.fantasy-transition-reduced .fantasy-mist {
+  animation-duration: 160ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fantasy-clouds,
+  .fantasy-compass {
+    display: none;
+  }
+  .fantasy-mist {
+    animation-duration: 160ms;
+  }
+}

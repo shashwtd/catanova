@@ -12,7 +12,7 @@ npm run build
 npm start
 ```
 
-Open `http://127.0.0.1:3000`. Choose **Create room**, then enter your name. Meet in the lobby, select a portrait, accent and frame, and share the invitation from the invite block or an empty seat’s plus icon. **Join room** is a separate form. An invite opens `/room/CODE`, shows that room’s roster, and asks the friend to join. A saved seat in another room never overrides the invitation. Each player marks **Ready**; the host starts once all three or four are ready and connected. The board appears after Start. Turn order is randomized. Additional players cannot join a started match. Existing account owners can resume.
+Open `http://127.0.0.1:3000`. Choose **Create room**, then enter your name. Meet in the lobby, select a fantasy avatar, and share the invitation from the invite block or an empty seat’s plus icon. **Join room** is a separate form. An invite opens `/room/CODE`, shows that room’s roster, and asks the friend to join. A saved seat in another room never overrides the invitation. Everyone except the host marks **Ready**; the host starts once all three or four are connected and the other players are ready. The host can set the optional turn timer through Settings. A settings change asks the other players to ready up again. The board appears after Start. Turn order is randomized. Additional players cannot join a started match. Existing account owners can resume.
 
 For a single-machine connectivity playtest, open the URL in four **independently opened tabs** and join the same room. Refreshing a tab resumes its own seat. Duplicating a tab may copy its session storage; that resumes the existing seat instead of creating a new player. A seat opened elsewhere closes the old connection.
 
@@ -24,7 +24,15 @@ The board highlights legal starting corners and roads. After setup, roll dice, s
 
 A trade offer states what the active player gives and wants. Any opponent with the requested cards can accept it, completing that exchange immediately. The active player's next non-offer action withdraws an open offer. There are no counteroffer messages or in-game chat yet; voice chat outside the game works well for negotiation.
 
-The bottom table edge holds the resource cards. Its right side has one dice button, Trade, Buy development card and End turn. The development-hand icon opens the card panel. Player profiles, piece counts, disconnected symbols and award badges are on the right. Game tools (history, connection graph, rules) are at top left; room/profile/invite/leave controls are at bottom left. Scroll or pinch to zoom within 85–220%, drag to pan, or reset to 100%. Cards bought this turn wait until a later turn, except Victory Point cards, which count automatically. Longest Road, Largest Army, and own-turn victory are computed by the server. A finished table remains saved; create a new room for another game.
+The bottom table edge holds the resource cards. Its right side has one dice button, Trade, Buy development card and End turn. The development-hand icon opens an illustrated spread. Copies share a stack, with a playable copy chosen first. Select a card, review its effect, and press its labeled Play button. Hover, focus or tap for the story and rule explanation; held cards explain why they cannot be played yet. Player profiles, piece counts, disconnected symbols and award badges are on the right. Game tools (history, connection graph, rules) are at top left; settings/room/profile/invite/leave controls are at bottom left. Scroll or pinch to zoom within 85–220%, drag to pan with a bounded 3D tilt, or use Fit view to reset. Cards bought this turn wait until a later turn, except Victory Point cards, which count automatically. Longest Road, Largest Army, and own-turn victory are computed by the server. A finished table remains saved; create a new room for another game.
+
+## Effects and controls
+
+Dice physically tumble to the saved server result. Resource-producing tiles glow, miniature resource cards travel to the hand, and each count changes on arrival. Spending sends miniatures toward the new piece. The server state and legal actions remain authoritative throughout; presentation never delays saving a move. Rapid new snapshots can replace an unfinished effect, but cannot replace the accepted game state with animation state.
+
+Roads, settlements and cities are lightweight CSS 3D meshes, with static lighting and a flat-view option. A cloud curtain introduces a newly started game. Sound effects use original synthesized material taps, paper swishes and short magical tones. Browsers require a click or keypress before audio; muted settings and hidden tabs stop it. Sound, volume, visual effects, 3D, tilt and activity announcements are saved locally in Settings. System reduced motion takes precedence. Empty resource cards have muted paper/ink and no hover tilt or sound.
+
+[Implementation and performance limits](GAME_FEEDBACK.md). Audio balance, browser rendering, touchscreen handling and longer multiplayer sessions still require human device testing.
 
 ## Recovery behavior
 
@@ -34,7 +42,7 @@ The last seat is also saved in local storage for the explicit **Resume game** bu
 
 The door icon leaves the room. Leaving before a game starts frees the seat and transfers hosting to the next remaining player. Leaving an active game keeps the seat and game saved for resumption. A network disconnection only changes presence and does not free a seat.
 
-No bot takes over a disconnected seat, and there is no timer or forfeit. The game waits for its player. Process restart is covered; disk loss and cloud failover are separate work.
+With the timer off (the default), the game waits for its player. If the host enabled the optional 40/65/90/115/140-second timer, expiry completes only mandatory actions and ends the turn with legal defaults. Discards have their own countdowns; the active turn pauses while they are pending. Deadlines survive reconnects and server restarts. There are no forfeits or optional purchases by a bot. [Full timer behavior](TURN_CLOCK.md). Process restart is covered; disk loss and cloud failover are separate work.
 
 ## Current scope and known differences
 
@@ -43,7 +51,7 @@ No bot takes over a disconnected seat, and there is no timer or forfeit. The gam
 - The server randomizes seat order instead of showing ceremonial starting-player dice rolls.
 - Two rare card situations use visible provisional decisions: Road Building requires a legal first road and uses the second whenever possible; Year of Plenty takes the bank's remaining card if only one exists and cannot be played into an empty bank. These await primary-source confirmation; see the [ledger](RULE_SOURCES.md).
 - The history tab records every newly accepted game action, including setup placements, rolls, builds and trades, and loads older pages on request. A game created before the ledger was added only retains its surviving old journal entries plus new events. The public journal records trades, builds and played cards. It omits the stolen resource type and discarded resource mix. Exact bank counts are available to the client for resource selection, so bank changes can reveal discarded resources; this is an explicit current information-policy difference to review during conformance testing. Opponent hands and deck order are never sent.
-- Three/four-player ordinary play is implemented. Expansions, two-player rules, bots, matchmaking, rematch controls, chat, sound and spectating are not implemented. Supabase Google authentication is integrated but needs project/provider configuration; public guests are proposed and remain disabled.
+- Three/four-player ordinary play is implemented. Expansions, two-player rules, bots, matchmaking, rematch controls, chat and spectating are not implemented. Supabase Google authentication is integrated but needs project/provider configuration; public guests are proposed and remain disabled.
 - The interface includes responsive layout, keyboard-accessible board targets, a native modal for rules, and reduced-motion support. Device/browser visual QA and full human games are still needed.
 
 ## Development

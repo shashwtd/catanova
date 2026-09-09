@@ -6,11 +6,15 @@ import type {
   Session,
 } from '../../../packages/protocol/src/index.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
+import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { snapshotProblem } from './state.js';
 
 type Ack = Extract<ServerMessage, { type: 'ack' }>;
-export type PendingCommand = Extract<ClientMessage, { type: 'increment' | 'action' | 'leave' | 'lobby' }>;
+export type PendingCommand = Extract<
+  ClientMessage,
+  { type: 'increment' | 'action' | 'leave' | 'lobby' | 'settings' }
+>;
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'closed';
 export type PingSample = { at: number; rtt: number | null };
 export type NetworkMetrics = {
@@ -19,6 +23,7 @@ export type NetworkMetrics = {
   rejectedSnapshots: number;
   serverRevision: number | null;
   syncIssue: string | null;
+  clockOffsetMs?: number;
 };
 export const initialMetrics = (): NetworkMetrics => ({
   samples: [],
@@ -241,6 +246,8 @@ export class Connection {
       } else if (message.type === 'pong') {
         const sent = this.probes.get(message.nonce);
         if (sent !== undefined) {
+          if (message.serverNow !== undefined)
+            this.metrics.clockOffsetMs = message.serverNow + (performance.now() - sent) / 2 - Date.now();
           this.probes.delete(message.nonce);
           this.sample(Math.round((performance.now() - sent) * 10) / 10);
         }
@@ -297,6 +304,7 @@ export class Connection {
     operation:
       | Omit<Extract<PendingCommand, { type: 'action' }>, 'commandId' | 'expectedRevision'>
       | Omit<Extract<PendingCommand, { type: 'lobby' }>, 'commandId' | 'expectedRevision'>
+      | Omit<Extract<PendingCommand, { type: 'settings' }>, 'commandId' | 'expectedRevision'>
       | { type: 'increment' | 'leave' },
   ): Promise<Ack> {
     if (this.status !== 'connected' || !this.state || this.socket?.readyState !== WebSocket.OPEN)
@@ -325,6 +333,9 @@ export class Connection {
   }
   lobby(ready: boolean, profile?: Profile) {
     return this.submit({ type: 'lobby', ready, ...(profile ? { profile } : {}) });
+  }
+  settings(settings: RoomSettings) {
+    return this.submit({ type: 'settings', settings });
   }
   stop() {
     this.stopped = true;

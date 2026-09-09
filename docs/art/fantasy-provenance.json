@@ -1,0 +1,570 @@
+{
+  "schemaVersion": 1,
+  "recordedAtUtc": "2026-09-09T09:40:52Z",
+  "status": "current",
+  "artDirection": "Expressive original fantasy silhouettes, crooked organic curves, tactile painted 2.5D storybook surfaces, bold shape hierarchy, atmospheric warm light against cool shadows, moderate saturation and charming unusual creatures.",
+  "toolProvenance": "Built-in tools.image_gen__imagegen. Four independent accepted generations ran concurrently. Avatars, terrain and development cards used three user images as style references only. Sprites used a fresh text-only generation to produce true alpha.",
+  "styleReferences": [
+    {
+      "id": "style-reference-1",
+      "filename": "codex-clipboard-c82ca602-0331-4736-b1cd-0662a7bc70f8.png",
+      "origin": "user-provided local image",
+      "role": "style only; no characters or scenes copied",
+      "inspectedBeforeGeneration": true
+    },
+    {
+      "id": "style-reference-2",
+      "filename": "codex-clipboard-02dc5144-854e-43b4-ae85-0d897767bc15.png",
+      "origin": "user-provided local image",
+      "role": "style only; no characters or scenes copied",
+      "inspectedBeforeGeneration": true
+    },
+    {
+      "id": "style-reference-3",
+      "filename": "codex-clipboard-43b6b1a3-a2f4-45f6-9e3b-6c8a58ef6deb.png",
+      "origin": "user-provided local image",
+      "role": "style only; no characters or scenes copied",
+      "inspectedBeforeGeneration": true
+    }
+  ],
+  "workflow": "All references and accepted outputs were visually inspected. PNG dimensions and hashes were independently checked; atlas boundaries were measured read-only; sprite alpha was decoded and verified. Only unchanged PNG copies were saved.",
+  "assets": [
+    {
+      "name": "avatars-fantasy",
+      "savedPath": "apps/client/public/art/avatars-fantasy.png",
+      "generatedOutputFilename": "exec-ce760d93-56e7-4b5b-8164-5e520c70e930.png",
+      "date": "2026-09-09",
+      "status": "accepted",
+      "tool": "tools.image_gen__imagegen",
+      "mode": "fresh generation with style references",
+      "styleReferenceIds": ["style-reference-1", "style-reference-2", "style-reference-3"],
+      "prompt": "Use case: stylized-concept\nAsset type: atlas of twelve original expressive fantasy character portraits for a whimsical island strategy game.\nSTYLE DIRECTION: Original expressive fantasy game art with bold exaggerated silhouettes, whimsical crooked curves and organic forms, tactile painted 2.5D storybook surfaces, confident broad shape hierarchy, atmospheric warm light with delicate rim glow against cooler shadows. Charming odd fantasy personalities, sculptural but visibly painted, soft brush texture and expressive irregular edges. Moderate saturation: rich and inviting, never neon or candy-colored. Invent wholly original subjects. Do not reproduce any actual character, costume, face, logo, composition or scene from the references. The attached images, when present, are STYLE REFERENCES ONLY. This is a major move away from generic realistic adult portraits or neutral medieval concept art.\nGenerate ONE image, request 1536x1152 pixels, exactly 4:3 aspect ratio. A precise FOUR-COLUMN by THREE-ROW grid of twelve equal SQUARE portrait cells, edge to edge, no gutters or drawn grid. Each cell is a lively circular bust composition with headgear and face safely inside its square and generous crop margin. Quiet atmospheric background colors vary across portraits. Medium detail, crisp bold silhouette and readable personality at 48 pixels.\nTwelve exact row-major personalities:\nTOP ROW 1: sly fox cartographer, long angular snout and expressive pointed ears, jaunty oversized ochre scarf, rolled blank map peeking below, clever tilted pose.\nTOP ROW 2: stout pebble golem, absurdly broad rounded stone head and tiny kind eyes, asymmetrical moss tuft, chunky shoulders, warm patient grin.\nTOP ROW 3: mischievous woodland sprite, twiglike curved features and leafy eyebrows, crooked acorn cap, impish sideways grin, wholly original bark-and-leaf creature.\nTOP ROW 4: owl alchemist, very round feathery silhouette, enormous swept eyebrows and hooked beak, comically tall bent indigo hat, curious intense expression.\nMIDDLE ROW 1: weathered adult human pirate woman with an exaggerated long nose, strongly angled cheekbones, wide adventurous grin, abundant red scarf and curling hair, asymmetrical crooked hat; expressive character design, not a realistic headshot.\nMIDDLE ROW 2: gruff badger mason, wide squat muzzle, lowered bushy eyebrows and massive shoulders, small battered work cap, reserved kindly expression.\nMIDDLE ROW 3: bright cheerful ram shepherd, exuberant curled horns, fluffy pear-shaped face, lively smile and patched sage neckerchief.\nMIDDLE ROW 4: lanky goblin merchant, long narrow face, huge asymmetrical ears and sharply curved nose, tall floppy burgundy trading cap, theatrical raised eyebrow and charming grin.\nBOTTOM ROW 1: warm witch herbalist, older adult with a long gently crooked chin, joyful crow's-feet, oversized soft bent hat with herb sprigs, curling silver hair and knowing smile.\nBOTTOM ROW 2: original aquatic trader, rounded amphibious face, frilled cheeks, broad gentle mouth and turquoise-gray scales, shell-studded curved headwrap, welcoming expression; invent a new creature silhouette.\nBOTTOM ROW 3: hardy adult human builder, exaggerated triangular jaw, broad shoulders and tiny crooked work cap, huge friendly eyebrows, strong hands near frame bottom and warm laugh; sculptural whimsical proportions.\nBOTTOM ROW 4: mushroom wanderer, small enigmatic face under a huge asymmetrical floppy russet mushroom cap, mossy wool collar and curious sideward gaze, charming original silhouette.\nComposition: varied poses and head shapes, unmistakably twelve different species/personalities. Heads and shoulders large enough for tiny avatar usage, but each entire expressive silhouette remains within its own circular crop area. Atmospheric muted teal, sage, ochre, terracotta, dusk violet and warm cream backgrounds. Give a soft warm rim light and cooler painted shadows, tactile wood/stone/fur/fabric surfaces. One cohesive handcrafted fantasy cast with obvious personality.\nAvoid photorealism, generic attractive adult headshots, repeated faces, plastic shiny eyes, smooth CGI, flat vector icons, oversaturated neon, heavy black outlines, familiar franchise characters, text, labels, letters, numbers, logos, watermark, borders or gutters. Exact 4x3 square-cell grid.",
+      "actualDimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "order": "row-major",
+        "nominalCellWidth": 362,
+        "nominalCellHeight": 362,
+        "gutters": 0
+      },
+      "cropBoundaries": {
+        "columns": [0, 362, 724, 1086, 1448],
+        "rows": [0, 350, 698, 1086],
+        "kind": "observed painted boundaries measured from pixel transitions"
+      },
+      "cells": [
+        {
+          "index": 0,
+          "name": "Fox cartographer",
+          "column": 0,
+          "row": 0,
+          "x": 0,
+          "y": 0,
+          "width": 362,
+          "height": 350
+        },
+        {
+          "index": 1,
+          "name": "Pebble golem",
+          "column": 1,
+          "row": 0,
+          "x": 362,
+          "y": 0,
+          "width": 362,
+          "height": 350
+        },
+        {
+          "index": 2,
+          "name": "Woodland sprite",
+          "column": 2,
+          "row": 0,
+          "x": 724,
+          "y": 0,
+          "width": 362,
+          "height": 350
+        },
+        {
+          "index": 3,
+          "name": "Owl alchemist",
+          "column": 3,
+          "row": 0,
+          "x": 1086,
+          "y": 0,
+          "width": 362,
+          "height": 350
+        },
+        {
+          "index": 4,
+          "name": "Pirate woman",
+          "column": 0,
+          "row": 1,
+          "x": 0,
+          "y": 350,
+          "width": 362,
+          "height": 348
+        },
+        {
+          "index": 5,
+          "name": "Badger mason",
+          "column": 1,
+          "row": 1,
+          "x": 362,
+          "y": 350,
+          "width": 362,
+          "height": 348
+        },
+        {
+          "index": 6,
+          "name": "Ram shepherd",
+          "column": 2,
+          "row": 1,
+          "x": 724,
+          "y": 350,
+          "width": 362,
+          "height": 348
+        },
+        {
+          "index": 7,
+          "name": "Goblin merchant",
+          "column": 3,
+          "row": 1,
+          "x": 1086,
+          "y": 350,
+          "width": 362,
+          "height": 348
+        },
+        {
+          "index": 8,
+          "name": "Witch herbalist",
+          "column": 0,
+          "row": 2,
+          "x": 0,
+          "y": 698,
+          "width": 362,
+          "height": 388
+        },
+        {
+          "index": 9,
+          "name": "Aquatic trader",
+          "column": 1,
+          "row": 2,
+          "x": 362,
+          "y": 698,
+          "width": 362,
+          "height": 388
+        },
+        {
+          "index": 10,
+          "name": "Human builder",
+          "column": 2,
+          "row": 2,
+          "x": 724,
+          "y": 698,
+          "width": 362,
+          "height": 388
+        },
+        {
+          "index": 11,
+          "name": "Mushroom wanderer",
+          "column": 3,
+          "row": 2,
+          "x": 1086,
+          "y": 698,
+          "width": 362,
+          "height": 388
+        }
+      ],
+      "format": "PNG",
+      "alpha": false,
+      "sha256": "56b28bdb8119a008f160c33a9efc20b1d1991b8ac73edddd50e02146e7b4e220",
+      "bytes": 2823576,
+      "visualAssessment": "Twelve original fantasy personalities with clearly different head and body silhouettes, expressive faces, tactile materials and atmospheric warm/cool lighting. The accepted original has unequal painted row heights; a generation-only layout correction did not improve precision, so the stronger original was retained. Use observed crop bounds for the three rows and center faces in circular interface crops.",
+      "copyValidation": "Saved PNG is byte-for-byte identical to the accepted generated output; no raster processing."
+    },
+    {
+      "name": "terrain-fantasy",
+      "savedPath": "apps/client/public/art/terrain-fantasy.png",
+      "generatedOutputFilename": "exec-4b245190-17f2-4151-b19d-be4b4124eb3e.png",
+      "date": "2026-09-09",
+      "status": "accepted",
+      "tool": "tools.image_gen__imagegen",
+      "mode": "fresh generation with style references",
+      "styleReferenceIds": ["style-reference-1", "style-reference-2", "style-reference-3"],
+      "prompt": "Use case: stylized-concept\nAsset type: whimsical fantasy terrain texture atlas for functional hex game tiles.\nSTYLE DIRECTION: Original expressive fantasy game art with bold exaggerated silhouettes, whimsical crooked curves and organic forms, tactile painted 2.5D storybook surfaces, confident broad shape hierarchy, atmospheric warm light with delicate rim glow against cooler shadows. Charming odd fantasy personalities, sculptural but visibly painted, soft brush texture and expressive irregular edges. Moderate saturation: rich and inviting, never neon or candy-colored. Invent wholly original subjects. Do not reproduce any actual character, costume, face, logo, composition or scene from the references. The attached images, when present, are STYLE REFERENCES ONLY. This is a major move away from generic realistic adult portraits or neutral medieval concept art.\nGenerate ONE landscape image, request1536x1024 pixels, exact3:2 canvas. Precisely THREE equal square columns and TWO equal square rows, six512x512 SQUARE terrain cells, edge to edge, no gutters. Sharp changes at exact cell boundaries.\nExact row-major terrains: TOP LEFT Timber forest: rich forest-green conifers with curving chunky trunks, swept crooked treetop shapes and gentle mossy clearings; bold layered foliage masses with tactile painted bark. TOP MIDDLE Clay: terracotta/rust earthen quarry hills with warm rounded curving layered landforms, tactile softly faceted clay faces and winding miniature paths. TOP RIGHT Sheep: distinctly lighter fresh sage/lime-green pasture with rounded rolling ground, curling grass clumps and a few clearly readable plump sheep. BOTTOM LEFT Hay: warm straw-gold cultivated fields with broad swooping curved field bands, few oversized recognizable golden sheaves and tactile painted crop surfaces. BOTTOM MIDDLE Rock: cool slate-blue-gray craggy mountain landforms, chunky leaning ridges and curving broken spires, broad readable rocky shapes and matte stone texture. BOTTOM RIGHT Desert: pale warm ochre sand with sculptural curling dune ridges, soft rippled painted sand and sparse rounded rock forms.\nCamera and usability: elevated near-top-down orthographic miniature terrain, NO horizon and NO side-view platformer scene. Every terrain fills its entire square. The cells will be cropped into roughly100-pixel hexes with a round number token over the center: distribute several strong terrain cues around the outer regions of each square. Keep coherent camera, scale and lighting. Bold organic shape hierarchy with medium material detail, not simplistic flat symbols and not noisy tiny foliage. Strong terrain color distinction, especially darker forest versus much lighter sheep meadow.\nAtmosphere: soft warm sunlight and modest rim glow, cool readable shadows, tactile brushwork and sculpted2.5D form. Curves and whimsy are essential. Restrained natural saturation, no neon, no radioactive grass, no washed-out gray. \nAvoid realistic generic landscape photography, smooth plastic CGI, copied scenes or characters from references, coastline, ocean, UI, text, numbers, tokens, letters, hex outlines, borders, labels, logos, watermark or gutters. Preserve exact3x2 grid and row-major terrain order.",
+      "actualDimensions": {
+        "width": 1536,
+        "height": 1024
+      },
+      "grid": {
+        "columns": 3,
+        "rows": 2,
+        "order": "row-major",
+        "nominalCellWidth": 512,
+        "nominalCellHeight": 512,
+        "gutters": 0
+      },
+      "cropBoundaries": {
+        "columns": [0, 512, 1024, 1536],
+        "rows": [0, 510, 1024],
+        "kind": "observed painted boundaries measured from pixel transitions"
+      },
+      "cells": [
+        {
+          "index": 0,
+          "name": "Timber",
+          "column": 0,
+          "row": 0,
+          "x": 0,
+          "y": 0,
+          "width": 512,
+          "height": 510
+        },
+        {
+          "index": 1,
+          "name": "Clay",
+          "column": 1,
+          "row": 0,
+          "x": 512,
+          "y": 0,
+          "width": 512,
+          "height": 510
+        },
+        {
+          "index": 2,
+          "name": "Sheep",
+          "column": 2,
+          "row": 0,
+          "x": 1024,
+          "y": 0,
+          "width": 512,
+          "height": 510
+        },
+        {
+          "index": 3,
+          "name": "Hay",
+          "column": 0,
+          "row": 1,
+          "x": 0,
+          "y": 510,
+          "width": 512,
+          "height": 514
+        },
+        {
+          "index": 4,
+          "name": "Rock",
+          "column": 1,
+          "row": 1,
+          "x": 512,
+          "y": 510,
+          "width": 512,
+          "height": 514
+        },
+        {
+          "index": 5,
+          "name": "Desert",
+          "column": 2,
+          "row": 1,
+          "x": 1024,
+          "y": 510,
+          "width": 512,
+          "height": 514
+        }
+      ],
+      "format": "PNG",
+      "alpha": false,
+      "sha256": "29af3d0997b9996b62706e0c76c1ed97493ad818ba513a5f96b9e4d2deecf0a2",
+      "bytes": 2858277,
+      "visualAssessment": "Curving tree trunks, swooping clay landforms, fluffy pasture sheep, rounded hay-field bands, leaning rock ridges and curling desert dunes preserve all six terrain identities. Stronger whimsical shape hierarchy and painted texture; darker forest remains distinct from lighter sheep pasture. Painted row boundary is 2 pixels above the nominal midpoint.",
+      "copyValidation": "Saved PNG is byte-for-byte identical to the accepted generated output; no raster processing."
+    },
+    {
+      "name": "development-cards",
+      "savedPath": "apps/client/public/art/development-cards.png",
+      "generatedOutputFilename": "exec-016a03f9-7913-47a5-9a4f-899ad35cc3ac.png",
+      "date": "2026-09-09",
+      "status": "accepted",
+      "tool": "tools.image_gen__imagegen",
+      "mode": "fresh generation with style references; authorized artwork replacement",
+      "styleReferenceIds": ["style-reference-1", "style-reference-2", "style-reference-3"],
+      "prompt": "Use case: illustration-story\nAsset type: six original fantasy development-card illustrations in one artwork atlas.\nSTYLE DIRECTION: Original expressive fantasy game art with bold exaggerated silhouettes, whimsical crooked curves and organic forms, tactile painted 2.5D storybook surfaces, confident broad shape hierarchy, atmospheric warm light with delicate rim glow against cooler shadows. Charming odd fantasy personalities, sculptural but visibly painted, soft brush texture and expressive irregular edges. Moderate saturation: rich and inviting, never neon or candy-colored. Invent wholly original subjects. Do not reproduce any actual character, costume, face, logo, composition or scene from the references. The attached images, when present, are STYLE REFERENCES ONLY. This is a major move away from generic realistic adult portraits or neutral medieval concept art.\nGenerate ONE SQUARE image, request1536x1536 pixels. Exact THREE-COLUMN by TWO-ROW grid with no gutters. Six tall2:3 PORTRAIT artwork rectangles, each512wide by768tall, filling the square sheet edge to edge. This is a square sheet of portrait cells, NOT a landscape sheet of square cells.\nExact row-major card scenes:\nTOP LEFT Knight: original stout badger harbor sentinel, large friendly angular muzzle and broad compact shoulders, oversized crooked sage cloak, leaf-shaped brass shield, comically bent helmet, standing guard over a quaint curved-roof island harbor. Warm trustworthy personality and heroic silhouette, sage/forest-green palette, atmospheric golden rim light.\nTOP MIDDLE Road Building: a mismatched friendly crew of original tiny woodland craftspeople building a winding raised path and charming arched timber footbridge. Crooked planks and curved stone forms, expressive staggered silhouettes, organic island landforms, cool slate/teal palette with warm worklight. Bridge and new road are the clear large shapes.\nTOP RIGHT Year of Plenty: a jovial round ram market keeper behind generous overflowing harvest baskets, thick curling hay sheaves, timber, clay and grain cargo; charming irregular stall awning and warm straw-gold atmosphere. Exaggerated abundant shapes, tactile painted resources, welcoming storybook market.\nBOTTOM LEFT Monopoly: an influential fantasy merchant's large BLANK cream trade charter with one deep burgundy wax seal, set among a visually generous gathering of rounded timber logs, clay cargo, grain sheaves, wool and stone. Curved irregular desk and cargo forms, burgundy and parchment-gold palette, dramatic but friendly warm/cool atmosphere. No writing or pseudo-writing on parchment or seal.\nBOTTOM MIDDLE Victory Point: a magnificent original island council hall with whimsical crooked sweeping roof curves, cream stone towers and brass details, grand curving steps and warm glowing windows, tiny diverse fantasy townsfolk celebrating below. Bold cream/brass silhouette against a soft blue-violet sky, welcoming civic wonder and human-painted architecture.\nBOTTOM RIGHT Card Back: elegant quiet original navy-and-antique-gold compass/leaf heraldic pattern, curving organic leaf shapes, restrained brush texture, softly irregular hand-painted symmetry and strong central generic compass motif. No logos, no words, no borrowed franchise emblems.\nArt direction: confident exaggerated shapes and crooked curves, tactile sculpted painted surfaces, whimsical original creatures, medium detail with strong focal hierarchy. Atmospheric warm light and gentle rim glow against cooler shadows; rich moderated colors. Clearly depart from generic realistic medieval concept art. All six images remain clear at100-pixel card width. \nConstraints: artwork only. No text, labels, letters, numbers, title bars, interface, watermark, logos, known characters or official Catan symbols. No glossy CGI, photorealism, noisy oversaturated tiny decoration, copied scenes, gutters or thick outside borders. Exact3x2 portrait-cell grid on square canvas.",
+      "actualDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "grid": {
+        "columns": 3,
+        "rows": 2,
+        "order": "row-major",
+        "nominalCellWidth": 418,
+        "nominalCellHeight": 627,
+        "gutters": 0
+      },
+      "cropBoundaries": {
+        "columns": [0, 419, 835, 1254],
+        "rows": [0, 628, 1254],
+        "kind": "observed painted boundaries measured from pixel transitions"
+      },
+      "cells": [
+        {
+          "index": 0,
+          "name": "Knight",
+          "column": 0,
+          "row": 0,
+          "x": 0,
+          "y": 0,
+          "width": 419,
+          "height": 628
+        },
+        {
+          "index": 1,
+          "name": "Road Building",
+          "column": 1,
+          "row": 0,
+          "x": 419,
+          "y": 0,
+          "width": 416,
+          "height": 628
+        },
+        {
+          "index": 2,
+          "name": "Year of Plenty",
+          "column": 2,
+          "row": 0,
+          "x": 835,
+          "y": 0,
+          "width": 419,
+          "height": 628
+        },
+        {
+          "index": 3,
+          "name": "Monopoly",
+          "column": 0,
+          "row": 1,
+          "x": 0,
+          "y": 628,
+          "width": 419,
+          "height": 626
+        },
+        {
+          "index": 4,
+          "name": "Victory Point",
+          "column": 1,
+          "row": 1,
+          "x": 419,
+          "y": 628,
+          "width": 416,
+          "height": 626
+        },
+        {
+          "index": 5,
+          "name": "Card Back",
+          "column": 2,
+          "row": 1,
+          "x": 835,
+          "y": 628,
+          "width": 419,
+          "height": 626
+        }
+      ],
+      "format": "PNG",
+      "alpha": false,
+      "sha256": "679dde0cf277d9ab77dfdf6df633044321ba1f6dfe5d15d941a23b584d5aa208",
+      "bytes": 2938577,
+      "visualAssessment": "Six new original creature-led card scenes: badger harbor sentinel, woodland builders, ram market keeper, blank charter and gathered cargo, sweeping fantasy council hall, and navy compass/leaf back. Bold readable focal shapes, warm atmospheric lighting, no text observed. Painted boundaries differ from the nominal portrait grid by at most 1 pixel.",
+      "copyValidation": "Saved PNG is byte-for-byte identical to the accepted generated output; no raster processing."
+    },
+    {
+      "name": "sprites-fantasy",
+      "savedPath": "apps/client/public/art/sprites-fantasy.png",
+      "generatedOutputFilename": "exec-a671058a-f3c6-4ddc-8664-1457293b916e.png",
+      "date": "2026-09-09",
+      "status": "accepted",
+      "tool": "tools.image_gen__imagegen",
+      "mode": "fresh generation without references for true-alpha output",
+      "styleReferenceIds": [],
+      "prompt": "Use case: stylized-concept\nAsset type: transparent resource-and-harbor sprite atlas for a whimsical painted2.5D island strategy game.\nGenerate ONE brand-new PNG with a genuinely transparent background and real alpha. Wide2:1 canvas, request2048x1024 pixels. Exactly FOUR equal square columns and TWO equal square rows form an invisible4x2 grid. Each of eight square cells contains one complete isolated sprite, centered with generous transparent padding and no overlap.\nExact row-major order: TOP LEFT a stack of chunky warm-brown timber logs with curving bark forms, exaggerated swirled cut ends and tactile painterly surfaces. TOP SECOND a mound of softened rust-orange clay chunks, gently curved facets, bold readable asymmetrical silhouette. TOP THIRD one charming original plump fluffy white sheep, irregular cloudlike wool silhouette, dark expressive face, slightly oversized head and small lively feet, gentle personality. TOP RIGHT a tied golden hay sheaf with swooping curved straw tips and clear rope binding. BOTTOM LEFT a cluster of chunky cool-blue-gray rocks with tilted curved forms, soft painted facets and broad shape hierarchy. BOTTOM SECOND a crooked wooden cargo crate full of clearly visible timber, clay, golden hay and gray rocks. BOTTOM THIRD an actual T-shaped wooden pier viewed directly from overhead, wide platform toward TOP and landward entrance at BOTTOM, slightly crooked organic planks, pilings and curved rope railings, fully contained in its cell. BOTTOM RIGHT a small wooden sailboat viewed directly from overhead, elegant curved hull, leaning cream sail, mast and painted planks, entire boat visible in cell.\nStyle: expressive whimsical fantasy game art with bold exaggerated silhouettes, curving organic shapes and tactile painted2.5D storybook surfaces. Fine visible human brushwork over broad confident material forms, charming hand-shaped irregularity, moderate natural saturation. Soft warm light with modest edge highlights and cooler shadows contained within objects. Original design family, no familiar franchise characters. Maintain medium tactile detail and instant recognition at32pixels; this is not generic realism, smooth CGI, flat vector icons or overly simplistic toys.\nAll space outside the eight painted objects must be genuinely transparent with real PNG alpha. No background, ground plane, sea, land, scenic backdrop or cast shadows outside objects. No text, letters, labels, numbers, logos, borders, grid marks, UI or watermark. Eight separate sprites in the exact4x2 grid. Output transparent PNG.",
+      "actualDimensions": {
+        "width": 1774,
+        "height": 887
+      },
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "order": "row-major",
+        "nominalCellWidth": 443.5,
+        "nominalCellHeight": 443.5,
+        "gutters": 0
+      },
+      "cropBoundaries": {
+        "columns": [0, 443.5, 887, 1330.5, 1774],
+        "rows": [0, 443.5, 887],
+        "kind": "nominal proportional grid"
+      },
+      "cells": [
+        {
+          "index": 0,
+          "name": "Timber logs",
+          "column": 0,
+          "row": 0,
+          "x": 0,
+          "y": 0,
+          "width": 443.5,
+          "height": 443.5
+        },
+        {
+          "index": 1,
+          "name": "Clay chunks",
+          "column": 1,
+          "row": 0,
+          "x": 443.5,
+          "y": 0,
+          "width": 443.5,
+          "height": 443.5
+        },
+        {
+          "index": 2,
+          "name": "Sheep",
+          "column": 2,
+          "row": 0,
+          "x": 887,
+          "y": 0,
+          "width": 443.5,
+          "height": 443.5
+        },
+        {
+          "index": 3,
+          "name": "Hay sheaf",
+          "column": 3,
+          "row": 0,
+          "x": 1330.5,
+          "y": 0,
+          "width": 443.5,
+          "height": 443.5
+        },
+        {
+          "index": 4,
+          "name": "Rock cluster",
+          "column": 0,
+          "row": 1,
+          "x": 0,
+          "y": 443.5,
+          "width": 443.5,
+          "height": 443.5
+        },
+        {
+          "index": 5,
+          "name": "Mixed-resource crate",
+          "column": 1,
+          "row": 1,
+          "x": 443.5,
+          "y": 443.5,
+          "width": 443.5,
+          "height": 443.5
+        },
+        {
+          "index": 6,
+          "name": "Overhead T-shaped pier",
+          "column": 2,
+          "row": 1,
+          "x": 887,
+          "y": 443.5,
+          "width": 443.5,
+          "height": 443.5
+        },
+        {
+          "index": 7,
+          "name": "Overhead sailboat",
+          "column": 3,
+          "row": 1,
+          "x": 1330.5,
+          "y": 443.5,
+          "width": 443.5,
+          "height": 443.5
+        }
+      ],
+      "format": "PNG",
+      "alpha": true,
+      "alphaValidation": {
+        "method": "read-only PNG decoding",
+        "minimum": 0,
+        "maximum": 255,
+        "fullyTransparentPixels": 775738,
+        "totalPixels": 1573538
+      },
+      "sha256": "80eef5ae75f32efb1da2af7cbd89f5b47f7692c895e920b08095798579e4adcf",
+      "bytes": 1819242,
+      "visualAssessment": "Eight separately isolated whimsical resource and harbor objects in the expected order. Broad curving silhouettes, tactile painted wood/stone/wool/hay, actual T-shaped overhead pier and overhead boat. Genuine alpha independently validated by decoding PNG; no background matte. Use proportional grid bounds because cell dimensions are fractional.",
+      "copyValidation": "Saved PNG is byte-for-byte identical to the accepted generated output; no raster processing."
+    }
+  ],
+  "historicalDevelopmentCardRecord": {
+    "path": "docs/art/development-provenance.json",
+    "status": "historical; superseded by this record",
+    "previousSha256": "bf177f6e49840eca6dc6e1c959c372960292cc75ade977ff6a283ea0c2e2a836",
+    "currentSha256": "679dde0cf277d9ab77dfdf6df633044321ba1f6dfe5d15d941a23b584d5aa208"
+  },
+  "supportingEnvironmentAssets": [
+    {
+      "name": "environment-painted",
+      "savedPath": "apps/client/public/art/environment-painted.png",
+      "actualDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "grid": {
+        "columns": 2,
+        "rows": 2,
+        "cellWidth": 627,
+        "cellHeight": 627,
+        "order": ["Deep ocean", "Shallow water", "Sand", "Wood"]
+      },
+      "usedCells": ["Deep ocean", "Shallow water", "Sand"],
+      "alpha": false,
+      "sha256": "9b2d36f82514b2ac2929ace704ea1c6904c52b345ce74aa7733cf2e90dac73c9",
+      "bytes": 2903217,
+      "originalGeneration": {
+        "tool": "tools.image_gen__imagegen",
+        "mode": "edit",
+        "prompt": "Use case: style-transfer\nAsset type: edited environment material atlas for a natural hand-painted storybook strategy board game.\nInput image: the attached environment.png is the EDIT TARGET. Preserve the exact 2-column by 2-row square grid, material order, top-down swatch nature, and clean gutter-free boundaries.\nPrimary request: repaint these same four material swatches with gentle natural gouache brushwork, softer contrast, less saturation, diffuse light, and a lighter overall palette. Retain the beautiful detailed ripples, foam, fine sand and wood-grain information. Do not simplify the materials into flat color.\nCell order remains TOP LEFT open ocean, TOP RIGHT shallow coastal water, BOTTOM LEFT sandy island ground, BOTTOM RIGHT wood tabletop. Ocean becomes softened natural muted blue/teal with gentle wave brushwork and restrained small sunlight glints. Shallow water becomes soft clear sea-glass turquoise with delicate ripples and sparse soft foam. Sand becomes warm pale natural beige/ochre with its fine texture and scattered tiny stones and subtle moss/grass flecks. Wood becomes visibly LIGHTER warm natural honey-walnut wood with delicate grain and restrained knots, matte rather than dark glossy varnish.\nStyle/medium: an experienced human illustrator's detailed traditional gouache painting, soft organic edges, gentle paper tooth, hand-painted material strokes, believable natural textures with no digital gloss or excessive sharpening. Light and airy but clearly readable material identities.\nInvariants: square canvas, exact 2x2 layout, four equal square cells with no gutters, swatches fill canvas edge to edge. Request 1024x1024 pixels. All surfaces top-down and seamless-looking inside each cell; no horizon or scenic composition.\nAvoid: no coastline shapes, no island silhouettes, no objects, no symbols, no labels, text, numbers, borders, UI, logos, watermark or grid outlines. No flat vector simplification, no loss of texture detail, no harsh black shadows, no oversaturated cyan, no dark chocolate tabletop.",
+        "provenanceRecord": "docs/art/painted-provenance.json"
+      },
+      "rasterProcessing": "None; accepted source PNG retained unchanged."
+    },
+    {
+      "name": "environment-dark",
+      "savedPath": "apps/client/public/art/environment-dark.png",
+      "actualDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "grid": {
+        "columns": 2,
+        "rows": 2,
+        "cellWidth": 627,
+        "cellHeight": 627,
+        "order": ["Deep ocean", "Shallow water", "Sand", "Wood"]
+      },
+      "usedCells": ["Dark walnut tabletop"],
+      "alpha": false,
+      "sha256": "63b2b58042a16e5eb7e718e0701d895f9588e3736224c3f4b006da8c85906260",
+      "bytes": 2985679,
+      "originalGeneration": {
+        "tool": "tools.image_gen__imagegen",
+        "mode": "fresh generation",
+        "prompt": "Use case: stylized-concept\nAsset type: environment MATERIAL texture atlas for a polished semi-realistic strategy board game.\nPrimary request: Generate exactly one 1024 by 1024 pixel square image as a precise 2-column by 2-row grid with no gutters. Four equally sized 512 by 512 pixel SQUARE material swatches fill the complete canvas edge to edge. Sharp swatch transitions at x=512 and y=512.\nCell order left to right then top to bottom: TOP LEFT: deep vibrant teal-blue ocean material, fine natural small wave texture, restrained subtle sun glints, rich saturated open-ocean water. TOP RIGHT: shallow turquoise coastal-water material with soft natural ripples and sparse white sea foam, luminous clear turquoise, entirely water. BOTTOM LEFT: sandy island ground material with fine tactile golden sand texture, scattered tiny rounded stones and sparse moss or grass flecks, entirely a top-down ground swatch with no horizon or scenery. BOTTOM RIGHT: rich dark walnut tabletop material with elegant subtle wood grain, dark warm brown, entirely flat top-down wood surface.\nStyle/medium: polished semi-realistic hand-painted 3D game-art materials, medium detail, natural and tactile, consistent warm soft daylight. These are seamless-looking repeatable material swatches within each square, distributed texture without one main object or vignette. Near-top-down orthographic surface view.\nConstraints: NO landscapes, horizon, islands, shoreline shapes, coast outlines, symbols, objects, labels, text, UI, numbers, borders, gutters, watermarks or illustrations of tiles. Each square is only its specified material filling the full square. Maintain distinct deep ocean, shallow turquoise, golden sand, and dark walnut palettes.",
+        "provenanceRecord": "docs/art/vibrant-provenance.json"
+      },
+      "rasterProcessing": "None; accepted source PNG retained unchanged.",
+      "restoration": {
+        "method": "unchanged copy from Git history",
+        "sourceGitRevision": "e7d567a649b3bf059cdaf12018e5843b91650483",
+        "sourceGitPath": "apps/client/public/art/environment.png",
+        "byteIdenticalToGitSource": true
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { Check, Copy, Crown, DoorOpen, Pencil, Plus, Sailboat, WifiOff } from 'lucide-react';
+import { Check, Copy, Crown, DoorOpen, Pencil, Plus, Sailboat, Settings2, WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -52,6 +52,7 @@ export function Lobby({
   onInvite,
   onLeave,
   onEdit,
+  onSettings,
 }: {
   room: RoomState;
   me?: string;
@@ -62,10 +63,12 @@ export function Lobby({
   onInvite: () => void;
   onLeave: () => void;
   onEdit: () => void;
+  onSettings: () => void;
 }) {
   const self = room.players.find((p) => p.id === me),
     host = room.players[0]?.id === me;
-  const canStart = room.players.length >= 3 && room.players.every((p) => p.ready && p.connected);
+  const canStart =
+    room.players.length >= 3 && room.players.every((p, i) => p.connected && (i === 0 || p.ready));
   return (
     <section className="lobby-screen" aria-label="Room lobby">
       <div className="lobby-heading">
@@ -74,15 +77,25 @@ export function Lobby({
           <h1>Lobby</h1>
           <span>{room.players.length}/4</span>
         </div>
-        <button
-          className="icon-button"
-          title="Leave lobby"
-          aria-label="Leave lobby"
-          onClick={onLeave}
-          disabled={busy}
-        >
-          <DoorOpen />
-        </button>
+        <div className="lobby-tools">
+          <button
+            className="icon-button"
+            title="Game settings"
+            aria-label="Game settings"
+            onClick={onSettings}
+          >
+            <Settings2 />
+          </button>
+          <button
+            className="icon-button"
+            title="Leave lobby"
+            aria-label="Leave lobby"
+            onClick={onLeave}
+            disabled={busy}
+          >
+            <DoorOpen />
+          </button>
+        </div>
       </div>
       <div className="lobby-content">
         <div className="lobby-seats">
@@ -106,6 +119,8 @@ export function Lobby({
                       <WifiOff size={14} />
                       Disconnected
                     </>
+                  ) : i === 0 ? (
+                    'Host'
                   ) : p.ready ? (
                     <>
                       <Check size={14} />
@@ -144,6 +159,8 @@ export function Lobby({
             <b>Balanced</b>
             <span>Victory</span>
             <b>10 points</b>
+            <span>Turn timer</span>
+            <b>{room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'Off'}</b>
           </div>
         </aside>
       </div>
@@ -160,15 +177,17 @@ export function Lobby({
                 : 'Waiting for players to ready up'}
         </span>
         <div>
-          <button
-            className={self?.ready ? 'dark-button' : 'gold-button'}
-            aria-pressed={!!self?.ready}
-            disabled={busy || !connected}
-            onClick={() => onReady(!self?.ready)}
-          >
-            <Check size={18} />
-            {self?.ready ? 'Not ready' : 'Ready'}
-          </button>
+          {!host && (
+            <button
+              className={self?.ready ? 'dark-button' : 'gold-button'}
+              aria-pressed={!!self?.ready}
+              disabled={busy || !connected}
+              onClick={() => onReady(!self?.ready)}
+            >
+              <Check size={18} />
+              {self?.ready ? 'Not ready' : 'Ready'}
+            </button>
+          )}
           {host && (
             <button className="gold-button" disabled={busy || !connected || !canStart} onClick={onStart}>
               Start game

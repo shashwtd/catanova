@@ -1,0 +1,53 @@
+/* Clip only outside the perspective scene. Within the camera, every intermediate
+   wrapper must preserve the piece faces' shared 3D coordinates. */
+.board-viewport[data-depth='true'] {
+  perspective: 1100px;
+  perspective-origin: 50% 46%;
+}
+.board-viewport[data-depth='true'] .board-camera,
+.board-viewport[data-depth='true'] .board-camera .island-stage {
+  transform-style: preserve-3d;
+  overflow: visible;
+  filter: none;
+  opacity: 1;
+  isolation: auto;
+  contain: none;
+}
+.board-viewport[data-depth='true'] .terrain-canvas {
+  transform: translateZ(-0.4px);
+}
+.board-viewport[data-depth='true'] .island {
+  transform: translateZ(0);
+}
+.board-viewport[data-depth='false'] .pieces3d {
+  display: none;
+}
+.board-viewport[data-dragging='true'] {
+  cursor: grabbing;
+}
+.board-fit-view {
+  position: absolute;
+  right: 9px;
+  bottom: 8px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 33px;
+  padding: 0;
+  border: 1px solid #aa9c7d70;
+  border-radius: 50%;
+  color: #596156;
+  background: #eee5d2df;
+  box-shadow: 0 2px 7px #51433120;
+}
+.board-fit-view:hover,
+.board-fit-view:focus-visible {
+  background: #fff5dd;
+  color: #304b50;
+  border-color: #a18b54;
+}
+.board-fit-view:focus-visible {
+  outline: 2px solid #477a82;
+  outline-offset: 3px;
+}

@@ -16,9 +16,11 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a portrait, accent and frame, invite friends, and mark Ready. The host starts when all three or four players are ready and connected. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all three or four seats are connected and everyone else is ready. The host can configure an optional turn timer in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
-Game tools and connection details sit at top left; room, invite and profile controls sit at bottom left. Players and awards are on the right. Resource cards sit above the bottom table edge, beside the dice, trade and development-card buttons. Scroll/pinch to zoom, drag to pan, or use the reset control. Each harbor has two bridges to its eligible coastal corners.
+Game tools and connection details sit at top left; room, invite and profile controls sit at bottom left. Players and awards are on the right. Resource cards sit above the bottom table edge, beside the dice, trade and development-card buttons. Scroll/pinch to zoom, drag to pan and gently tilt the board, or use the single Fit-view icon. Each harbor has two bridges to its eligible coastal corners.
+
+Two thrown dice land on the accepted server result. Producing tiles glow and resource cards travel to your hand; building spends miniature cards with distinct material sounds. Development cards have illustrated stories, a compact spread, explicit Play controls, and explanations for cards held until next turn. Settings control sound, volume, effects and 3D pieces. [Feedback and performance](docs/GAME_FEEDBACK.md), [turn timer rules](docs/TURN_CLOCK.md).
 
 The local URL works on this machine. Other devices need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
@@ -64,7 +66,7 @@ npm run check
 npm run probe
 ```
 
-`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, concurrent lobby readiness, account ownership, the Supabase verification contract, durable move history, invite previews, lobby departures, both harbor entrances, all 72 road orientations, bounded zoom, rejected rollback snapshots, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
+`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, concurrent lobby readiness, account ownership, the Supabase verification contract, durable move history, invite previews, lobby departures, both harbor entrances, all 72 road orientations, bounded zoom/3D tilt, correct die faces, resource-effect timing, optional server-owned turn/discard deadlines, rejected rollback snapshots, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
 
 Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
@@ -72,7 +74,7 @@ Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a s
 
 ```text
 apps/
-  client/       React game UI, WebGL terrain + SVG controls, recoverable connection
+  client/       React UI, static terrain, CSS 3D, sound/effects, recoverable connection
   server/       Same-origin HTTP/WebSocket server, private snapshots, SQLite saves
 packages/
   protocol/     Shared messages and bounded input validation

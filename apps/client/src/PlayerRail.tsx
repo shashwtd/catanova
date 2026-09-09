@@ -14,6 +14,7 @@ export function PlayerRail({ room, game, me }: { room: RoomState; game: GameView
           army = game.largestArmy === p.id;
         return (
           <article
+            data-player-profile={p.id}
             key={p.id}
             className={`player-profile ${game.players[game.active]?.id === p.id ? 'active' : ''} ${p.id === me ? 'self' : ''}`}
             style={{ '--player-color': PLAYER_COLORS[i] } as CSSProperties}

@@ -1,3 +1,12 @@
+import { usePreferences } from './preferences.js';
+import { useFeedback } from './useFeedback.js';
+import { ResourceHand } from './ResourceHand.js';
+import { DevelopmentCards } from './DevelopmentCards.js';
+import { GameEffects } from './GameEffects.js';
+import { GameSettings } from './GameSettings.js';
+import { TurnTimer } from './TurnTimer.js';
+import { FantasyTransition } from './FantasyTransition.js';
+import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
 import { useAuth, entryLocation } from './auth.js';
 import { Avatar, ProfileEditor } from './Profile.js';
 import { Lobby, Invite, InviteRoster } from './Lobby.js';
@@ -8,9 +17,10 @@ import { initialMetrics } from './connection.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent, ReactNode } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  Settings2,
   UserRound,
   LogOut,
   Sailboat,
@@ -42,14 +52,20 @@ import '@fontsource/barlow/latin-600.css';
 import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
-import { CARD_NAMES, canPay, emptyHand, robberVictims, total } from '../../../packages/rules/src/game.js';
-import type { Card, GameAction, Hand } from '../../../packages/rules/src/game.js';
+import { canPay, emptyHand, robberVictims, total } from '../../../packages/rules/src/game.js';
+import type { GameAction, Hand } from '../../../packages/rules/src/game.js';
 import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
 import { invitationCode, roomPath, shouldResume, validRoomCode } from './navigation.js';
 import './style.css';
+import './card-motion.css';
+import './pieces3d.css';
+import './dice.css';
+import './presentation.css';
+import './board-camera.css';
+import './fantasy-transition.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -125,13 +141,6 @@ function Dialog({
         {children}
       </div>
     </dialog>
-  );
-}
-function NumberPop({ value }: { value: number }) {
-  return (
-    <span key={value} className="t-digit-group is-animating">
-      <span className="t-digit">{value}</span>
-    </span>
   );
 }
 function ResourceSummary({ hand }: { hand: Hand }) {
@@ -210,6 +219,9 @@ function ResourceSelect({
 
 function App() {
   const auth = useAuth();
+  const { preferences, update, reducedMotion, osReduced } = usePreferences();
+  const feedback = useFeedback(preferences, reducedMotion);
+  const [transitionId, setTransitionId] = useState<string | null>(null);
   const connection = useRef<Connection | null>(null);
   const [metrics, setMetrics] = useState(initialMetrics);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
@@ -233,7 +245,7 @@ function App() {
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
-      'trade' | 'cards' | 'rules' | 'journal' | 'leave' | 'profile' | 'network' | 'invite' | null
+      'settings' | 'trade' | 'cards' | 'rules' | 'journal' | 'leave' | 'profile' | 'network' | 'invite' | null
     >(null);
   const [robberHex, setRobberHex] = useState<number | null>(null),
     [selected, setSelected] = useState<Hand>(emptyHand),
@@ -241,8 +253,6 @@ function App() {
     [want, setWant] = useState<Hand>(emptyHand);
   const [bankGive, setBankGive] = useState<Resource>('wood'),
     [bankReceive, setBankReceive] = useState<Resource>('brick');
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null),
-    [cardResource, setCardResource] = useState<Resource>('wood');
 
   const g = room?.game,
     player = g?.players.find((p) => p.id === me),
@@ -263,6 +273,8 @@ function App() {
     }
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(OUTBOX_KEY);
+    feedback.reset();
+    setTransitionId(null);
     setRoom(null);
     setHistoryEntries([]);
     historyLoaded.current = false;
@@ -284,6 +296,8 @@ function App() {
     connection.current = null;
     old?.stop();
     setError('');
+    feedback.reset();
+    setTransitionId(null);
     setRoom(null);
     setBusy(!!pending);
     const c = new Connection(
@@ -311,12 +325,28 @@ function App() {
         },
       },
     );
+    let previousSnapshot: RoomState | null = null;
     c.subscribe((message) => {
       if (connection.current !== c) return;
       if (message.type === 'welcome' || message.type === 'state') {
-        setRoom(c.state);
+        const next = c.state;
+        if (next && c.playerId) {
+          feedback.accept(previousSnapshot, next, c.playerId, message.type === 'welcome');
+          if (message.type === 'state' && previousSnapshot && !previousSnapshot.game && next.game) {
+            setTransitionId(`${next.roomId}:${next.revision}`);
+            feedback.sound.play('development');
+          } else if (
+            !next.game &&
+            previousSnapshot &&
+            next.players.length > previousSnapshot.players.length
+          ) {
+            feedback.sound.play('join');
+          }
+          previousSnapshot = next;
+        }
+        setRoom(next);
         setMe(c.playerId ?? undefined);
-        if (message.type === 'welcome') history.replaceState(null, '', roomPath(message.state.roomId));
+        if (message.type === 'welcome' && next) history.replaceState(null, '', roomPath(next.roomId));
       }
       if (message.type === 'history') {
         if (message.before !== undefined || !historyLoaded.current) setHistoryHasMore(message.hasMore);
@@ -340,6 +370,7 @@ function App() {
           return;
         }
         setError(message.message);
+        feedback.sound.play('error');
         if (message.commandId) setBusy(false);
         if (['SEAT_LEFT', 'INVALID_SESSION', 'ROOM_NOT_FOUND', 'AUTH_MISMATCH'].includes(message.code)) {
           sessionStorage.removeItem(SESSION_KEY);
@@ -405,7 +436,6 @@ function App() {
     setMode(null);
     setRobberHex(null);
     setSelected(emptyHand());
-    setSelectedCard(null);
   }, [g?.phase, g?.turn]);
   useEffect(() => {
     if (!toast) return;
@@ -421,7 +451,6 @@ function App() {
       await c.action(action);
       setMode(null);
       setRobberHex(null);
-      setSelectedCard(null);
       if (action.kind === 'playCard') setSelected(emptyHand());
     } catch (e) {
       if (connection.current === c)
@@ -516,6 +545,16 @@ function App() {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
   }
+  async function saveSettings(settings: RoomSettings) {
+    const c = connection.current;
+    if (!c || disabled) throw new Error('Reconnect before changing room rules');
+    setBusy(true);
+    try {
+      await c.settings(settings);
+    } finally {
+      if (connection.current === c) setBusy(c.awaitingConfirmation);
+    }
+  }
   async function saveProfile(profile: Profile) {
     const c = connection.current;
     if (room && !g && c) {
@@ -554,13 +593,28 @@ function App() {
                       ? `Place ${mode === 'city' ? 'a city' : `a ${mode}`}`
                       : 'Your turn';
   return (
-    <main className={`game-world ${g ? 'playing' : room ? 'lobby' : 'entry-world'}`}>
+    <main
+      className={`game-world ${g ? 'playing' : room ? 'lobby' : 'entry-world'}`}
+      data-motion={reducedMotion ? 'reduced' : 'full'}
+      onClickCapture={(e) => {
+        const button = (e.target as HTMLElement).closest('button');
+        if (button && !button.disabled) feedback.sound.play('ui');
+      }}
+    >
       {g && (
         <div className="board-anchor">
-          <BoardViewport seed={g.board.seed}>
+          <BoardViewport
+            seed={g.board.seed}
+            depth={preferences.depth}
+            tilt={preferences.boardTilt}
+            reducedMotion={reducedMotion}
+          >
             <Board
               board={g.board}
               game={g}
+              depth={preferences.depth}
+              glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}
+              effectId={feedback.event?.id}
               me={me}
               mode={mode}
               disabled={disabled}
@@ -604,6 +658,9 @@ function App() {
         )}
       </nav>
       <nav className="side-controls room-controls" aria-label="Room and profile">
+        <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
+          <Settings2 />
+        </IconButton>
         {auth.canPlay && (
           <IconButton label="Your profile" active={panel === 'profile'} onClick={() => setPanel('profile')}>
             <UserRound />
@@ -847,6 +904,7 @@ function App() {
           onInvite={() => void copyInvite()}
           onLeave={() => void leave()}
           onEdit={() => setPanel('profile')}
+          onSettings={() => setPanel('settings')}
         />
       )}
       {g && (
@@ -854,6 +912,15 @@ function App() {
           <div className="phase-prompt" role="status">
             {g.winner ? <Trophy /> : myTurn ? <span className="turn-dot" /> : null}
             {phaseText}
+            {room && (
+              <TurnTimer
+                room={room}
+                me={me}
+                offset={metrics.clockOffsetMs}
+                connected={connected}
+                onWarning={() => feedback.sound.play('warning')}
+              />
+            )}
             {mode && (
               <IconButton label="Cancel placement" onClick={() => setMode(null)}>
                 <X />
@@ -862,25 +929,12 @@ function App() {
           </div>
           <div className="card-table">
             <div className="hand-zone">
-              <div className="resource-hand" aria-label="Your resource cards">
-                {RESOURCES.map((r, i) => (
-                  <div
-                    key={r}
-                    className={`resource-card resource-${r} ${hand[r] ? '' : 'empty-card'}`}
-                    style={{ '--card-angle': (i - 2) * 4 + 'deg' } as CSSProperties}
-                    title={`${RESOURCE_NAMES[r]}: ${hand[r]}`}
-                  >
-                    <span className="card-corner">
-                      <NumberPop value={hand[r]} />
-                    </span>
-                    <div className="card-illustration">
-                      <ResourceIcon resource={r} />
-                    </div>
-                    <span className="card-name">{RESOURCE_NAMES[r]}</span>
-                    <span className="card-mark">✦</span>
-                  </div>
-                ))}
-              </div>
+              <ResourceHand
+                hand={feedback.hand ?? hand}
+                pulse={feedback.pulse}
+                reducedMotion={reducedMotion}
+                onHover={() => feedback.sound.play('hover')}
+              />
               <div className="build-actions">
                 {(['road', 'settlement', 'city'] as const).map((kind, i) => {
                   const Icon = [Route, House, Castle][i]!,
@@ -989,10 +1043,10 @@ function App() {
               </button>
             </div>
           )}
-          {(panel === 'trade' || panel === 'cards' || panel === 'journal') && (
+          {(panel === 'trade' || panel === 'journal') && (
             <aside className="game-panel floating-panel" aria-label={panel}>
               <div className="panel-heading">
-                <h2>{panel === 'trade' ? 'Trade' : panel === 'cards' ? 'Development' : 'Move history'}</h2>
+                <h2>{panel === 'trade' ? 'Trade' : 'Move history'}</h2>
                 <IconButton label="Close panel" onClick={() => setPanel(null)}>
                   <X />
                 </IconButton>
@@ -1058,6 +1112,7 @@ function App() {
                       disabled={
                         disabled ||
                         !total(give) ||
+                        !canPay(hand, give) ||
                         !total(want) ||
                         RESOURCES.some((r) => !!give[r] && !!want[r])
                       }
@@ -1078,78 +1133,18 @@ function App() {
                 ) : (
                   <p className="muted">Wait for a trade offer.</p>
                 ))}
-              {panel === 'cards' && (
-                <>
-                  <button
-                    className="dark-button"
-                    disabled={disabled || !g.legal.canBuyCard}
-                    onClick={() => act({ kind: 'buyCard' })}
-                  >
-                    Buy card <ResourceSummary hand={COSTS.developmentCard} />
-                  </button>
-                  <div className="development-hand">
-                    {player?.cards?.length ? (
-                      player.cards.map((card) => (
-                        <button
-                          key={card.id}
-                          className={`development-card ${selectedCard?.id === card.id ? 'is-selected' : ''}`}
-                          disabled={disabled || !g.legal.playableCards.includes(card.id)}
-                          onClick={() => {
-                            if (card.kind === 'knight' || card.kind === 'roadBuilding')
-                              void act({ kind: 'playCard', cardId: card.id });
-                            else {
-                              setSelectedCard(card);
-                              setSelected(emptyHand());
-                            }
-                          }}
-                        >
-                          <span>{CARD_NAMES[card.kind]}</span>
-                          <small>
-                            {card.kind === 'victoryPoint'
-                              ? '+1 VP'
-                              : card.boughtTurn === g.turn
-                                ? 'Next turn'
-                                : 'Play'}
-                          </small>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="muted">No development cards</p>
-                    )}
-                  </div>
-                  {selectedCard?.kind === 'monopoly' && (
-                    <>
-                      <ResourceSelect label="Collect" value={cardResource} onChange={setCardResource} />
-                      <button
-                        className="gold-button"
-                        disabled={disabled}
-                        onClick={() =>
-                          act({ kind: 'playCard', cardId: selectedCard.id, resource: cardResource })
-                        }
-                      >
-                        Play Monopoly
-                      </button>
-                    </>
-                  )}
-                  {selectedCard?.kind === 'yearOfPlenty' && (
-                    <>
-                      <ResourcePicker label="Take 2" value={selected} onChange={setSelected} max={g.bank} />
-                      <button
-                        className="gold-button"
-                        disabled={
-                          disabled || total(selected) !== Math.min(2, total(g.bank)) || !total(selected)
-                        }
-                        onClick={() =>
-                          act({ kind: 'playCard', cardId: selectedCard.id, resources: selected })
-                        }
-                      >
-                        Take cards
-                      </button>
-                    </>
-                  )}
-                </>
-              )}
             </aside>
+          )}
+          {panel === 'cards' && me && (
+            <DevelopmentCards
+              game={g}
+              me={me}
+              disabled={disabled}
+              reducedMotion={reducedMotion}
+              onAction={(a) => void act(a)}
+              onClose={() => setPanel(null)}
+              onHover={() => feedback.sound.play('hover')}
+            />
           )}
           {g.phase === 'discard' && !!g.discards[me ?? ''] && (
             <aside className="required-action floating-panel">
@@ -1189,6 +1184,28 @@ function App() {
           )}
         </>
       )}
+      <GameEffects event={feedback.event} reducedMotion={reducedMotion} activity={preferences.activity} />
+      {transitionId && (
+        <FantasyTransition
+          id={transitionId}
+          reducedMotion={reducedMotion}
+          onComplete={() => setTransitionId(null)}
+        />
+      )}
+      {panel === 'settings' && (
+        <Dialog title="Settings" onClose={() => setPanel(null)}>
+          <GameSettings
+            preferences={preferences}
+            update={update}
+            room={room}
+            me={me}
+            busy={disabled}
+            save={saveSettings}
+            previewSound={() => feedback.sound.play('settlement')}
+            osReduced={osReduced}
+          />
+        </Dialog>
+      )}
       {panel === 'network' && room && (
         <aside className="game-panel utility-panel floating-panel">
           <div className="panel-heading">
@@ -1219,7 +1236,7 @@ function App() {
                 <Avatar profile={room?.players.find((p) => p.id === me)?.profile ?? auth.profile} />
                 <strong>{player?.name}</strong>
               </div>
-              <p className="muted">Change your avatar, frame and name in the lobby before your next game.</p>
+              <p className="muted">Change your avatar and name in the lobby before your next game.</p>
             </>
           ) : (
             <ProfileEditor

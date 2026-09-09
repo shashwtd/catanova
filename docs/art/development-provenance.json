@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "asset": "development-cards",
+  "createdAtUtc": "2026-09-09T09:13:50Z",
+  "savedPath": "apps/client/public/art/development-cards.png",
+  "generatedOutputFilename": "exec-f5fcbe4b-5692-4e16-baa1-30923831b3fe.png",
+  "toolProvenance": {
+    "tool": "tools.image_gen__imagegen",
+    "mode": "fresh generation with style references",
+    "calls": 1,
+    "postprocessing": "None. Accepted PNG copied unchanged; byte-for-byte equality verified."
+  },
+  "styleReferences": [
+    {
+      "path": "apps/client/public/art/terrain-painted.png",
+      "role": "style reference only",
+      "inspectedBeforeGeneration": true
+    },
+    {
+      "path": "apps/client/public/art/sprites-painted.png",
+      "role": "style reference only",
+      "inspectedBeforeGeneration": true
+    }
+  ],
+  "prompt": "Use case: illustration-story\nAsset type: six development-card ARTWORK illustrations in one game-art atlas.\nInput images: terrain-painted.png and sprites-painted.png are STYLE REFERENCES ONLY. Generate brand-new card illustrations. Do not edit or reproduce the terrain or sprite atlases. Match their refined soft natural hand-painted gouache, visible human brushwork, matte pigment, restrained palette and tactile miniature-storybook quality.\nLayout is critical: ONE SQUARE CANVAS, request exactly 1536 by 1536 pixels. Exactly THREE equal columns and TWO equal rows, no gutters or borders. Each of the SIX cells is a tall 2:3 PORTRAIT rectangle, 512 pixels wide by 768 pixels tall. Sharp cell boundaries at x=512 and x=1024, y=768. Every cell is completely filled by its own portrait card artwork, edge to edge. The full atlas is square, not landscape.\nSix cells, exact row-major order:\nTOP LEFT \u2014 Knight artwork: a friendly heroic adult harbor watch guard, warm trustworthy expression, practical modest armor, muted sage cloak, standing watch above a welcoming island harbor. Rich forest/sage palette, well-composed portrait silhouette, softly painted face. Calm strength and guardianship, no combat or menace.\nTOP MIDDLE \u2014 Road Building artwork: a winding newly built path crossing a handsome timber footbridge, a few friendly adult builders setting stones and carrying boards, island terrain beyond. Distinct slate/teal palette, winding path guides the eye upward through the portrait, believable wood and stone.\nTOP RIGHT \u2014 Year of Plenty artwork: generous harvest-market baskets and crates overflowing with golden hay, grain, vegetables and mixed natural resources such as timber logs and clay, warm abundance in a small sunny island market. Distinct straw-gold palette, clear generous foreground still life, medium detail.\nBOTTOM LEFT \u2014 Monopoly artwork: an influential merchant's large BLANK cream trade charter, a prominent deep burgundy wax seal, and gathered resource cargo of timber, clay, grain, wool and stone around the parchment. A tasteful trade desk/cargo composition suggesting strong trading influence. Burgundy and parchment-gold palette. The parchment has NO writing, letters, numbers, drawn pseudo-writing or marks; the wax seal is generic and unlettered.\nBOTTOM MIDDLE \u2014 Victory Point artwork: a beautiful grand council hall in a thriving island town, cream stone, warm brass roof accents, soft banners without writing, broad welcoming steps, tasteful civic splendor and small human scale. Distinct cream/brass palette, main building is the clear focal point, original refined storybook architecture.\nBOTTOM RIGHT \u2014 Card back artwork: a restrained elegant repeating compass-and-leaf heraldic pattern on soft deep navy paper, subtle muted antique-gold line and gouache detail, rotationally balanced, classy and quiet, one simple central generic compass rose surrounded by sparse leaf motifs. Original unbranded pattern.\nStyle and composition: rich tasteful traditional gouache illustration, experienced human-illustrator feel, matte paper and natural brush texture, refined storybook fantasy, soft diffuse daylight, restrained saturation and gentle contrast, detailed but composed rather than busy. Each portrait artwork has a strong focal point and remains recognizably different at 100 pixels wide. Confident organic brush strokes and well-observed natural materials. Maintain one cohesive illustration family while clearly distinguishing each card palette.\nConstraints: ART ONLY, no written text, lettering, numbers, labels, title bars, UI, watermarks, logos or official Catan symbols. No brand imitation, no glossy CGI, no plastic faces, no oversaturated busy decoration, no thick card border, no gutter, no spacing between cells. No labels inside the image. Keep exact 3-column by 2-row grid on a square sheet, with six tall 2:3 portrait illustrations.",
+  "requestedDimensions": {
+    "width": 1536,
+    "height": 1536
+  },
+  "actualDimensions": {
+    "width": 1254,
+    "height": 1254
+  },
+  "grid": {
+    "columns": 3,
+    "rows": 2,
+    "gutters": 0,
+    "cellWidth": 418,
+    "cellHeight": 627,
+    "cellAspectRatio": "2:3",
+    "order": "row-major"
+  },
+  "cells": [
+    {
+      "index": 0,
+      "name": "Knight",
+      "column": 0,
+      "row": 0,
+      "x": 0,
+      "y": 0,
+      "width": 418,
+      "height": 627
+    },
+    {
+      "index": 1,
+      "name": "Road Building",
+      "column": 1,
+      "row": 0,
+      "x": 418,
+      "y": 0,
+      "width": 418,
+      "height": 627
+    },
+    {
+      "index": 2,
+      "name": "Year of Plenty",
+      "column": 2,
+      "row": 0,
+      "x": 836,
+      "y": 0,
+      "width": 418,
+      "height": 627
+    },
+    {
+      "index": 3,
+      "name": "Monopoly",
+      "column": 0,
+      "row": 1,
+      "x": 0,
+      "y": 627,
+      "width": 418,
+      "height": 627
+    },
+    {
+      "index": 4,
+      "name": "Victory Point",
+      "column": 1,
+      "row": 1,
+      "x": 418,
+      "y": 627,
+      "width": 418,
+      "height": 627
+    },
+    {
+      "index": 5,
+      "name": "Card Back",
+      "column": 2,
+      "row": 1,
+      "x": 836,
+      "y": 627,
+      "width": 418,
+      "height": 627
+    }
+  ],
+  "format": "PNG",
+  "alpha": false,
+  "sha256": "bf177f6e49840eca6dc6e1c959c372960292cc75ade977ff6a283ea0c2e2a836",
+  "bytes": 3273167,
+  "qualityInspection": {
+    "accepted": true,
+    "inspectionMethod": "Visual inspection of generated output plus independent read-only PNG dimension/hash verification.",
+    "findings": [
+      "Exactly six portrait artwork cells in the requested 3-column by 2-row layout on a square atlas, with no gutters.",
+      "All requested scenes appear in the correct row-major order.",
+      "Clear focal compositions: friendly harbor guard; builders and bridge; generous harvest cargo; blank charter with burgundy wax seal; grand council hall; navy compass-and-leaf card back.",
+      "Traditional matte gouache appearance with natural brushwork and material detail matching the supplied style references.",
+      "No text, labels, numbers, watermark, logos or branded marks observed; charter remains blank for interface composition.",
+      "Tool returned 1254 by 1254 pixels rather than requested 1536 by 1536; actual cells are exactly 418 by 627 pixels, preserving the required 2:3 portrait ratio."
+    ]
+  },
+  "status": "historical",
+  "supersededAtUtc": "2026-09-09T09:40:52Z",
+  "supersededBy": "docs/art/fantasy-provenance.json",
+  "historicalNote": "This record describes the earlier painted-realism development-card atlas. Its hash applies to generatedOutputFilename, not the current file at savedPath. Current development-cards.png was replaced with accepted original fantasy artwork and is recorded in fantasy-provenance.json."
+}
