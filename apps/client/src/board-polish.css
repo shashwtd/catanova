@@ -1,0 +1,49 @@
+/* Strong player color and a small ground shadow replace the pale piece halo. */
+.road-foundation,
+.own-piece .road-foundation {
+  fill: #293b3b79;
+  stroke: none;
+}
+.road-body {
+  stroke: #33463f;
+  stroke-width: 1.1;
+}
+.road-sheen {
+  stroke: #fff7d44d;
+  stroke-width: 1.5;
+}
+.building-plinth,
+.own-piece .building-plinth {
+  fill: #26373170;
+  stroke: none;
+}
+.building {
+  stroke: #31453e;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.roof-highlight {
+  stroke: #36463f88;
+  stroke-width: 1.4;
+}
+.house-door {
+  fill: #344b45;
+  stroke: #263831;
+  stroke-width: 0.65;
+}
+.house-window {
+  fill: #e4c783;
+  stroke: #5c704f;
+  stroke-width: 0.4;
+}
+.city-wing {
+  stroke: #3e584e;
+  stroke-width: 1.4;
+}
+.road-piece,
+.house-piece {
+  opacity: 1;
+}
+.water-band {
+  paint-order: stroke fill;
+}

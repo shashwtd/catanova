@@ -1,4 +1,4 @@
-import { Activity, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Activity, RefreshCw, Wifi, WifiOff } from './GameIcons.js';
 import type { NetworkMetrics, ConnectionStatus } from './connection.js';
 export function ConnectionPanel({
   metrics,

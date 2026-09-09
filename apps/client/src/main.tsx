@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  History,
   Settings2,
   UserRound,
   LogOut,
@@ -43,7 +44,7 @@ import {
   WifiOff,
   X,
   ArrowLeftRight,
-} from 'lucide-react';
+} from './GameIcons.js';
 import '@fontsource/cinzel/latin-600.css';
 import '@fontsource/cinzel/latin-700.css';
 import '@fontsource/barlow/latin-400.css';
@@ -61,11 +62,12 @@ import type { BuildMode } from './Board.js';
 import { invitationCode, roomPath, shouldResume, validRoomCode } from './navigation.js';
 import './style.css';
 import './card-motion.css';
-import './pieces3d.css';
 import './dice.css';
 import './presentation.css';
 import './board-camera.css';
 import './fantasy-transition.css';
+import './polish.css';
+import './board-polish.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -219,7 +221,7 @@ function ResourceSelect({
 
 function App() {
   const auth = useAuth();
-  const { preferences, update, reducedMotion, osReduced } = usePreferences();
+  const { preferences, update, reducedMotion } = usePreferences();
   const feedback = useFeedback(preferences, reducedMotion);
   const [transitionId, setTransitionId] = useState<string | null>(null);
   const connection = useRef<Connection | null>(null);
@@ -245,7 +247,7 @@ function App() {
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
-      'settings' | 'trade' | 'cards' | 'rules' | 'journal' | 'leave' | 'profile' | 'network' | 'invite' | null
+      'settings' | 'trade' | 'rules' | 'journal' | 'leave' | 'profile' | 'network' | 'invite' | null
     >(null);
   const [robberHex, setRobberHex] = useState<number | null>(null),
     [selected, setSelected] = useState<Hand>(emptyHand),
@@ -259,7 +261,7 @@ function App() {
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me;
   const connected = status === 'connected',
-    disabled = !connected || busy,
+    disabled = !connected || busy || feedback.presentationBusy,
     hand = player?.hand ?? emptyHand();
   const actionPhase = myTurn && g?.phase === 'actions';
   const networkBusy = status === 'connecting' || status === 'reconnecting';
@@ -576,22 +578,20 @@ function App() {
       : g.phase === 'discard'
         ? g.discards[me ?? '']
           ? `Discard ${g.discards[me!]} cards`
-          : 'Waiting for discards'
+          : ''
         : !myTurn
-          ? `${active?.name}'s turn`
+          ? ''
           : g.phase === 'setupSettlement'
             ? 'Place a settlement'
             : g.phase === 'setupRoad'
               ? 'Place a road'
-              : g.phase === 'roll'
-                ? 'Your turn'
-                : g.phase === 'robber'
-                  ? 'Move the robber'
-                  : g.phase === 'freeRoads'
-                    ? `Place ${g.freeRoads} free road${g.freeRoads === 1 ? '' : 's'}`
-                    : mode
-                      ? `Place ${mode === 'city' ? 'a city' : `a ${mode}`}`
-                      : 'Your turn';
+              : g.phase === 'robber'
+                ? 'Move the robber'
+                : g.phase === 'freeRoads'
+                  ? `Place ${g.freeRoads} free road${g.freeRoads === 1 ? '' : 's'}`
+                  : mode
+                    ? `Place ${mode === 'city' ? 'a city' : `a ${mode}`}`
+                    : '';
   return (
     <main
       className={`game-world ${g ? 'playing' : room ? 'lobby' : 'entry-world'}`}
@@ -603,16 +603,10 @@ function App() {
     >
       {g && (
         <div className="board-anchor">
-          <BoardViewport
-            seed={g.board.seed}
-            depth={preferences.depth}
-            tilt={preferences.boardTilt}
-            reducedMotion={reducedMotion}
-          >
+          <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
             <Board
               board={g.board}
               game={g}
-              depth={preferences.depth}
               glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}
               effectId={feedback.event?.id}
               me={me}
@@ -631,7 +625,7 @@ function App() {
             active={panel === 'journal'}
             onClick={() => setPanel(panel === 'journal' ? null : 'journal')}
           >
-            <ScrollText />
+            <History />
           </IconButton>
         )}
         {room && (
@@ -656,25 +650,53 @@ function App() {
             <Maximize />
           </IconButton>
         )}
+        {g && (
+          <div className="construction-tools" aria-label="Build">
+            {(['road', 'settlement', 'city'] as const).map((kind, i) => {
+              const Icon = [Route, House, Castle][i]!,
+                sites =
+                  kind === 'road' ? g.legal.roads : kind === 'city' ? g.legal.cities : g.legal.settlements;
+              return (
+                <IconButton
+                  key={kind}
+                  className="build-control"
+                  label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
+                    .map((r) => `${COSTS[kind][r]} ${RESOURCE_NAMES[r]}`)
+                    .join(', ')}`}
+                  active={mode === kind}
+                  disabled={disabled || !actionPhase || !sites.length}
+                  onClick={() => {
+                    setMode(mode === kind ? null : kind);
+                    setPanel(null);
+                  }}
+                >
+                  <Icon />
+                </IconButton>
+              );
+            })}
+          </div>
+        )}
       </nav>
       <nav className="side-controls room-controls" aria-label="Room and profile">
         <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
           <Settings2 />
         </IconButton>
-        {auth.canPlay && (
+        {auth.canPlay && !g && (
           <IconButton label="Your profile" active={panel === 'profile'} onClick={() => setPanel('profile')}>
             <UserRound />
           </IconButton>
         )}
         {room && (
           <>
-            <IconButton
-              label="Room invitation"
-              active={panel === 'invite'}
-              onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
-            >
-              <Users />
-            </IconButton>
+            {!g && (
+              <IconButton
+                label="Room invitation"
+                active={panel === 'invite'}
+                onClick={() => setPanel(panel === 'invite' ? null : 'invite')}
+              >
+                <Users />
+              </IconButton>
+            )}
             <IconButton
               label="Leave room"
               disabled={busy}
@@ -690,7 +712,22 @@ function App() {
           </IconButton>
         )}
       </nav>
-      {g && room && <PlayerRail room={room} game={g} me={me} />}
+      {g && room && (
+        <PlayerRail
+          room={room}
+          game={g}
+          me={me}
+          timer={
+            <TurnTimer
+              room={room}
+              me={me}
+              offset={metrics.clockOffsetMs}
+              connected={connected}
+              onWarning={() => feedback.sound.play('warning')}
+            />
+          }
+        />
+      )}
       {(error || auth.error) && (
         <div className="error-toast" role="alert">
           <span>{error || auth.error}</span>
@@ -909,24 +946,16 @@ function App() {
       )}
       {g && (
         <>
-          <div className="phase-prompt" role="status">
-            {g.winner ? <Trophy /> : myTurn ? <span className="turn-dot" /> : null}
-            {phaseText}
-            {room && (
-              <TurnTimer
-                room={room}
-                me={me}
-                offset={metrics.clockOffsetMs}
-                connected={connected}
-                onWarning={() => feedback.sound.play('warning')}
-              />
-            )}
-            {mode && (
-              <IconButton label="Cancel placement" onClick={() => setMode(null)}>
-                <X />
-              </IconButton>
-            )}
-          </div>
+          {phaseText && (
+            <div className="action-prompt" role="status" key={`${g.turn}:${g.phase}:${mode}`}>
+              <span>{phaseText}</span>
+              {mode && (
+                <IconButton label="Cancel placement" onClick={() => setMode(null)}>
+                  <X />
+                </IconButton>
+              )}
+            </div>
+          )}
           <div className="card-table">
             <div className="hand-zone">
               <ResourceHand
@@ -935,92 +964,46 @@ function App() {
                 reducedMotion={reducedMotion}
                 onHover={() => feedback.sound.play('hover')}
               />
-              <div className="build-actions">
-                {(['road', 'settlement', 'city'] as const).map((kind, i) => {
-                  const Icon = [Route, House, Castle][i]!,
-                    sites =
-                      kind === 'road'
-                        ? g.legal.roads
-                        : kind === 'city'
-                          ? g.legal.cities
-                          : g.legal.settlements;
-                  return (
-                    <IconButton
-                      key={kind}
-                      label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
-                        .map((r) => COSTS[kind][r] + ' ' + RESOURCE_NAMES[r])
-                        .join(', ')}`}
-                      active={mode === kind}
-                      disabled={disabled || !actionPhase || !sites.length}
-                      onClick={() => {
-                        setMode(mode === kind ? null : kind);
-                        setPanel(null);
-                      }}
-                    >
-                      <Icon />
-                    </IconButton>
-                  );
-                })}
-                <span className="action-divider" />
-                <IconButton
-                  label="Your development cards"
-                  active={panel === 'cards'}
-                  onClick={() => {
-                    setPanel(panel === 'cards' ? null : 'cards');
-                    setMode(null);
-                  }}
-                >
-                  <ScrollText />
-                  {!!player?.cards?.length && <small className="button-count">{player.cards.length}</small>}
-                </IconButton>
-              </div>
+              {me && (
+                <DevelopmentCards
+                  game={g}
+                  me={me}
+                  disabled={disabled}
+                  reducedMotion={reducedMotion}
+                  onAction={(a) => void act(a)}
+                  onHover={() => feedback.sound.play('hover')}
+                  obscured={panel !== null}
+                  onSelect={() => setPanel(null)}
+                  canBuy={g.legal.canBuyCard}
+                  onBuy={() => void act({ kind: 'buyCard' })}
+                />
+              )}
             </div>
             <div className="table-actions">
+              <div className="dice-dock" data-dice-dock aria-hidden="true" />
               <button
-                className="dice-button"
-                disabled={disabled || !myTurn || g.phase !== 'roll'}
-                onClick={() => void act({ kind: 'roll' })}
+                className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
+                aria-label={actionPhase ? 'End turn' : 'Roll dice'}
+                title={actionPhase ? 'End turn' : 'Roll dice'}
+                disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
+                onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
               >
-                <Dices size={32} />
-                <span>
-                  <strong>
-                    {g.dice ? g.dice[0] + ' + ' + g.dice[1] + ' = ' + (g.dice[0] + g.dice[1]) : 'Roll dice'}
-                  </strong>
-                  <small>
-                    {g.dice ? 'Last roll' : myTurn && g.phase === 'roll' ? 'Your turn' : 'Waiting for turn'}
-                  </small>
-                </span>
+                {actionPhase ? <ArrowRight size={36} /> : <Dices size={38} />}
+                <span>{actionPhase ? 'End' : 'Roll'}</span>
               </button>
               <button
-                className="table-action"
+                className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
+                aria-label="Trade"
+                title="Trade"
                 disabled={disabled || g.phase !== 'actions'}
                 onClick={() => {
                   setPanel(panel === 'trade' ? null : 'trade');
                   setMode(null);
                 }}
               >
-                <ArrowLeftRight size={18} />
-                Trade
+                <ArrowLeftRight size={33} />
+                <span>Trade</span>
               </button>
-              <button
-                className="table-action"
-                disabled={disabled || !g.legal.canBuyCard}
-                title="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
-                onClick={() => void act({ kind: 'buyCard' })}
-              >
-                <ScrollText size={18} />
-                Buy development card
-              </button>
-              {actionPhase && (
-                <button
-                  className="table-action end-turn"
-                  disabled={disabled}
-                  onClick={() => void act({ kind: 'endTurn' })}
-                >
-                  End turn
-                  <ArrowRight size={17} />
-                </button>
-              )}
             </div>
           </div>
           {g.trade && !myTurn && (
@@ -1135,21 +1118,18 @@ function App() {
                 ))}
             </aside>
           )}
-          {panel === 'cards' && me && (
-            <DevelopmentCards
-              game={g}
-              me={me}
-              disabled={disabled}
-              reducedMotion={reducedMotion}
-              onAction={(a) => void act(a)}
-              onClose={() => setPanel(null)}
-              onHover={() => feedback.sound.play('hover')}
-            />
-          )}
           {g.phase === 'discard' && !!g.discards[me ?? ''] && (
             <aside className="required-action floating-panel">
               <div className="panel-heading">
                 <h2>Discard {g.discards[me!]} cards</h2>
+                <TurnTimer
+                  room={room!}
+                  me={me}
+                  discard
+                  offset={metrics.clockOffsetMs}
+                  connected={connected}
+                  onWarning={() => feedback.sound.play('warning')}
+                />
               </div>
               <ResourcePicker value={selected} onChange={setSelected} max={hand} label="Discard" />
               <button
@@ -1184,7 +1164,9 @@ function App() {
           )}
         </>
       )}
-      <GameEffects event={feedback.event} reducedMotion={reducedMotion} activity={preferences.activity} />
+      {g && (
+        <GameEffects event={feedback.event} lastDice={g.dice} reducedMotion={reducedMotion} activity={true} />
+      )}
       {transitionId && (
         <FantasyTransition
           id={transitionId}
@@ -1202,7 +1184,6 @@ function App() {
             busy={disabled}
             save={saveSettings}
             previewSound={() => feedback.sound.play('settlement')}
-            osReduced={osReduced}
           />
         </Dialog>
       )}

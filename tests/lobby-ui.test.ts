@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { TurnTimer } from '../apps/client/src/TurnTimer.js';
+import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { Lobby } from '../apps/client/src/Lobby.js';
 import { GameSettings } from '../apps/client/src/GameSettings.js';
 import { ProfileEditor } from '../apps/client/src/Profile.js';
@@ -119,8 +121,8 @@ test('room timer controls are editable only by the host before play and expose a
   const duration = (html: string) => html.match(/<input\b[^>]*aria-label="Turn duration"[^>]*>/)?.[0];
   assert.ok(duration(render('p0')) && !duration(render('p0'))!.includes('disabled=""'));
   assert.ok(duration(render('p1'))!.includes('disabled=""'));
-  assert.ok(render('p1').includes('The host chooses these rules.'));
-  for (const seconds of [40, 65, 90, 115, 140]) assert.ok(render('p0').includes(`${seconds}s`));
+  assert.ok(render('p1').includes('Chosen by the host.'));
+  for (const seconds of [40, 65, 90, 115, 140]) assert.ok(render('p0').includes(`>${seconds}</span>`));
   room.game = gameView(
     createGame(
       room.players.map(({ id, name }) => ({ id, name })),
@@ -130,7 +132,7 @@ test('room timer controls are editable only by the host before play and expose a
     'p0',
   );
   assert.ok(duration(render('p0'))!.includes('disabled=""'));
-  assert.ok(render('p0').includes('Room rules are locked during play.'));
+  assert.ok(render('p0').includes('Set before the game.'));
 });
 
 test('profile editing presents names and twelve fantasy portraits without the removed accent or frame selectors', () => {
@@ -153,4 +155,48 @@ test('profile editing presents names and twelve fantasy portraits without the re
   assert.ok(!/aria-label="(?:Accent|Frame|Choose accent|Choose frame)"/.test(html));
   assert.ok(!html.includes('frame-brass') && !html.includes('--avatar-accent'));
   assert.deepEqual(profile, saved, 'legacy cosmetic data remains compatible while its controls are removed');
+});
+
+test('the active portrait shows the active clock while a separate discard panel shows the local discard deadline', () => {
+  const room = lobby();
+  room.game = gameView(
+    createGame(room.players, 82, () => 0.34),
+    'p1',
+  );
+  room.serverNow = Date.now();
+  room.turnClock = {
+    playerId: 'p0',
+    turn: 1,
+    startedAt: room.serverNow - 20000,
+    deadlineAt: room.serverNow + 45000,
+    pausedAt: room.serverNow,
+    discardDeadlines: { p1: room.serverNow + 90000 },
+  };
+  const render = (discard = false) =>
+    renderToStaticMarkup(
+      createElement(TurnTimer, { room, me: 'p1', connected: true, discard, onWarning: () => {} }),
+    );
+  assert.match(render(), /<b>45s<\/b>/);
+  assert.match(render(), /Turn clock paused/);
+  assert.match(render(true), /<b>90s<\/b>/);
+  assert.ok(!render(true).includes('Turn clock paused'));
+  delete room.turnClock.discardDeadlines!.p1;
+  assert.equal(render(true), '', 'a completed discard leaves no phantom local deadline');
+});
+
+test('game profiles retain turn, score, awards and disconnect status without connected text or piece inventories', () => {
+  const room = lobby();
+  const game = gameView(
+    createGame(room.players, 82, () => 0.34),
+    'p0',
+  );
+  game.longestRoad = 'p0';
+  room.players[1]!.connected = false;
+  const html = renderToStaticMarkup(createElement(PlayerRail, { room, game, me: 'p0' }));
+  assert.equal([...html.matchAll(/data-player-profile=/g)].length, 3);
+  assert.equal([...html.matchAll(/aria-label="Current turn"/g)].length, 1);
+  assert.match(html, /Longest Road, plus 2 victory points/);
+  assert.match(html, /aria-label="Disconnected"/);
+  assert.ok(!html.includes('profile-pieces'));
+  assert.ok(!/>Connected<|>You<|>Playing</.test(html));
 });

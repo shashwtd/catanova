@@ -3,33 +3,39 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
-import { constrainTilt, dragTilt, REST_PITCH } from '../apps/client/src/camera.js';
+import { constrainCamera, fitBoard, pinchScale, wheelScale } from '../apps/client/src/camera.js';
+import { WORLD } from '../apps/client/src/scene.js';
 import { FantasyTransition, FANTASY_TRANSITION_MS } from '../apps/client/src/FantasyTransition.js';
 
-test('board tilt is bounded and large pointer jumps cannot fling its viewing angle', () => {
-  const rest = { pitch: REST_PITCH, yaw: 0 };
-  assert.deepEqual(dragTilt(rest, 10000, -10000), { pitch: 13, yaw: 1 });
-  assert.deepEqual(dragTilt(rest, -10000, 10000), { pitch: 11, yaw: -1 });
-  let tilt = rest;
-  for (let i = 0; i < 1000; i++) tilt = dragTilt(tilt, 15, -15);
-  assert.deepEqual(tilt, { pitch: 16, yaw: 5 });
-  for (let i = 0; i < 1000; i++) tilt = dragTilt(tilt, -15, 15);
-  assert.deepEqual(tilt, { pitch: 8, yaw: -5 });
-  assert.deepEqual(constrainTilt({ pitch: -999, yaw: 999 }), { pitch: 8, yaw: 5 });
+test('initial island fit keeps the complete scene in view across narrow and short viewports', () => {
+  for (const bounds of [
+    { width: 180, height: 520 },
+    { width: 940, height: 240 },
+    { width: 620, height: 560 },
+    { width: 280, height: 190 },
+  ]) {
+    const fitted = fitBoard(bounds);
+    assert.ok(fitted.width <= bounds.width - 24 && fitted.height <= bounds.height - 24 + 1e-8);
+    assert.ok(Math.abs(fitted.width / fitted.height - WORLD.width / WORLD.height) < 1e-8);
+  }
+  assert.ok(wheelScale(1, -10000) < 1.023 && wheelScale(1, 10000) > 0.978);
+  assert.equal(pinchScale(1, 10000, 1), 1.035);
+  assert.equal(pinchScale(1, 1, 10000), 0.965);
+  const moved = constrainCamera({ scale: 1, x: 40, y: -30 }, { width: 600, height: 600 });
+  assert.deepEqual(
+    moved,
+    { scale: 1, x: 40, y: -30 },
+    'a fitted island and its table can still be panned together',
+  );
 });
 
-test('camera keeps gestures and keyboard controls with one fit button and offers a flat view', () => {
+test('camera presents a straight-down island and a matching wooden world with gestures and no buttons', () => {
   const html = renderToStaticMarkup(createElement(BoardViewport, { seed: 42, children: 'board' }));
-  assert.equal([...html.matchAll(/<button/g)].length, 1);
-  assert.match(html, /aria-label="Fit board view"/);
+  assert.equal([...html.matchAll(/<button/g)].length, 0);
   assert.match(html, /Scroll or pinch to zoom/);
-  assert.match(html, /rotateX\(12deg\) rotateY\(0deg\)/);
-  assert.ok(!html.includes('zoom-controls') && !html.includes('100%'));
-  const flat = renderToStaticMarkup(
-    createElement(BoardViewport, { seed: 42, depth: false, children: 'board' }),
-  );
-  assert.match(flat, /data-depth="false"/);
-  assert.ok(!flat.includes('rotateX') && !flat.includes('gently tilt'));
+  assert.ok(!html.includes('rotateX') && !html.includes('rotateY') && !html.includes('zoom-controls'));
+  assert.match(html, /class="board-world-surface"/);
+  assert.match(html, /patternTransform="translate\(0 0\) scale\(1\)"/);
   const reduced = renderToStaticMarkup(
     createElement(BoardViewport, { seed: 42, reducedMotion: true, children: 'board' }),
   );

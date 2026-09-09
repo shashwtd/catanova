@@ -272,7 +272,7 @@ The bank's precise remaining stacks may be counted to resolve a possible product
 
 ## 13. What is not a base-game rule
 
-This ruleset does not add a friendly robber, an opening grace period without sevens, extra resources, forced balanced dice, resource hand caps, undo after revealed information, automatic forfeits, turn timers, special building phases, or two-player rules. All may be considered as explicit options or separate rulesets later.
+This base ruleset does not add a friendly robber, an opening grace period without sevens, extra resources, forced balanced dice, resource hand caps, undo after revealed information, automatic forfeits, special building phases, or two-player rules. These may be considered as explicit options or separate rulesets later. The app also offers an optional [turn timer](TURN_CLOCK.md), disabled by default and documented separately as a house rule.
 
 Network loss is also not a game action. It must not change a dice result, reroll a theft, remove a building, discard a hand, or transfer a seat. [Online behavior](ARCHITECTURE.md) is specified separately so recovery does not change the board-game rules.
 

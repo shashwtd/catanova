@@ -1,7 +1,7 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
-import { emptyHand } from '../../../packages/rules/src/game.js';
+import { emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { GameView, Hand } from '../../../packages/rules/src/game.js';
 import type { SoundCue } from './sound.js';
 export type FlightIntent = {
@@ -21,6 +21,7 @@ export type FeedbackEvent = {
   sites: string[];
   hand: Hand;
   changed: Resource[];
+  gains: { playerId: string; resource: Resource | 'any'; amount: number }[];
 };
 const bank = '[data-effect-bank]';
 const card = (r: Resource) => `[data-resource-card="${r}"]`;
@@ -28,6 +29,62 @@ const resourceText = (hand: Hand) =>
   RESOURCES.filter((r) => hand[r])
     .map((r) => `${hand[r]} ${RESOURCE_NAMES[r]}`)
     .join(', ');
+function rollFaces(line: string, playerName: string): readonly [number, number] | null {
+  const prefix = playerName + ' rolled ';
+  if (!line.startsWith(prefix)) return null;
+  const match = /^([1-6]) \+ ([1-6]) = (\d+)\.$/.exec(line.slice(prefix.length));
+  return match && Number(match[1]) + Number(match[2]) === Number(match[3])
+    ? [Number(match[1]), Number(match[2])]
+    : null;
+}
+/** Production is public board information. Verify every bank/count delta before labeling another player's gains. */
+export function publicProduction(
+  before: GameView,
+  next: GameView,
+  dice: readonly [number, number],
+): Map<string, Hand> | null {
+  const sum = dice[0] + dice[1];
+  if (sum === 7 || before.robber !== next.robber) return null;
+  const owed = new Map(before.players.map((p) => [p.id, emptyHand()]));
+  for (const hex of before.board.hexes)
+    if (hex.number === sum && hex.id !== before.robber && hex.terrain !== 'desert')
+      for (const vertex of hex.vertices) {
+        const building = before.buildings[vertex];
+        if (building) {
+          const payment = owed.get(building.player);
+          if (!payment) return null;
+          payment[hex.terrain] += building.kind === 'city' ? 2 : 1;
+        }
+      }
+  const paid = new Map(before.players.map((p) => [p.id, emptyHand()]));
+  for (const resource of RESOURCES) {
+    const recipients = [...owed].filter(([, hand]) => hand[resource] > 0),
+      needed = recipients.reduce((n, [, hand]) => n + hand[resource], 0);
+    if (needed > before.bank[resource] && recipients.length > 1) continue;
+    for (const [id, hand] of recipients)
+      paid.get(id)![resource] = Math.min(hand[resource], before.bank[resource]);
+  }
+  if (
+    RESOURCES.some(
+      (resource) =>
+        next.bank[resource] !==
+        before.bank[resource] - [...paid.values()].reduce((n, hand) => n + hand[resource], 0),
+    )
+  )
+    return null;
+  for (const player of before.players) {
+    const after = next.players.find((p) => p.id === player.id),
+      payment = paid.get(player.id)!;
+    if (!after || after.resourceCount - player.resourceCount !== total(payment)) return null;
+    if (
+      player.hand &&
+      after.hand &&
+      RESOURCES.some((resource) => after.hand![resource] - player.hand![resource] !== payment[resource])
+    )
+      return null;
+  }
+  return paid;
+}
 /** Trade sounds use canonical public evidence, including equal-count trades invisible to observers' hands. */
 function traded(before: GameView, next: GameView, lines: string[]): boolean {
   if (
@@ -81,15 +138,11 @@ export function deriveFeedback(
     hand = g.players.find((p) => p.id === me)?.hand;
   if (!old || !hand) return null;
   const lines = g.log.filter((e) => e.id > (before.log.at(-1)?.id ?? -1)).map((e) => e.text);
-  const rollPrefix = before.players[before.active]!.name + ' rolled ';
-  const timedRoll = lines.find((line) => line.startsWith(rollPrefix));
-  const faces = timedRoll ? /^([1-6]) \+ ([1-6]) = (\d+)\.$/.exec(timedRoll.slice(rollPrefix.length)) : null;
-  const dice =
-    g.dice && (!before.dice || before.turn !== g.turn)
-      ? g.dice
-      : faces && Number(faces[1]) + Number(faces[2]) === Number(faces[3])
-        ? ([Number(faces[1]), Number(faces[2])] as const)
-        : undefined;
+  const faces = lines.flatMap((line) => {
+    const result = rollFaces(line, before.players[before.active]!.name);
+    return result ? [result] : [];
+  })[0];
+  const dice = g.dice && (!before.dice || before.turn !== g.turn) ? g.dice : faces;
   const event: FeedbackEvent = {
     id: `${next.roomId}:${next.revision}`,
     dice,
@@ -100,6 +153,7 @@ export function deriveFeedback(
     sites: [],
     hand: { ...hand },
     changed: RESOURCES.filter((r) => old[r] !== hand[r]),
+    gains: [],
   };
   const gain = emptyHand();
   for (const r of RESOURCES) gain[r] = Math.max(0, hand[r] - old[r]);
@@ -113,26 +167,42 @@ export function deriveFeedback(
       event.sites.push(`[data-road-id="${id}"]`);
       event.sounds.push('road');
     }
+  const production = dice ? publicProduction(before, g, dice) : null;
   if (dice) {
     event.sounds.push('dice');
-    for (const hex of g.board.hexes) {
-      if (hex.number !== dice[0] + dice[1] || hex.id === g.robber || hex.terrain === 'desert') continue;
-      const units = hex.vertices.reduce(
-        (sum, v) => sum + (g.buildings[v]?.player === me ? (g.buildings[v]!.kind === 'city' ? 2 : 1) : 0),
-        0,
-      );
-      const amount = Math.min(units, gain[hex.terrain]);
-      if (amount) {
+    const remaining = production
+      ? new Map([...production].map(([id, hand]) => [id, { ...hand }]))
+      : new Map<string, Hand>();
+    for (const hex of before.board.hexes) {
+      if (hex.number !== dice[0] + dice[1] || hex.id === before.robber || hex.terrain === 'desert') continue;
+      for (const [id, payment] of remaining) {
+        const units = hex.vertices.reduce(
+          (n, v) =>
+            n + (before.buildings[v]?.player === id ? (before.buildings[v]!.kind === 'city' ? 2 : 1) : 0),
+          0,
+        );
+        const amount = Math.min(units, payment[hex.terrain]);
+        if (!amount) continue;
         event.glowHexes.push(hex.id);
         event.flights.push({
           resource: hex.terrain,
           amount,
           from: `[data-effect-hex="${hex.id}"]`,
-          to: card(hex.terrain),
+          to: id === me ? card(hex.terrain) : `[data-player-profile="${id}"]`,
         });
-        gain[hex.terrain] -= amount;
+        payment[hex.terrain] -= amount;
+        if (id === me) gain[hex.terrain] -= amount;
       }
     }
+  }
+  if (production) {
+    for (const [id, payment] of production)
+      for (const resource of RESOURCES)
+        if (payment[resource]) event.gains.push({ playerId: id, resource, amount: payment[resource] });
+  } else {
+    for (const resource of RESOURCES)
+      if (hand[resource] > old[resource])
+        event.gains.push({ playerId: me, resource, amount: hand[resource] - old[resource] });
   }
   for (const r of RESOURCES) {
     if (gain[r])
@@ -156,13 +226,15 @@ export function deriveFeedback(
     if (p.id !== me) {
       const delta =
         p.resourceCount - (before.players.find((q) => q.id === p.id)?.resourceCount ?? p.resourceCount);
-      if (delta > 0)
+      if (delta > 0 && !production) {
         event.flights.push({
           resource: 'any',
           amount: delta,
           from: bank,
           to: `[data-player-profile="${p.id}"]`,
         });
+        event.gains.push({ playerId: p.id, resource: 'any', amount: delta });
+      }
     }
   if (event.flights.some((f) => !f.spending && f.resource !== 'any')) event.sounds.push('gain');
   if (event.flights.some((f) => f.spending)) event.sounds.push('spend');
@@ -186,11 +258,12 @@ export function deriveFeedback(
     event.sounds.push('award');
   if (g.turn !== before.turn && g.players[g.active]?.id === me) event.sounds.push('turn');
   event.notices = lines
-    .filter((s) => !s.endsWith("'s turn."))
+    .filter((s) => !s.endsWith("'s turn.") && !before.players.some((player) => rollFaces(s, player.name)))
     .map((s) => s.replace(/ on edge \d+| at corner \d+/g, ''));
   if (!event.notices.length && g.turn !== before.turn)
     event.notices = [`${g.players[g.active]!.name}'s turn`];
   event.sounds = [...new Set(event.sounds)];
+  event.glowHexes = [...new Set(event.glowHexes)];
   event.flights = event.flights.slice(0, 16);
   return event;
 }

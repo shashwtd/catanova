@@ -5,20 +5,19 @@ import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
 import { Terrain } from './Terrain.js';
-import { Pieces3D } from './Pieces3D.js';
-import { DICE_ROLL_MS } from './DiceThrow.js';
+import { DICE_READABLE_MS } from './DiceThrow.js';
 import {
   coastline,
   HEX_SIZE as SIZE,
   hexPoints,
-  oceanRing,
+  waterOutline,
   portPlacement,
   SPRITE_INDEX,
   TERRAIN_INDEX,
   WORLD,
 } from './scene.js';
 
-export const PLAYER_COLORS = ['#cf6345', '#3787b5', '#9867b5', '#c5a335'];
+export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#e2bd4c'];
 export type BuildMode = 'road' | 'settlement' | 'city' | null;
 export function Sprite({
   kind,
@@ -65,7 +64,6 @@ export function Board({
   disabled,
   onAction,
   onRobber,
-  depth = true,
   glowHexes = [],
   effectId,
 }: {
@@ -76,13 +74,18 @@ export function Board({
   disabled: boolean;
   onAction: (action: GameAction) => void;
   onRobber: (hex: number) => void;
-  depth?: boolean;
   glowHexes?: readonly number[];
   effectId?: string;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
   const coast = useMemo(() => coastline(board), [board.seed]);
-  const water = useMemo(oceanRing, []);
+  const water = useMemo(
+    () =>
+      waterOutline(board)
+        .map((p) => `${p.x},${p.y}`)
+        .join(' '),
+    [board.seed],
+  );
   const color = (id: string) =>
     PLAYER_COLORS[game?.players.findIndex((p) => p.id === id) ?? 0] ?? PLAYER_COLORS[0];
   const setupSettlement = game?.phase === 'setupSettlement',
@@ -99,7 +102,10 @@ export function Board({
     }
   };
   return (
-    <div className={`island-stage ${gpuReady ? 'gpu-ready' : ''} ${depth ? 'has-depth' : ''}`}>
+    <div
+      className={`island-stage ${gpuReady ? 'gpu-ready' : ''}`}
+      style={{ aspectRatio: `${WORLD.width}/${WORLD.height}` }}
+    >
       <Terrain board={board} onReady={setGpuReady} />
       <svg
         className="island"
@@ -151,15 +157,14 @@ export function Board({
           ))}
         </defs>
         <g className="terrain-fallback" aria-hidden="true">
-          {water.map((h) => (
-            <polygon
-              key={`${h.q},${h.r}`}
-              points={hexPoints(h.x, h.y)}
-              fill="url(#ocean-material)"
-              stroke="#518d99"
-              strokeWidth="1.3"
-            />
-          ))}
+          <polygon
+            className="water-band"
+            points={water}
+            fill="url(#ocean-material)"
+            stroke="#275c62"
+            strokeWidth="3"
+            strokeLinejoin="round"
+          />
           <polygon
             points={coast}
             fill="#52bebf"
@@ -228,7 +233,7 @@ export function Board({
                   key={`${effectId}-${h.id}`}
                   className="production-bloom"
                   points={hexPoints(x, y, 57)}
-                  style={{ animationDelay: `${DICE_ROLL_MS}ms` }}
+                  style={{ animationDelay: `${DICE_READABLE_MS}ms` }}
                   aria-hidden="true"
                 />
               )}
@@ -304,8 +309,8 @@ export function Board({
                   </g>
                 );
               })}
-              <g transform={`translate(${p.x + p.nx * 70},${p.y + p.ny * 70}) rotate(${p.angle})`}>
-                <svg x="-26" y="-28" width="52" height="56" viewBox="1536 512 512 512">
+              <g transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
+                <svg x="-22" y="-23" width="44" height="46" viewBox="1536 512 512 512">
                   <image href="/art/sprites-fantasy.png" width="2048" height="1024" />
                 </svg>
               </g>
@@ -353,18 +358,18 @@ export function Board({
                 <rect
                   className="road-foundation"
                   x={-length / 2 + 4}
-                  y="-7"
+                  y="-4"
                   width={length - 8}
-                  height="14"
+                  height="12"
                   rx="4"
                 />
                 <rect
                   className="road-body"
                   fill={color(owner)}
                   x={-length / 2 + 6}
-                  y="-5"
+                  y="-6"
                   width={length - 12}
-                  height="10"
+                  height="12"
                   rx="2"
                 />
                 <path className="road-sheen" d={`M${-length / 2 + 8} -3H${length / 2 - 8}`} />
@@ -385,15 +390,15 @@ export function Board({
                 transform={`translate(${v.x * SIZE},${v.y * SIZE})`}
               >
                 <title>{`${game.players.find((p) => p.id === b.player)?.name} · ${b.kind}`}</title>
-                <ellipse className="building-plinth" rx={city ? 22 : 18} ry="10" cy="7" />
+                <ellipse className="building-plinth" rx={city ? 23 : 18} ry="8" cy="10" />
                 <path
                   className="building"
                   fill={color(b.player)}
-                  d={city ? 'M-17 8V-9L-8-17L1-9V-1L9-9L18-1V8Z' : 'M-13 8V-5L0-17L13-5V8Z'}
+                  d={city ? 'M-19 9V-10L-9-20L2-10V-2L11-12L21-2V9Z' : 'M-14 9V-6L0-20L14-6V9Z'}
                 />
                 <path
                   className="roof-highlight"
-                  d={city ? 'M-17-9L-8-17L1-9M1-1L9-9L18-1' : 'M-13-5L0-17L13-5'}
+                  d={city ? 'M-19-10L-9-20L2-10M2-2L11-12L21-2' : 'M-14-6L0-20L14-6'}
                 />
                 <path className="house-door" d="M-3 8V0H3V8" />
                 {city && (
@@ -464,7 +469,6 @@ export function Board({
           aria-hidden="true"
         />
       </svg>
-      {depth && game && <Pieces3D board={board} game={game} me={me} colors={PLAYER_COLORS} />}
     </div>
   );
 }

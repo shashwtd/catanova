@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Clock3, LockKeyhole, Play, ScrollText, X } from 'lucide-react';
+import { Check, Clock3, LockKeyhole, Play, ScrollText, X } from './GameIcons.js';
 import type { CSSProperties } from 'react';
 import { CARD_NAMES, canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { Card, CardKind, GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
@@ -49,6 +49,10 @@ export function DevelopmentCards({
   reducedMotion,
   onAction,
   onClose,
+  onBuy,
+  onSelect,
+  obscured = false,
+  canBuy = false,
   onHover,
 }: {
   game: GameView;
@@ -56,7 +60,11 @@ export function DevelopmentCards({
   disabled: boolean;
   reducedMotion: boolean;
   onAction: (action: GameAction) => void;
-  onClose: () => void;
+  onClose?: () => void;
+  onBuy?: () => void;
+  onSelect?: () => void;
+  obscured?: boolean;
+  canBuy?: boolean;
   onHover: () => void;
 }) {
   const cards = game.players.find((p) => p.id === me)?.cards ?? [],
@@ -69,8 +77,12 @@ export function DevelopmentCards({
   useEffect(() => {
     if (!cards.some((c) => c.id === selected)) setSelected(null);
   }, [cards.map((c) => c.id).join('|'), selected]);
+  useEffect(() => {
+    if (obscured) setSelected(null);
+  }, [obscured]);
   function choose(id: string) {
-    setSelected(id);
+    onSelect?.();
+    setSelected((current) => (current === id ? null : id));
     setTake(emptyHand());
   }
   function play() {
@@ -89,16 +101,16 @@ export function DevelopmentCards({
     });
   }
   return (
-    <section className="development-spread floating-panel" aria-label="Development cards">
-      <div className="panel-heading">
-        <h2>
-          <ScrollText size={18} />
-          Your development cards
-        </h2>
-        <button className="icon-button" aria-label="Close development cards" onClick={onClose}>
-          <X />
-        </button>
-      </div>
+    <section
+      className="development-hand-inline"
+      aria-label="Development cards"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          setSelected(null);
+          e.stopPropagation();
+        }
+      }}
+    >
       {cards.length ? (
         <>
           <div className="development-fan">
@@ -170,7 +182,21 @@ export function DevelopmentCards({
             })}
           </div>
           {card ? (
-            <div className="development-detail">
+            <div
+              className="development-detail floating-panel"
+              role="dialog"
+              aria-label={CARD_NAMES[card.kind]}
+            >
+              <button
+                className="icon-button development-close"
+                aria-label="Close card details"
+                onClick={() => {
+                  setSelected(null);
+                  onClose?.();
+                }}
+              >
+                <X />
+              </button>
               <div className="development-explanation">
                 <span className="field-caption">{CARD_LORE[card.kind].title}</span>
                 <h3>{CARD_NAMES[card.kind]}</h3>
@@ -260,16 +286,22 @@ export function DevelopmentCards({
                 </div>
               )}
             </div>
-          ) : (
-            <p className="spread-hint">Choose a card.</p>
-          )}
+          ) : null}
         </>
-      ) : (
-        <div className="empty-development">
+      ) : null}
+      {onBuy && (
+        <button
+          className="development-buy"
+          disabled={disabled || !canBuy}
+          aria-label="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
+          title="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
+          onClick={onBuy}
+        >
           <DevelopmentArt kind="back" />
-          <p>No development cards yet.</p>
-          <span>Buy a development card with Sheep, Hay, and Rock.</span>
-        </div>
+          <span className="development-buy-mark">
+            <ScrollText size={20} />
+          </span>
+        </button>
       )}
     </section>
   );

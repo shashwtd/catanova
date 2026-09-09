@@ -1,34 +1,14 @@
 import { useEffect, useState } from 'react';
-export type Preferences = {
-  sound: boolean;
-  volume: number;
-  motion: boolean;
-  depth: boolean;
-  boardTilt: boolean;
-  activity: boolean;
-};
-export const DEFAULT_PREFERENCES: Preferences = {
-  sound: true,
-  volume: 0.55,
-  motion: true,
-  depth: true,
-  boardTilt: true,
-  activity: true,
-};
+export type Preferences = { sound: boolean; volume: number };
+export const DEFAULT_PREFERENCES: Preferences = { sound: true, volume: 0.55 };
+/** Ignore retired display options so old saved settings cannot hide gameplay feedback. */
 export function parsePreferences(input: unknown): Preferences {
   const p = input && typeof input === 'object' ? (input as Partial<Preferences>) : {};
   return {
-    ...Object.fromEntries(
-      ['sound', 'motion', 'depth', 'boardTilt', 'activity'].map((k) => [
-        k,
-        typeof p[k as keyof Preferences] === 'boolean'
-          ? p[k as keyof Preferences]
-          : DEFAULT_PREFERENCES[k as keyof Preferences],
-      ]),
-    ),
+    sound: typeof p.sound === 'boolean' ? p.sound : true,
     volume:
       typeof p.volume === 'number' && Number.isFinite(p.volume) ? Math.max(0, Math.min(1, p.volume)) : 0.55,
-  } as Preferences;
+  };
 }
 export function usePreferences() {
   const [preferences, setPreferences] = useState(() => {
@@ -56,5 +36,5 @@ export function usePreferences() {
       return next;
     });
   }
-  return { preferences, update, reducedMotion: osReduced || !preferences.motion, osReduced };
+  return { preferences, update, reducedMotion: osReduced };
 }

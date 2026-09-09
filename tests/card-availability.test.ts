@@ -2,12 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import {
-  CARD_LORE,
-  DEVELOPMENT_ART_INDEX,
-  RESOURCE_DESCRIPTION,
-  cardLockReason,
-} from '../apps/client/src/cards.js';
+import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from '../apps/client/src/cards.js';
 import { DevelopmentCards, developmentStacks } from '../apps/client/src/DevelopmentCards.js';
 import { ResourceHand } from '../apps/client/src/ResourceHand.js';
 import { activePlayer, applyAction, createGame, emptyHand, gameView } from '../packages/rules/src/game.js';
@@ -105,7 +100,7 @@ test('Road Building and Year of Plenty explain unavailable inventory instead of 
   assert.equal(cardLockReason(plenty, emptyBank, 'p0'), null, 'the last bank resource may still be taken');
 });
 
-test('resource cards expose concise accessible descriptions; empty cards retain texture with static hover treatment', () => {
+test('resource cards keep accessible names without visible labels or hover popups; empty cards remain static', () => {
   const hand = { ...emptyHand(), wood: 2, wheat: 1 };
   const html = renderToStaticMarkup(
     createElement(ResourceHand, { hand, pulse: {}, reducedMotion: false, onHover: () => {} }),
@@ -113,11 +108,12 @@ test('resource cards expose concise accessible descriptions; empty cards retain 
   assert.equal([...html.matchAll(/data-resource-card=/g)].length, 5);
   assert.equal([...html.matchAll(/class="[^"]*\bempty-card\b/g)].length, 3);
   assert.equal([...html.matchAll(/class="[^"]*\bstatic-card\b/g)].length, 3);
-  assert.equal([...html.matchAll(/role="tooltip"/g)].length, 5);
-  assert.equal([...html.matchAll(/aria-describedby=/g)].length, 5);
+  assert.equal([...html.matchAll(/role="tooltip"/g)].length, 0);
+  assert.equal([...html.matchAll(/aria-describedby=/g)].length, 0);
   for (const resource of RESOURCES) {
     assert.ok(html.includes(RESOURCE_NAMES[resource]));
-    assert.ok(html.includes(RESOURCE_DESCRIPTION[resource]));
+    assert.ok(html.includes(`aria-label="${hand[resource]} ${RESOURCE_NAMES[resource]}"`));
+    assert.ok(!html.includes(`>${RESOURCE_NAMES[resource]}<`));
   }
   assert.ok(!html.includes('opacity:0'));
 });

@@ -74,7 +74,7 @@ h3,
 p {
   margin: 0;
 }
-svg.lucide {
+svg.game-icon {
   width: 20px;
   height: 20px;
   stroke-width: 1.7;
@@ -1204,7 +1204,7 @@ svg.lucide {
   justify-content: space-between;
   margin-bottom: 18px;
 }
-.trade-summary > .lucide {
+.trade-summary > .game-icon {
   width: 16px;
   color: #b6a46c;
 }
@@ -3287,7 +3287,7 @@ svg.lucide {
     white-space: normal;
     text-align: center;
   }
-  .phase-prompt .lucide {
+  .phase-prompt .game-icon {
     width: 13px;
   }
   .card-table {

@@ -23,7 +23,7 @@ Use [Supabase's Google setup guide](https://supabase.com/docs/guides/auth/social
 
 The browser retains its Supabase session and refreshes it with the official SDK. Invite context survives the OAuth redirect. On every WebSocket handshake, the server verifies the access token with Supabase's Auth user endpoint through `auth.getUser(token)`. It uses the verified user ID, requires a Google-linked non-anonymous account, and rejects another account's seat token. It never takes ownership from a browser-supplied ID or an unverified decoded JWT claim. Auth token expiry closes the socket so reconnection obtains a fresh token.
 
-An account occupies one active seat per room. Signing in on another device and opening its invite offers Resume. Resuming rotates that seat's local token and revokes the old socket without creating an extra player. Google profile data only supplies a default name; users choose their portrait, display name, accent and frame. Display names are not globally unique identities.
+An account occupies one active seat per room. Signing in on another device and opening its invite offers Resume. Resuming rotates that seat's local token and revokes the old socket without creating an extra player. Google profile data only supplies a default name; users choose their portrait and display name. Portraits share a consistent border. Display names are not globally unique identities.
 
 Profiles and game saves are currently stored by the game server in **SQLite**, keyed by verified Supabase user ID. They are not yet in Supabase Postgres. They survive normal server restarts as long as the database volume survives. The hosted Postgres migration remains a separate milestone.
 

@@ -6,16 +6,19 @@
 - [x] Timber, Clay, Sheep, Hay and Rock; textured original terrain, environment and resource atlases.
 - [x] Reproducible balanced islands with inventory, geometry and fairness tests across 500 seeds.
 - [x] Three/four-player lobbies, direct invite previews, explicit Create/Join, lobby leave and host transfer.
-- [x] Separate ready-up lobby; twelve portraits, six accents and three frames with saved cosmetics.
+- [x] Separate ready-up lobby; saved names and twelve fantasy portraits with a consistent rounded-square border.
 - [x] Supabase Google integration and verified account-owned seats; real project activation still pending.
 - [x] Durable paginated move history and guards against incomplete or rollback snapshots.
-- [x] Softer painted art, two harbor bridges, player-profile awards and a bottom card table.
+- [x] Painted flat board, rugged continuous sea band, bright player pieces and two harbor bridges per port.
+- [x] Original editable SVG icons, thin textured borders, profile turn markers/awards and resource receipts.
+- [x] Compact colored resource cards, inline development hand and square Roll/End plus Trade controls.
 - [x] Bounded board zoom/pan and live ping diagnostics.
 - [x] Shuffled turn order and snake setup.
 - [x] Dice production, bank shortages, sevens/discards, robber and private theft.
 - [x] Roads, settlements, cities, piece limits and distance/connectivity rules.
 - [x] Bank/port exchanges and public player offers/acceptance.
 - [x] Development deck, card timing/effects, road/army awards and own-turn victory.
+- [x] Optional host-configured turn timer with durable server-owned turn and discard deadlines.
 - [x] React interface, clickable legal sites, private hands, journal and endgame.
 - [x] Saved games, revision checks, atomic command receipts and per-player projections.
 - [x] Reconnect, tab-refresh outbox recovery, restart and process-crash tests.
@@ -38,7 +41,7 @@ Configure and exercise Google OAuth on the chosen Supabase project. Review the [
 
 ## Visual and audio polish
 
-Keep terrain instantly readable and playful. Improve pieces, resource arrivals, dice and interaction feedback using the current art direction. Add original sound with volume/mute controls. Measure the new static WebGL terrain layer and its SVG fallback across devices. Optimize the generated PNG delivery pack for slow connections. Keep the renderer free of continuous idle animation.
+Keep terrain instantly readable and playful. Evaluate the current flat board, compact hand, dice reading pause and profile resource receipts in human playtests. Tune the original procedural sound through the volume control. Measure the static WebGL terrain layer, its SVG fallback and the shared table/island camera across devices. Optimize the generated PNG delivery pack for slow connections. Keep idle rendering bounded and effects finite.
 
 ## Public playable release
 

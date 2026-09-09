@@ -1,0 +1,934 @@
+{
+  "generation": {
+    "schema_version": 1,
+    "project": "Catanova",
+    "generated_at": "2026-09-09",
+    "generation_mode": "built-in image_gen",
+    "tool": "image_gen__imagegen",
+    "request_count": 2,
+    "retries": 0,
+    "reference": {
+      "path": "sprites-fantasy.png",
+      "usage": "Inspected visually for painted wood/rope/fantasy material family; not sent as edit target or reference-image tool input."
+    },
+    "assets": [
+      {
+        "name": "fantasy-ui-icon-atlas",
+        "source_path": "exec-0dcfafe1-b230-403e-a8a2-ef01e659c803.png",
+        "prompt": "Use case: stylized-concept.\nAsset type: production fantasy board-game UI icon sprite atlas.\nCreate one NEW PNG image, exactly 1536 pixels wide by 768 pixels high, landscape exact 2:1 aspect ratio. TRUE transparent alpha background, not a checkerboard, no opaque canvas.\nLayout: exactly EIGHT equal columns and FOUR equal rows, 32 square 192x192 invisible cells. Each single distinct icon is centered in its cell, maximum footprint about 144x144, with at least 24px transparent padding on every edge. Perfectly regular grid, no labels, no drawn grid lines, no tile backgrounds. Never combine icons across cells.\nExact row-major icon contents:\nRow 1: column1 two ivory dice together; column2 a chunky forward/end-turn arrow pointing right; column3 two chunky curved trade arrows chasing each other; column4 a warm timber settlement house; column5 a little fortified city with two towers; column6 a short wooden road of planks; column7 a development-card parchment scroll; column8 an open history logbook.\nRow 2: column1 a chunky brass settings cog; column2 a sound-on speaker with sound rays; column3 a muted speaker with an X; column4 a connected signal of three rising bars; column5 a disconnected broken signal with an X; column6 an open door for leave/exit; column7 two companion figures for invite; column8 one profile bust.\nRow 3: column1 a bold X close mark; column2 a bold check tick; column3 a bold plus sign; column4 a chunky back arrow pointing left; column5 a question-mark on a little parchment scroll; column6 four chunky outward-pointing fullscreen corners; column7 a warm brass crown; column8 a victory cup trophy.\nRow 4: column1 a sturdy shield; column2 crossed swords; column3 a stack of three resource cards; column4 a wooden hourglass; column5 a brass padlock; column6 a chunky right-pointing play triangle; column7 two chunky pause bars; column8 a quill and pencil writing icon.\nStyle: full-color expressive hand-painted tactile fantasy game art, medium detail, bold chunky shapes, dimensional highlights and painted dark edge definition, warm worn brass, carved walnut wood, parchment and cloth, hand-crafted irregularity. Material family and rendering consistently match a friendly painterly board game with richly painted wood logs, golden wheat and wooden docks. Strong silhouettes readable at 24 to 40 pixels. Every symbol should be a substantial tangible painted object, not thin-stroke web icons. Soft warm directional lighting contained within the object.\nConstraints: no text except the pictorial question mark, no words, no cell numbers, no white or colored background, no tile panels, no shadows outside icon silhouette, no glow haze, no thin outline icons, no modern glossy flat UI, no copied franchise assets. All 32 requested objects appear exactly once in the listed positions. Preserve genuine alpha around every icon.",
+        "requested_dimensions": [
+          1536,
+          768
+        ],
+        "actual_dimensions": [
+          1774,
+          887
+        ],
+        "layout": {
+          "columns": 8,
+          "rows": 4
+        },
+        "postprocessing": "None; original generated alpha preserved."
+      },
+      {
+        "name": "rope-wood-rounded-square-frame",
+        "source_path": "exec-e6278c05-84ab-47ea-8794-f4f51b688f7c.png",
+        "prompt": "Use case: stylized-concept.\nAsset type: fantasy board-game portrait and control frame overlay.\nCreate one NEW square 1024x1024 PNG with TRUE transparent alpha in BOTH the center opening and the entire outside. No opaque background, no checkerboard.\nSubject: one rounded-square rope-and-carved-dark-wood portrait frame seen perfectly straight-on, no perspective tilt. Warm worn brass corner clasps, organically rounded corners, irregular handcrafted bevel, short rough twisted rope wrapped around and following the dark wood frame. The complete frame is a rounded SQUARE, not a circle, not a rectangle. Thin practical border: transparent central opening about 76 percent of canvas width and height. Artwork fills about 96 percent of canvas width and height with 2 percent transparent margin. Keep center completely empty and genuinely transparent.\nStyle: full-color expressive hand-painted tactile fantasy game art, chunky painted wood grain, twisted hemp rope strands, warm patinated brass highlights, deliberate handcrafted irregularity, rich dark walnut, tan rope. Medium detail with clean strong silhouette, legible when scaled down to an 80px avatar border. Matches a friendly painterly board game with richly painted wood logs, golden wheat and wooden docks.\nConstraints: only the frame, no portrait, no character, no text, no emblem in the opening, no scene, no background, no drop shadow outside the frame, no glow haze, no duplicated frames, no copied franchise assets. Opaque paint belongs only to wood/rope/brass. Preserve true transparent alpha everywhere else.",
+        "requested_dimensions": [
+          1024,
+          1024
+        ],
+        "actual_dimensions": [
+          1254,
+          1254
+        ],
+        "postprocessing": "None; original generated alpha preserved."
+      }
+    ],
+    "notes": [
+      "Built-in generation chose output dimensions larger than requested; atlas remains exact 2:1 and frame remains square.",
+      "No repository files modified by asset generation task. Root agent handles copying and integration."
+    ]
+  },
+  "acceptedAssets": [
+    {
+      "name": "rope-wood-rounded-square-frame",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "sha256": "b7acb41f49aa9496b52af9e886aedbaca78232400606ce31713d2b66da15b40f",
+      "mode": "RGBA",
+      "alpha_extrema": [
+        0,
+        255
+      ],
+      "transparent_pixels": 961248,
+      "opaque_pixels": 222,
+      "partial_alpha_pixels": 611046,
+      "transparent_fraction": 0.61128,
+      "alpha_bbox": [
+        0,
+        9,
+        1244,
+        1254
+      ],
+      "alpha_bbox_gt16": [
+        21,
+        33,
+        1234,
+        1219
+      ],
+      "corner_alpha": [
+        0,
+        0,
+        1,
+        0
+      ],
+      "center_alpha": 0,
+      "central_transparent_span": {
+        "horizontal": [
+          554,
+          1062
+        ],
+        "vertical": [
+          195,
+          1046
+        ],
+        "width_fraction": 0.405104,
+        "height_fraction": 0.678628
+      },
+      "central_opening_alpha_le16": {
+        "horizontal": [
+          182,
+          1072
+        ],
+        "vertical": [
+          193,
+          1051
+        ],
+        "width_fraction": 0.709729,
+        "height_fraction": 0.684211
+      },
+      "integration_note": "Genuine transparent alpha; very faint alpha=1 specks exist in the otherwise empty center/outside. At alpha>16 visible frame bounds are [21,33,1234,1219].",
+      "sourceFile": "exec-e6278c05-84ab-47ea-8794-f4f51b688f7c.png",
+      "savedPath": "apps/client/public/art/portrait-frame.png"
+    }
+  ],
+  "note": "The generated icon atlas was rejected and is not shipped. Runtime interface icons are original code-native vectors in GameIcons.tsx. The frame is retained only as a 3\u20134 pixel border-image, not the thick full-size overlay.",
+  "rejectedIconAtlas": {
+    "name": "fantasy-ui-icon-atlas",
+    "dimensions": [
+      1774,
+      887
+    ],
+    "sha256": "b881213c21e33f59f80cb92fdcdaef03f3d2e2016eadaba7762993612c1cc808",
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "transparent_pixels": 914381,
+    "opaque_pixels": 1787,
+    "partial_alpha_pixels": 657370,
+    "transparent_fraction": 0.581099,
+    "alpha_bbox": [
+      23,
+      35,
+      1760,
+      857
+    ],
+    "alpha_bbox_gt16": [
+      31,
+      42,
+      1757,
+      847
+    ],
+    "corner_alpha": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "center_alpha": 0,
+    "cells": [
+      {
+        "name": "dice-pair",
+        "index": 0,
+        "column": 0,
+        "row": 0,
+        "cell_bounds": [
+          0,
+          0,
+          222,
+          237
+        ],
+        "visible_bounds_gt16": [
+          32,
+          74,
+          213,
+          225
+        ],
+        "padding_gt16": [
+          32,
+          74,
+          9,
+          12
+        ]
+      },
+      {
+        "name": "end-turn",
+        "index": 1,
+        "column": 1,
+        "row": 0,
+        "cell_bounds": [
+          222,
+          0,
+          444,
+          237
+        ],
+        "visible_bounds_gt16": [
+          254,
+          66,
+          426,
+          212
+        ],
+        "padding_gt16": [
+          32,
+          66,
+          18,
+          25
+        ]
+      },
+      {
+        "name": "trade",
+        "index": 2,
+        "column": 2,
+        "row": 0,
+        "cell_bounds": [
+          444,
+          0,
+          665,
+          237
+        ],
+        "visible_bounds_gt16": [
+          480,
+          44,
+          632,
+          224
+        ],
+        "padding_gt16": [
+          36,
+          44,
+          33,
+          13
+        ]
+      },
+      {
+        "name": "settlement",
+        "index": 3,
+        "column": 3,
+        "row": 0,
+        "cell_bounds": [
+          665,
+          0,
+          887,
+          237
+        ],
+        "visible_bounds_gt16": [
+          678,
+          55,
+          871,
+          221
+        ],
+        "padding_gt16": [
+          13,
+          55,
+          16,
+          16
+        ]
+      },
+      {
+        "name": "city",
+        "index": 4,
+        "column": 4,
+        "row": 0,
+        "cell_bounds": [
+          887,
+          0,
+          1109,
+          237
+        ],
+        "visible_bounds_gt16": [
+          904,
+          42,
+          1102,
+          223
+        ],
+        "padding_gt16": [
+          17,
+          42,
+          7,
+          14
+        ]
+      },
+      {
+        "name": "road",
+        "index": 5,
+        "column": 5,
+        "row": 0,
+        "cell_bounds": [
+          1109,
+          0,
+          1330,
+          237
+        ],
+        "visible_bounds_gt16": [
+          1140,
+          68,
+          1322,
+          221
+        ],
+        "padding_gt16": [
+          31,
+          68,
+          8,
+          16
+        ]
+      },
+      {
+        "name": "development-card",
+        "index": 6,
+        "column": 6,
+        "row": 0,
+        "cell_bounds": [
+          1330,
+          0,
+          1552,
+          237
+        ],
+        "visible_bounds_gt16": [
+          1370,
+          46,
+          1526,
+          227
+        ],
+        "padding_gt16": [
+          40,
+          46,
+          26,
+          10
+        ]
+      },
+      {
+        "name": "history",
+        "index": 7,
+        "column": 7,
+        "row": 0,
+        "cell_bounds": [
+          1552,
+          0,
+          1774,
+          237
+        ],
+        "visible_bounds_gt16": [
+          1556,
+          68,
+          1757,
+          213
+        ],
+        "padding_gt16": [
+          4,
+          68,
+          17,
+          24
+        ]
+      },
+      {
+        "name": "settings",
+        "index": 8,
+        "column": 0,
+        "row": 1,
+        "cell_bounds": [
+          0,
+          237,
+          222,
+          444
+        ],
+        "visible_bounds_gt16": [
+          31,
+          260,
+          204,
+          433
+        ],
+        "padding_gt16": [
+          31,
+          23,
+          18,
+          11
+        ]
+      },
+      {
+        "name": "sound-on",
+        "index": 9,
+        "column": 1,
+        "row": 1,
+        "cell_bounds": [
+          222,
+          237,
+          444,
+          444
+        ],
+        "visible_bounds_gt16": [
+          255,
+          272,
+          419,
+          416
+        ],
+        "padding_gt16": [
+          33,
+          35,
+          25,
+          28
+        ]
+      },
+      {
+        "name": "sound-off",
+        "index": 10,
+        "column": 2,
+        "row": 1,
+        "cell_bounds": [
+          444,
+          237,
+          665,
+          444
+        ],
+        "visible_bounds_gt16": [
+          470,
+          267,
+          635,
+          416
+        ],
+        "padding_gt16": [
+          26,
+          30,
+          30,
+          28
+        ]
+      },
+      {
+        "name": "connected",
+        "index": 11,
+        "column": 3,
+        "row": 1,
+        "cell_bounds": [
+          665,
+          237,
+          887,
+          444
+        ],
+        "visible_bounds_gt16": [
+          706,
+          278,
+          844,
+          410
+        ],
+        "padding_gt16": [
+          41,
+          41,
+          43,
+          34
+        ]
+      },
+      {
+        "name": "disconnected",
+        "index": 12,
+        "column": 4,
+        "row": 1,
+        "cell_bounds": [
+          887,
+          237,
+          1109,
+          444
+        ],
+        "visible_bounds_gt16": [
+          928,
+          284,
+          1078,
+          412
+        ],
+        "padding_gt16": [
+          41,
+          47,
+          31,
+          32
+        ]
+      },
+      {
+        "name": "leave",
+        "index": 13,
+        "column": 5,
+        "row": 1,
+        "cell_bounds": [
+          1109,
+          237,
+          1330,
+          444
+        ],
+        "visible_bounds_gt16": [
+          1145,
+          249,
+          1300,
+          434
+        ],
+        "padding_gt16": [
+          36,
+          12,
+          30,
+          10
+        ]
+      },
+      {
+        "name": "invite",
+        "index": 14,
+        "column": 6,
+        "row": 1,
+        "cell_bounds": [
+          1330,
+          237,
+          1552,
+          444
+        ],
+        "visible_bounds_gt16": [
+          1362,
+          270,
+          1532,
+          412
+        ],
+        "padding_gt16": [
+          32,
+          33,
+          20,
+          32
+        ]
+      },
+      {
+        "name": "profile",
+        "index": 15,
+        "column": 7,
+        "row": 1,
+        "cell_bounds": [
+          1552,
+          237,
+          1774,
+          444
+        ],
+        "visible_bounds_gt16": [
+          1590,
+          266,
+          1726,
+          413
+        ],
+        "padding_gt16": [
+          38,
+          29,
+          48,
+          31
+        ]
+      },
+      {
+        "name": "close",
+        "index": 16,
+        "column": 0,
+        "row": 2,
+        "cell_bounds": [
+          0,
+          444,
+          222,
+          651
+        ],
+        "visible_bounds_gt16": [
+          39,
+          476,
+          194,
+          630
+        ],
+        "padding_gt16": [
+          39,
+          32,
+          28,
+          21
+        ]
+      },
+      {
+        "name": "check",
+        "index": 17,
+        "column": 1,
+        "row": 2,
+        "cell_bounds": [
+          222,
+          444,
+          444,
+          651
+        ],
+        "visible_bounds_gt16": [
+          255,
+          480,
+          432,
+          624
+        ],
+        "padding_gt16": [
+          33,
+          36,
+          12,
+          27
+        ]
+      },
+      {
+        "name": "plus",
+        "index": 18,
+        "column": 2,
+        "row": 2,
+        "cell_bounds": [
+          444,
+          444,
+          665,
+          651
+        ],
+        "visible_bounds_gt16": [
+          480,
+          472,
+          629,
+          624
+        ],
+        "padding_gt16": [
+          36,
+          28,
+          36,
+          27
+        ]
+      },
+      {
+        "name": "back",
+        "index": 19,
+        "column": 3,
+        "row": 2,
+        "cell_bounds": [
+          665,
+          444,
+          887,
+          651
+        ],
+        "visible_bounds_gt16": [
+          680,
+          480,
+          853,
+          624
+        ],
+        "padding_gt16": [
+          15,
+          36,
+          34,
+          27
+        ]
+      },
+      {
+        "name": "help",
+        "index": 20,
+        "column": 4,
+        "row": 2,
+        "cell_bounds": [
+          887,
+          444,
+          1109,
+          651
+        ],
+        "visible_bounds_gt16": [
+          910,
+          457,
+          1089,
+          647
+        ],
+        "padding_gt16": [
+          23,
+          13,
+          20,
+          4
+        ]
+      },
+      {
+        "name": "fullscreen",
+        "index": 21,
+        "column": 5,
+        "row": 2,
+        "cell_bounds": [
+          1109,
+          444,
+          1330,
+          651
+        ],
+        "visible_bounds_gt16": [
+          1149,
+          478,
+          1293,
+          622
+        ],
+        "padding_gt16": [
+          40,
+          34,
+          37,
+          29
+        ]
+      },
+      {
+        "name": "crown",
+        "index": 22,
+        "column": 6,
+        "row": 2,
+        "cell_bounds": [
+          1330,
+          444,
+          1552,
+          651
+        ],
+        "visible_bounds_gt16": [
+          1358,
+          466,
+          1531,
+          629
+        ],
+        "padding_gt16": [
+          28,
+          22,
+          21,
+          22
+        ]
+      },
+      {
+        "name": "trophy",
+        "index": 23,
+        "column": 7,
+        "row": 2,
+        "cell_bounds": [
+          1552,
+          444,
+          1774,
+          651
+        ],
+        "visible_bounds_gt16": [
+          1569,
+          466,
+          1751,
+          639
+        ],
+        "padding_gt16": [
+          17,
+          22,
+          23,
+          12
+        ]
+      },
+      {
+        "name": "shield",
+        "index": 24,
+        "column": 0,
+        "row": 3,
+        "cell_bounds": [
+          0,
+          651,
+          222,
+          887
+        ],
+        "visible_bounds_gt16": [
+          38,
+          655,
+          195,
+          846
+        ],
+        "padding_gt16": [
+          38,
+          4,
+          27,
+          41
+        ]
+      },
+      {
+        "name": "swords",
+        "index": 25,
+        "column": 1,
+        "row": 3,
+        "cell_bounds": [
+          222,
+          651,
+          444,
+          887
+        ],
+        "visible_bounds_gt16": [
+          246,
+          661,
+          426,
+          845
+        ],
+        "padding_gt16": [
+          24,
+          10,
+          18,
+          42
+        ]
+      },
+      {
+        "name": "resource-cards",
+        "index": 26,
+        "column": 2,
+        "row": 3,
+        "cell_bounds": [
+          444,
+          651,
+          665,
+          887
+        ],
+        "visible_bounds_gt16": [
+          456,
+          667,
+          664,
+          837
+        ],
+        "padding_gt16": [
+          12,
+          16,
+          1,
+          50
+        ]
+      },
+      {
+        "name": "hourglass",
+        "index": 27,
+        "column": 3,
+        "row": 3,
+        "cell_bounds": [
+          665,
+          651,
+          887,
+          887
+        ],
+        "visible_bounds_gt16": [
+          707,
+          656,
+          835,
+          846
+        ],
+        "padding_gt16": [
+          42,
+          5,
+          52,
+          41
+        ]
+      },
+      {
+        "name": "padlock",
+        "index": 28,
+        "column": 4,
+        "row": 3,
+        "cell_bounds": [
+          887,
+          651,
+          1109,
+          887
+        ],
+        "visible_bounds_gt16": [
+          932,
+          662,
+          1066,
+          846
+        ],
+        "padding_gt16": [
+          45,
+          11,
+          43,
+          41
+        ]
+      },
+      {
+        "name": "play",
+        "index": 29,
+        "column": 5,
+        "row": 3,
+        "cell_bounds": [
+          1109,
+          651,
+          1330,
+          887
+        ],
+        "visible_bounds_gt16": [
+          1164,
+          682,
+          1292,
+          839
+        ],
+        "padding_gt16": [
+          55,
+          31,
+          38,
+          48
+        ]
+      },
+      {
+        "name": "pause",
+        "index": 30,
+        "column": 6,
+        "row": 3,
+        "cell_bounds": [
+          1330,
+          651,
+          1552,
+          887
+        ],
+        "visible_bounds_gt16": [
+          1380,
+          683,
+          1506,
+          831
+        ],
+        "padding_gt16": [
+          50,
+          32,
+          46,
+          56
+        ]
+      },
+      {
+        "name": "quill",
+        "index": 31,
+        "column": 7,
+        "row": 3,
+        "cell_bounds": [
+          1552,
+          651,
+          1774,
+          887
+        ],
+        "visible_bounds_gt16": [
+          1588,
+          659,
+          1751,
+          847
+        ],
+        "padding_gt16": [
+          36,
+          8,
+          23,
+          40
+        ]
+      }
+    ],
+    "row_divisions": [
+      0,
+      237,
+      444,
+      651,
+      887
+    ],
+    "integration_note": "Rows are evenly ordered but not precisely centered on a mathematical 8x4 grid. Use the supplied per-icon visible bounds to prevent adjacent-row bleed or clipping.",
+    "sourceFile": "exec-0dcfafe1-b230-403e-a8a2-ef01e659c803.png"
+  }
+}

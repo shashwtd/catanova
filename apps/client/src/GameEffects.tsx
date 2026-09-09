@@ -1,31 +1,112 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles } from './GameIcons.js';
 import { ResourceIcon } from './Board.js';
 import { DevelopmentArt } from './DevelopmentCards.js';
 import { DiceThrow } from './DiceThrow.js';
 import type { FeedbackEvent, FlightIntent } from './feedback.js';
-import { resourceFlightStart, RESOURCE_FLIGHT_MS } from './useFeedback.js';
+import { resourceFlightStart, RESOURCE_FLIGHT_MS, PROFILE_GAIN_DWELL_MS } from './useFeedback.js';
+import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 type Flight = FlightIntent & { key: string; x: number; y: number; dx: number; dy: number; delay: number };
+type GainBadge = { playerId: string; key: string; left: number; top: number; gains: FeedbackEvent['gains'] };
+type DicePresentation = { id: string; faces: readonly [number, number]; initiallyDocked: boolean };
+/** A resync can restore the result, but must never replay its old throw. */
+export function nextDicePresentation(
+  current: DicePresentation | null,
+  event: FeedbackEvent | null,
+  lastDice?: readonly [number, number] | null,
+): DicePresentation | null {
+  const restored = lastDice
+    ? { id: `restored:${lastDice.join('-')}`, faces: lastDice, initiallyDocked: true }
+    : null;
+  if (!event) return restored;
+  if (event.dice) return { id: event.id, faces: event.dice, initiallyDocked: false };
+  if (lastDice && (!current || current.faces[0] !== lastDice[0] || current.faces[1] !== lastDice[1]))
+    return restored;
+  return current;
+}
+export function profileGainArrival(event: FeedbackEvent, playerId: string) {
+  const direct = event.flights.flatMap((flight, index) =>
+    flight.to === `[data-player-profile="${playerId}"]` ? [index] : [],
+  );
+  const own = event.flights.flatMap((flight, index) =>
+    !flight.spending &&
+    flight.to.startsWith('[data-resource-card=') &&
+    event.gains.some((gain) => gain.playerId === playerId && gain.resource === flight.resource)
+      ? [index]
+      : [],
+  );
+  const indices = direct.length ? direct : own;
+  return indices.length ? resourceFlightStart(!!event.dice, Math.max(...indices)) + RESOURCE_FLIGHT_MS : 0;
+}
 export function GameEffects({
   event,
   reducedMotion,
   activity,
+  lastDice,
 }: {
   event: FeedbackEvent | null;
   reducedMotion: boolean;
   activity: boolean;
+  lastDice?: readonly [number, number] | null;
 }) {
   const [flights, setFlights] = useState<Flight[]>([]),
-    [diceVisible, setDiceVisible] = useState(false);
+    [badges, setBadges] = useState<GainBadge[]>([]);
+  const [dice, setDice] = useState<DicePresentation | null>(() => nextDicePresentation(null, null, lastDice));
+  const badgeTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(
+    () => () => {
+      for (const timer of badgeTimers.current.values()) clearTimeout(timer);
+    },
+    [],
+  );
+  useEffect(() => {
+    setDice((current) => nextDicePresentation(current, event, lastDice));
+  }, [event?.id, lastDice?.[0], lastDice?.[1]]);
   useEffect(() => {
     setFlights([]);
-    setDiceVisible(!!event?.dice);
-    if (!event || reducedMotion) return;
+    if (!event || document.hidden) {
+      for (const timer of badgeTimers.current.values()) clearTimeout(timer);
+      badgeTimers.current.clear();
+      setBadges([]);
+      return;
+    }
     let cancelled = false;
     const animations: Animation[] = [];
+    const gainTimers: ReturnType<typeof setTimeout>[] = [];
+    for (const playerId of new Set(event.gains.map((gain) => gain.playerId))) {
+      gainTimers.push(
+        setTimeout(
+          () => {
+            const box = document
+              .querySelector(`[data-player-profile="${playerId}"]`)
+              ?.getBoundingClientRect();
+            if (cancelled || !box) return;
+            const badge = {
+              playerId,
+              key: `${event.id}:${playerId}`,
+              left: Math.max(120, box.left - 8),
+              top: box.top + Math.min(box.height / 2, 38),
+              gains: event.gains.filter((gain) => gain.playerId === playerId),
+            };
+            setBadges((current) =>
+              [...current.filter((item) => item.playerId !== playerId), badge].slice(-4),
+            );
+            clearTimeout(badgeTimers.current.get(playerId));
+            badgeTimers.current.set(
+              playerId,
+              setTimeout(() => {
+                setBadges((current) => current.filter((item) => item.key !== badge.key));
+                badgeTimers.current.delete(playerId);
+              }, PROFILE_GAIN_DWELL_MS),
+            );
+          },
+          reducedMotion ? 0 : profileGainArrival(event, playerId),
+        ),
+      );
+    }
     const frame = requestAnimationFrame(() => {
-      if (cancelled) return;
+      if (cancelled || reducedMotion) return;
       const center = (selector: string) => {
         const box = document.querySelector(selector)?.getBoundingClientRect();
         return box && box.width && box.height
@@ -52,12 +133,7 @@ export function GameEffects({
       for (const site of event.sites) {
         const svg = document.querySelector(site);
         if (!svg) continue;
-        const id = svg.getAttribute('data-building-id') ?? svg.getAttribute('data-road-id'),
-          isRoad = svg.hasAttribute('data-road-id');
-        const target = document.querySelector(`[data-piece-${isRoad ? 'road' : 'building'}="${id}"]`) ?? svg;
-        // A filter on a preserve-3d ancestor flattens its entire mesh. Animate only
-        // leaf faces (or individual SVG shapes in the flat fallback).
-        const leaves = target.querySelectorAll(target === svg ? 'path,rect,ellipse,circle' : '.piece3d-face');
+        const leaves = svg.querySelectorAll('path,rect,ellipse,circle,polygon');
         for (const face of Array.from(leaves))
           if (typeof face.animate === 'function')
             animations.push(
@@ -73,20 +149,44 @@ export function GameEffects({
       cancelled = true;
       cancelAnimationFrame(frame);
       animations.forEach((a) => a.cancel());
+      gainTimers.forEach((timer) => clearTimeout(timer));
     };
   }, [event?.id, reducedMotion]);
   const notice = event?.notices.find((s) => /played |wins |claimed /.test(s)) ?? event?.notices[0];
   return (
     <>
-      {event?.dice && diceVisible && (
+      {dice && (
         <DiceThrow
-          key={event.id}
-          id={event.id}
-          dice={event.dice}
+          key={dice.id}
+          id={dice.id}
+          dice={dice.faces}
+          initiallyDocked={dice.initiallyDocked}
           reducedMotion={reducedMotion}
-          onComplete={() => setDiceVisible(false)}
         />
       )}
+      <div className="profile-gain-layer" aria-hidden="true">
+        {badges.map((badge) => (
+          <div
+            key={badge.key}
+            className={`profile-gain-badge ${reducedMotion ? 'gain-static' : ''}`}
+            style={{ left: badge.left, top: badge.top }}
+          >
+            {badge.gains.map((gain) => (
+              <span
+                key={gain.resource}
+                title={gain.resource === 'any' ? 'Resource cards' : RESOURCE_NAMES[gain.resource]}
+              >
+                {gain.resource === 'any' ? (
+                  <DevelopmentArt kind="back" />
+                ) : (
+                  <ResourceIcon resource={gain.resource} />
+                )}
+                <b>+{gain.amount}</b>
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
       {!reducedMotion && (
         <div className="resource-flights" aria-hidden="true">
           {flights.map((f) => (

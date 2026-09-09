@@ -1,0 +1,1386 @@
+/* Compact, top-down game HUD. The island camera is one world; these controls stay fixed. */
+:root {
+  --hand-card-width: 54px;
+  --hand-card-height: 82px;
+  --dev-card-width: 45px;
+  --dev-card-height: 76px;
+  --hud-bottom: 124px;
+  --hud-left: 70px;
+  --hud-right: 190px;
+}
+.game-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+  overflow: hidden;
+}
+.game-world.playing {
+  background: #332720;
+  min-height: 0;
+  height: 100dvh;
+}
+.playing .board-anchor {
+  position: absolute;
+  inset: 22px var(--hud-right) var(--hud-bottom) var(--hud-left);
+  width: auto;
+  height: auto;
+  transform: none;
+}
+.playing .side-controls {
+  left: 16px;
+  gap: 9px;
+  z-index: 24;
+}
+.playing .side-controls.game-controls {
+  top: 20px;
+  bottom: auto;
+}
+.playing .side-controls.room-controls {
+  bottom: 22px;
+  top: auto;
+}
+.side-controls .icon-button {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  padding: 8px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #6e5136, #302820);
+  box-shadow:
+    0 3px 5px #120e13aa,
+    inset 0 0 9px #e9b76720;
+  color: #ecd3a1;
+}
+.side-controls .icon-button::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: url('/art/portrait-frame.png') center/100% 100%;
+  pointer-events: none;
+}
+.side-controls .icon-button .game-icon {
+  position: relative;
+  z-index: 1;
+  width: 27px;
+  height: 27px;
+  filter: drop-shadow(0 1px 1px #171015bb);
+}
+.side-controls .icon-button:hover:not(:disabled),
+.side-controls .icon-button.is-selected {
+  background: linear-gradient(145deg, #af7c3f, #694729);
+  box-shadow:
+    0 0 14px #e7b45c55,
+    0 3px 6px #17101988;
+}
+.side-controls .icon-button:disabled {
+  opacity: 1;
+  background: #322e29;
+  box-shadow: 0 2px 4px #100f1455;
+}
+.side-controls .icon-button:disabled .game-icon {
+  filter: grayscale(0.75) brightness(0.55);
+}
+.side-controls .icon-button:disabled::before {
+  filter: saturate(0.4) brightness(0.6);
+}
+.construction-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ad8a4755;
+}
+.construction-tools .build-control:not(:disabled)::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #edc879;
+  box-shadow: 0 0 6px #efc05f;
+}
+/* Artwork makes every portrait a rounded square; the source frame supplies the rope/bevel. */
+.avatar-medallion {
+  position: relative;
+  display: block;
+  border: 0 !important;
+  outline: 0;
+  overflow: visible;
+  border-radius: 17%;
+  background: none;
+  box-shadow: none;
+}
+.avatar-medallion svg {
+  position: absolute;
+  inset: 10%;
+  width: 80%;
+  height: 80%;
+  border-radius: 15%;
+  overflow: hidden;
+}
+.avatar-medallion::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/art/portrait-frame.png') center/100% 100%;
+  pointer-events: none;
+}
+.avatar-choices .avatar-medallion {
+  aspect-ratio: 1;
+}
+.avatar-choices button {
+  border-radius: 17%;
+  padding: 0;
+}
+.avatar-choices button.selected {
+  background: #c5984766;
+  box-shadow: 0 0 12px #e6c27e66;
+}
+.profile-preview .avatar-medallion {
+  width: 96px;
+  height: 96px;
+}
+.playing .player-rail {
+  position: absolute;
+  z-index: 18;
+  right: 15px;
+  top: 22px;
+  bottom: var(--hud-bottom);
+  width: 162px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 3px;
+  overflow-y: auto;
+  overflow-x: visible;
+  scrollbar-width: none;
+}
+.playing .player-profile {
+  display: grid;
+  grid-template-columns: clamp(64px, 10.6vh, 84px) minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  flex: none;
+  min-height: 86px;
+  padding: 0 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #efd9a5;
+}
+.profile-portrait {
+  position: relative;
+  isolation: isolate;
+}
+.profile-portrait .avatar-medallion {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.player-profile.active .avatar-medallion {
+  filter: drop-shadow(0 0 6px #ffd37499);
+}
+.player-profile.self .profile-caption strong {
+  color: var(--player-color);
+  text-shadow:
+    0 1px 2px #080c10,
+    0 0 5px #0007;
+}
+.profile-caption {
+  min-width: 0;
+  align-self: center;
+  padding-top: 3px;
+}
+.profile-caption strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f3d9a6;
+  text-shadow: 0 2px 2px #141018;
+}
+.player-profile .profile-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 7px;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.profile-stats > span {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  font-size: 12px;
+  color: #ead9b3;
+  text-shadow: 0 1px 2px #171319;
+}
+.profile-stats .game-icon {
+  width: 19px;
+  height: 19px;
+}
+.profile-portrait .profile-score {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: row;
+  gap: 1px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 1px 5px 2px 2px;
+  min-width: 31px;
+  width: auto;
+  background: linear-gradient(140deg, #79552e, #352922);
+  border: 1px solid #b78e46;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px #0d0b14aa;
+}
+.profile-score .game-icon {
+  width: 18px;
+  height: 18px;
+}
+.profile-score b {
+  font-family: Barlow, sans-serif;
+  font-size: 15px;
+  color: #ffe3a2;
+  line-height: 1;
+}
+.profile-turn {
+  position: absolute;
+  left: 4px;
+  top: -5px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  background: #564027;
+  border: 1px solid #d6b268;
+  border-radius: 6px;
+  box-shadow: 0 0 10px #ecba5766;
+}
+.turn-gem {
+  display: block;
+  width: 7px;
+  height: 7px;
+  background: #f4d26f;
+  transform: rotate(45deg);
+  box-shadow:
+    inset 1px 1px #fff0c5,
+    0 0 5px #fada86;
+}
+.profile-turn .turn-timer {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #ffe7b0;
+  font-size: 10px;
+  gap: 3px;
+}
+.profile-turn .turn-timer > .game-icon {
+  display: none;
+}
+.profile-turn .turn-timer b {
+  min-width: 24px;
+  font-size: 10px;
+}
+.profile-turn .turn-timer small {
+  display: none;
+}
+.profile-turn .turn-timer.running-low {
+  color: #ff9572;
+}
+.profile-portrait .offline-mark {
+  right: auto;
+  left: -1px;
+  bottom: 4px;
+  z-index: 5;
+  width: 25px;
+  height: 25px;
+  background: #4a3030;
+  border: 1px solid #ad6c45;
+  border-radius: 6px;
+  box-shadow: 0 2px 3px #100d16;
+}
+.profile-portrait .offline-mark .game-icon {
+  width: 23px;
+  height: 23px;
+}
+.player-profile .profile-awards {
+  position: absolute;
+  bottom: -2px;
+  left: 12px;
+  display: flex;
+  gap: 3px;
+  flex-wrap: nowrap;
+  padding: 0;
+  z-index: 4;
+}
+.profile-awards .award-ribbon {
+  padding: 1px 4px;
+  display: flex;
+  gap: 2px;
+  border: 1px solid #bb9955;
+  background: linear-gradient(#70512d, #30251d);
+  border-radius: 4px;
+  box-shadow: 0 2px 3px #15101baa;
+  color: #f5d792;
+}
+.award-ribbon .game-icon {
+  width: 20px;
+  height: 20px;
+}
+.award-ribbon b {
+  font-size: 10px;
+}
+/* Specific instructions only. Turn ownership stays on the portrait. */
+.action-prompt {
+  position: absolute;
+  z-index: 23;
+  left: calc((100% + var(--hud-left) - var(--hud-right)) / 2);
+  top: 12px;
+  bottom: auto;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - var(--hud-left) - var(--hud-right) - 12px);
+  height: auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid #a8854766;
+  background: #312b22e8;
+  color: #efdcb5;
+  box-shadow: 0 3px 9px #0f0e1788;
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+.action-prompt .icon-button {
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 3px;
+  background: transparent;
+  pointer-events: auto;
+}
+.action-prompt .game-icon {
+  width: 19px;
+  height: 19px;
+}
+.move-announcement {
+  top: 49px;
+  left: calc((100% + var(--hud-left) - var(--hud-right)) / 2);
+  max-width: calc(100% - var(--hud-left) - var(--hud-right) - 18px);
+  font-size: 11px;
+  padding: 7px 12px;
+}
+/* One short hand shelf, with the colored resources and development cards side by side. */
+.playing .card-table {
+  left: 76px;
+  right: 23px;
+  bottom: 0;
+  height: 112px;
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 22px;
+  padding: 0 17px 16px;
+  isolation: isolate;
+}
+.playing .card-table::before {
+  inset: auto -7px -18px;
+  height: 49px;
+  border-radius: 24% 24% 0 0 / 12px 12px 0 0;
+  border-top: 3px solid #8b6039;
+  background:
+    linear-gradient(#3c291b22, #17151988),
+    url('/art/environment-dark.png') right bottom/200% 200%;
+  box-shadow:
+    0 -2px 4px #110f1699,
+    inset 0 2px 1px #e8b77a44;
+}
+.playing .hand-zone {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: end;
+  justify-content: center;
+  gap: 19px;
+  overflow: visible;
+}
+.playing .resource-hand {
+  display: flex;
+  align-items: end;
+  flex: none;
+  gap: 4px;
+  min-height: 0;
+  margin: 0;
+  perspective: none;
+}
+.playing .hand-slot {
+  transform: rotate(var(--card-angle));
+  transform-origin: 50% 115%;
+}
+.playing .resource-card {
+  width: var(--hand-card-width);
+  height: var(--hand-card-height);
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  position: relative;
+  border: 2px solid color-mix(in srgb, var(--resource-color), #e6c486 50%);
+  border-radius: 7px;
+  background:
+    radial-gradient(ellipse at 45% 32%, #fff3c346, transparent 60%),
+    linear-gradient(145deg, color-mix(in srgb, var(--resource-color), #e6c886 30%), var(--resource-color));
+  box-shadow:
+    0 3px 5px #110e1b99,
+    inset 0 0 8px #f1d7a340;
+  transform: none;
+  transition:
+    translate 180ms ease-out,
+    box-shadow 180ms ease-out;
+}
+.resource-wood {
+  --resource-color: #376247;
+}
+.resource-brick {
+  --resource-color: #a65033;
+}
+.resource-sheep {
+  --resource-color: #839655;
+}
+.resource-wheat {
+  --resource-color: #b4862f;
+}
+.resource-ore {
+  --resource-color: #516f86;
+}
+.playing .resource-card::before {
+  inset: 3px;
+  border: 1px solid #edcea249;
+  border-radius: 3px;
+  background: none;
+}
+.playing .resource-card::after {
+  inset: 3px -3px -3px 3px;
+  z-index: -1;
+  border: 1px solid #473c2a;
+  background: color-mix(in srgb, var(--resource-color), #8b754a 34%);
+  border-radius: 5px;
+  box-shadow: none;
+  transform: none;
+}
+.playing .resource-card:hover:not(.empty-card) {
+  transform: none;
+  translate: 0 -5px;
+  box-shadow:
+    0 5px 9px #110e1b99,
+    0 0 9px color-mix(in srgb, var(--resource-color), transparent 35%);
+}
+.playing .resource-card-content {
+  justify-content: center;
+  overflow: hidden;
+}
+.playing .resource-card .card-illustration {
+  height: auto;
+  width: 100%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding-top: 8px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  margin: 0;
+}
+.playing .resource-card .card-illustration::before,
+.playing .resource-card .card-illustration::after {
+  display: none;
+}
+.playing .resource-card .card-illustration .sprite {
+  width: calc(var(--hand-card-width) - 6px);
+  height: calc(var(--hand-card-width) - 6px);
+  filter: drop-shadow(0 2px 2px #20171866);
+}
+.playing .resource-card .card-corner {
+  position: absolute;
+  left: 5px;
+  top: 3px;
+  right: auto;
+  bottom: auto;
+  font-size: 17px;
+  line-height: 1;
+  font-family: Barlow, sans-serif;
+  font-weight: 600;
+  color: #fff0c9;
+  text-shadow: 0 1px 2px #33271d;
+}
+.playing .resource-card.empty-card {
+  background:
+    repeating-linear-gradient(130deg, #ccb67a12 0 2px, transparent 2px 5px),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--resource-color), #897f67 67%),
+      color-mix(in srgb, var(--resource-color), #463f37 67%)
+    );
+  border-color: #76694f;
+  box-shadow:
+    0 2px 4px #120e1644,
+    inset 0 0 8px #2c272a33;
+  opacity: 1;
+}
+.playing .empty-card .card-corner {
+  color: #b2a790;
+  text-shadow: none;
+}
+.playing .empty-card .card-illustration {
+  filter: grayscale(0.65) brightness(0.8);
+}
+/* Inline illustrated development cards; details open only after selecting one. */
+.development-hand-inline {
+  position: relative;
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  min-width: 0;
+  flex: none;
+  padding-bottom: 2px;
+}
+.development-hand-inline .development-fan {
+  display: flex;
+  align-items: end;
+  justify-content: start;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+}
+.development-hand-inline .development-slot {
+  flex: none;
+  width: var(--dev-card-width);
+  min-width: 0;
+  max-width: none;
+  margin-left: -10px;
+  transform: rotate(var(--dev-angle));
+  transform-origin: 50% 110%;
+}
+.development-hand-inline .development-slot:first-child {
+  margin-left: 0;
+}
+.development-hand-inline .development-slot.selected {
+  transform: translateY(-7px);
+}
+.development-hand-inline .development-card {
+  width: var(--dev-card-width);
+  height: var(--dev-card-height);
+  border-radius: 5px;
+  border-width: 1px;
+}
+.development-hand-inline .development-title {
+  display: none;
+}
+.development-hand-inline .development-status {
+  height: 13px;
+  bottom: 0;
+  padding: 1px;
+  gap: 1px;
+  font-size: 0;
+  background: #2c332cd9;
+}
+.development-hand-inline .development-status .game-icon {
+  width: 12px;
+  height: 12px;
+}
+.development-hand-inline .development-count {
+  top: 3px;
+  right: 3px;
+  font-size: 10px;
+  min-width: 16px;
+  padding: 1px 2px;
+  border-radius: 3px;
+}
+.development-hand-inline .playable-card {
+  box-shadow:
+    0 0 10px #dfbc5e4a,
+    0 3px 5px #110e1b77;
+}
+.development-hand-inline .resting-card .development-status {
+  background: #686954e5;
+}
+.development-buy {
+  position: relative;
+  flex: none;
+  padding: 0;
+  width: var(--dev-card-width);
+  height: var(--dev-card-height);
+  overflow: hidden;
+  border: 1px solid #bba267;
+  border-radius: 5px;
+  transform: rotate(4deg);
+  background: #182b37;
+  box-shadow:
+    2px 2px #847143,
+    4px 4px #382a1e,
+    0 4px 5px #12101b99;
+}
+.development-buy:hover:not(:disabled) {
+  translate: 0 -3px;
+}
+.development-buy:disabled {
+  opacity: 1;
+  filter: saturate(0.5) brightness(0.7);
+}
+.development-buy-mark {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  justify-content: center;
+  padding: 1px;
+  background: #342d2188;
+}
+.development-buy-mark .game-icon {
+  width: 15px;
+  height: 15px;
+}
+.development-hand-inline .development-detail {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: 128px;
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 38px));
+  max-height: calc(100dvh - 190px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 19px 22px;
+  color: #ded0aa;
+  background: linear-gradient(#38382df5, #232920fc);
+  border: 1px solid #9d8557;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px #080c14bb;
+  z-index: 46;
+}
+.development-explanation .field-caption {
+  display: none;
+}
+.development-explanation h3 {
+  margin: 0 24px 6px 0;
+  color: #f0d396;
+  font-size: 16px;
+}
+.development-explanation p {
+  font-size: 12px;
+  color: #d4c5a4;
+}
+.development-choice {
+  max-width: none;
+}
+.development-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 29px;
+  height: 29px;
+  padding: 6px;
+  background: transparent;
+}
+.development-detail .card-unavailable {
+  color: #cebb8f;
+}
+.development-resources button {
+  background: #6a6144;
+  border-color: #97865855;
+  color: #f1dbb2;
+}
+.development-resources button[aria-pressed='true'] {
+  background: #8c8850;
+  border-color: #dfc27b;
+}
+/* Roll and end turn share the same square control. Trade is the only adjacent action. */
+.playing .table-actions {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: row;
+  align-items: end;
+  gap: 10px;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+.turn-action,
+.trade-action {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  width: 58px;
+  height: 58px;
+  min-height: 0;
+  padding: 5px 6px 3px;
+  border-radius: 12px;
+  border: 0;
+  background: linear-gradient(135deg, #9b713d, #473420);
+  box-shadow: 0 3px 6px #100e17aa;
+}
+.turn-action::before,
+.trade-action::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  background: url('/art/portrait-frame.png') center/100% 100%;
+  pointer-events: none;
+}
+.turn-action .game-icon,
+.trade-action .game-icon {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+.turn-action > span,
+.trade-action > span {
+  position: relative;
+  font-size: 10px;
+  color: #f1d5a0;
+  text-shadow: 0 1px 2px #211923;
+}
+.turn-action:not(:disabled) {
+  background: linear-gradient(140deg, #c29642, #6a4d2c);
+  box-shadow:
+    0 0 11px #dcaf4e44,
+    0 3px 6px #100e17aa;
+}
+.turn-action:hover:not(:disabled),
+.trade-action:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.turn-action:disabled,
+.trade-action:disabled {
+  opacity: 1;
+  filter: saturate(0.4) brightness(0.63);
+}
+.dice-dock {
+  position: absolute;
+  left: 0;
+  bottom: 70px;
+  width: 100%;
+  height: 28px;
+  pointer-events: none;
+}
+/* Settings contain exactly the volume and optional turn timer. */
+.compact-settings {
+  width: min(320px, 100%);
+  max-height: 65dvh;
+  overflow: auto;
+  padding: 0 2px;
+}
+.volume-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  color: #dbc08b;
+}
+.volume-heading output {
+  margin-left: auto;
+  font-size: 12px;
+}
+.compact-settings > input,
+.compact-timer-settings > input {
+  width: 100%;
+  margin: 12px 0 8px;
+}
+.compact-timer-settings {
+  margin-top: 17px;
+  padding-top: 12px;
+  border-top: 1px solid #a7895055;
+}
+.compact-timer-settings .settings-toggle {
+  margin: 0 0 10px;
+  color: #dbc08b;
+}
+.compact-timer-settings .settings-toggle > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.compact-timer-settings .timer-value {
+  justify-content: center;
+  margin: 5px 0;
+}
+.compact-timer-settings .timer-value strong {
+  font:
+    600 21px Barlow,
+    sans-serif;
+  color: #e8c988;
+}
+.compact-timer-settings .settings-note {
+  margin: 8px 0 12px;
+  font-size: 11px;
+  color: #b8a17b;
+}
+.compact-timer-settings .timer-stops {
+  padding: 0;
+  color: #b8a17b;
+}
+.compact-timer-settings > .gold-button {
+  width: 100%;
+  justify-content: center;
+  min-height: 35px;
+  padding: 7px;
+}
+.game-dialog:has(.compact-settings) .dialog-surface {
+  background: linear-gradient(140deg, #454234, #2b2c24);
+  color: #e0ca9e;
+  border-color: #a38b5e;
+}
+.game-dialog:has(.compact-settings) .panel-heading h2 {
+  color: #e4c78e;
+}
+.playing .game-panel,
+.playing .required-action,
+.playing .game-panel.utility-panel {
+  top: 55px;
+  bottom: auto;
+  left: 72px;
+  max-height: calc(100dvh - 188px);
+}
+@media (min-width: 1500px) {
+  :root {
+    --hud-right: 216px;
+  }
+  .playing .player-rail {
+    right: 23px;
+    width: 182px;
+  }
+  .playing .player-profile {
+    grid-template-columns: 92px minmax(0, 1fr);
+  }
+  .profile-caption strong {
+    font-size: 15px;
+  }
+}
+@media (max-width: 1000px) {
+  :root {
+    --hand-card-width: 46px;
+    --hand-card-height: 73px;
+    --dev-card-width: 38px;
+    --dev-card-height: 66px;
+    --hud-right: 166px;
+    --hud-left: 64px;
+    --hud-bottom: 112px;
+  }
+  .playing .player-rail {
+    right: 9px;
+    width: 145px;
+    gap: 10px;
+  }
+  .playing .player-profile {
+    grid-template-columns: 68px minmax(0, 1fr);
+    min-height: 78px;
+  }
+  .profile-caption strong {
+    font-size: 12px;
+  }
+  .playing .card-table {
+    left: 66px;
+    right: 14px;
+    height: 102px;
+    gap: 16px;
+    padding-bottom: 14px;
+  }
+  .playing .hand-zone {
+    gap: 13px;
+  }
+  .turn-action,
+  .trade-action {
+    width: 49px;
+    height: 49px;
+  }
+  .turn-action .game-icon,
+  .trade-action .game-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .dice-dock {
+    bottom: 60px;
+    height: 24px;
+  }
+  .development-hand-inline .development-detail {
+    bottom: 114px;
+  }
+  .playing .side-controls {
+    left: 12px;
+  }
+  .side-controls .icon-button {
+    width: 38px;
+    height: 38px;
+    padding: 7px;
+  }
+  .side-controls .icon-button .game-icon {
+    width: 25px;
+    height: 25px;
+  }
+}
+@media (max-width: 700px) {
+  :root {
+    --hud-left: 47px;
+    --hud-right: 103px;
+    --hud-bottom: 102px;
+    --hand-card-width: 37px;
+    --hand-card-height: 61px;
+    --dev-card-width: 31px;
+    --dev-card-height: 57px;
+  }
+  .playing .board-anchor {
+    top: 29px;
+  }
+  .playing .player-rail {
+    top: 22px;
+    right: 7px;
+    width: 87px;
+    gap: 8px;
+    bottom: var(--hud-bottom);
+  }
+  .playing .player-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    min-height: 0;
+    padding: 0 0 3px;
+  }
+  .profile-portrait {
+    width: clamp(50px, 9.3vh, 68px);
+  }
+  .profile-caption {
+    width: 100%;
+    padding-top: 1px;
+    text-align: center;
+  }
+  .profile-caption strong {
+    font-size: 10px;
+  }
+  .player-profile .profile-stats {
+    justify-content: center;
+    gap: 7px;
+    margin-top: 2px;
+  }
+  .profile-stats > span {
+    font-size: 10px;
+    gap: 1px;
+  }
+  .profile-stats .game-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .profile-portrait .profile-score {
+    right: -2px;
+    bottom: 0;
+    padding: 1px 3px 1px 1px;
+    min-width: 23px;
+  }
+  .profile-score .game-icon {
+    width: 13px;
+    height: 13px;
+  }
+  .profile-score b {
+    font-size: 12px;
+  }
+  .profile-turn {
+    top: -3px;
+    left: 1px;
+    padding: 1px 3px;
+  }
+  .player-profile .profile-awards {
+    left: 0;
+    bottom: 33px;
+  }
+  .award-ribbon b {
+    display: none;
+  }
+  .profile-awards .award-ribbon {
+    padding: 1px;
+  }
+  .award-ribbon .game-icon {
+    width: 15px;
+    height: 15px;
+  }
+  .playing .side-controls {
+    left: 7px;
+    gap: 7px;
+  }
+  .playing .side-controls.game-controls {
+    top: 20px;
+  }
+  .playing .side-controls.room-controls {
+    bottom: 110px;
+  }
+  .side-controls .icon-button {
+    width: 31px;
+    height: 32px;
+    padding: 5px;
+  }
+  .side-controls .icon-button .game-icon {
+    width: 23px;
+    height: 23px;
+  }
+  .construction-tools {
+    gap: 7px;
+    margin-top: 7px;
+    padding-top: 10px;
+  }
+  .playing .card-table {
+    left: 10px;
+    right: 10px;
+    height: 86px;
+    padding: 0 4px 12px;
+    gap: 10px;
+  }
+  .playing .card-table::before {
+    height: 35px;
+    bottom: -13px;
+    inset-inline: -12px;
+  }
+  .playing .hand-zone {
+    gap: 10px;
+  }
+  .playing .resource-hand {
+    gap: 3px;
+  }
+  .development-hand-inline {
+    gap: 7px;
+  }
+  .development-hand-inline .development-slot {
+    margin-left: -11px;
+  }
+  .development-hand-inline .development-slot:first-child {
+    margin-left: 0;
+  }
+  .playing .table-actions {
+    gap: 7px;
+  }
+  .turn-action,
+  .trade-action {
+    width: 39px;
+    height: 42px;
+    padding: 3px;
+  }
+  .turn-action .game-icon,
+  .trade-action .game-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .turn-action > span,
+  .trade-action > span {
+    font-size: 8px;
+  }
+  .dice-dock {
+    bottom: 50px;
+    height: 22px;
+  }
+  .playing .resource-card .card-corner {
+    font-size: 14px;
+    left: 4px;
+    top: 3px;
+  }
+  .development-hand-inline .development-detail {
+    bottom: 98px;
+  }
+  .playing .game-panel,
+  .playing .required-action,
+  .playing .game-panel.utility-panel {
+    left: 47px;
+    top: 58px;
+    max-height: calc(100dvh - 168px);
+  }
+  .action-prompt {
+    font-size: 10px;
+    padding: 6px 8px;
+    top: 10px;
+  }
+  .move-announcement {
+    font-size: 10px;
+    top: 43px;
+    padding: 5px 8px;
+  }
+}
+@media (max-width: 480px) {
+  :root {
+    --hand-card-width: 31px;
+    --hand-card-height: 55px;
+    --dev-card-width: 28px;
+    --dev-card-height: 51px;
+  }
+  .playing .card-table {
+    gap: 9px;
+    padding-bottom: 13px;
+  }
+  .playing .hand-zone {
+    gap: 9px;
+  }
+  .playing .resource-hand {
+    gap: 2px;
+  }
+  .playing .table-actions {
+    flex-direction: column;
+    gap: 7px;
+  }
+  .turn-action,
+  .trade-action {
+    width: 35px;
+    height: 35px;
+    padding: 2px;
+  }
+  .turn-action .game-icon,
+  .trade-action .game-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .turn-action > span,
+  .trade-action > span {
+    display: none;
+  }
+  .dice-dock {
+    width: 58px;
+    left: -11px;
+    bottom: 84px;
+    height: 20px;
+  }
+  .development-hand-inline {
+    gap: 6px;
+  }
+  .development-hand-inline .development-slot {
+    margin-left: -13px;
+  }
+  .playing .resource-card .card-corner {
+    font-size: 12px;
+    top: 2px;
+    left: 3px;
+  }
+  .playing .resource-card .card-illustration {
+    padding-top: 7px;
+  }
+}
+@media (max-height: 580px) and (min-width: 701px) {
+  :root {
+    --hud-bottom: 101px;
+  }
+  .playing .board-anchor {
+    top: 18px;
+  }
+  .playing .player-rail {
+    top: 12px;
+    gap: 6px;
+  }
+  .playing .player-profile {
+    min-height: 65px;
+    grid-template-columns: 59px minmax(0, 1fr);
+    padding-bottom: 4px;
+  }
+  .playing .side-controls.game-controls {
+    top: 12px;
+  }
+  .playing .side-controls {
+    gap: 5px;
+  }
+  .side-controls .icon-button {
+    height: 31px;
+    width: 32px;
+    padding: 5px;
+  }
+  .side-controls .icon-button .game-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .construction-tools {
+    gap: 5px;
+    margin-top: 5px;
+    padding-top: 7px;
+  }
+  .playing .side-controls.room-controls {
+    bottom: 16px;
+  }
+  .playing .card-table {
+    height: 87px;
+    padding-bottom: 10px;
+  }
+  .playing .resource-card {
+    height: 65px;
+  }
+  .development-hand-inline .development-card,
+  .development-buy {
+    height: 59px;
+  }
+  .action-prompt {
+    top: 7px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playing .resource-card,
+  .development-slot {
+    transition: none;
+  }
+  .playing .resource-card:hover:not(.empty-card) {
+    translate: none;
+  }
+  .card-arrival {
+    animation: none;
+  }
+  .player-profile.active .avatar-medallion {
+    filter: none;
+  }
+}
+[data-motion='reduced'] .playing .resource-card:hover {
+  translate: none;
+}
+/* A slim textured edge, not a large ornamental surround. Icons use their own purposeful palette. */
+.avatar-medallion {
+  box-sizing: border-box;
+  border: 4px solid transparent !important;
+  border-image: url('/art/portrait-frame.png') 205 / 4px / 0 stretch;
+  background: #354948;
+  border-radius: 11%;
+}
+.avatar-medallion svg {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 9%;
+}
+.avatar-medallion::after {
+  display: none;
+}
+.side-controls .icon-button {
+  border: 3px solid transparent;
+  border-image: url('/art/portrait-frame.png') 205 / 3px / 0 stretch;
+  background: linear-gradient(145deg, #59615a, #2b3534);
+  padding: 6px;
+}
+.side-controls .icon-button::before,
+.turn-action::before,
+.trade-action::before {
+  display: none;
+}
+.side-controls .icon-button .game-icon {
+  width: 25px;
+  height: 25px;
+  filter: none;
+}
+.side-controls .icon-button:hover:not(:disabled),
+.side-controls .icon-button.is-selected {
+  background: linear-gradient(145deg, #687960, #3d4b3d);
+  box-shadow:
+    0 0 8px #bdcd9155,
+    0 2px 5px #17101988;
+}
+.turn-action,
+.trade-action {
+  border: 3px solid transparent;
+  border-image: url('/art/portrait-frame.png') 205 / 3px / 0 stretch;
+  background: linear-gradient(145deg, #526a69, #293f44);
+}
+.turn-action:not(:disabled) {
+  background: linear-gradient(140deg, #839362, #41573f);
+  box-shadow:
+    0 0 9px #b7cf7940,
+    0 3px 6px #100e17aa;
+}
+@media (max-width: 700px) {
+  .avatar-medallion {
+    border-width: 3px !important;
+    border-image-width: 3px;
+  }
+  .side-controls .icon-button {
+    padding: 3px;
+  }
+  .side-controls .icon-button .game-icon {
+    width: 21px;
+    height: 21px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playing .resource-card:hover:not(.empty-card) {
+    translate: none;
+  }
+}
+.game-world[data-motion='reduced'] .resource-card:hover:not(.empty-card) {
+  translate: none;
+}
+
+@media (max-width: 380px) {
+  :root {
+    --hand-card-width: 26px;
+    --hand-card-height: 50px;
+    --dev-card-width: 24px;
+    --dev-card-height: 48px;
+  }
+  .playing .hand-zone {
+    gap: 8px;
+  }
+  .playing .card-table {
+    gap: 8px;
+  }
+  .turn-action,
+  .trade-action {
+    width: 32px;
+  }
+  .playing .resource-card .card-corner {
+    font-size: 12px;
+    left: 3px;
+    top: 3px;
+  }
+}
+
+/* A selected card or mandatory choice must stay above the fixed player rail. */
+.playing .card-table:has(.development-detail) {
+  z-index: 46;
+}
+.playing .game-panel,
+.playing .required-action,
+.playing .game-panel.utility-panel {
+  z-index: 46;
+}
+
+@media (max-height: 580px) and (min-width: 480px) and (max-width: 700px) {
+  .playing .side-controls.game-controls {
+    top: 12px;
+  }
+  .playing .side-controls {
+    gap: 5px;
+  }
+  .side-controls .icon-button {
+    height: 28px;
+  }
+  .construction-tools {
+    gap: 5px;
+    margin-top: 5px;
+    padding-top: 7px;
+  }
+  .playing .side-controls.room-controls {
+    bottom: 16px;
+  }
+}

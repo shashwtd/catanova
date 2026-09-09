@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Board } from '../../../packages/rules/src/board.js';
-import { HEX_SIZE, oceanRing, oceanBoundary, TERRAIN_INDEX, WORLD } from './scene.js';
+import { HEX_SIZE, WATER_BAND, TERRAIN_INDEX, WORLD } from './scene.js';
 
 const vertexSource = `#version 300 es
 in vec2 aPosition;
@@ -15,29 +15,24 @@ out vec4 outColor;
 uniform sampler2D uTerrain;
 uniform sampler2D uEnvironment;
 uniform vec3 uLand[19];
-uniform vec2 uSea[18];
-uniform vec4 uRim[42];
 uniform vec4 uWorld;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
-float hex(vec2 p,float r){p=abs(p);return max(p.x,dot(p,vec2(0.5,0.8660254)))-0.8660254*r;}
-float segment(vec2 p,vec4 edge){vec2 d=edge.zw-edge.xy;return length(p-edge.xy-d*clamp(dot(p-edge.xy,d)/dot(d,d),0.0,1.0));}
+float hex(vec2 p,float r){p=abs(p.yx);r*=0.8660254;vec3 k=vec3(-0.8660254,0.5,0.57735027);p-=2.0*min(dot(k.xy,p),0.0)*k.xy;p-=vec2(clamp(p.x,-k.z*r,k.z*r),r);return length(p)*sign(p.y);}
 vec3 environment(vec2 uv,vec2 cell){return texture(uEnvironment,(cell+clamp(uv,vec2(0.002),vec2(0.998)))*0.5).rgb;}
 void main(){
   vec2 p=uWorld.xy+vec2(vUv.x,1.0-vUv.y)*uWorld.zw;
-  float land=10000.0,sea=10000.0;int nearest=0;
+  float land=10000.0;int nearest=0;
   for(int i=0;i<19;i++){float d=hex(p-uLand[i].xy,64.0);if(d<land){land=d;nearest=i;}}
-  for(int i=0;i<18;i++){sea=min(sea,hex(p-uSea[i],64.0));}
-  float outer=min(land,sea);
-  if(outer>6.0){outColor=vec4(0);return;}
+  float angle=atan(p.y,p.x);
+  float waterWidth=${WATER_BAND.toFixed(1)}+sin(angle*11.0+0.35)*3.8+sin(angle*23.0+1.7)*2.6+sin(angle*41.0+0.6)*1.8+sin(angle*73.0)*0.8;
+  float outer=land-waterWidth;
+  if(outer>3.0){outColor=vec4(0);return;}
   float rough=(noise(p*0.13)-0.5)*3.0+(noise(p*0.043)-0.5)*3.0;
   vec2 waterUv=fract((p+vec2(470,430))/370.0);
   vec3 deep=environment(waterUv,vec2(0,0));
   vec3 shallow=environment(waterUv,vec2(1,0));
   vec3 color=mix(deep,shallow,1.0-smoothstep(10.0,69.0,land));
-  // Clear ocean hex geometry sits outside the organic coast.
-  float seam=(1.0-smoothstep(0.25,1.35,abs(sea)))*smoothstep(15.0,25.0,land);
-  color=mix(color,vec3(0.40,0.77,0.80),seam*0.30);
   float foam=(1.0-smoothstep(0.4,1.7,abs(land+rough-11.0)))*(0.35+noise(p*0.09)*0.4);
   color=mix(color,vec3(0.87,0.96,0.86),foam);
   vec3 sand=environment(fract((p+vec2(600))/145.0),vec2(0,1));
@@ -54,13 +49,10 @@ void main(){
   float light=dot(terrain,vec3(0.2126,0.7152,0.0722));
   terrain=clamp((mix(vec3(light),terrain,0.94)-0.5)*0.94+0.54,0.0,1.0);
   color=mix(color,terrain,terrainMask);
-  // The outer ocean ring has a quiet physical rim against the wooden table.
-  float boundary=10000.0;
-  if(outer>-2.0){for(int i=0;i<42;i++){boundary=min(boundary,segment(p,uRim[i]));}}
-  float silhouette=outer>0.05?boundary:-boundary;
-  float rim=smoothstep(-1.3,0.2,silhouette);
-  color=mix(color,vec3(0.30,0.26,0.18),rim*0.8);
-  outColor=vec4(color,1.0-smoothstep(0.5,3.0,silhouette));
+  // A rugged cut-water silhouette sits softly on the wooden surface.
+  float rim=smoothstep(-5.0,0.0,outer);
+  color=mix(color,vec3(0.11,0.30,0.34),rim*0.42);
+  outColor=vec4(color,1.0-smoothstep(-0.5,1.5,outer));
 }
 `;
 function compile(gl: WebGL2RenderingContext, type: number, source: string) {
@@ -148,11 +140,6 @@ export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boo
           board.hexes.flatMap((h) => [h.x * HEX_SIZE, h.y * HEX_SIZE, TERRAIN_INDEX[h.terrain]]),
         ),
       );
-      gl.uniform2fv(
-        gl.getUniformLocation(program, 'uSea[0]'),
-        new Float32Array(oceanRing().flatMap((h) => [h.x, h.y])),
-      );
-      gl.uniform4fv(gl.getUniformLocation(program, 'uRim[0]'), new Float32Array(oceanBoundary().flat()));
       gl.uniform4f(gl.getUniformLocation(program, 'uWorld'), WORLD.x, WORLD.y, WORLD.width, WORLD.height);
       const draw = () => {
         if (disposed || gl.isContextLost()) return;

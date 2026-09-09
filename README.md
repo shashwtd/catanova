@@ -18,9 +18,9 @@ npm start
 
 Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all three or four seats are connected and everyone else is ready. The host can configure an optional turn timer in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
-Game tools and connection details sit at top left; room, invite and profile controls sit at bottom left. Players and awards are on the right. Resource cards sit above the bottom table edge, beside the dice, trade and development-card buttons. Scroll/pinch to zoom, drag to pan and gently tilt the board, or use the single Fit-view icon. Each harbor has two bridges to its eligible coastal corners.
+Game and construction tools sit at top left; settings and leave controls sit at bottom left during play. Player portraits on the right carry scores, awards and the current-turn marker. Compact colored resource cards and the development hand share the bottom shelf, beside one square Roll/End control and Trade. Resource artwork and counts identify the hand cards; accessible resource names remain available. Scroll/pinch to zoom the flat board, or drag to pan the island and wood table together. Each harbor has two bridges to its eligible coastal corners.
 
-Two thrown dice land on the accepted server result. Producing tiles glow and resource cards travel to your hand; building spends miniature cards with distinct material sounds. Development cards have illustrated stories, a compact spread, explicit Play controls, and explanations for cards held until next turn. Settings control sound, volume, effects and 3D pieces. [Feedback and performance](docs/GAME_FEEDBACK.md), [turn timer rules](docs/TURN_CLOCK.md).
+Two thrown dice settle on the accepted server result, pause for reading, and move to a small dock above the turn control. Producing tiles glow and resource cards travel to hands or profiles, followed by brief +N receipts. Building spends miniature cards with distinct material sounds. Development cards stay visible beside the resource hand; selecting one opens its explanation and Play control. Settings contain volume and the optional host-owned turn timer. [Feedback and performance](docs/GAME_FEEDBACK.md), [turn timer rules](docs/TURN_CLOCK.md).
 
 The local URL works on this machine. Other devices need an HTTPS proxy/tunnel or the future hosted deployment. See [playtest instructions](docs/PLAYTEST.md) for recovery, controls, and development setup.
 
@@ -66,7 +66,7 @@ npm run check
 npm run probe
 ```
 
-`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, concurrent lobby readiness, account ownership, the Supabase verification contract, durable move history, invite previews, lobby departures, both harbor entrances, all 72 road orientations, bounded zoom/3D tilt, correct die faces, resource-effect timing, optional server-owned turn/discard deadlines, rejected rollback snapshots, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
+`check` runs TypeScript, the test suite and the browser/server production build. `probe` needs a running server and creates a separate counter-only test room. The tests cover 500 map seeds, three/four-player setup, rule scenarios, resource conservation, real four-client gameplay, concurrent lobby readiness, account ownership, the Supabase verification contract, durable move history, invite previews, lobby departures, both harbor entrances, all 72 road orientations, bounded zoom/pan, correct die faces, resource-effect timing, optional server-owned turn/discard deadlines, rejected rollback snapshots, hidden-state filtering, duplicate commands, lost replies, refresh/restart recovery, failed writes, and a child server killed with `SIGKILL`. They do not establish internet latency, supported-device performance, or cloud availability.
 
 Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
@@ -74,7 +74,7 @@ Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a s
 
 ```text
 apps/
-  client/       React UI, static terrain, CSS 3D, sound/effects, recoverable connection
+  client/       React UI, flat terrain/SVG board, sound/effects, recoverable connection
   server/       Same-origin HTTP/WebSocket server, private snapshots, SQLite saves
 packages/
   protocol/     Shared messages and bounded input validation
@@ -93,6 +93,6 @@ The client animates accepted state; the server owns randomness, hidden informati
 - [Architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md), and [art provenance](docs/ART.md).
 - [Contributing](CONTRIBUTING.md) and [security](SECURITY.md).
 
-Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). Terrain, environment, resource and avatar atlases are original AI-generated art, with their prompts and provenance recorded. Bundled fonts and interface icons retain their own licenses, listed in the art documentation. Do not contribute official game artwork or copied rulebook passages.
+Original repository contributions are MIT-licensed; see [LICENSE](LICENSE). Terrain, environment, resource, avatar and development-card atlases, plus the portrait border texture, are original AI-generated art with recorded prompts and provenance. Interface icons are original editable SVG artwork. Bundled fonts retain their own licenses, listed in the art documentation. Do not contribute official game artwork or copied rulebook passages.
 
 Catanova is an independent, unofficial project. It is not affiliated with, endorsed by, or licensed by CATAN GmbH or CATAN Studio. CATAN is a trademark of its respective owners. The original game was designed by Klaus Teuber. The MIT license applies to our contributions and grants no rights to third-party trademarks or assets. Public source availability does not establish legal clearance for the name or a finished release.

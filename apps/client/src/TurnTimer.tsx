@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Clock3, Pause } from 'lucide-react';
+import { Clock3, Pause } from './GameIcons.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 export function TurnTimer({
   room,
@@ -7,12 +7,14 @@ export function TurnTimer({
   offset,
   connected,
   onWarning,
+  discard = false,
 }: {
   room: RoomState;
   me?: string;
   offset?: number;
   connected: boolean;
   onWarning: () => void;
+  discard?: boolean;
 }) {
   const [now, setNow] = useState(Date.now),
     fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() }),
@@ -20,13 +22,13 @@ export function TurnTimer({
   if (fallback.current.server !== room.serverNow && room.serverNow)
     fallback.current = { server: room.serverNow, local: Date.now() };
   const clock = room.turnClock,
-    deadline = (me && clock?.discardDeadlines?.[me]) || clock?.deadlineAt;
-  const paused = !!clock?.pausedAt && !(me && clock.discardDeadlines?.[me]);
+    deadline = discard ? (me ? clock?.discardDeadlines?.[me] : undefined) : clock?.deadlineAt;
+  const paused = !!clock?.pausedAt && !discard;
   const serverNow = now + (offset ?? fallback.current.server - fallback.current.local),
     remaining = deadline
       ? Math.max(0, Math.ceil((deadline - (paused ? clock!.pausedAt! : serverNow)) / 1000))
       : 0;
-  const mine = !!clock && (clock.playerId === me || !!(me && clock.discardDeadlines?.[me]));
+  const mine = !!clock && (discard ? !!(me && clock.discardDeadlines?.[me]) : clock.playerId === me);
   const warning = useRef(onWarning);
   warning.current = onWarning;
   useEffect(() => {
@@ -43,7 +45,7 @@ export function TurnTimer({
       warning.current();
     }
   }, [remaining, mine, paused, connected, room.roomId, clock?.turn, deadline]);
-  if (!clock || !room.game || room.game.winner) return null;
+  if (!clock || !deadline || !room.game || room.game.winner) return null;
   return (
     <span
       className={`turn-timer ${remaining <= 10 && !paused ? 'running-low' : ''} ${paused ? 'paused' : ''}`}

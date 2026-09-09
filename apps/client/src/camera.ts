@@ -1,29 +1,21 @@
+import { WORLD } from './scene.js';
 export type Camera = { scale: number; x: number; y: number };
 export type Bounds = { width: number; height: number };
-export type BoardTilt = { pitch: number; yaw: number };
-export const REST_PITCH = 12,
-  MIN_PITCH = 8,
-  MAX_PITCH = 16,
-  MAX_YAW = 5;
 export const MIN_ZOOM = 0.85,
   MAX_ZOOM = 2.2;
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-export function constrainTilt(tilt: BoardTilt): BoardTilt {
-  return { pitch: clamp(tilt.pitch, MIN_PITCH, MAX_PITCH), yaw: clamp(tilt.yaw, -MAX_YAW, MAX_YAW) || 0 };
-}
-/** No velocity or inertia: a large input event cannot fling the viewing angle. */
-export function dragTilt(tilt: BoardTilt, dx: number, dy: number): BoardTilt {
-  return constrainTilt({
-    pitch: tilt.pitch - clamp(dy, -40, 40) * 0.025,
-    yaw: tilt.yaw + clamp(dx, -40, 40) * 0.025,
-  });
+export function fitBoard(bounds: Bounds): Bounds {
+  const width = Math.min(
+    Math.max(1, bounds.width - 24),
+    (Math.max(1, bounds.height - 24) * WORLD.width) / WORLD.height,
+  );
+  return { width, height: (width * WORLD.height) / WORLD.width };
 }
 export function constrainCamera(camera: Camera, bounds: Bounds): Camera {
   const scale = clamp(camera.scale, MIN_ZOOM, MAX_ZOOM);
-  const boardWidth = Math.min(bounds.width, (bounds.height * 880) / 804),
-    boardHeight = (boardWidth * 804) / 880;
-  const maxX = Math.max(0, (boardWidth * scale - bounds.width) / 2) + (scale > 1 ? 25 : 0);
-  const maxY = Math.max(0, (boardHeight * scale - bounds.height) / 2) + (scale > 1 ? 25 : 0);
+  const board = fitBoard(bounds);
+  const maxX = Math.max(0, (board.width * scale - bounds.width) / 2) + Math.min(90, bounds.width * 0.18);
+  const maxY = Math.max(0, (board.height * scale - bounds.height) / 2) + Math.min(80, bounds.height * 0.18);
   return { scale, x: clamp(camera.x, -maxX, maxX) || 0, y: clamp(camera.y, -maxY, maxY) || 0 };
 }
 export function zoomAt(
@@ -39,6 +31,6 @@ export function zoomAt(
     bounds,
   );
 }
-export const wheelScale = (scale: number, delta: number) => scale * Math.exp(-clamp(delta, -40, 40) * 0.0018);
+export const wheelScale = (scale: number, delta: number) => scale * Math.exp(-clamp(delta, -24, 24) * 0.0009);
 export const pinchScale = (scale: number, distance: number, previous: number) =>
-  scale * clamp(Math.pow(Math.max(20, distance) / Math.max(20, previous), 0.65), 0.93, 1.07);
+  scale * clamp(Math.pow(Math.max(20, distance) / Math.max(20, previous), 0.4), 0.965, 1.035);

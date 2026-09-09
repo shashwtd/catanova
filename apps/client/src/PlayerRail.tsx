@@ -1,106 +1,94 @@
-import type { CSSProperties } from 'react';
-import { Castle, House, Layers, Route, ScrollText, Shield, Swords, Trophy, WifiOff } from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
+import { Layers, ScrollText, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
-export function PlayerRail({ room, game, me }: { room: RoomState; game: GameView; me?: string }) {
+export function PlayerRail({
+  room,
+  game,
+  me,
+  timer,
+}: {
+  room: RoomState;
+  game: GameView;
+  me?: string;
+  timer?: ReactNode;
+}) {
   return (
     <aside className="player-rail" aria-label="Players">
       {game.players.map((p, i) => {
         const seat = room.players.find((s) => s.id === p.id),
+          active = game.players[game.active]?.id === p.id && !game.winner,
           road = game.longestRoad === p.id,
           army = game.largestArmy === p.id;
         return (
           <article
-            data-player-profile={p.id}
             key={p.id}
-            className={`player-profile ${game.players[game.active]?.id === p.id ? 'active' : ''} ${p.id === me ? 'self' : ''}`}
+            data-player-profile={p.id}
+            aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${active ? ', current turn' : ''}`}
+            className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''}`}
             style={{ '--player-color': PLAYER_COLORS[i] } as CSSProperties}
           >
-            <div className="player-heading">
-              <div className="profile-portrait">
-                <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
-                {!seat?.connected && (
-                  <span className="offline-mark" title="Disconnected" aria-label="Disconnected">
-                    <WifiOff size={19} />
-                  </span>
-                )}
-              </div>
-              <div className="profile-name">
-                <strong title={p.name}>{p.name}</strong>
-                <span>
-                  {!seat?.connected
-                    ? 'Disconnected'
-                    : p.id === me
-                      ? 'You'
-                      : game.players[game.active]?.id === p.id
-                        ? 'Playing'
-                        : 'Connected'}
+            <div className="profile-portrait">
+              <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
+              {!seat?.connected && (
+                <span className="offline-mark" title="Disconnected" aria-label="Disconnected">
+                  <WifiOff size={24} />
                 </span>
-              </div>
-              <span className="profile-score" title="Victory points">
-                <Trophy size={15} />
+              )}
+              {active && (
+                <span className="profile-turn" aria-label="Current turn">
+                  <span className="turn-gem" />
+                  {timer}
+                </span>
+              )}
+              <span className="profile-score" title={`${p.points} victory points`}>
+                <Trophy size={22} />
                 <b>{p.points}</b>
               </span>
             </div>
-            <div className="profile-stats">
-              <span title="Resource cards">
-                <Layers />
-                {p.resourceCount}
-              </span>
-              <span title="Development cards">
-                <ScrollText />
-                {p.cardCount}
-              </span>
-              <span title="Played knights">
-                <Swords />
-                {p.knights}
-              </span>
-              <span title="Longest continuous road">
-                <Route />
-                {p.roadLength}
-              </span>
-            </div>
-            <div className="profile-pieces">
-              <span title="Roads built">
-                <Route />
-                {p.pieces.roads}/15
-              </span>
-              <span title="Settlements built">
-                <House />
-                {p.pieces.settlements}/5
-              </span>
-              <span title="Cities built">
-                <Castle />
-                {p.pieces.cities}/4
-              </span>
+            <div className="profile-caption">
+              <strong title={p.name}>{p.name}</strong>
+              <div className="profile-stats">
+                <span title={`${p.resourceCount} resource cards`}>
+                  <Layers size={20} />
+                  {p.resourceCount}
+                </span>
+                <span title={`${p.cardCount} development cards`}>
+                  <ScrollText size={20} />
+                  {p.cardCount}
+                </span>
+              </div>
             </div>
             {(road || army || game.winner === p.id) && (
               <div className="profile-awards">
                 {road && (
-                  <span key="road" className="award-ribbon" title="Longest Road · +2 victory points">
-                    <Route size={15} />
-                    Longest Road
-                    <span className="t-badge" data-open="true">
-                      <span className="t-badge-dot">+2</span>
-                    </span>
+                  <span
+                    key="road"
+                    className="award-ribbon"
+                    aria-label="Longest Road, plus 2 victory points"
+                    title="Longest Road · +2 points"
+                  >
+                    <Route />
+                    <b>+2</b>
                   </span>
                 )}
                 {army && (
-                  <span key="army" className="award-ribbon" title="Largest Army · +2 victory points">
-                    <Shield size={15} />
-                    Largest Army
-                    <span className="t-badge" data-open="true">
-                      <span className="t-badge-dot">+2</span>
-                    </span>
+                  <span
+                    key="army"
+                    className="award-ribbon"
+                    aria-label="Largest Army, plus 2 victory points"
+                    title="Largest Army · +2 points"
+                  >
+                    <Shield />
+                    <b>+2</b>
                   </span>
                 )}
                 {game.winner === p.id && (
-                  <span className="award-ribbon winner">
-                    <Trophy size={15} />
-                    Winner
+                  <span className="award-ribbon winner" title="Winner">
+                    <Trophy />
                   </span>
                 )}
               </div>

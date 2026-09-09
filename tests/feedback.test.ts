@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveFeedback } from '../apps/client/src/feedback.js';
+import { deriveFeedback, publicProduction } from '../apps/client/src/feedback.js';
+import { PresentationBuffer, presentationHold } from '../apps/client/src/useFeedback.js';
+import { nextDicePresentation } from '../apps/client/src/GameEffects.js';
 import { DEFAULT_PREFERENCES, parsePreferences } from '../apps/client/src/preferences.js';
 import { SoundEngine, soundScore } from '../apps/client/src/sound.js';
 import type { SoundCue } from '../apps/client/src/sound.js';
@@ -93,7 +95,11 @@ test('dice feedback uses the exact committed faces and does not reroll during la
   const rolled = move(game, { kind: 'roll' }, 'p0', 'p0', () => (call++ ? 0.84 : 0.17));
   assert.deepEqual(rolled.event.dice, [2, 6]);
   assert.equal(rolled.event.sounds.filter((s) => s === 'dice').length, 1);
-  assert.ok(rolled.event.notices.some((s) => s.includes('2 + 6 = 8')));
+  assert.ok(!rolled.event.notices.some((s) => s.includes('2 + 6 = 8')), 'faces replace visible arithmetic');
+  assert.ok(
+    rolled.after.game!.log.some((line) => line.text.includes('2 + 6 = 8')),
+    'history keeps the exact result',
+  );
   const ended = move(rolled.game, { kind: 'endTurn' });
   assert.equal(ended.event.dice, undefined);
   assert.ok(!ended.event.sounds.includes('dice'));
@@ -154,9 +160,13 @@ test('resource production flies from its paying tile to the local hand, includin
     },
   );
   assert.deepEqual(
-    event.flights.find((f) => f.resource === 'any'),
-    { resource: 'any', amount: 1, from: '[data-effect-bank]', to: '[data-player-profile="p1"]' },
+    event.flights.find((f) => f.to === '[data-player-profile="p1"]'),
+    { resource, amount: 1, from: `[data-effect-hex="${hex.id}"]`, to: '[data-player-profile="p1"]' },
   );
+  assert.deepEqual(event.gains, [
+    { playerId: 'p0', resource, amount: 2 },
+    { playerId: 'p1', resource, amount: 1 },
+  ]);
   assert.equal(event.hand[resource], 2);
   assert.deepEqual(event.changed, [resource]);
   assert.ok(event.sounds.includes('gain'));
@@ -186,6 +196,91 @@ test('production feedback respects blocked tiles and the bank shortage rules ins
     assert.deepEqual(event.glowHexes, mode === 'sole-shortage' ? [hex.id] : []);
     assert.equal(event.sounds.includes('gain'), mode === 'sole-shortage');
   }
+});
+
+test('public production labels require complete bank and player-count conservation', () => {
+  const game = setup();
+  clearHands(game);
+  game.buildings = {};
+  const hex = game.board.hexes.find((h) => h.number === 6 && h.terrain !== 'desert')!,
+    resource = hex.terrain as Resource;
+  game.buildings[hex.vertices[0]!] = { player: 'p1', kind: 'city' };
+  const rolled = move(game, { kind: 'roll' });
+  assert.equal(publicProduction(rolled.before.game!, rolled.after.game!, [3, 3])!.get('p1')![resource], 2);
+  for (const mode of ['bank', 'count'] as const) {
+    const combined = structuredClone(rolled.after);
+    if (mode === 'bank') combined.game!.bank[resource]--;
+    else combined.game!.players[1]!.resourceCount++;
+    assert.equal(publicProduction(rolled.before.game!, combined.game!, [3, 3]), null);
+    const event = deriveFeedback(rolled.before, combined, 'p0')!;
+    assert.deepEqual(event.glowHexes, [], 'unverified net changes must not claim a producing tile');
+    assert.ok(event.gains.filter((gain) => gain.playerId !== 'p0').every((gain) => gain.resource === 'any'));
+    assert.ok(
+      event.flights
+        .filter((flight) => flight.to.includes('player-profile'))
+        .every((flight) => flight.resource === 'any'),
+    );
+    assert.equal(combined.game!.players[1]!.hand, undefined);
+  }
+});
+
+test('a burst preserves the readable roll then coalesces later moves without changing authoritative snapshots', () => {
+  const game = setup();
+  clearHands(game);
+  fund(game, 'p0', { wood: 4, brick: 4 });
+  const roll = move(game, { kind: 'roll' });
+  const buffer = new PresentationBuffer();
+  const hold = presentationHold(roll.event);
+  buffer.begin(roll.after, hold);
+  const first = applyAction(
+    roll.game,
+    'p0',
+    {
+      kind: 'road',
+      edge: gameView(roll.game, 'p0').legal.roads[0]!,
+    },
+    () => 0.34,
+  );
+  const one = snapshot(first, 22);
+  const second = applyAction(
+    first,
+    'p0',
+    { kind: 'road', edge: gameView(first, 'p0').legal.roads[0]! },
+    () => 0.34,
+  );
+  const two = snapshot(second, 23);
+  assert.equal(buffer.offer(roll.after, one, 'p0', 100), null);
+  assert.equal(buffer.offer(one, two, 'p0', 200), null);
+  const queued = buffer.take()!;
+  assert.equal(queued.previous, roll.after);
+  assert.equal(queued.next, two);
+  const presentation = deriveFeedback(queued.previous, queued.next, queued.me)!;
+  assert.equal(presentation.dice, undefined, 'the displayed roll does not replay');
+  assert.equal(presentation.sites.length, 2);
+  for (const resource of ['wood', 'brick'])
+    assert.equal(
+      presentation.flights.find((flight) => flight.resource === resource && flight.spending)!.amount,
+      2,
+    );
+  assert.deepEqual(presentation.hand, two.game!.players[0]!.hand);
+  assert.equal(buffer.take(), null, 'the bounded range drains once');
+  buffer.begin(one, hold);
+  buffer.offer(one, two, 'p0', 0);
+  buffer.reset();
+  assert.equal(buffer.take(), null, 'welcome, hidden tabs and room changes discard queued presentation');
+});
+
+test('resync restores dice directly in the dock while a following accepted move preserves the active throw', () => {
+  const rolled = move(setup(), { kind: 'roll' });
+  const active = nextDicePresentation(null, rolled.event, rolled.game.dice)!;
+  assert.equal(active.initiallyDocked, false);
+  const ended = move(rolled.game, { kind: 'endTurn' });
+  assert.equal(nextDicePresentation(active, ended.event, null), active);
+  const restored = nextDicePresentation(active, null, rolled.game.dice)!;
+  assert.equal(restored.initiallyDocked, true);
+  assert.deepEqual(restored.faces, rolled.event.dice);
+  assert.notEqual(restored.id, active.id, 'restoring unmounts any unfinished throw and its timers');
+  assert.equal(nextDicePresentation(active, null, null), null);
 });
 
 test('construction feedback spends the exact local cards toward the committed road or city and signals the distinct piece', () => {
@@ -403,7 +498,7 @@ test('saved preferences accept only known booleans and a finite clamped volume',
       activity: false,
       extra: true,
     }),
-    { sound: false, volume: 1, motion: false, depth: false, boardTilt: false, activity: false },
+    { sound: false, volume: 1 },
   );
   assert.equal(parsePreferences({ volume: -0.5 }).volume, 0);
   assert.equal(parsePreferences({ volume: 0.37 }).volume, 0.37);

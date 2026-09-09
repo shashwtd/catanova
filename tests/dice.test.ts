@@ -9,7 +9,12 @@ import {
   diceTrajectory,
   DICE_ROLL_MS,
   DICE_PRESENTATION_MS,
+  DICE_HOLD_MS,
+  DICE_READABLE_MS,
+  DICE_IMPACT_MS,
+  diceStageAt,
 } from '../apps/client/src/DiceThrow.js';
+import { soundScore } from '../apps/client/src/sound.js';
 
 test('all six server results finish with the correct face toward the viewer and opposite faces total seven', () => {
   for (const face of DIE_FACES) {
@@ -48,6 +53,31 @@ test('throw paths vary per event within safe bounds and never determine the outc
   assert.match(html, /data-result="2"/);
   assert.match(html, /data-result="5"/);
   assert.match(html, /dice-throw-reduced/);
+  assert.match(html, /aria-label="Dice: 2 and 5"/);
+  assert.equal([...html.matchAll(/data-result-face="true"/g)].length, 2);
+  assert.ok(!html.includes('dice-throw-result') && !html.includes('2 + 5'));
   assert.ok(DICE_ROLL_MS >= 900 && DICE_ROLL_MS <= 1400);
   assert.ok(DICE_PRESENTATION_MS > DICE_ROLL_MS);
+});
+
+test('dice settle flat, hold for reading, then dock once without replaying on preference changes', () => {
+  assert.equal(diceStageAt(0), 'rolling');
+  assert.equal(diceStageAt(DICE_ROLL_MS), 'held');
+  assert.equal(diceStageAt(DICE_READABLE_MS - 1), 'held');
+  assert.equal(diceStageAt(DICE_READABLE_MS), 'docking');
+  assert.equal(diceStageAt(DICE_PRESENTATION_MS), 'docked');
+  assert.equal(diceStageAt(DICE_PRESENTATION_MS, true), 'docked');
+  assert.equal(diceStageAt(0, false, true), 'docked');
+  assert.equal(diceStageAt(0, true), 'held');
+  assert.ok(DICE_HOLD_MS >= 1000);
+  const html = renderToStaticMarkup(
+    createElement(DiceThrow, { id: 'restored', dice: [1, 6], initiallyDocked: true }),
+  );
+  assert.match(html, /dice-stage-docked/);
+  assert.equal([...html.matchAll(/data-result-face="true"/g)].length, 2);
+  const contacts = soundScore('dice');
+  for (const impact of DICE_IMPACT_MS) {
+    assert.ok(contacts.some((note) => Math.abs(note.at - impact / 1000) < 0.00001));
+    assert.ok(impact < DICE_ROLL_MS, 'dice sounds stop before the readable hold');
+  }
 });

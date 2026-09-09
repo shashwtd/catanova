@@ -1,4 +1,4 @@
-import { Check, Copy, Crown, DoorOpen, Pencil, Plus, Sailboat, Settings2, WifiOff } from 'lucide-react';
+import { Check, Copy, Crown, DoorOpen, Pencil, Plus, Sailboat, Settings2, WifiOff } from './GameIcons.js';
 import { useEffect, useState } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
