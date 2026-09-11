@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveAwardCelebrations, deriveFeedback, publicProduction } from '../apps/client/src/feedback.js';
+import {
+  deriveAwardCelebrations,
+  deriveFeedback,
+  publicProduction,
+  latestRoll,
+  RollPresentationTracker,
+} from '../apps/client/src/feedback.js';
 import { PresentationBuffer, presentationHold } from '../apps/client/src/useFeedback.js';
 import { nextDicePresentation } from '../apps/client/src/GameEffects.js';
 import { DEFAULT_PREFERENCES, parsePreferences } from '../apps/client/src/preferences.js';
@@ -103,6 +109,88 @@ test('dice feedback uses the exact committed faces and does not reroll during la
   const ended = move(rolled.game, { kind: 'endTurn' });
   assert.equal(ended.event.dice, undefined);
   assert.ok(!ended.event.sounds.includes('dice'));
+});
+
+test('one committed roll has one presentation identity across twelve later snapshot revisions', () => {
+  const rolled = move(setup(), { kind: 'roll' });
+  const tracker = new RollPresentationTracker();
+  let dice = null as ReturnType<typeof nextDicePresentation>;
+  let throws = 0;
+  for (let i = 0; i < 12; i++) {
+    const next = { ...rolled.after, revision: rolled.after.revision + i };
+    const derived = deriveFeedback(rolled.before, next, 'p0')!;
+    assert.equal(derived.diceId, rolled.event.diceId);
+    const accepted = tracker.accept(derived);
+    throws += accepted.sounds.filter((cue) => cue === 'dice').length;
+    const presented = nextDicePresentation(dice, accepted, rolled.game.dice);
+    if (dice) assert.equal(presented, dice, 'an updated room revision cannot remount its old throw');
+    dice = presented;
+  }
+  assert.equal(throws, 1);
+  const nextTurn = applyAction(rolled.game, 'p0', { kind: 'endTurn' }, () => 0.34);
+  const again = applyAction(nextTurn, 'p1', { kind: 'roll' }, () => 0.34);
+  const nextRoll = deriveFeedback(snapshot(nextTurn, 40), snapshot(again, 41), 'p0')!;
+  assert.deepEqual(nextRoll.dice, rolled.event.dice);
+  assert.notEqual(nextRoll.diceId, rolled.event.diceId, 'identical faces on a different turn still animate');
+  assert.ok(tracker.accept(nextRoll).dice);
+});
+
+test('a coalesced timeout backlog shows the latest roll once, and a reconnect shows none of its old throws', () => {
+  let game = setup();
+  const before = snapshot(game, 20);
+  for (let i = 0; i < 12; i++) {
+    game = applyAction(game, activePlayer(game).id, { kind: 'roll' }, () => (i === 11 ? 0.84 : 0.17));
+    game = applyAction(game, activePlayer(game).id, { kind: 'endTurn' }, () => 0.34);
+  }
+  const next = snapshot(game, 44);
+  const event = deriveFeedback(before, next, 'p0')!;
+  assert.deepEqual(event.dice, [6, 6]);
+  assert.equal(event.diceId, latestRoll(before, next)!.id);
+  assert.equal(event.sounds.filter((cue) => cue === 'dice').length, 1);
+  const tracker = new RollPresentationTracker();
+  tracker.observe(null, next);
+  assert.equal(
+    tracker.accept(event).dice,
+    undefined,
+    'welcome/hidden baselines never replay historical rolls',
+  );
+  assert.ok(!tracker.accept(event).sounds.includes('dice'));
+});
+
+test('overlapping snapshot retries never redistribute old cards and still present a newer construction', () => {
+  const game = setup();
+  clearHands(game);
+  fund(game, 'p0', { wood: 4, brick: 4 });
+  const rolled = move(game, { kind: 'roll' });
+  const buffer = new PresentationBuffer();
+  buffer.begin(rolled.after, 0);
+  for (let i = 0; i < 12; i++) {
+    const next = { ...rolled.after, revision: 22 + i };
+    const ready = buffer.offer(rolled.before, next, 'p0', 1)!;
+    const event = deriveFeedback(ready.previous, ready.next, 'p0')!;
+    assert.equal(event.dice, undefined);
+    assert.deepEqual(event.flights, []);
+    assert.deepEqual(event.gains, []);
+    assert.deepEqual(event.sounds, []);
+    assert.deepEqual(event.changed, [], 'the visible hand is never rewound to before production');
+    buffer.begin(next, 0);
+  }
+  const built = applyAction(
+    rolled.game,
+    'p0',
+    { kind: 'road', edge: gameView(rolled.game, 'p0').legal.roads[0]! },
+    () => 0.34,
+  );
+  const after = snapshot(built, 34);
+  const ready = buffer.offer(rolled.before, after, 'p0', 1)!;
+  const event = deriveFeedback(ready.previous, ready.next, 'p0')!;
+  assert.equal(event.dice, undefined);
+  assert.equal(event.sites.length, 1);
+  assert.ok(event.sounds.includes('road'));
+  assert.ok(event.sounds.includes('spend'));
+  assert.ok(event.flights.every((flight) => flight.spending));
+  buffer.observe(after);
+  assert.equal(buffer.offer(rolled.before, after, 'p0', 2), null, 'a welcome baseline also fences retries');
 });
 
 test('a combined automatic roll and end-turn still displays committed faces, and player names cannot forge a roll', () => {

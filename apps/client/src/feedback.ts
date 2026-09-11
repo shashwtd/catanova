@@ -14,6 +14,8 @@ export type FlightIntent = {
 export type FeedbackEvent = {
   id: string;
   dice?: readonly [number, number];
+  /** Stable committed roll identity, independent of later room/presence revisions. */
+  diceId?: string;
   notices: string[];
   sounds: SoundCue[];
   flights: FlightIntent[];
@@ -37,6 +39,53 @@ function rollFaces(line: string, playerName: string): readonly [number, number] 
     ? [Number(match[1]), Number(match[2])]
     : null;
 }
+
+/** Use the latest actual roll in a coalesced range, never replay each historical throw. */
+export function latestRoll(previous: RoomState | null, next: RoomState) {
+  const game = next.game;
+  if (!game) return null;
+  const afterLog = previous?.game?.log.at(-1)?.id ?? -1;
+  for (let index = game.log.length - 1; index >= 0; index--) {
+    const line = game.log[index]!;
+    if (line.id <= afterLog) break;
+    for (const player of game.players) {
+      const faces = rollFaces(line.text, player.name);
+      if (faces) return { id: `${next.roomId}:roll:${line.id}`, faces };
+    }
+  }
+  return null;
+}
+
+/** Presentation retries may repeat a snapshot range; a committed roll still sounds once. */
+export class RollPresentationTracker {
+  private seen = new Set<string>();
+  reset() {
+    this.seen.clear();
+  }
+  observe(previous: RoomState | null, next: RoomState) {
+    const roll = latestRoll(previous, next);
+    if (roll) this.remember(roll.id);
+  }
+  private remember(id: string) {
+    this.seen.add(id);
+    if (this.seen.size > 128) this.seen.delete(this.seen.values().next().value!);
+  }
+  accept(event: FeedbackEvent): FeedbackEvent {
+    if (!event.dice) return event;
+    const id = event.diceId ?? event.id;
+    if (!this.seen.has(id)) {
+      this.remember(id);
+      return event;
+    }
+    return {
+      ...event,
+      dice: undefined,
+      diceId: undefined,
+      sounds: event.sounds.filter((cue) => cue !== 'dice'),
+      glowHexes: [],
+    };
+  }
+}
 /** Production is public board information. Verify every bank/count delta before labeling another player's gains. */
 export function publicProduction(
   before: GameView,
@@ -51,6 +100,7 @@ export function publicProduction(
       for (const vertex of hex.vertices) {
         const building = before.buildings[vertex];
         if (building) {
+          if (before.players.find((player) => player.id === building.player)?.resigned) continue;
           const payment = owed.get(building.player);
           if (!payment) return null;
           payment[hex.terrain] += building.kind === 'city' ? 2 : 1;
@@ -151,14 +201,12 @@ export function deriveFeedback(
     hand = g.players.find((p) => p.id === me)?.hand;
   if (!old || !hand) return null;
   const lines = g.log.filter((e) => e.id > (before.log.at(-1)?.id ?? -1)).map((e) => e.text);
-  const faces = lines.flatMap((line) => {
-    const result = rollFaces(line, before.players[before.active]!.name);
-    return result ? [result] : [];
-  })[0];
-  const dice = g.dice && (!before.dice || before.turn !== g.turn) ? g.dice : faces;
+  const roll = latestRoll(previous, next);
+  const dice = roll?.faces ?? (g.dice && (!before.dice || before.turn !== g.turn) ? g.dice : undefined);
   const event: FeedbackEvent = {
     id: `${next.roomId}:${next.revision}`,
     dice,
+    ...(dice ? { diceId: roll?.id ?? `${next.roomId}:turn:${g.turn}:dice` } : {}),
     notices: [],
     sounds: [],
     flights: [],
@@ -252,17 +300,22 @@ export function deriveFeedback(
   if (event.flights.some((f) => !f.spending && f.resource !== 'any')) event.sounds.push('gain');
   if (event.flights.some((f) => f.spending)) event.sounds.push('spend');
   if (before.robber !== g.robber) event.sounds.push('robber');
+  const resignation = g.players.some(
+    (p) => p.resigned && !before.players.find((q) => q.id === p.id)?.resigned,
+  );
   const knight = g.players.some(
     (p) => p.knights > (before.players.find((q) => q.id === p.id)?.knights ?? p.knights),
   );
   if (knight) event.sounds.push('knight');
   else if (
+    !resignation &&
     g.players.some(
       (p) => p.cardCount !== (before.players.find((q) => q.id === p.id)?.cardCount ?? p.cardCount),
     )
   )
     event.sounds.push('development');
   if (!dice && !event.sites.length && traded(before, g, lines)) event.sounds.push('trade');
+  if (resignation && !g.winner) event.sounds.push('warning');
   if (g.winner && !before.winner) event.sounds.push('win');
   event.notices = lines
     .filter((s) => !s.endsWith("'s turn.") && !before.players.some((player) => rollFaces(s, player.name)))

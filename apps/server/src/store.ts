@@ -15,7 +15,13 @@ import { createHash, randomUUID, randomInt } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { applyAction, createGame, gameView, parseGameAction } from '../../../packages/rules/src/game.js';
+import {
+  applyAction,
+  createGame,
+  gameView,
+  parseGameAction,
+  resignPlayers,
+} from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
 import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
@@ -34,6 +40,9 @@ type Receipt = { expected_revision: number; revision: number; counter: number };
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 const privateRandom = () => randomInt(0, 2 ** 32) / 2 ** 32;
 export const ROOM_CODE_LEASE_MS = 30 * 24 * 60 * 60 * 1000;
+export const RECONNECT_GRACE_MS = 3 * 60 * 1000;
+type Absence = { disconnectedAt: number; resignAt: number };
+type Presence = { pausedAt?: number; seats: Record<string, Absence> };
 const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
 function codeForSlot(slot: number): string {
   let code = '';
@@ -50,13 +59,23 @@ export class Store {
   private readonly now: () => number;
   private readonly random: () => number;
   private readonly codeRandom: (max: number) => number;
+  private readonly trackPresence: boolean;
+  private connectedSeats = new Set<string>();
+  private readonly pendingPresence = new Set<string>();
+  private dueRoomCursor = '';
   constructor(
     path: string,
-    options: { now?: () => number; random?: () => number; codeRandom?: (max: number) => number } = {},
+    options: {
+      now?: () => number;
+      random?: () => number;
+      codeRandom?: (max: number) => number;
+      trackPresence?: boolean;
+    } = {},
   ) {
     this.now = options.now ?? Date.now;
     this.random = options.random ?? privateRandom;
     this.codeRandom = options.codeRandom ?? ((max) => randomInt(max));
+    this.trackPresence = options.trackPresence ?? false;
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(`
@@ -114,6 +133,10 @@ export class Store {
         next_deadline INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS clocks_due ON turn_clocks(next_deadline);
+      CREATE TABLE IF NOT EXISTS room_presence (
+        room_id TEXT PRIMARY KEY REFERENCES rooms(id), state TEXT NOT NULL, next_deadline INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS presence_due ON room_presence(next_deadline);
       CREATE TABLE IF NOT EXISTS game_events (
         room_id TEXT NOT NULL REFERENCES rooms(id), revision INTEGER NOT NULL,
         command_id TEXT NOT NULL, actor TEXT, action TEXT NOT NULL,
@@ -150,6 +173,13 @@ export class Store {
     this.db.exec(
       'CREATE UNIQUE INDEX IF NOT EXISTS seat_account_room ON seats(user_id, room_id) WHERE user_id IS NOT NULL AND departed = 0',
     );
+    // A server outage is not a player resignation. Wait for a human before restarting clocks.
+    if (this.trackPresence)
+      this.db
+        .prepare(
+          'INSERT INTO room_presence(room_id,state,next_deadline) SELECT room_id,?,NULL FROM games WHERE 1 ON CONFLICT(room_id) DO UPDATE SET state=excluded.state,next_deadline=NULL',
+        )
+        .run(JSON.stringify({ pausedAt: this.now(), seats: {} } satisfies Presence));
   }
   private transaction<T>(run: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
@@ -312,6 +342,7 @@ export class Store {
       .prepare('SELECT id, name, profile, ready FROM seats WHERE room_id = ? AND departed = 0 ORDER BY rowid')
       .all(roomId) as { id: string; name: string; profile: string | null; ready: number }[];
     const game = viewer ? this.loadGame(roomId) : undefined;
+    const presence = this.presence(roomId);
     const roomCode = this.roomCode(roomId);
     return {
       roomId,
@@ -322,7 +353,9 @@ export class Store {
         name: p.name,
         profile: p.profile ? (JSON.parse(p.profile) as Profile) : defaultProfile(p.name),
         ready: !!p.ready,
+        ...(presence?.pausedAt === undefined ? presence?.seats[p.id] : {}),
       })),
+      ...(presence?.pausedAt !== undefined ? { paused: true } : {}),
       historyRevision: this.eventHead(roomId)?.revision ?? 0,
       settings: this.settings(roomId),
       serverNow: this.now(),
@@ -590,6 +623,119 @@ export class Store {
       return { revision, counter: room.counter, duplicate: false };
     });
   }
+  private presence(roomId: string): Presence | undefined {
+    if (!this.trackPresence) return undefined;
+    const row = this.db.prepare('SELECT state FROM room_presence WHERE room_id=?').get(roomId) as
+      { state: string } | undefined;
+    return row ? (JSON.parse(row.state) as Presence) : undefined;
+  }
+  private updatePresence(roomId: string, game: Game, connected = this.connectedSeats) {
+    if (!this.trackPresence) return;
+    if (game.phase === 'finished') {
+      this.db.prepare('DELETE FROM room_presence WHERE room_id=?').run(roomId);
+      return;
+    }
+    const old = this.presence(roomId),
+      now = this.now();
+    const remaining = game.players.filter((p) => !p.resigned);
+    const paused = !remaining.some((p) => connected.has(p.id));
+    const resumed = old?.pausedAt !== undefined && !paused;
+    const state: Presence = { seats: {} };
+    if (paused) state.pausedAt = old?.pausedAt ?? now;
+    for (const p of remaining)
+      if (!connected.has(p.id)) {
+        state.seats[p.id] = (!resumed && old?.seats[p.id]) || {
+          disconnectedAt: now,
+          resignAt: now + RECONNECT_GRACE_MS,
+        };
+      }
+    const deadlines = Object.values(state.seats).map((seat) => seat.resignAt);
+    this.db
+      .prepare(
+        'INSERT INTO room_presence(room_id,state,next_deadline) VALUES(?,?,?) ON CONFLICT(room_id) DO UPDATE SET state=excluded.state,next_deadline=excluded.next_deadline',
+      )
+      .run(roomId, JSON.stringify(state), paused || !deadlines.length ? null : Math.min(...deadlines));
+    if (resumed) {
+      // Nobody owes an immediate automatic move for time when nobody could see the game.
+      this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
+      this.updateClock(roomId, game);
+    }
+  }
+  /** Call only for admitted sockets, after replacement checks. A returning resigned seat can watch. */
+  setConnected(seat: Seat, connected: boolean) {
+    if (!this.trackPresence) return;
+    if (connected) this.expireAbsences(seat.room_id);
+    const nextConnected = new Set(this.connectedSeats);
+    if (connected) nextConnected.add(seat.id);
+    else nextConnected.delete(seat.id);
+    try {
+      this.transaction(() => {
+        const game = this.loadGame(seat.room_id);
+        if (game) this.updatePresence(seat.room_id, game, nextConnected);
+      });
+    } catch (error) {
+      // A closed transport stays closed even if its presence write needs a retry.
+      if (!connected) {
+        this.connectedSeats = nextConnected;
+        this.pendingPresence.add(seat.room_id);
+      }
+      throw error;
+    }
+    this.connectedSeats = nextConnected;
+    this.pendingPresence.delete(seat.room_id);
+  }
+  /** Presence expiry and the complete resulting game transition have one durable commit. */
+  private expireAbsences(roomId: string): boolean {
+    const presence = this.presence(roomId);
+    if (!presence || presence.pausedAt !== undefined) return false;
+    const due = Object.entries(presence.seats)
+      .filter(([id, absence]) => !this.connectedSeats.has(id) && absence.resignAt <= this.now())
+      .map(([id]) => id);
+    if (!due.length) return false;
+    return this.transaction(() => {
+      const current = this.loadGame(roomId);
+      if (!current || current.phase === 'finished') return false;
+      // A sole returning spectator cannot cause all absent humans to forfeit one another.
+      if (!current.players.some((p) => !p.resigned && this.connectedSeats.has(p.id))) {
+        this.updatePresence(roomId, current);
+        return false;
+      }
+      const next = resignPlayers(current, due);
+      if (next === current) {
+        this.updatePresence(roomId, current);
+        return false;
+      }
+      const room = this.db.prepare('SELECT revision FROM rooms WHERE id=?').get(roomId)!;
+      const revision = (room.revision as number) + 1;
+      if (!this.eventHead(roomId))
+        this.recordEvent(
+          roomId,
+          revision - 1,
+          'legacy-import',
+          null,
+          { kind: 'legacy' },
+          current,
+          current.log.map((e) => e.text),
+          'legacy',
+        );
+      this.recordEvent(
+        roomId,
+        revision,
+        'resign-' + hash(JSON.stringify({ roomId, revision, due })).slice(0, 48),
+        due.length === 1 ? due[0]! : null,
+        { kind: 'resign', players: due },
+        next,
+        next.log.filter((e) => e.id >= current.nextLog).map((e) => e.text),
+        'resign',
+        true,
+      );
+      this.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(next), roomId);
+      this.db.prepare('UPDATE rooms SET revision=? WHERE id=?').run(revision, roomId);
+      this.updateClock(roomId, next);
+      this.updatePresence(roomId, next);
+      return true;
+    });
+  }
   clock(roomId: string): TurnClock | undefined {
     const row = this.db.prepare('SELECT state FROM turn_clocks WHERE room_id = ?').get(roomId) as
       { state: string } | undefined;
@@ -626,17 +772,64 @@ export class Store {
       .run(roomId, JSON.stringify(clock), nextDeadline);
   }
   dueRooms(): string[] {
-    // Bound each scheduler batch so a backlog after restart cannot monopolize the event loop.
-    return this.db
-      .prepare('SELECT room_id FROM turn_clocks WHERE next_deadline <= ? ORDER BY next_deadline LIMIT 32')
-      .all(this.now())
-      .map((r) => r.room_id as string);
+    // Reserve at least half the batch for saved deadlines. Rotate both queues even if a
+    // selected room fails: one damaged room must never strand healthy games behind it.
+    const pendingCount = Math.min(16, this.pendingPresence.size);
+    const normalLimit = 32 - pendingCount;
+    const query = this.trackPresence
+      ? `
+        SELECT room_id FROM (
+          SELECT c.room_id,c.next_deadline FROM turn_clocks c JOIN room_presence p ON p.room_id=c.room_id
+          WHERE c.next_deadline<=? AND json_extract(p.state,'$.pausedAt') IS NULL
+          UNION ALL SELECT room_id,next_deadline FROM room_presence WHERE next_deadline<=?
+        )
+      `
+      : 'SELECT room_id FROM turn_clocks WHERE next_deadline<=?';
+    const times = this.trackPresence ? [this.now(), this.now()] : [this.now()];
+    const select = (operator: '>' | '<=', limit: number) =>
+      this.db
+        .prepare(
+          `SELECT DISTINCT room_id FROM (${query}) WHERE room_id ${operator} ? ORDER BY room_id LIMIT ?`,
+        )
+        .all(...times, this.dueRoomCursor, limit)
+        .map((row) => row.room_id as string);
+    const due = select('>', normalLimit);
+    if (due.length < normalLimit && this.dueRoomCursor) due.push(...select('<=', normalLimit - due.length));
+    if (due.length) this.dueRoomCursor = due[due.length - 1]!;
+    const pending = [...this.pendingPresence].slice(0, 32 - due.length);
+    for (const roomId of pending) {
+      this.pendingPresence.delete(roomId);
+      this.pendingPresence.add(roomId);
+    }
+    return [...new Set([...due, ...pending])];
   }
   /** Each chosen action commits independently, so a crash resumes from the last saved mandatory choice. */
   expireRoom(roomId: string): boolean {
-    let changed = false;
+    let presenceRecovered = false;
+    if (this.pendingPresence.has(roomId)) {
+      this.transaction(() => {
+        const game = this.loadGame(roomId);
+        if (game) this.updatePresence(roomId, game);
+      });
+      this.pendingPresence.delete(roomId);
+      presenceRecovered = true;
+    }
+    if (this.trackPresence) {
+      const game = this.loadGame(roomId);
+      if (
+        game &&
+        game.phase !== 'finished' &&
+        !game.players.some((p) => !p.resigned && this.connectedSeats.has(p.id))
+      ) {
+        this.transaction(() => this.updatePresence(roomId, game));
+        return presenceRecovered;
+      }
+    }
+    let changed = this.expireAbsences(roomId) || presenceRecovered;
+    if (this.trackPresence && (!this.presence(roomId) || this.presence(roomId)?.pausedAt !== undefined))
+      return changed;
     const firstClock = this.clock(roomId);
-    if (!firstClock) return false;
+    if (!firstClock) return changed;
     // At most four discards, two free roads, a robber move, a roll and an end-turn.
     for (let step = 0; step < 12; step++) {
       const clock = this.clock(roomId);
@@ -779,6 +972,7 @@ export class Store {
         )
         .run(seat.room_id, JSON.stringify(next));
       this.updateClock(seat.room_id, next);
+      this.updatePresence(seat.room_id, next);
       this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
       this.db
         .prepare(

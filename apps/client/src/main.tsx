@@ -86,6 +86,7 @@ import './trade-polish.css';
 import './awards.css';
 import './game-guidance.css';
 import './mobile-layout.css';
+import './disconnect.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -213,9 +214,9 @@ function App() {
   const g = room?.game,
     player = g?.players.find((p) => p.id === me),
     active = g?.players[g.active],
-    myTurn = !!me && active?.id === me;
+    myTurn = !!me && active?.id === me && !player?.resigned;
   const connected = status === 'connected',
-    disabled = !connected || busy || feedback.presentationBusy,
+    disabled = !connected || busy || feedback.presentationBusy || !!player?.resigned || !!room?.paused,
     hand = player?.hand ?? emptyHand();
   const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
     feedback.sound.playAttention(cue),
@@ -578,14 +579,17 @@ function App() {
     setName(canonical.name);
     setPanel(null);
   }
-  const phaseText =
-    !g || ['discard', 'robber'].includes(g.phase)
-      ? ''
-      : mode && myTurn && g.phase === 'actions'
-        ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
-        : g.phase === 'actions'
-          ? ''
-          : (gameNotice?.prompt ?? '');
+  const phaseText = !g
+    ? ''
+    : player?.resigned || room?.paused
+      ? (gameNotice?.prompt ?? '')
+      : ['discard', 'robber'].includes(g.phase)
+        ? ''
+        : mode && myTurn && g.phase === 'actions'
+          ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
+          : g.phase === 'actions'
+            ? ''
+            : (gameNotice?.prompt ?? '');
   return (
     <main
       className={`game-world ${g ? 'playing' : room ? 'lobby' : 'entry-world'}`}
@@ -663,6 +667,7 @@ function App() {
       )}
       {g && room && (
         <PlayerRail
+          clockOffset={metrics.clockOffsetMs}
           room={room}
           game={g}
           me={me}
@@ -1054,7 +1059,11 @@ function App() {
       )}
       {panel === 'leave' && (
         <Dialog title="Leave game?" compact onClose={() => setPanel(null)}>
-          <p className="muted">Your seat stays saved.</p>
+          <p className="muted">
+            {player?.resigned
+              ? 'You can come back to watch.'
+              : 'Return within 3 minutes to keep playing. If everyone leaves, the game pauses.'}
+          </p>
           <div className="dialog-actions">
             <button className="dark-button" onClick={() => setPanel(null)}>
               Cancel

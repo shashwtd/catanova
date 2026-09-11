@@ -6,7 +6,7 @@ Only the host can change these settings. Every change is saved, broadcast to the
 
 ## What happens when time runs out
 
-Setup settlements and roads are untimed. The first normal turn starts its countdown when setup finishes. Rolling, trading, buying, playing a development card, and reconnecting do not restart that countdown.
+Setup settlements and roads are untimed. The first normal turn starts its countdown when setup finishes. Rolling, trading, buying, playing a development card, and reconnecting while someone else remains in the game do not restart that countdown.
 
 At expiry, the server finishes the current turn using legal defaults:
 
@@ -29,12 +29,22 @@ The game server owns all deadlines. Room snapshots and ping replies include its 
 
 The deadline and paused/discard deadlines are stored in SQLite. Each game action saves the game state, clock update, event history, and command receipt in the same transaction. A storage failure cannot acknowledge a successful move or advance just the clock. Automatic actions use the same rule validation and commit path as manual moves. Their history entries carry `automatic: true`.
 
-The server checks due clocks approximately every half second, in bounded batches, including rooms whose players are disconnected. It also checks the deadline before accepting a manual action, closing the race between a click at expiry and the next scheduler tick. If that action was already saved, its receipt remains safe to replay; an unsaved stale action gets the latest room state.
+The server checks due clocks approximately every half second, in bounded batches, while at least one remaining player is connected. It also checks the deadline before accepting a manual action, closing the race between a click at expiry and the next scheduler tick. If that action was already saved, its receipt remains safe to replay; an unsaved stale action gets the latest room state.
 
-A refresh, another device, or a server restart keeps the saved deadline. After a long server outage, an expired current turn completes, then the next player receives a fresh full countdown. The server does not fast-forward many turns to simulate all elapsed downtime. If it crashes between required automatic choices, it resumes from the last committed choice without rerolling an already saved roll.
+A refresh or another device keeps the saved deadline while another player is present. When every remaining player disconnects, automatic progression pauses. A server restart also pauses saved games until a player reconnects; server downtime cannot forfeit a player. The first returning player restarts the current turn and any required discard clocks with their full configured duration. The saved game stays at exactly its last committed choice, so a saved roll never needs rolling again. The server never fast-forwards turns to simulate elapsed downtime.
 
-SQLite still needs a persistent volume and backups; this clock does not provide protection against losing the host's entire disk. An enabled timer remains enabled for the current game, including when all players disconnect.
+SQLite still needs a persistent volume and backups; this clock does not provide protection against losing the host's entire disk. Timer settings remain saved when a game pauses.
+
+## Reconnect grace and resignation
+
+In a started game, a disconnected player has **three minutes to return**, separately from the optional turn timer. The deadline appears beside their profile. Reconnecting before it expires restores their seat; it does not reset their ongoing turn clock. Intentional Leave uses the same grace so leaving the screen is not an immediate resignation. Lobby players never auto-resign.
+
+At expiry, the server resigns the absent player. Their roads, settlements and cities stay on the island and continue to occupy their sites. Their resource cards return to the bank; unused development cards are retired, not returned to the deck. Their buildings stop producing resources, they cannot trade or receive stolen cards, and they no longer qualify for either award. Future turns and setup slots skip them. With two or more remaining players the match continues; with one, the match ends explicitly as a **win by resignation**, without claiming a ten-point victory. A player who returns after resignation may watch but cannot reclaim play in that match.
+
+Required discards belonging to a resigned player disappear when their whole resource hand returns to the bank. Other players still finish their own discards. If the resigned player owed the robber move, the next remaining player moves it before rolling for their own fresh turn. Any unfinished free-road placements from the departed player are abandoned. Existing pieces are never removed to make these transitions possible.
+
+If everyone disconnects, grace pauses along with automatic play. The next returning player gives every still-absent player a new three-minute grace period. This also applies after server restart. A connected resigned spectator cannot keep a game progressing while all remaining players are offline. Multiple departures that expire together commit in one transaction; their iteration order cannot select a winner.
 
 ## Validation
 
-`tests/turn-clock.test.ts` exercises accepted durations, host ownership, readiness resets, command reuse, exact revision conflicts, active and discarded-player deadlines, restart recovery, action/receipt rollback, automatic seven/robber/free-road transitions, manual deadline races, and live WebSocket broadcasts. Resource inventories remain conserved during timeout choices.
+`tests/turn-clock.test.ts` exercises accepted durations, host ownership, readiness resets, command reuse, exact revision conflicts, active and discarded-player deadlines, restart recovery, action/receipt rollback, automatic seven/robber/free-road transitions, manual deadline races, and live WebSocket broadcasts. `tests/disconnect-resignation.test.ts` adds real socket disconnects, reconnect cancellation, all-offline pauses, server restart grace, batch resignation rollback/retry, preserved pieces, conserved resources, and setup/discard/robber handling.

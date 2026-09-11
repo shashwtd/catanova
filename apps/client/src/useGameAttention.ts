@@ -12,7 +12,7 @@ export function useGameAttention(
   const tracker = useRef(new AttentionTracker());
   const callback = useRef(notify);
   callback.current = notify;
-  const status = room?.game ? gameStatus(room.game, me) : null;
+  const status = room?.game ? gameStatus(room.game, me, room) : null;
   const title =
     room && !connected
       ? 'Reconnecting — Catanova'

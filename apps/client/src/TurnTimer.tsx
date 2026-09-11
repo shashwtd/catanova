@@ -23,10 +23,10 @@ export function TurnTimer({
     fallback.current = { server: room.serverNow, local: Date.now() };
   const clock = room.turnClock,
     deadline = discard ? (me ? clock?.discardDeadlines?.[me] : undefined) : clock?.deadlineAt;
-  const paused = !!clock?.pausedAt && !discard;
+  const paused = room.paused || (clock?.pausedAt !== undefined && !discard);
   const serverNow = now + (offset ?? fallback.current.server - fallback.current.local),
     remaining = deadline
-      ? Math.max(0, Math.ceil((deadline - (paused ? clock!.pausedAt! : serverNow)) / 1000))
+      ? Math.max(0, Math.ceil((deadline - (paused ? (clock?.pausedAt ?? serverNow) : serverNow)) / 1000))
       : 0;
   const mine = !!clock && (discard ? !!(me && clock.discardDeadlines?.[me]) : clock.playerId === me);
   const warning = useRef(onWarning);
@@ -45,7 +45,7 @@ export function TurnTimer({
       warning.current();
     }
   }, [remaining, mine, paused, connected, room.roomId, clock?.turn, deadline]);
-  if (!clock || !deadline || !room.game || room.game.winner) return null;
+  if (!clock || !deadline || !room.game || room.game.winner || room.paused) return null;
   return (
     <span
       className={`turn-timer ${remaining <= 10 && !paused ? 'running-low' : ''} ${paused ? 'paused' : ''}`}

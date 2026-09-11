@@ -23,7 +23,15 @@ export type HistoryEntry = {
   lines: string[];
   automatic?: boolean;
 };
-export type RoomPlayer = { id: string; name: string; connected: boolean; profile?: Profile; ready?: boolean };
+export type RoomPlayer = {
+  id: string;
+  name: string;
+  connected: boolean;
+  profile?: Profile;
+  ready?: boolean;
+  disconnectedAt?: number;
+  resignAt?: number;
+};
 export type RoomState = {
   roomId: string;
   roomCode?: string;
@@ -36,6 +44,7 @@ export type RoomState = {
   settings?: RoomSettings;
   turnClock?: TurnClock;
   serverNow?: number;
+  paused?: boolean;
 };
 export type RoomPreview = {
   canResume?: boolean;

@@ -22,7 +22,11 @@ export function nextDicePresentation(
     ? { id: `restored:${lastDice.join('-')}`, faces: lastDice, initiallyDocked: true }
     : null;
   if (!event) return restored;
-  if (event.dice) return { id: event.id, faces: event.dice, initiallyDocked: false };
+  if (event.dice) {
+    const id = event.diceId ?? event.id;
+    if (current?.id === id) return current;
+    return { id, faces: event.dice, initiallyDocked: false };
+  }
   if (lastDice && (!current || current.faces[0] !== lastDice[0] || current.faces[1] !== lastDice[1]))
     return restored;
   return current;

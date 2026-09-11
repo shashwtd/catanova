@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GameIcon, Layers, ScrollText, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
@@ -6,22 +7,45 @@ import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
 import { playerTurnActivity } from './turn-activity.js';
+import { DisconnectStatus } from './DisconnectStatus.js';
 export function PlayerRail({
   room,
   game,
   me,
   timer,
+  clockOffset,
 }: {
   room: RoomState;
   game: GameView;
   me?: string;
   timer?: ReactNode;
+  clockOffset?: number;
 }) {
+  const [now, setNow] = useState(Date.now);
+  const fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() });
+  if (room.serverNow !== undefined && room.serverNow !== fallback.current.server)
+    fallback.current = { server: room.serverNow, local: Date.now() };
+  const serverNow = now + (clockOffset ?? fallback.current.server - fallback.current.local);
+  const counting =
+    !room.paused &&
+    !game.winner &&
+    room.players.some((seat) => !seat.connected && seat.resignAt !== undefined);
+  useEffect(() => {
+    if (!counting) return;
+    const update = () => setNow(Date.now());
+    update();
+    const interval = setInterval(update, 1000);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, [counting]);
   return (
     <aside className="player-rail" aria-label="Players">
       {game.players.map((p, i) => {
         const seat = room.players.find((s) => s.id === p.id),
-          active = game.players[game.active]?.id === p.id && !game.winner,
+          active = game.players[game.active]?.id === p.id && !game.winner && !p.resigned,
           activity = playerTurnActivity(game, p.id),
           road = game.longestRoad === p.id,
           army = game.largestArmy === p.id;
@@ -30,7 +54,7 @@ export function PlayerRail({
             key={p.id}
             data-player-profile={p.id}
             aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${active ? ', current turn' : ''}`}
-            className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''} ${!seat?.connected ? 'offline' : ''}`}
+            className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''} ${!seat?.connected ? 'offline' : ''} ${p.resigned ? 'has-resigned' : ''}`}
             style={{ '--player-color': PLAYER_COLORS[i] } as CSSProperties}
           >
             <div className="profile-portrait">
@@ -102,10 +126,19 @@ export function PlayerRail({
                   {army && <small>+2</small>}
                 </span>
               </div>
+              <DisconnectStatus
+                resigned={p.resigned}
+                deadline={!seat?.connected && !game.winner ? seat?.resignAt : undefined}
+                now={serverNow}
+                paused={room.paused}
+              />
             </div>
             {game.winner === p.id && (
               <div className="profile-awards">
-                <span className="award-ribbon winner" title="Winner">
+                <span
+                  className="award-ribbon winner"
+                  title={game.finishReason === 'resignation' ? 'Winner by resignation' : 'Winner'}
+                >
                   <Trophy />
                 </span>
               </div>

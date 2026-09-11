@@ -278,9 +278,9 @@ The bank's precise remaining stacks may be counted to resolve a possible product
 
 ## 13. What is not a base-game rule
 
-This base ruleset does not add a friendly robber, an opening grace period without sevens, extra resources, forced balanced dice, resource hand caps, undo after revealed information, automatic forfeits, or special building phases. Catanova’s two-player option reuses these mechanics without official two-player variant rules or neutral players; see the scope at the beginning of this document. Other variants remain separate future rulesets. The app also offers an optional [turn timer](TURN_CLOCK.md), disabled by default and documented separately as a house rule.
+This base ruleset does not add a friendly robber, an opening grace period without sevens, extra resources, forced balanced dice, resource hand caps, undo after revealed information, or special building phases. Catanova’s two-player option reuses these mechanics without official two-player variant rules or neutral players; see the scope at the beginning of this document. Other variants remain separate future rulesets. The app also offers an optional [turn timer](TURN_CLOCK.md), disabled by default, and a separate [three-minute reconnect grace before resignation](TURN_CLOCK.md#reconnect-grace-and-resignation). These online room rules are documented separately from the base game. When everybody is offline, the game pauses rather than automatically playing or forfeiting anyone.
 
-Network loss is also not a game action. It must not change a dice result, reroll a theft, remove a building, discard a hand, or transfer a seat. [Online behavior](ARCHITECTURE.md) is specified separately so recovery does not change the board-game rules.
+A temporary network loss before reconnect grace expires is not a game action. It must not change a dice result, reroll a theft, remove a building, discard a hand, or transfer a seat. [Online behavior](ARCHITECTURE.md) is specified separately so recovery does not change the board-game rules.
 
 ## 14. Completeness and corrections
 

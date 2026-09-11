@@ -149,7 +149,13 @@ function Move({ entry, names }: { entry: HistoryEntry; names: string[] }) {
       <span className="journal-action">
         <Icon />
         {entry.automatic && (
-          <span className="automatic-mark" role="img" aria-label="Automatic timer move">
+          <span
+            className="automatic-mark"
+            role="img"
+            aria-label={
+              entry.kind === 'resign' ? 'Automatic resignation after disconnect' : 'Automatic timer move'
+            }
+          >
             <Clock3 />
           </span>
         )}

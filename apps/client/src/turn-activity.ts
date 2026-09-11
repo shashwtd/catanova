@@ -5,7 +5,8 @@ export type TurnActivity = { icon: GameIconName; label: string };
 
 /** Discard obligations belong to each player, independently of whose turn it is. */
 export function playerTurnActivity(game: GameView, playerId: string): TurnActivity | null {
-  if (game.winner || game.phase === 'finished') return null;
+  if (game.winner || game.phase === 'finished' || game.players.find((p) => p.id === playerId)?.resigned)
+    return null;
   const count = game.discards[playerId] ?? 0;
   if (game.phase === 'discard' && count > 0) {
     return { icon: 'discard', label: `Discard ${count} resource ${count === 1 ? 'card' : 'cards'}` };

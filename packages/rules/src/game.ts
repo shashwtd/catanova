@@ -6,7 +6,7 @@ import type { Board } from './board.js';
 export type Hand = Record<Resource, number>;
 export type CardKind = keyof typeof DEVELOPMENT_DECK;
 export type Card = { id: string; kind: CardKind; boughtTurn: number };
-export type Player = { id: string; name: string; hand: Hand; cards: Card[]; knights: number };
+export type Player = { id: string; name: string; hand: Hand; cards: Card[]; knights: number; resigned?: boolean };
 export type Building = { player: string; kind: 'settlement' | 'city' };
 export type Phase = 'setupSettlement' | 'setupRoad' | 'roll' | 'actions' | 'discard' | 'robber' | 'freeRoads' | 'finished';
 export type TradeProposal = { player: string; give: Hand };
@@ -19,6 +19,7 @@ export type Game = {
   playedCard: boolean; returnPhase: 'roll' | 'actions'; freeRoads: number;
   discards: Record<string, number>; trade: Trade | null; nextTrade: number;
   longestRoad: string | null; largestArmy: string | null; winner: string | null;
+  finishReason?: 'resignation';
   log: { id: number; text: string }[]; nextLog: number;
 };
 export type GameAction =
@@ -130,8 +131,8 @@ export function score(g: Pick<Game, 'buildings' | 'longestRoad' | 'largestArmy'>
 }
 function updateAwards(g: Game) {
   for (const [key, minimum, values] of [
-    ['longestRoad', 5, g.players.map(p => longestTrail(g, p.id))],
-    ['largestArmy', 3, g.players.map(p => p.knights)],
+    ['longestRoad', 5, g.players.map(p => p.resigned ? 0 : longestTrail(g, p.id))],
+    ['largestArmy', 3, g.players.map(p => p.resigned ? 0 : p.knights)],
   ] as const) {
     const max = Math.max(...values); const leaders = g.players.filter((_, i) => values[i] === max);
     const old = g[key];
@@ -140,10 +141,10 @@ function updateAwards(g: Game) {
   }
 }
 function checkWin(g: Game) {
-  if (g.turn && score(g, activePlayer(g)) >= 10) { g.winner = activePlayer(g).id; g.phase = 'finished'; g.trade = null; log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`); }
+  if (g.turn && !activePlayer(g).resigned && score(g, activePlayer(g)) >= 10) { g.winner = activePlayer(g).id; g.phase = 'finished'; g.trade = null; log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`); }
 }
-export function robberVictims(g: BoardState, player: string, hex: number): string[] {
-  return [...new Set(g.board.hexes[hex]!.vertices.map(v => g.buildings[v]?.player).filter((p): p is string => !!p && p !== player))];
+export function robberVictims(g: BoardState & { players?: { id: string; resigned?: boolean }[] }, player: string, hex: number): string[] {
+  return [...new Set(g.board.hexes[hex]!.vertices.map(v => g.buildings[v]?.player).filter((p): p is string => !!p && p !== player && !g.players?.find(other => other.id === p)?.resigned))];
 }
 function finishFreeRoads(g: Game) {
   if (g.freeRoads <= 0 || pieces(g, activePlayer(g).id).roads >= SUPPLY.roads || !roadSites(g, activePlayer(g).id).length) { g.freeRoads = 0; g.phase = g.returnPhase; }
@@ -151,7 +152,7 @@ function finishFreeRoads(g: Game) {
 function produce(g: Game, number: number) {
   const owed = g.players.map(() => emptyHand());
   for (const h of g.board.hexes) if (h.number === number && h.id !== g.robber && h.terrain !== 'desert') {
-    for (const v of h.vertices) { const b = g.buildings[v]; if (b) owed[g.players.findIndex(p => p.id === b.player)]![h.terrain] += b.kind === 'city' ? 2 : 1; }
+    for (const v of h.vertices) { const b = g.buildings[v]; if (b) { const i = g.players.findIndex(p => p.id === b.player); if (!g.players[i]?.resigned) owed[i]![h.terrain] += b.kind === 'city' ? 2 : 1; } }
   }
   for (const r of RESOURCES) {
     const recipients = owed.map((h, i) => ({ n: h[r], i })).filter(x => x.n > 0);
@@ -161,10 +162,63 @@ function produce(g: Game, number: number) {
   }
 }
 
+function advanceTurn(g: Game, pendingRobber = false) {
+  do { g.active = (g.active + 1) % g.players.length; } while (activePlayer(g).resigned);
+  g.turn++; g.phase = pendingRobber ? 'robber' : 'roll'; g.returnPhase = 'roll';
+  g.dice = null; g.playedCard = false; g.freeRoads = 0; g.trade = null;
+  log(g, `${activePlayer(g).name}'s turn.${pendingRobber ? ' Move the robber, then roll.' : ''}`);
+}
+
+function advanceSetup(g: Game) {
+  g.setupVertex = null;
+  while (g.setupIndex < g.players.length * 2) {
+    g.active = g.setupIndex < g.players.length ? g.setupIndex : g.players.length * 2 - 1 - g.setupIndex;
+    if (!activePlayer(g).resigned) { g.phase = 'setupSettlement'; return; }
+    g.setupIndex++;
+  }
+  g.active = g.players.findIndex(p => !p.resigned); g.turn = 1; g.phase = 'roll';
+  log(g, 'Setup complete. Roll the dice to begin.');
+}
+
+/** Departures are a room rule, not a client game action. Apply all due seats together. */
+export function resignPlayers(state: Game, playerIds: string[]): Game {
+  if (state.phase === 'finished') return state;
+  const departing = state.players.filter(p => !p.resigned && playerIds.includes(p.id));
+  if (!departing.length) return state;
+  requireRule(departing.length < state.players.filter(p => !p.resigned).length, 'Cannot resign every remaining player');
+  const g = structuredClone(state);
+  for (const p of g.players) if (departing.some(other => other.id === p.id)) {
+    p.resigned = true; transfer(p.hand, g.bank, { ...p.hand }); p.cards = [];
+    delete g.discards[p.id]; log(g, `${p.name} resigned after not reconnecting.`);
+  }
+  if (g.trade) {
+    if (g.players.find(p => p.id === g.trade!.player)?.resigned) g.trade = null;
+    else {
+      g.trade.proposals = g.trade.proposals?.filter(proposal => !playerIds.includes(proposal.player));
+      if (g.players.every(p => p.resigned || p.id === g.trade!.player || g.trade!.declinedBy?.includes(p.id))) g.trade = null;
+    }
+  }
+  updateAwards(g);
+  const remaining = g.players.filter(p => !p.resigned);
+  if (remaining.length === 1) {
+    g.winner = remaining[0]!.id; g.finishReason = 'resignation'; g.phase = 'finished';
+    g.trade = null; g.discards = {}; g.freeRoads = 0;
+    log(g, `${remaining[0]!.name} wins by resignation.`); return g;
+  }
+  if (activePlayer(g).resigned) {
+    if (g.phase === 'setupSettlement' || g.phase === 'setupRoad') { g.setupIndex++; advanceSetup(g); }
+    else if (g.phase !== 'discard' || !Object.keys(g.discards).length) advanceTurn(g, g.phase === 'robber' || g.phase === 'discard');
+    // Other players finish required discards before the next player moves the robber.
+  } else if (g.phase === 'discard' && !Object.keys(g.discards).length) g.phase = 'robber';
+  checkWin(g);
+  return g;
+}
+
 /** Pure transition: caller supplies private randomness, and commits the result before broadcasting. */
 export function applyAction(state: Game, playerId: string, raw: GameAction, random: () => number): Game {
   const a = parseGameAction(raw), g = structuredClone(state);
   const p = g.players.find(p => p.id === playerId); requireRule(p, 'Not a player in this game');
+  requireRule(!p.resigned, 'You resigned from this game; you can still watch');
   requireRule(g.phase !== 'finished', 'The game has ended');
   const isActive = activePlayer(g).id === p.id;
   if (a.kind === 'discard') {
@@ -172,7 +226,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     requireRule(total(a.resources) === g.discards[p.id], `Discard exactly ${g.discards[p.id]} cards`);
     transfer(p.hand, g.bank, a.resources); delete g.discards[p.id];
     log(g, `${p.name} discarded ${total(a.resources)} cards.`);
-    if (!Object.keys(g.discards).length) g.phase = 'robber';
+    if (!Object.keys(g.discards).length) { if (activePlayer(g).resigned) { advanceTurn(g, true); checkWin(g); } else g.phase = 'robber'; }
     return g;
   }
   if (a.kind === 'declineTrade') {
@@ -182,7 +236,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     offer.declinedBy = [...(offer.declinedBy ?? []), p.id];
     if (offer.proposals) offer.proposals = offer.proposals.filter(proposal => proposal.player !== p.id);
     log(g, `${p.name} declined the trade offer.`);
-    if (g.players.every(other => other.id === offer.player || offer.declinedBy!.includes(other.id))) {
+    if (g.players.every(other => other.resigned || other.id === offer.player || offer.declinedBy!.includes(other.id))) {
       g.trade = null;
       log(g, 'Trade closed: everyone declined.');
     }
@@ -207,7 +261,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   if (a.kind === 'acceptProposal') {
     requireRule(g.phase === 'actions' && isActive && g.trade?.id === a.tradeId && g.trade.open && g.trade.player === p.id, 'That proposal is no longer available');
     const offer = g.trade, proposal = offer.proposals?.find(proposal => proposal.player === a.player);
-    const responder = g.players.find(other => other.id === a.player && other.id !== p.id);
+    const responder = g.players.find(other => other.id === a.player && other.id !== p.id && !other.resigned);
     requireRule(proposal && responder && !offer.declinedBy?.includes(a.player), 'That proposal is no longer available');
     requireRule(!a.expectedGive || RESOURCES.every(r => a.expectedGive![r] === proposal.give[r]), 'That proposal changed; review the new cards');
     requireRule(canPay(p.hand, offer.give) && canPay(responder.hand, proposal.give), 'A player no longer has the offered cards');
@@ -236,9 +290,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   if (g.phase === 'setupRoad') {
     requireRule(a.kind === 'road' && roadSites(g, p.id, g.setupVertex).includes(a.edge), 'Place a road touching your new settlement');
     log(g, `${p.name} placed a starting road on edge ${a.edge + 1}.`);
-    g.roads[a.edge] = p.id; g.setupIndex++; g.setupVertex = null;
-    if (g.setupIndex === g.players.length * 2) { g.phase = 'roll'; g.active = 0; g.turn = 1; log(g, 'Setup complete. Roll the dice to begin.'); }
-    else { g.active = g.setupIndex < g.players.length ? g.setupIndex : g.players.length * 2 - 1 - g.setupIndex; g.phase = 'setupSettlement'; }
+    g.roads[a.edge] = p.id; g.setupIndex++; advanceSetup(g);
     return g;
   }
   if (a.kind === 'robber') {
@@ -286,7 +338,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     g.dice = [1 + Math.floor(random() * 6), 1 + Math.floor(random() * 6)];
     const sum = g.dice[0] + g.dice[1]; log(g, `${p.name} rolled ${g.dice[0]} + ${g.dice[1]} = ${sum}.`);
     if (sum === 7) {
-      g.discards = Object.fromEntries(g.players.filter(other => total(other.hand) > 7).map(other => [other.id, Math.floor(total(other.hand) / 2)]));
+      g.discards = Object.fromEntries(g.players.filter(other => !other.resigned && total(other.hand) > 7).map(other => [other.id, Math.floor(total(other.hand) / 2)]));
       g.returnPhase = 'actions'; g.phase = Object.keys(g.discards).length ? 'discard' : 'robber';
     } else { produce(g, sum); g.phase = 'actions'; }
     return g;
@@ -320,25 +372,25 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       log(g, `${p.name} offered ${resourceText(a.give)} and invited trade proposals.`); break;
     case 'cancelTrade': log(g, `${p.name} withdrew the trade offer.`); break;
     case 'endTurn':
-      g.active = (g.active + 1) % g.players.length; g.turn++; g.phase = 'roll'; g.dice = null; g.playedCard = false; log(g, `${activePlayer(g).name}'s turn.`); break;
+      advanceTurn(g); break;
     default: throw new RuleError('That action is unavailable');
   }
   updateAwards(g); checkWin(g); return g;
 }
 
 export const CARD_NAMES: Record<CardKind, string> = { knight: 'Knight', roadBuilding: 'Road Building', yearOfPlenty: 'Year of Plenty', monopoly: 'Monopoly', victoryPoint: 'Victory Point' };
-export type PlayerView = { id: string; name: string; resourceCount: number; cardCount: number; knights: number; points: number; roadLength: number; pieces: ReturnType<typeof pieces>; hand?: Hand; cards?: Card[] };
+export type PlayerView = { id: string; name: string; resigned?: boolean; resourceCount: number; cardCount: number; knights: number; points: number; roadLength: number; pieces: ReturnType<typeof pieces>; hand?: Hand; cards?: Card[] };
 export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 'nextTrade'> & {
   deckCount: number; players: PlayerView[];
   legal: { roads: number[]; settlements: number[]; cities: number[]; playableCards: string[]; canBuyCard: boolean; rates: Hand };
 };
 export function gameView(g: Game, viewer: string): GameView {
   const { deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
-  const me = players.find(p => p.id === viewer)!; const active = activePlayer(g).id === viewer; const owned = pieces(g, viewer);
+  const me = players.find(p => p.id === viewer)!; const active = !me.resigned && activePlayer(g).id === viewer; const owned = pieces(g, viewer);
   const build = active && g.phase === 'actions', setup = active && g.phase === 'setupSettlement';
   return {
     ...structuredClone(publicState), deckCount: deck.length,
-    players: players.map(p => ({ id: p.id, name: p.name, resourceCount: total(p.hand), cardCount: p.cards.length, knights: p.knights, points: score(g, p, p.id === viewer || !!g.winner), roadLength: longestTrail(g, p.id), pieces: pieces(g, p.id), ...(p.id === viewer ? { hand: { ...p.hand }, cards: structuredClone(p.cards) } : {}) })),
+    players: players.map(p => ({ id: p.id, name: p.name, ...(p.resigned ? { resigned: true } : {}), resourceCount: total(p.hand), cardCount: p.cards.length, knights: p.knights, points: score(g, p, p.id === viewer || !!g.winner), roadLength: longestTrail(g, p.id), pieces: pieces(g, p.id), ...(p.id === viewer ? { hand: { ...p.hand }, cards: structuredClone(p.cards) } : {}) })),
     legal: {
       roads: owned.roads >= 15 ? [] : active && g.phase === 'setupRoad' ? roadSites(g, viewer, g.setupVertex) : active && g.phase === 'freeRoads' || build && canPay(me.hand, COSTS.road) ? roadSites(g, viewer) : [],
       settlements: owned.settlements < 5 && (setup || build && canPay(me.hand, COSTS.settlement)) ? settlementSites(g, viewer, setup) : [],

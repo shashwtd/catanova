@@ -11,7 +11,7 @@ export type GameStatus = {
 export const HOME_TITLE = 'Catanova — Catan Alternative for Friends';
 
 /** A tab and a small on-board prompt describe the same authoritative phase. */
-export function gameStatus(game: GameView, me?: string): GameStatus {
+export function gameStatus(game: GameView, me?: string, room?: RoomState): GameStatus {
   const active = game.players[game.active];
   const mine = active?.id === me;
   const name = active?.name ?? 'A player';
@@ -19,8 +19,12 @@ export function gameStatus(game: GameView, me?: string): GameStatus {
     icon: GameIconName = 'timer',
     favicon: GameStatus['favicon'] = null;
   if (game.winner || game.phase === 'finished') {
-    prompt = `${game.players.find((p) => p.id === game.winner)?.name ?? 'A player'} wins!`;
+    prompt = `${game.players.find((p) => p.id === game.winner)?.name ?? 'A player'} wins${game.finishReason === 'resignation' ? ' by resignation' : ''}!`;
     icon = 'trophy';
+  } else if (room?.paused) {
+    prompt = 'Game paused — waiting for players';
+  } else if (game.players.find((p) => p.id === me)?.resigned) {
+    prompt = 'You resigned — watching the game';
   } else
     switch (game.phase) {
       case 'setupSettlement':
@@ -61,11 +65,26 @@ export function gameStatus(game: GameView, me?: string): GameStatus {
         favicon = mine ? 'robber' : null;
         break;
     }
+  if (
+    !game.winner &&
+    !room?.paused &&
+    !mine &&
+    !game.players.find((p) => p.id === me)?.resigned &&
+    !((game.discards[me ?? ''] ?? 0) > 0)
+  ) {
+    const seat = room?.players.find((p) => p.id === active?.id);
+    if (seat && !seat.connected && seat.resignAt !== undefined) {
+      prompt = `Waiting for ${name} to reconnect`;
+      icon = 'connection';
+      favicon = null;
+    }
+  }
   return { prompt, icon, favicon, title: `${prompt} — Catanova` };
 }
 
 export function requiredAction(game: GameView, me?: string) {
-  if (!me || game.winner || game.phase === 'finished') return null;
+  if (!me || game.winner || game.phase === 'finished' || game.players.find((p) => p.id === me)?.resigned)
+    return null;
   if (game.phase === 'discard' && (game.discards[me] ?? 0) > 0) return 'discard';
   if (game.players[game.active]?.id !== me) return null;
   return ['roll', 'setupSettlement', 'setupRoad', 'freeRoads', 'robber'].includes(game.phase)
@@ -88,7 +107,7 @@ export class AttentionTracker {
       this.action = null;
       return null;
     }
-    if (!connected || presenting) return null;
+    if (!connected || presenting || room.paused) return null;
     const g = room.game,
       action = requiredAction(g, me);
     if (!action) {

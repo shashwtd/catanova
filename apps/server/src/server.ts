@@ -62,7 +62,7 @@ export async function startServer(
       ? undefined
       : (options.captcha?.siteKey ?? process.env.TURNSTILE_SITE_KEY)?.trim();
   const captcha = siteKey ? { siteKey } : undefined;
-  const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now });
+  const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now, trackPresence: true });
   let closing = false;
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -424,6 +424,7 @@ export async function startServer(
             setAuthDeadline();
           }
           const oldSocket = activeSeats.get(seat.id);
+          store.setConnected(seat, true);
           if (oldSocket && oldSocket !== ws) {
             // Revoke immediately, before asynchronous close, so the replaced socket cannot act.
             sessions.delete(oldSocket);
@@ -522,6 +523,7 @@ export async function startServer(
           if (message.type === 'leave') {
             commandId = message.commandId;
             const receipt = store.leave(seat, commandId, message.expectedRevision);
+            store.setConnected(seat, false);
             sessions.delete(ws);
             activeSeats.delete(seat.id);
             send(ws, { type: 'ack', commandId, ...receipt });
@@ -583,6 +585,13 @@ export async function startServer(
       sessions.delete(ws);
       if (seat && activeSeats.get(seat.id) === ws) {
         activeSeats.delete(seat.id);
+        if (!closing) {
+          try {
+            store.setConnected(seat, false);
+          } catch (error) {
+            console.error('Could not save disconnected player presence:', error);
+          }
+        }
         broadcast(seat.room_id);
       }
     });

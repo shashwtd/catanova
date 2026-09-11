@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import type { Hand } from '../../../packages/rules/src/game.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
-import { AwardPresentationQueue, deriveFeedback } from './feedback.js';
+import { AwardPresentationQueue, deriveFeedback, RollPresentationTracker } from './feedback.js';
 import type { AwardCelebration, FeedbackEvent } from './feedback.js';
 import { SoundEngine } from './sound.js';
 import type { Preferences } from './preferences.js';
@@ -36,16 +36,27 @@ type PendingPresentation = { previous: RoomState; next: RoomState; me: string };
 export class PresentationBuffer {
   private active: { until: number; after: RoomState } | null = null;
   private pending: PendingPresentation | null = null;
+  private presented: RoomState | null = null;
   begin(after: RoomState, until: number) {
     this.active = { after, until };
+    this.presented = after;
     this.pending = null;
   }
+  observe(after: RoomState) {
+    this.reset();
+    this.presented = after;
+  }
   offer(previous: RoomState, next: RoomState, me: string, now: number): PendingPresentation | null {
+    // A retry may supply an overlapping range. Start after the last presented
+    // snapshot so production cannot replay, while newer builds/trades still show.
+    const baseline = this.presented?.roomId === next.roomId ? this.presented : previous;
+    if (next.revision <= baseline.revision || (this.pending && next.revision <= this.pending.next.revision))
+      return null;
     if (this.active && now < this.active.until) {
-      this.pending = { previous: this.pending?.previous ?? this.active.after, next, me };
+      this.pending = { previous: this.pending?.previous ?? baseline, next, me };
       return null;
     }
-    const result = { previous: this.pending?.previous ?? previous, next, me };
+    const result = { previous: this.pending?.previous ?? baseline, next, me };
     this.pending = null;
     return result;
   }
@@ -58,6 +69,7 @@ export class PresentationBuffer {
   reset() {
     this.active = null;
     this.pending = null;
+    this.presented = null;
   }
 }
 export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
@@ -70,6 +82,7 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
   const [presentationBusy, setPresentationBusy] = useState(false);
   const [awards, setAwards] = useState<readonly AwardCelebration[]>([]);
   const awardQueue = useRef(new AwardPresentationQueue());
+  const rolls = useRef(new RollPresentationTracker());
   const clearAwards = useCallback(() => {
     awardQueue.current.reset();
     setAwards([]);
@@ -100,6 +113,7 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     clearAwards();
     setHand(null);
     last.current = '';
+    rolls.current.reset();
     sound.silence();
   }, [clear, clearAwards, sound]);
   useEffect(() => {
@@ -139,8 +153,9 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     };
   }, [sound, clear, clearAwards]);
   present.current = (previous, next, me) => {
-    const nextEvent = deriveFeedback(previous, next, me);
-    if (!nextEvent) return;
+    const derived = deriveFeedback(previous, next, me);
+    if (!derived) return;
+    const nextEvent = rolls.current.accept(derived);
     clear();
     setEvent(nextEvent);
     const reduced = config.current.reducedMotion;
@@ -204,6 +219,8 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
       const baseline = welcome || !previous?.game || previous.roomId !== next.roomId;
       if (baseline || document.hidden) {
         clear();
+        buffer.current.observe(next);
+        rolls.current.observe(previous, next);
         setAwards(awardQueue.current.observe(previous, next, false));
         // Hiding already silenced ambience. Later background snapshots must not cut
         // short the separate, deduplicated turn/required-action attention cue.
