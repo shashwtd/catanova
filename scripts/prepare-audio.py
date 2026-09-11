@@ -53,7 +53,11 @@ for name, (_, expected) in PACKS.items():
     if sha(data) != expected:
         raise ValueError(f'Unexpected source archive: {name}')
     archives[name] = zipfile.ZipFile(io.BytesIO(data))
-    (DOCS / 'licenses' / f'kenney-{name}.txt').write_bytes(archives[name].read('License.txt'))
+    license_text = archives[name].read('License.txt').decode('utf-8-sig')
+    # Preserve the creator's text with repository-normalized line endings/whitespace.
+    (DOCS / 'licenses' / f'kenney-{name}.txt').write_text(
+        '\n'.join(line.rstrip() for line in license_text.splitlines()).strip() + '\n'
+    )
 entries = []
 for key, (pack, member, start, duration) in CLIPS.items():
     original = archives[pack].read(member)

@@ -1,6 +1,4 @@
-	
-
-	RPG Audio
+RPG Audio
 
 	by  Kenney Vleugels (Kenney.nl)
 
