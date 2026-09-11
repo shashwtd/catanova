@@ -10,6 +10,7 @@ import {
 import type { Account, Profile, UsernameAvailability } from '../../../packages/protocol/src/profile.js';
 import { accountApi, AccountApiError } from './account-api.js';
 import { beginGoogleSignIn, beginGuestSignIn, completeGoogleLink } from './auth-flow.js';
+import { safeEntryPath } from './navigation.js';
 type GameIdentity = Pick<User, 'id' | 'is_anonymous'>;
 export type RuntimeConfig = {
   auth: { url: string; publishableKey: string } | null;
@@ -28,10 +29,7 @@ function localProfile(): Profile {
 export function entryLocation() {
   if (location.pathname !== '/auth/callback') return new URL(location.href);
   const target = sessionStorage.getItem(RETURN_KEY) ?? '/';
-  return new URL(
-    /^\/room\/[A-Z2-9]{8}(?:\?.*)?$/.test(target) || target === '/' ? target : '/',
-    location.origin,
-  );
+  return new URL(safeEntryPath(target), location.origin);
 }
 export function useAuth() {
   const signingIn = useRef(false);
@@ -278,7 +276,7 @@ export function useAuth() {
     signingIn.current = true;
     setLoading(true);
     setError('');
-    sessionStorage.setItem(RETURN_KEY, /^\/room\/[A-Z2-9]{8}$/.test(returnPath) ? returnPath : '/');
+    sessionStorage.setItem(RETURN_KEY, safeEntryPath(returnPath));
     try {
       await beginGoogleSignIn(
         client.current,
@@ -314,7 +312,7 @@ export function useAuth() {
         guestExpired,
       );
       // No navigation: preserve an invite room while the same screen opens onboarding.
-      if (/^\/room\/[A-Z2-9]{8}$/.test(returnPath)) sessionStorage.setItem(RETURN_KEY, returnPath);
+      sessionStorage.setItem(RETURN_KEY, safeEntryPath(returnPath));
       await reloadProfile.current();
     } catch (e) {
       accountError(e);

@@ -1,0 +1,657 @@
+/* Phones use the viewport edges for HUD; the board keeps one clear camera area.
+   This file is last in the cascade. Normal desktop layout is unchanged. */
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  :root {
+    --mobile-safe-top: env(safe-area-inset-top, 0px);
+    --mobile-safe-right: env(safe-area-inset-right, 0px);
+    --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --mobile-safe-left: env(safe-area-inset-left, 0px);
+  }
+  .playing {
+    --table-button-size: 44px;
+    --turn-button-size: 52px;
+    --mobile-tool-size: 44px;
+  }
+  .playing .side-controls .icon-button {
+    width: var(--mobile-tool-size);
+    height: var(--mobile-tool-size);
+    min-height: var(--mobile-tool-size);
+    padding: 7px;
+    touch-action: manipulation;
+  }
+  .playing .side-controls .icon-button .game-icon {
+    width: 25px;
+    height: 25px;
+  }
+  .playing [data-dice-dock] {
+    position: fixed;
+    left: auto;
+    right: calc(var(--hud-right) + 12px);
+    bottom: calc(var(--hud-bottom) + 8px);
+    width: 64px;
+    height: 28px;
+    transform: none;
+    pointer-events: none;
+  }
+  .playing .turn-action,
+  .playing .trade-action,
+  .playing .development-buy,
+  .playing .build-control {
+    touch-action: manipulation;
+  }
+  .playing .hand-zone {
+    min-width: 0;
+    align-items: center;
+  }
+  .playing .resource-hand {
+    flex: none;
+    gap: 3px;
+  }
+  .playing .hand-zone > .development-hand-inline {
+    flex: 0 1 auto;
+    min-width: 44px;
+    max-width: 100%;
+    padding: 0;
+  }
+  /* Scroll the five possible card stacks, not the hand or its open card detail. */
+  .playing .hand-zone .development-fan {
+    max-width: 100%;
+    gap: 6px;
+    padding: 7px 4px 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    scrollbar-width: thin;
+    scrollbar-color: #b4a17e70 transparent;
+  }
+  .playing .hand-zone .development-slot,
+  .playing .hand-zone .development-slot:first-child,
+  .playing .hand-zone .development-slot.selected {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    margin: 0;
+    transform: none;
+  }
+  .playing .hand-zone .development-card {
+    width: 44px;
+    height: var(--dev-card-height);
+    min-height: 44px;
+    touch-action: pan-x;
+  }
+  .playing .hand-zone .development-slot.selected .development-card {
+    outline-offset: 1px;
+  }
+  .playing .table-actions {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .playing .utility-actions {
+    gap: 4px;
+  }
+  .playing .turn-action > span,
+  .playing .trade-action > span {
+    font-size: 10px;
+  }
+  .playing .development-buy-cost > span,
+  .playing .development-buy-cost .sprite {
+    width: 11px;
+    height: 11px;
+  }
+  /* One scroll container per panel. Gestures here never pan the island behind it. */
+  .game-dialog,
+  .playing .floating-panel,
+  .playing .robber-flow {
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-block: 12px;
+  }
+  .game-dialog {
+    max-width: calc(100vw - var(--mobile-safe-left) - var(--mobile-safe-right) - 20px);
+    max-height: calc(100dvh - var(--mobile-safe-top) - var(--mobile-safe-bottom) - 20px);
+    margin-block: auto;
+  }
+  .game-dialog .dialog-surface,
+  .game-dialog:has(.settings-menu) .dialog-surface,
+  .game-dialog:has(.rules-book) .dialog-surface {
+    padding: 16px;
+    overflow: visible;
+  }
+  .game-dialog .panel-heading {
+    align-items: center;
+    gap: 12px;
+  }
+  .game-dialog .panel-heading .icon-button,
+  .playing .floating-panel .panel-heading .icon-button,
+  .playing .development-close {
+    flex: none;
+    min-width: 40px;
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+  /* Choosing the destination needs the island visible, not a panel over its tiles. */
+  .playing .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true']) {
+    width: max-content;
+    padding: 6px 10px;
+    border-radius: 9px;
+    overflow: visible;
+  }
+  .playing .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true']) .robber-steps,
+  .playing .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true']) .robber-explanation {
+    display: none;
+  }
+  .playing .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true']) .robber-flow-heading {
+    gap: 7px;
+  }
+  .playing .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true']) h2 {
+    font-size: 14px;
+  }
+  .playing
+    .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true'])
+    .robber-flow-heading
+    > .game-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .game-dialog input:not([type='range']),
+  .entry-world .field input,
+  .lobby .field input,
+  .playing .floating-panel input:not([type='range']) {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .game-dialog input[type='range'] {
+    min-height: 40px;
+    touch-action: pan-y;
+  }
+  .playing .development-hand-inline .development-detail {
+    position: fixed;
+    inset-inline: calc(var(--mobile-safe-left) + 10px) calc(var(--mobile-safe-right) + 10px);
+    top: auto;
+    bottom: calc(var(--hud-bottom) + 8px);
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - var(--hud-bottom) - var(--mobile-safe-top) - 28px);
+    transform: none;
+    margin: 0;
+    padding: 16px;
+  }
+  .playing .development-detail .development-explanation {
+    padding-right: 28px;
+  }
+  .playing .build-confirmation .gold-button,
+  .playing .build-confirmation .text-button,
+  .playing .robber-back,
+  .playing .discard-submit {
+    min-height: 44px;
+  }
+}
+
+/* Portrait: players above the island; cards above a compact, reachable action row. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing {
+    --mobile-profile-height: 116px;
+    --hud-left: calc(var(--mobile-safe-left) + 58px);
+    --hud-right: calc(var(--mobile-safe-right) + 10px);
+    --hud-bottom: calc(var(--mobile-safe-bottom) + 164px);
+    --hand-card-width: clamp(32px, 10vw, 42px);
+    --hand-card-height: 68px;
+    --dev-card-height: 68px;
+  }
+  .playing .player-rail {
+    position: fixed;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: none;
+    align-items: start;
+    gap: 4px;
+    inset: calc(var(--mobile-safe-top) + 4px) calc(var(--mobile-safe-right) + 8px) auto
+      calc(var(--mobile-safe-left) + 8px);
+    width: auto;
+    max-height: var(--mobile-profile-height);
+    padding: 13px 3px 6px;
+    overflow: visible;
+    border-radius: 12px;
+    background: linear-gradient(#263a32eb, #26342a85);
+    border-bottom: 1px solid #ddc38b24;
+  }
+  .playing .player-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    gap: 1px;
+    padding: 0;
+  }
+  .playing .player-profile .profile-portrait {
+    width: 36px;
+    flex: none;
+  }
+  .playing .player-profile .profile-caption {
+    min-width: 0;
+    width: 100%;
+  }
+  .playing .player-profile .profile-name-banner,
+  .playing .player-profile.self .profile-name-banner,
+  .playing .player-profile.active .profile-name-banner {
+    font-size: 12px;
+    line-height: 1.1;
+    text-align: center;
+    padding-block: 2px;
+  }
+  .playing .player-profile .profile-caption .profile-stats {
+    justify-content: center;
+    gap: 3px;
+    margin-top: 1px;
+  }
+  .playing .player-profile .profile-stats .game-icon {
+    width: 11px;
+    height: 11px;
+  }
+  .playing .player-profile .profile-stats b {
+    font-size: 11px;
+  }
+  .playing .player-profile .profile-stats .profile-score b {
+    font-size: 14px;
+  }
+  .playing .player-profile .profile-stats .profile-score .game-icon {
+    width: 13px;
+    height: 13px;
+  }
+  .playing .player-profile .profile-achievements {
+    justify-content: center;
+    gap: 2px;
+    margin-top: 2px;
+  }
+  .playing .player-profile .profile-achievement {
+    min-height: 16px;
+    padding: 0 2px;
+    gap: 2px;
+  }
+  .playing .player-profile .profile-achievement .game-icon {
+    width: 10px;
+    height: 10px;
+  }
+  .playing .player-profile .profile-achievement b {
+    font-size: 11px;
+  }
+  .playing .player-profile .profile-achievement small {
+    font-size: 8px;
+    padding-left: 2px;
+  }
+  .playing .player-profile .profile-turn {
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    padding: 1px 3px;
+  }
+  .playing .player-profile .profile-turn .game-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .playing .player-profile .profile-portrait .offline-mark .game-icon {
+    width: 25px;
+    height: 25px;
+  }
+  .playing .board-anchor {
+    inset: calc(var(--mobile-safe-top) + var(--mobile-profile-height) + 31px) var(--hud-right)
+      var(--hud-bottom) var(--hud-left);
+  }
+  .playing .action-prompt {
+    top: calc(var(--mobile-safe-top) + var(--mobile-profile-height) + 6px);
+    left: 50%;
+    max-width: calc(100vw - var(--mobile-safe-left) - var(--mobile-safe-right) - 24px);
+    font-size: 12px;
+    padding: 5px 9px;
+  }
+  .playing .action-prompt > .game-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .playing .side-controls {
+    left: calc(var(--mobile-safe-left) + 7px);
+    gap: 5px;
+  }
+  .playing .side-controls.game-controls {
+    top: calc(var(--mobile-safe-top) + var(--mobile-profile-height) + 38px);
+  }
+  .playing .side-controls.room-controls {
+    top: auto;
+    bottom: calc(var(--hud-bottom) + 10px);
+  }
+  .playing .card-table {
+    position: fixed;
+    inset: auto calc(var(--mobile-safe-right) + 8px) var(--mobile-safe-bottom)
+      calc(var(--mobile-safe-left) + 8px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 84px 52px;
+    align-items: center;
+    justify-content: stretch;
+    gap: 8px;
+    width: auto;
+    max-width: none;
+    height: 156px;
+    padding: 0 6px 12px;
+    transform: none;
+    margin: 0;
+  }
+  .playing .card-table::before {
+    inset: auto 0 calc(-1 * var(--mobile-safe-bottom));
+    height: calc(115px + var(--mobile-safe-bottom));
+    border-radius: 12px 12px 0 0;
+  }
+  .playing .hand-zone {
+    width: 100%;
+    justify-content: center;
+    gap: 10px;
+  }
+  .playing .table-actions {
+    justify-self: end;
+  }
+  .playing .construction-tools.build-shelf {
+    left: calc(var(--mobile-safe-left) + 10px);
+    bottom: calc(var(--mobile-safe-bottom) + 9px);
+    padding: 4px;
+    gap: 4px;
+    border-radius: 9px;
+  }
+  .playing .build-shelf .build-control {
+    width: 42px;
+    height: 44px;
+  }
+  .playing .build-shelf .build-control .game-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .playing .floating-panel,
+  .playing .game-panel.utility-panel,
+  .playing .game-panel.journal-panel,
+  .playing .trade-notice,
+  .playing .robber-flow,
+  .playing .robber-flow.waiting {
+    inset: auto calc(var(--mobile-safe-right) + 10px) calc(var(--hud-bottom) + 8px)
+      calc(var(--mobile-safe-left) + 10px);
+    width: auto;
+    max-width: none;
+    max-height: calc(
+      100dvh - var(--mobile-safe-top) - var(--mobile-profile-height) - var(--hud-bottom) - 28px
+    );
+    margin: 0;
+    transform: none;
+    padding: 14px;
+  }
+  .playing .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true']) {
+    inset: calc(var(--mobile-safe-top) + var(--mobile-profile-height) + 6px) auto auto 50%;
+    max-width: calc(100vw - var(--mobile-safe-left) - var(--mobile-safe-right) - 24px);
+    max-height: none;
+    transform: translateX(-50%);
+  }
+  .playing .build-confirmation {
+    left: calc(var(--mobile-safe-left) + 10px);
+    right: calc(var(--mobile-safe-right) + 10px);
+    bottom: calc(var(--hud-bottom) + 8px);
+    max-width: none;
+    width: auto;
+    justify-content: space-between;
+    padding: 9px;
+    transform: none;
+  }
+  .playing .award-celebration-layer {
+    top: calc(var(--mobile-safe-top) + var(--mobile-profile-height) + 38px);
+    left: calc(var(--mobile-safe-left) + 10px);
+    right: calc(var(--mobile-safe-right) + 10px);
+  }
+  .profile-gain-badge[data-placement='below'] {
+    justify-content: center;
+    padding: 4px;
+    gap: 3px;
+    border-radius: 8px;
+    transform: translate(-50%, 0);
+    animation: none;
+  }
+  .profile-gain-badge[data-placement='below'] svg {
+    width: 18px;
+    height: 20px;
+  }
+  .profile-gain-badge[data-placement='below'] b {
+    font-size: 12px;
+  }
+  .playing .move-announcement {
+    top: auto;
+    bottom: calc(var(--hud-bottom) + 8px);
+    left: 50%;
+    max-width: calc(100vw - 24px);
+    font-size: 12px;
+  }
+}
+
+/* A landscape phone keeps a compact right rail and one low hand/action row. */
+@media (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing {
+    --hud-left: calc(var(--mobile-safe-left) + 108px);
+    --hud-right: calc(var(--mobile-safe-right) + 166px);
+    --hud-bottom: calc(var(--mobile-safe-bottom) + 94px);
+    --hand-card-width: 35px;
+    --hand-card-height: 62px;
+    --dev-card-height: 62px;
+    --table-button-size: 44px;
+    --turn-button-size: 50px;
+  }
+  .playing .board-anchor {
+    inset: calc(var(--mobile-safe-top) + 8px) var(--hud-right) var(--hud-bottom) var(--hud-left);
+  }
+  .playing .player-rail {
+    inset: calc(var(--mobile-safe-top) + 5px) calc(var(--mobile-safe-right) + 5px) var(--hud-bottom) auto;
+    width: 156px;
+    padding: 9px 3px 3px;
+    gap: 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+  }
+  .playing .player-profile {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: center;
+    gap: 1px 5px;
+    min-height: 0;
+    padding: 0;
+    flex: none;
+  }
+  .playing .player-profile .profile-portrait {
+    width: 36px;
+  }
+  .playing .player-profile .profile-name-banner,
+  .playing .player-profile.self .profile-name-banner,
+  .playing .player-profile.active .profile-name-banner {
+    font-size: 12px;
+    text-align: left;
+  }
+  .playing .player-profile .profile-caption .profile-stats {
+    justify-content: flex-start;
+    margin-top: 2px;
+    gap: 4px;
+  }
+  .playing .player-profile .profile-stats .game-icon {
+    width: 12px;
+    height: 12px;
+  }
+  .playing .player-profile .profile-stats b {
+    font-size: 12px;
+  }
+  .playing .player-profile .profile-stats .profile-score b {
+    font-size: 15px;
+  }
+  .playing .player-profile .profile-stats .profile-score .game-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .playing .player-profile .profile-achievements {
+    justify-content: flex-start;
+    gap: 4px;
+    margin-top: 1px;
+  }
+  .playing .player-profile .profile-achievement {
+    min-height: 17px;
+    font-size: 11px;
+    padding: 0 2px;
+    gap: 2px;
+  }
+  .playing .player-profile .profile-achievement b {
+    font-size: 11px;
+  }
+  .playing .player-profile .profile-achievement .game-icon {
+    width: 11px;
+    height: 11px;
+  }
+  .playing .player-profile .profile-achievement small {
+    font-size: 8px;
+    padding-left: 2px;
+  }
+  .playing .player-profile .profile-turn {
+    top: -8px;
+    left: 0;
+    padding: 1px 3px;
+  }
+  .playing .player-profile .profile-turn > .game-icon {
+    width: 15px;
+    height: 15px;
+  }
+  .playing .player-profile .profile-portrait .offline-mark .game-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .playing .side-controls.game-controls,
+  .playing .side-controls.room-controls {
+    top: calc(var(--mobile-safe-top) + 10px);
+    bottom: auto;
+    gap: 6px;
+  }
+  .playing .side-controls.game-controls {
+    left: calc(var(--mobile-safe-left) + 6px);
+  }
+  .playing .side-controls.room-controls {
+    left: calc(var(--mobile-safe-left) + 56px);
+  }
+  .playing .construction-tools.build-shelf {
+    left: calc(var(--mobile-safe-left) + 6px);
+    bottom: calc(var(--hud-bottom) + 9px);
+    padding: 4px;
+    gap: 4px;
+    border-radius: 9px;
+  }
+  .playing .build-shelf .build-control {
+    width: 38px;
+    height: 42px;
+  }
+  .playing .build-shelf .build-control .game-icon {
+    width: 23px;
+    height: 23px;
+  }
+  .playing .card-table {
+    position: fixed;
+    inset: auto calc(var(--mobile-safe-right) + 9px) var(--mobile-safe-bottom)
+      calc(var(--mobile-safe-left) + 9px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 18px;
+    width: auto;
+    max-width: 760px;
+    height: 86px;
+    padding: 4px 12px 8px;
+    margin: 0 auto;
+    transform: none;
+  }
+  .playing .card-table::before {
+    height: calc(56px + var(--mobile-safe-bottom));
+    inset: auto 0 calc(-1 * var(--mobile-safe-bottom));
+    border-radius: 12px 12px 0 0;
+  }
+  .playing .hand-zone {
+    justify-content: center;
+    gap: 16px;
+  }
+  .playing .action-prompt {
+    top: calc(var(--mobile-safe-top) + 7px);
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+  .playing .action-prompt > .game-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .playing .floating-panel,
+  .playing .game-panel.utility-panel,
+  .playing .game-panel.journal-panel,
+  .playing .trade-notice,
+  .playing .robber-flow,
+  .playing .robber-flow.waiting {
+    inset: calc(var(--mobile-safe-top) + 10px) auto auto calc(var(--mobile-safe-left) + 108px);
+    width: min(370px, calc(100vw - var(--mobile-safe-left) - var(--mobile-safe-right) - 125px));
+    max-width: none;
+    max-height: calc(100dvh - var(--mobile-safe-top) - var(--hud-bottom) - 20px);
+    padding: 14px;
+    margin: 0;
+    transform: none;
+  }
+  .playing .robber-flow:has(.robber-steps > li:nth-child(2)[data-current='true']) {
+    inset: calc(var(--mobile-safe-top) + 8px) auto auto calc((100% + var(--hud-left) - var(--hud-right)) / 2);
+    max-width: calc(100vw - var(--hud-left) - var(--hud-right) - 10px);
+    max-height: none;
+    transform: translateX(-50%);
+  }
+  .playing .build-confirmation {
+    bottom: calc(var(--hud-bottom) + 8px);
+    left: calc(var(--mobile-safe-left) + 144px);
+    right: calc(var(--mobile-safe-right) + 10px);
+    max-width: none;
+    width: auto;
+    transform: none;
+    padding: 8px;
+  }
+  .playing .award-celebration-layer {
+    top: calc(var(--mobile-safe-top) + 42px);
+    left: var(--hud-left);
+    right: var(--hud-right);
+  }
+}
+@media (max-width: 380px) and (orientation: portrait) {
+  .playing .build-shelf .build-control {
+    width: 38px;
+  }
+  .playing .player-profile .profile-achievement small {
+    display: none;
+  }
+  .playing .card-table {
+    padding-inline: 4px;
+  }
+  .playing .table-actions {
+    gap: 6px;
+  }
+}
+@media (max-width: 700px) and (max-height: 660px) and (orientation: portrait) {
+  .playing {
+    --mobile-tool-size: 36px;
+  }
+  .playing .side-controls .icon-button {
+    padding: 5px;
+  }
+  .playing .side-controls .icon-button .game-icon {
+    width: 23px;
+    height: 23px;
+  }
+}

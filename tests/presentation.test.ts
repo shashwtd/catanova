@@ -58,8 +58,8 @@ test('zoom has uniform bounded steps, retains its focal point, and cannot shrink
   assert.equal(zoomAt(initial, 0.001, focal, bounds).scale, MIN_ZOOM);
   assert.ok(wheelScale(1, -10000) < 1.08);
   assert.ok(wheelScale(1, 10000) > 0.92);
-  assert.equal(pinchScale(1, 10000, 1), 1.035);
-  assert.equal(pinchScale(1, 1, 10000), 0.965);
+  assert.equal(zoomAt(initial, pinchScale(initial.scale, 10000, 1), focal, bounds).scale, MAX_ZOOM);
+  assert.equal(zoomAt(initial, pinchScale(initial.scale, 1, 10000), focal, bounds).scale, MIN_ZOOM);
   assert.deepEqual(constrainCamera({ scale: 0.9, x: 9999, y: -9999 }, bounds), { scale: 0.9, x: 90, y: -80 });
   const bounded = constrainCamera({ scale: 2, x: 9999, y: -9999 }, bounds);
   assert.ok(Math.abs(bounded.x) < bounds.width && Math.abs(bounded.y) < bounds.height);

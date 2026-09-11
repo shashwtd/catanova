@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   DIE_FACES,
   DiceThrow,
+  DiceResult,
   diceLanding,
   diceTrajectory,
   DICE_ROLL_MS,
@@ -13,6 +14,8 @@ import {
   DICE_READABLE_MS,
   DICE_IMPACT_MS,
   diceStageAt,
+  advanceDiceStage,
+  diceDockSize,
 } from '../apps/client/src/DiceThrow.js';
 import { soundScore } from '../apps/client/src/sound.js';
 
@@ -49,7 +52,8 @@ test('throw paths vary per event within safe bounds and never determine the outc
   const html = renderToStaticMarkup(
     createElement(DiceThrow, { id: 'accepted-roll', dice: [2, 5], reducedMotion: true }),
   );
-  assert.equal([...html.matchAll(/class="dice-cube-face"/g)].length, 12);
+  assert.equal([...html.matchAll(/dice-flat-face/g)].length, 2);
+  assert.ok(!html.includes('class="dice-cube"'), 'reduced motion has only two flat faces');
   assert.match(html, /data-result="2"/);
   assert.match(html, /data-result="5"/);
   assert.match(html, /dice-throw-reduced/);
@@ -73,11 +77,45 @@ test('dice settle flat, hold for reading, then dock once without replaying on pr
   const html = renderToStaticMarkup(
     createElement(DiceThrow, { id: 'restored', dice: [1, 6], initiallyDocked: true }),
   );
-  assert.match(html, /dice-stage-docked/);
-  assert.equal([...html.matchAll(/data-result-face="true"/g)].length, 2);
+  assert.equal(html, '', 'restored dice never leave a full-screen overlay at the board center');
   const contacts = soundScore('dice');
   for (const impact of DICE_IMPACT_MS) {
     assert.ok(contacts.some((note) => Math.abs(note.at - impact / 1000) < 0.00001));
     assert.ok(impact < DICE_ROLL_MS, 'dice sounds stop before the readable hold');
+  }
+});
+
+test('lasting dice results have two flat faces and no throw/perspective tree', () => {
+  for (let value = 1; value <= 6; value++) {
+    const html = renderToStaticMarkup(
+      createElement(DiceResult, { id: 'restored', dice: [value, 7 - value] }),
+    );
+    assert.match(html, /class="dice-result-dock"/);
+    assert.equal([...html.matchAll(/data-result-face="true"/g)].length, 2);
+    assert.equal([...html.matchAll(/class="dice-pip"/g)].length, 7);
+    assert.ok(
+      !html.includes('dice-throw') &&
+        !html.includes('class="dice-cube"') &&
+        !html.includes('dice-flight-path'),
+    );
+  }
+  assert.equal(diceStageAt(60_000), 'docked', 'returning from a background tab skips an expired throw');
+});
+
+test('changing motion preferences never resurrects a completed throw or spins a held result', () => {
+  const held = advanceDiceStage('rolling', 500, true);
+  assert.equal(held, 'held');
+  assert.equal(advanceDiceStage(held, 600, false), 'held');
+  const docked = advanceDiceStage(held, 1200, true);
+  assert.equal(docked, 'docked');
+  assert.equal(advanceDiceStage(docked, 1500, false), 'docked');
+  assert.equal(advanceDiceStage('docking', 60_000), 'docked');
+});
+
+test('the docking endpoint matches the lasting 2D dice at phone and desktop sizes', () => {
+  for (const size of [40, 48, 57]) {
+    const dock = diceDockSize(size);
+    assert.equal(size * dock.scale, 23);
+    assert.ok(Math.abs(dock.gap * dock.scale - 7) < 1e-8);
   }
 });

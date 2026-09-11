@@ -64,6 +64,7 @@ import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/in
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
 import { invitationCode, roomPath, shouldResume, validRoomCode } from './navigation.js';
+import { normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
 import './style.css';
 import './card-motion.css';
 import './dice.css';
@@ -84,6 +85,7 @@ import './settings.css';
 import './trade-polish.css';
 import './awards.css';
 import './game-guidance.css';
+import './mobile-layout.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -423,7 +425,14 @@ function App() {
       });
     })()
       .then(async (response) => {
-        if (!response.ok) throw new Error(response.status === 404 ? 'Room not found' : 'Room unavailable');
+        if (!response.ok)
+          throw new Error(
+            response.status === 404
+              ? 'Room not found'
+              : response.status === 429
+                ? 'Too many attempts. Try again in a minute.'
+                : 'Room unavailable',
+          );
         return response.json() as Promise<RoomPreview>;
       })
       .then((preview) => {
@@ -495,9 +504,9 @@ function App() {
       setError('Enter your name');
       return;
     }
-    const target = (entry === 'invite' ? invite : code)?.trim().toUpperCase();
+    const target = normalizeRoomReference((entry === 'invite' ? invite : code) ?? '');
     if (kind === 'join' && (!target || !validRoomCode(target))) {
-      setError('Enter an eight-character room code');
+      setError('Enter a four-character room code');
       return;
     }
     sessionStorage.removeItem(OUTBOX_KEY);
@@ -531,8 +540,8 @@ function App() {
     }
   }
   const last = readJSON<Session>(localStorage, LAST_SEAT_KEY);
-  const resumableInvite =
-    entry === 'invite' && (!!previewRoom?.canResume || (last?.roomId === invite && !!last.joined));
+  const savedInviteSeat = !!last?.joined && !!invite && last.roomId === (previewRoom?.roomId ?? invite);
+  const resumableInvite = entry === 'invite' && (!!previewRoom?.canResume || savedInviteSeat);
   async function ready(value: boolean) {
     const c = connection.current;
     if (!c || disabled) return;
@@ -731,7 +740,7 @@ function App() {
           onResume={() => {
             const seat =
               entry === 'invite'
-                ? last?.roomId === invite
+                ? savedInviteSeat
                   ? last
                   : newSession(auth.profile.name, invite!, auth.profile)
                 : last;
@@ -846,7 +855,7 @@ function App() {
               )}
             </div>
             <div className="table-actions">
-              <div className="dice-dock" data-dice-dock aria-hidden="true" />
+              <div className="dice-dock" data-dice-dock />
               <div className="utility-actions">
                 <button
                   className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
@@ -1015,7 +1024,7 @@ function App() {
       )}
       {panel === 'invite' && room && (
         <Dialog title="Room invitation" compact onClose={() => setPanel(null)}>
-          <Invite code={room.roomId} />
+          <Invite code={room.roomCode ?? room.roomId} roomId={room.roomId} />
         </Dialog>
       )}
       {panel === 'profile' && (

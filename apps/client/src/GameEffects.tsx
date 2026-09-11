@@ -8,7 +8,9 @@ import type { AwardCelebration, FeedbackEvent, FlightIntent } from './feedback.j
 import { resourceFlightStart, RESOURCE_FLIGHT_MS, PROFILE_GAIN_DWELL_MS } from './useFeedback.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 type Flight = FlightIntent & { key: string; x: number; y: number; dx: number; dy: number; delay: number };
-type GainBadge = { playerId: string; key: string; left: number; top: number; gains: FeedbackEvent['gains'] };
+type GainBadge = { playerId: string; key: string; gains: FeedbackEvent['gains'] } & ReturnType<
+  typeof profileGainPosition
+>;
 type DicePresentation = { id: string; faces: readonly [number, number]; initiallyDocked: boolean };
 /** A resync can restore the result, but must never replay its old throw. */
 export function nextDicePresentation(
@@ -24,6 +26,27 @@ export function nextDicePresentation(
   if (lastDice && (!current || current.faces[0] !== lastDice[0] || current.faces[1] !== lastDice[1]))
     return restored;
   return current;
+}
+/** A phone's top profile row receives cards below each player; side rails keep their left-side badges. */
+export function profileGainPosition(
+  box: { left: number; top: number; width: number; height: number },
+  viewport: { width: number; height: number },
+) {
+  if (viewport.width <= 700 && viewport.width <= viewport.height) {
+    const maxWidth = Math.max(52, Math.min(88, box.width - 6));
+    return {
+      left: Math.max(maxWidth / 2 + 8, Math.min(viewport.width - maxWidth / 2 - 8, box.left + box.width / 2)),
+      top: box.top + box.height + 7,
+      maxWidth,
+      placement: 'below' as const,
+    };
+  }
+  return {
+    left: Math.max(120, box.left - 8),
+    top: box.top + Math.min(box.height / 2, 38),
+    maxWidth: 178,
+    placement: 'beside' as const,
+  };
 }
 export function profileGainArrival(event: FeedbackEvent, playerId: string) {
   const direct = event.flights.flatMap((flight, index) =>
@@ -91,8 +114,7 @@ export function GameEffects({
             const badge = {
               playerId,
               key: `${event.id}:${playerId}`,
-              left: Math.max(120, box.left - 8),
-              top: box.top + Math.min(box.height / 2, 38),
+              ...profileGainPosition(box, { width: innerWidth, height: innerHeight }),
               gains: event.gains.filter((gain) => gain.playerId === playerId),
             };
             setBadges((current) =>
@@ -184,7 +206,8 @@ export function GameEffects({
           <div
             key={badge.key}
             className={`profile-gain-badge ${reducedMotion ? 'gain-static' : ''}`}
-            style={{ left: badge.left, top: badge.top }}
+            data-placement={badge.placement}
+            style={{ left: badge.left, top: badge.top, maxWidth: badge.maxWidth }}
           >
             {badge.gains.map((gain) => (
               <span

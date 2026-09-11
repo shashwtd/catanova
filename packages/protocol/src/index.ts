@@ -1,3 +1,10 @@
+import { isRoomReference, normalizeRoomReference } from './room-reference.js';
+export {
+  isRoomReference,
+  normalizeRoomReference,
+  ROOM_CODE_LENGTH,
+  ROOM_CODE_ALPHABET,
+} from './room-reference.js';
 import { parseProfile } from './profile.js';
 import type { Profile } from './profile.js';
 import { parseRoomSettings } from './settings.js';
@@ -19,6 +26,7 @@ export type HistoryEntry = {
 export type RoomPlayer = { id: string; name: string; connected: boolean; profile?: Profile; ready?: boolean };
 export type RoomState = {
   roomId: string;
+  roomCode?: string;
   revision: number;
   counter: number;
   game?: GameView;
@@ -32,6 +40,7 @@ export type RoomState = {
 export type RoomPreview = {
   canResume?: boolean;
   roomId: string;
+  roomCode?: string;
   board: Board;
   players: Omit<RoomPlayer, 'connected'>[];
   started: boolean;
@@ -80,7 +89,8 @@ export function parseClientMessage(input: string): ClientMessage {
     if (typeof v.token !== 'string' || !/^[a-f0-9]{64}$/.test(v.token)) throw new Error('Invalid seat token');
     if (typeof v.name !== 'string' || v.name.trim().length < 1 || v.name.trim().length > 32)
       throw new Error('Name must contain 1–32 characters');
-    if (v.type !== 'create' && (typeof v.roomId !== 'string' || !/^[A-Z2-9]{8}$/.test(v.roomId)))
+    const roomId = typeof v.roomId === 'string' ? normalizeRoomReference(v.roomId) : undefined;
+    if ((v.type !== 'create' || v.roomId !== undefined) && !isRoomReference(roomId))
       throw new Error('Invalid room code');
     if (v.accessToken !== undefined && (typeof v.accessToken !== 'string' || v.accessToken.length > 16000))
       throw new Error('Invalid authentication');
@@ -89,7 +99,7 @@ export function parseClientMessage(input: string): ClientMessage {
       version: v.version,
       token: v.token,
       name: v.name.trim(),
-      ...(typeof v.roomId === 'string' ? { roomId: v.roomId } : {}),
+      ...(roomId ? { roomId } : {}),
       ...(typeof v.accessToken === 'string' ? { accessToken: v.accessToken } : {}),
       ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
     };

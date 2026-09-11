@@ -18,7 +18,7 @@ import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { roomPath } from './navigation.js';
 
-export function Invite({ code }: { code: string }) {
+export function Invite({ code, roomId = code }: { code: string; roomId?: string }) {
   const [feedback, setFeedback] = useState('');
   const [showLink, setShowLink] = useState(false);
   useEffect(() => {
@@ -26,7 +26,7 @@ export function Invite({ code }: { code: string }) {
     const timer = setTimeout(() => setFeedback(''), 2500);
     return () => clearTimeout(timer);
   }, [feedback]);
-  const url = () => `${location.origin}${roomPath(code)}`;
+  const url = () => `${location.origin}${roomPath(roomId)}`;
   async function copy(value: string, message: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -77,7 +77,7 @@ export function Invite({ code }: { code: string }) {
           className="share-link-field"
           aria-label="Room invite link"
           readOnly
-          value={typeof location === 'undefined' ? roomPath(code) : url()}
+          value={typeof location === 'undefined' ? roomPath(roomId) : url()}
           onFocus={(event) => event.currentTarget.select()}
         />
       )}
@@ -209,7 +209,7 @@ export function Lobby({
         </button>
       </div>
       <footer className="lobby-footer">
-        <Invite code={room.roomId} />
+        <Invite code={room.roomCode ?? room.roomId} roomId={room.roomId} />
         <div className="lobby-launch">
           <span role="status">
             {room.players.length < 2

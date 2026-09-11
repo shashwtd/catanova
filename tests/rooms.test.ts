@@ -7,7 +7,13 @@ import { join } from 'node:path';
 import { Store } from '../apps/server/src/store.js';
 import { startServer } from '../apps/server/src/server.js';
 import { Connection, newSession } from '../apps/client/src/connection.js';
-import { invitationCode, roomPath, shouldResume } from '../apps/client/src/navigation.js';
+import {
+  invitationCode,
+  roomPath,
+  shouldResume,
+  safeEntryPath,
+  visibleRoomCode,
+} from '../apps/client/src/navigation.js';
 import type { RoomPreview } from '../packages/protocol/src/index.js';
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -29,6 +35,37 @@ test('an explicit invite wins over an unrelated saved seat and supports legacy l
   assert.equal(shouldResume(saved, 'ABCD2345'), true);
   assert.equal(shouldResume(saved, null), true);
   assert.equal(shouldResume({ ...saved, token: 'broken' }, null), false);
+});
+
+test('short room entry and permanent links survive auth without exposing internal IDs as codes', () => {
+  const id = '9bfec3ad-0a2c-47d1-bfe5-735a3e2dc25f';
+  assert.equal(invitationCode('/room/ab2c', ''), 'AB2C');
+  assert.equal(invitationCode('/', '?room=ab2c'), 'AB2C');
+  assert.equal(invitationCode(roomPath(id.toUpperCase()), ''), id);
+  for (const reference of ['AB2C', 'ABCD2345', id]) {
+    assert.equal(safeEntryPath(`/room/${reference.toLowerCase()}?ignored=1`), roomPath(reference));
+  }
+  for (const invalid of [
+    '//evil.test/room/AB2C',
+    'https://evil.test/room/AB2C',
+    '/room/AB2C/extra',
+    '/room/A01O',
+    '/room/..%2f..',
+    '/room/AB2C#//evil.test',
+  ]) {
+    assert.equal(safeEntryPath(invalid), '/');
+  }
+  assert.equal(visibleRoomCode({ roomId: id, roomCode: 'AB2C' }), 'AB2C');
+  assert.equal(visibleRoomCode(null, id), null);
+  assert.equal(visibleRoomCode({ roomId: id }), null);
+  assert.equal(visibleRoomCode({ roomId: 'ABCD2345' }), 'ABCD2345');
+  const saved = { ...newSession('Player', id), joined: true };
+  assert.equal(shouldResume(saved, id.toUpperCase()), true);
+  assert.equal(
+    shouldResume(saved, 'AB2C'),
+    false,
+    'a reusable alias cannot silently resume an unrelated permanent seat',
+  );
 });
 
 test('invite previews expose the exact persisted board without private game state', async (t) => {
@@ -54,7 +91,14 @@ test('invite previews expose the exact persisted board without private game stat
   const before = await preview();
   assert.equal(before.started, false);
   assert.equal(before.players.length, 3);
-  assert.deepEqual(Object.keys(before).sort(), ['board', 'players', 'roomId', 'settings', 'started']);
+  assert.deepEqual(Object.keys(before).sort(), [
+    'board',
+    'players',
+    'roomCode',
+    'roomId',
+    'settings',
+    'started',
+  ]);
   assert.deepEqual(Object.keys(before.players[0]!).sort(), ['id', 'name', 'profile', 'ready']);
   assert.ok(!JSON.stringify(before).includes(s.token));
   await server.close();

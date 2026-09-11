@@ -11,7 +11,7 @@ import { Avatar } from './Profile.js';
 import { AccountSetup } from './AccountSetup.js';
 import { InviteRoster } from './Lobby.js';
 import type { useAuth } from './auth.js';
-import { roomPath } from './navigation.js';
+import { roomPath, visibleRoomCode } from './navigation.js';
 
 type Auth = ReturnType<typeof useAuth>;
 export function EntryScreen({
@@ -64,6 +64,7 @@ export function EntryScreen({
   const [signInOpen, setSignInOpen] = useState(false);
   const [guestCheck, setGuestCheck] = useState(false);
   const local = auth.config?.mode === 'local';
+  const inviteCode = visibleRoomCode(previewRoom, invite);
   const homeMenu = entry === 'home' && (!signInOpen || auth.canPlay) && !auth.needsOnboarding;
   const goBack = () => {
     if (guestCheck) {
@@ -188,7 +189,7 @@ export function EntryScreen({
               </div>
               {invite && (
                 <>
-                  <span className="entry-invite-caption">Room {invite}</span>
+                  {inviteCode && <span className="entry-invite-caption">Room {inviteCode}</span>}
                   {previewRoom && <InviteRoster room={previewRoom} />}
                 </>
               )}
@@ -244,7 +245,7 @@ export function EntryScreen({
               </div>
               {entry === 'invite' && (
                 <>
-                  <div className="invite-room-code">{invite}</div>
+                  {inviteCode && <div className="invite-room-code">{inviteCode}</div>}
                   {previewRoom && <InviteRoster room={previewRoom} />}
                 </>
               )}
@@ -258,10 +259,11 @@ export function EntryScreen({
                       <input
                         autoComplete="off"
                         autoCapitalize="characters"
+                        spellCheck={false}
                         maxLength={8}
                         value={code}
                         onChange={(event) => setCode(event.target.value.toUpperCase())}
-                        placeholder="XXXXXXXX"
+                        placeholder="AB2C"
                         required
                         autoFocus
                       />

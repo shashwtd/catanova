@@ -1,3 +1,9 @@
+import {
+  isRoomReference,
+  isShortRoomCode,
+  normalizeRoomReference,
+} from '../../../packages/protocol/src/room-reference.js';
+import { RoomAccessLimit, roomClientAddress } from './room-access.js';
 import { createVerifier, readAuthConfig } from './auth.js';
 import type { AuthConfig, Identity, VerifyIdentity } from './auth.js';
 import { AccountService, accountFailure } from './accounts.js';
@@ -35,12 +41,22 @@ export async function startServer(
     verifyIdentity?: VerifyIdentity;
     captcha?: { siteKey: string } | null;
     now?: () => number;
+    trustedProxyCidrs?: string[];
   } = {},
 ) {
   const auth = options.auth === null ? undefined : (options.auth ?? readAuthConfig());
   const verify = options.verifyIdentity ?? (auth ? createVerifier(auth) : undefined);
   const accounts = auth ? new AccountService(auth) : undefined;
   const now = options.now ?? Date.now;
+  const clientAddress = roomClientAddress(
+    options.trustedProxyCidrs ??
+      (process.env.TRUSTED_PROXY_CIDRS ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
+  );
+  const lookups = new RoomAccessLimit(60);
+  const admissions = new RoomAccessLimit(30);
   const siteKey =
     options.captcha === null
       ? undefined
@@ -189,9 +205,22 @@ export async function startServer(
       } catch {
         response.writeHead(503).end('{"status":"unavailable"}');
       }
-    } else if (request.method === 'GET' && /^\/api\/rooms\/[A-Z2-9]{8}$/.test(request.url ?? '')) {
+    } else if (request.method === 'GET' && request.url?.startsWith('/api/rooms/')) {
+      const access = lookups.consume(clientAddress(request), now());
+      if (!access.allowed) {
+        response.writeHead(429, { 'Retry-After': String(access.retryAfter) }).end(
+          JSON.stringify({
+            code: 'ROOM_RATE_LIMIT',
+            error: 'Too many room lookups. Wait a minute and try again.',
+          }),
+        );
+        return;
+      }
       try {
-        const preview = store.preview(request.url!.split('/').pop()!);
+        const path = new URL(request.url, 'http://localhost').pathname;
+        const reference = normalizeRoomReference(decodeURIComponent(path.slice('/api/rooms/'.length)));
+        if (!isRoomReference(reference)) throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
+        const preview = store.preview(reference);
         const authorization = request.headers.authorization;
         const identity = authorization?.startsWith('Bearer ')
           ? accounts
@@ -270,7 +299,8 @@ export async function startServer(
     }
     wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
   });
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, request) => {
+    const address = clientAddress(request);
     alive.add(ws);
     ws.on('error', () => ws.terminate());
     ws.on('pong', () => alive.add(ws));
@@ -358,6 +388,14 @@ export async function startServer(
         if (message.type === 'create' || message.type === 'join' || message.type === 'resume') {
           if (sessions.has(ws)) throw new ProtocolError('ALREADY_JOINED', 'Socket already has a seat');
           if (authenticating) throw new ProtocolError('ALREADY_JOINING', 'Joining is already in progress');
+          // A saved seat uses a strong token plus its permanent ID. Code-guessing limits must
+          // never strand admitted players reconnecting through the same unreliable network.
+          const savedResume = message.type === 'resume' && message.roomId && !isShortRoomCode(message.roomId);
+          if (!savedResume && !admissions.consume(address, now()).allowed)
+            throw new ProtocolError(
+              'ROOM_RATE_LIMIT',
+              'Too many attempts to join a room. Wait a minute and try again.',
+            );
           authenticating = true;
           let identity: Identity | undefined;
           try {

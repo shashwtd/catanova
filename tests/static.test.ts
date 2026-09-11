@@ -64,7 +64,15 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.equal(config.headers.get('x-robots-tag'), 'noindex, nofollow');
   assert.deepEqual(await config.json(), { auth, mode: 'authenticated' });
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-  for (const path of ['/room/ABCD2345', '/room/abcd2345/', '/auth/callback', '/?room=ABCD2345']) {
+  for (const path of [
+    '/room/ABCD2345',
+    '/room/abcd2345/',
+    '/room/AB2C',
+    '/room/ab2c/',
+    '/room/9bfec3ad-0a2c-47d1-bfe5-735a3e2dc25f',
+    '/auth/callback',
+    '/?room=ABCD2345',
+  ]) {
     const invitation = await fetch(origin + path);
     assert.equal(invitation.status, 200);
     assert.match(await invitation.text(), /Catanova room/);

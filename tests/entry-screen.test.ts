@@ -257,3 +257,19 @@ test('room sharing exposes distinct Share, Copy link and Copy code actions witho
     assert.ok(lobby.includes(`aria-label="${label}"`));
   assert.ok(!buttonWith(lobby, 'Start game')?.includes('disabled=""'));
 });
+
+test('permanent invitation links display the friendly code and never a UUID in the room heading', () => {
+  const roomId = '9bfec3ad-0a2c-47d1-bfe5-735a3e2dc25f';
+  const html = renderEntry({
+    auth: authState({ canPlay: true }),
+    entry: 'invite',
+    invite: roomId,
+    previewRoom: preview({ roomId, roomCode: 'AB2C' }),
+  });
+  assert.match(html, /invite-room-code">AB2C</);
+  assert.ok(!html.includes(roomId));
+  const pending = renderEntry({ entry: 'invite', invite: roomId, previewLoading: true });
+  assert.ok(!pending.includes(roomId));
+  const share = renderToStaticMarkup(createElement(Invite, { code: 'AB2C', roomId }));
+  assert.match(share, /<code>AB2C<\/code>/);
+});

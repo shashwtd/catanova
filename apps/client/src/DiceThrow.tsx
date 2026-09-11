@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 
 export const DICE_ROLL_MS = 1120;
 export const DICE_HOLD_MS = 1200;
@@ -8,12 +9,26 @@ export const DICE_DOCK_MS = 480;
 export const DICE_PRESENTATION_MS = DICE_READABLE_MS + DICE_DOCK_MS;
 export const DICE_REDUCED_MS = 1200;
 export const DICE_IMPACT_MS = [260, 580, 830, 1030] as const;
+const RESULT_SIZE = 23,
+  RESULT_GAP = 7;
+export function diceDockSize(dieSize: number) {
+  const scale = RESULT_SIZE / Math.max(1, dieSize);
+  return { scale, gap: RESULT_GAP / scale };
+}
 type DiceStyle = CSSProperties & Record<`--${string}`, string | number>;
+type DiceStage = 'rolling' | 'held' | 'docking' | 'docked';
 export function diceStageAt(elapsed: number, reduced = false, initiallyDocked = false) {
   if (initiallyDocked || elapsed >= (reduced ? DICE_REDUCED_MS : DICE_PRESENTATION_MS)) return 'docked';
   if (!reduced && elapsed >= DICE_READABLE_MS) return 'docking';
   if (reduced || elapsed >= DICE_ROLL_MS) return 'held';
   return 'rolling';
+}
+
+/** Preference changes and delayed timers may advance a throw, never replay it. */
+export function advanceDiceStage(current: DiceStage, elapsed: number, reduced = false): DiceStage {
+  const order: DiceStage[] = ['rolling', 'held', 'docking', 'docked'];
+  const next = diceStageAt(elapsed, reduced);
+  return order.indexOf(next) > order.indexOf(current) ? next : current;
 }
 
 export const DIE_FACES = [
@@ -59,7 +74,31 @@ const PIPS: Record<number, readonly number[]> = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
-function Die({ id, value, index }: { id: string; value: number; index: number }) {
+function Pips({ value }: { value: number }) {
+  return (
+    <>
+      {PIPS[value]!.map((pip) => (
+        <i
+          key={pip}
+          className="dice-pip"
+          style={{ gridColumn: (pip % 3) + 1, gridRow: Math.floor(pip / 3) + 1 }}
+        />
+      ))}
+    </>
+  );
+}
+
+function Die({
+  id,
+  value,
+  index,
+  flat = false,
+}: {
+  id: string;
+  value: number;
+  index: number;
+  flat?: boolean;
+}) {
   const trajectory = useMemo(() => diceTrajectory(id, index), [id, index]);
   const landing = diceLanding(value);
   const style: DiceStyle = {
@@ -73,34 +112,54 @@ function Die({ id, value, index }: { id: string; value: number; index: number })
   };
   return (
     <span className={`dice-flight dice-flight-${index}`} style={style} data-result={value}>
-      <span className="dice-floor-shadow" />
-      <span className="dice-floor-glow" />
-      <span className="dice-flight-path">
-        <span className="dice-view-angle">
-          <span className="dice-cube">
-            {DIE_FACES.map((face) => (
-              <span
-                key={face.value}
-                className="dice-cube-face"
-                data-face={face.value}
-                data-result-face={face.value === value ? 'true' : undefined}
-                style={{
-                  transform: `rotateX(${face.x}deg) rotateY(${face.y}deg) translateZ(calc(var(--die-size) / 2))`,
-                }}
-              >
-                {PIPS[face.value]!.map((pip) => (
-                  <i
-                    key={pip}
-                    className="dice-pip"
-                    style={{ gridColumn: (pip % 3) + 1, gridRow: Math.floor(pip / 3) + 1 }}
-                  />
+      {flat ? (
+        <>
+          <span className="dice-floor-glow" />
+          <span className="dice-cube-face dice-flat-face" data-result-face="true">
+            <Pips value={value} />
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="dice-floor-shadow" />
+          <span className="dice-floor-glow" />
+          <span className="dice-flight-path">
+            <span className="dice-view-angle">
+              <span className="dice-cube">
+                {DIE_FACES.map((face) => (
+                  <span
+                    key={face.value}
+                    className="dice-cube-face"
+                    data-face={face.value}
+                    data-result-face={face.value === value ? 'true' : undefined}
+                    style={{
+                      transform: `rotateX(${face.x}deg) rotateY(${face.y}deg) translateZ(calc(var(--die-size) / 2))`,
+                    }}
+                  >
+                    <Pips value={face.value} />
+                  </span>
                 ))}
               </span>
-            ))}
+            </span>
           </span>
-        </span>
-      </span>
+        </>
+      )}
     </span>
+  );
+}
+
+/** The lasting result is ordinary 2D HUD content, with no animated board overlay. */
+export function DiceResult({ id, dice }: { id: string; dice: readonly [number, number] }) {
+  return (
+    <div
+      className="dice-result-dock"
+      role="img"
+      aria-label={`Dice: ${dice[0]} and ${dice[1]}`}
+      data-roll-id={id}
+    >
+      <Die id={id} value={dice[0]} index={0} flat />
+      <Die id={id} value={dice[1]} index={1} flat />
+    </div>
   );
 }
 
@@ -120,9 +179,11 @@ export function DiceThrow({
 }) {
   const tray = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<'rolling' | 'held' | 'docking' | 'docked'>(
-    initiallyDocked ? 'docked' : 'rolling',
+    initiallyDocked ? 'docked' : reducedMotion ? 'held' : 'rolling',
   );
-  const [dock, setDock] = useState({ x: 0, y: 0, scale: 0.44 });
+  const progress = useRef({ id, stage });
+  const [dockTarget, setDockTarget] = useState<Element | null>(null);
+  const [dock, setDock] = useState({ x: 0, y: 0, ...diceDockSize(40) });
   const [systemReduced, setSystemReduced] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
@@ -134,30 +195,52 @@ export function DiceThrow({
   }, []);
   const quiet = reducedMotion ?? systemReduced;
   const complete = useRef(onComplete);
+  const completedId = useRef<string | null>(null);
   const started = useRef<{ id: string; at: number } | null>(null);
   complete.current = onComplete;
   useEffect(() => {
     if (initiallyDocked) {
+      progress.current = { id, stage: 'docked' };
       setStage('docked');
       return;
     }
-    if (started.current?.id !== id) started.current = { id, at: performance.now() };
+    if (started.current?.id !== id) {
+      started.current = { id, at: performance.now() };
+      progress.current = { id, stage: 'rolling' };
+    }
     const elapsed = performance.now() - started.current.at;
-    setStage(diceStageAt(elapsed, quiet));
     const deadlines = quiet ? [DICE_REDUCED_MS] : [DICE_ROLL_MS, DICE_READABLE_MS, DICE_PRESENTATION_MS];
+    const syncStage = (minimumElapsed = 0) => {
+      const next = advanceDiceStage(
+        progress.current.stage,
+        Math.max(minimumElapsed, performance.now() - started.current!.at),
+        quiet,
+      );
+      progress.current = { id, stage: next };
+      setStage(next);
+      if (next === 'docked' && completedId.current !== id) {
+        completedId.current = id;
+        complete.current?.();
+      }
+    };
+    syncStage();
+    if (progress.current.stage === 'docked') return;
     const timers = deadlines
       .filter((at) => at > elapsed)
-      .map((at) =>
-        window.setTimeout(() => {
-          const stage = diceStageAt(at, quiet);
-          setStage(stage);
-          if (stage === 'docked') complete.current?.();
-        }, at - elapsed),
-      );
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
+      .map((at) => window.setTimeout(() => syncStage(at), at - elapsed));
+    const onVisible = () => {
+      if (!document.hidden) syncStage();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [id, quiet, initiallyDocked]);
   useEffect(() => {
     const anchor = document.querySelector('[data-dice-dock]');
+    setDockTarget(anchor);
+    if (stage === 'docked') return;
     const place = () => {
       const box = anchor?.getBoundingClientRect();
       const center = box
@@ -166,29 +249,23 @@ export function DiceThrow({
       setDock({
         x: center.x - innerWidth / 2,
         y: center.y - innerHeight / 2,
-        scale: Math.max(
-          0.35,
-          Math.min(
-            0.5,
-            box
-              ? Math.min(
-                  box.width / (tray.current?.offsetWidth || 220),
-                  box.height / (tray.current?.offsetHeight || 100),
-                )
-              : 0.44,
-          ),
-        ),
+        ...diceDockSize(tray.current?.querySelector<HTMLElement>('.dice-flight')?.offsetWidth || 40),
       });
     };
     place();
     window.addEventListener('resize', place);
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null;
     if (anchor) observer?.observe(anchor);
+    if (anchor?.parentElement) observer?.observe(anchor.parentElement);
     return () => {
       window.removeEventListener('resize', place);
       observer?.disconnect();
     };
-  }, [id]);
+  }, [id, stage]);
+  // Remove the perspective/animation tree altogether. Keeping a scaled, fixed
+  // 3D overlay here left stale dice on the island when the hand moved or resized.
+  if (stage === 'docked')
+    return dockTarget ? createPortal(<DiceResult id={id} dice={dice} />, dockTarget) : null;
   return (
     <div
       key={id}
@@ -200,6 +277,7 @@ export function DiceThrow({
           '--dock-x': `${dock.x}px`,
           '--dock-y': `${dock.y}px`,
           '--dock-scale': dock.scale,
+          '--dock-gap': `${dock.gap}px`,
         } as DiceStyle
       }
       role="img"
@@ -207,8 +285,8 @@ export function DiceThrow({
       data-roll-id={id}
     >
       <div ref={tray} className="dice-throw-tray">
-        <Die id={id} value={dice[0]} index={0} />
-        <Die id={id} value={dice[1]} index={1} />
+        <Die id={id} value={dice[0]} index={0} flat={quiet || stage !== 'rolling'} />
+        <Die id={id} value={dice[1]} index={1} flat={quiet || stage !== 'rolling'} />
       </div>
     </div>
   );

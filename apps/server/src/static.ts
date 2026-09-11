@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ART_REDIRECTS } from './art-redirects.js';
+import { isRoomReference, normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
 
 const types: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -104,7 +105,11 @@ export async function serveClient(
     response.writeHead(307, { Location: artRedirect, 'Cache-Control': 'no-cache' }).end();
     return;
   }
-  const isAppRoute = path === '/' || path === '/auth/callback' || /^\/room\/[A-Z2-9]{8}\/?$/i.test(path);
+  const roomReference = /^\/room\/([^/]+)\/?$/i.exec(path)?.[1];
+  const isAppRoute =
+    path === '/' ||
+    path === '/auth/callback' ||
+    (!!roomReference && isRoomReference(normalizeRoomReference(roomReference)));
   const assetPath = isAppRoute
     ? privateEntry
       ? '/app.html'

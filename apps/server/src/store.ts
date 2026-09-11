@@ -1,10 +1,17 @@
+import {
+  isRoomReference,
+  isShortRoomCode,
+  normalizeRoomReference,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+} from '../../../packages/protocol/src/room-reference.js';
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { DEFAULT_ROOM_SETTINGS, parseRoomSettings } from '../../../packages/protocol/src/settings.js';
 import type { RoomSettings, TurnClock } from '../../../packages/protocol/src/settings.js';
 import type { Identity } from './auth.js';
-import { createHash, randomBytes, randomUUID, randomInt } from 'node:crypto';
+import { createHash, randomUUID, randomInt } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -26,15 +33,30 @@ export type Seat = { id: string; room_id: string; name: string };
 type Receipt = { expected_revision: number; revision: number; counter: number };
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 const privateRandom = () => randomInt(0, 2 ** 32) / 2 ** 32;
+export const ROOM_CODE_LEASE_MS = 30 * 24 * 60 * 60 * 1000;
+const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
+function codeForSlot(slot: number): string {
+  let code = '';
+  for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
+    code = ROOM_CODE_ALPHABET[slot % ROOM_CODE_ALPHABET.length]! + code;
+    slot = Math.floor(slot / ROOM_CODE_ALPHABET.length);
+  }
+  return code;
+}
 
 /** Single-process probe store. Cloud play will use the Postgres adapter described in docs. */
 export class Store {
   readonly db: DatabaseSync;
   private readonly now: () => number;
   private readonly random: () => number;
-  constructor(path: string, options: { now?: () => number; random?: () => number } = {}) {
+  private readonly codeRandom: (max: number) => number;
+  constructor(
+    path: string,
+    options: { now?: () => number; random?: () => number; codeRandom?: (max: number) => number } = {},
+  ) {
     this.now = options.now ?? Date.now;
     this.random = options.random ?? privateRandom;
+    this.codeRandom = options.codeRandom ?? ((max) => randomInt(max));
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(`
@@ -45,6 +67,12 @@ export class Store {
         id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0,
         counter INTEGER NOT NULL DEFAULT 0
       );
+      CREATE TABLE IF NOT EXISTS room_codes (
+        code TEXT PRIMARY KEY CHECK(length(code)=4 AND code NOT GLOB '*[^ABCDEFGHJKLMNPQRSTUVWXYZ23456789]*'),
+        slot INTEGER NOT NULL UNIQUE CHECK(slot>=0 AND slot<1048576),
+        room_id TEXT NOT NULL UNIQUE REFERENCES rooms(id), expires_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS room_codes_expiry ON room_codes(expires_at);
       CREATE TABLE IF NOT EXISTS seats (
         id TEXT PRIMARY KEY, room_id TEXT NOT NULL REFERENCES rooms(id),
         token_hash TEXT NOT NULL UNIQUE, name TEXT NOT NULL
@@ -134,6 +162,71 @@ export class Store {
       throw error;
     }
   }
+  /** Anonymous previews are read-only: code leases only change after admitted player activity. */
+  resolveRoom(reference: string): string {
+    const normalized = normalizeRoomReference(reference);
+    if (!isRoomReference(normalized)) throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
+    if (isShortRoomCode(normalized)) {
+      const row = this.db
+        .prepare('SELECT room_id FROM room_codes WHERE code=? AND expires_at>?')
+        .get(normalized, this.now()) as { room_id: string } | undefined;
+      if (!row)
+        throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found. Check the code or ask for a new invite.');
+      return row.room_id;
+    }
+    if (!this.db.prepare('SELECT 1 FROM rooms WHERE id=?').get(normalized))
+      throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
+    return normalized;
+  }
+  roomCode(roomId: string): string | undefined {
+    return this.db
+      .prepare('SELECT code FROM room_codes WHERE room_id=? AND expires_at>?')
+      .get(roomId, this.now())?.code as string | undefined;
+  }
+  /** Must run inside the caller's successful admission/action transaction. */
+  private renewRoomCode(roomId: string, required = false): string | undefined {
+    const old = this.db.prepare('SELECT code FROM room_codes WHERE room_id=?').get(roomId) as
+      { code: string } | undefined;
+    if (old) {
+      this.db
+        .prepare('UPDATE room_codes SET expires_at=? WHERE room_id=?')
+        .run(this.now() + ROOM_CODE_LEASE_MS, roomId);
+      return old.code;
+    }
+    this.db.prepare('DELETE FROM room_codes WHERE expires_at<=?').run(this.now());
+    let slot: number | undefined;
+    for (let attempt = 0; attempt < 32; attempt++) {
+      const candidate = this.codeRandom(ROOM_CODE_SPACE);
+      if (!Number.isSafeInteger(candidate) || candidate < 0 || candidate >= ROOM_CODE_SPACE)
+        throw new Error('Invalid room code randomness');
+      if (!this.db.prepare('SELECT 1 FROM room_codes WHERE slot=?').get(candidate)) {
+        slot = candidate;
+        break;
+      }
+    }
+    if (slot === undefined) {
+      // Ordered bounded scan finds the first gap, without an unbounded random retry loop.
+      let candidate = 0;
+      for (const row of this.db.prepare('SELECT slot FROM room_codes ORDER BY slot').iterate()) {
+        if (row.slot !== candidate) break;
+        candidate++;
+      }
+      if (candidate < ROOM_CODE_SPACE) slot = candidate;
+    }
+    if (slot === undefined) {
+      if (required)
+        throw new ProtocolError(
+          'ROOM_CODES_FULL',
+          'All room codes are in use. Please try creating a room later.',
+        );
+      return undefined; // Existing games and permanent resume links still work when aliases are exhausted.
+    }
+    const code = codeForSlot(slot);
+    this.db
+      .prepare('INSERT INTO room_codes(code,slot,room_id,expires_at) VALUES(?,?,?,?)')
+      .run(code, slot, roomId, this.now() + ROOM_CODE_LEASE_MS);
+    return code;
+  }
   enter(
     mode: 'create' | 'join' | 'resume',
     token: string,
@@ -143,6 +236,7 @@ export class Store {
     requestedProfile?: Profile,
   ): Seat {
     return this.transaction(() => {
+      if (roomId) roomId = this.resolveRoom(roomId);
       let existing = this.db
         .prepare('SELECT id, room_id, name, departed, user_id FROM seats WHERE token_hash = ?')
         .get(hash(token)) as (Seat & { departed: number; user_id: string | null }) | undefined;
@@ -177,21 +271,14 @@ export class Store {
             existing.name = profile.name;
           }
         }
+        this.renewRoomCode(existing.room_id);
         return { id: existing.id, room_id: existing.room_id, name: existing.name };
       }
       if (mode === 'resume') throw new ProtocolError('INVALID_SESSION', 'This seat cannot be resumed');
       if (mode === 'create') {
-        if ((this.db.prepare('SELECT COUNT(*) AS n FROM rooms').get()!.n as number) >= 1000)
-          throw new ProtocolError('CAPACITY', 'Probe room limit reached');
-        do {
-          roomId = randomBytes(5)
-            .toString('base64url')
-            .replace(/[^A-Za-z2-9]/g, '')
-            .toUpperCase()
-            .padEnd(8, 'X')
-            .slice(0, 8);
-        } while (this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId));
+        roomId = randomUUID();
         this.db.prepare('INSERT INTO rooms(id) VALUES (?)').run(roomId);
+        this.renewRoomCode(roomId, true);
         this.board(roomId);
       } else if (!this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId!)) {
         throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
@@ -212,6 +299,7 @@ export class Store {
           'INSERT INTO seats(id, room_id, token_hash, name, user_id, profile) VALUES (?, ?, ?, ?, ?, ?)',
         )
         .run(seat.id, seat.room_id, hash(token), profile.name, identity?.id ?? null, JSON.stringify(profile));
+      this.renewRoomCode(seat.room_id);
       return seat;
     });
   }
@@ -224,8 +312,10 @@ export class Store {
       .prepare('SELECT id, name, profile, ready FROM seats WHERE room_id = ? AND departed = 0 ORDER BY rowid')
       .all(roomId) as { id: string; name: string; profile: string | null; ready: number }[];
     const game = viewer ? this.loadGame(roomId) : undefined;
+    const roomCode = this.roomCode(roomId);
     return {
       roomId,
+      ...(roomCode ? { roomCode } : {}),
       ...room,
       players: players.map((p) => ({
         id: p.id,
@@ -255,10 +345,12 @@ export class Store {
       .run(roomId, JSON.stringify(board));
     return board;
   }
-  preview(roomId: string) {
+  preview(reference: string) {
+    const roomId = this.resolveRoom(reference);
     const state = this.snapshot(roomId);
     return {
       roomId,
+      ...(state.roomCode ? { roomCode: state.roomCode } : {}),
       board: state.board,
       players: state.players,
       settings: state.settings,
@@ -313,6 +405,7 @@ export class Store {
           'INSERT INTO leave_receipts(room_id, player_id, command_id, expected_revision, revision, counter, released) VALUES (?, ?, ?, ?, ?, ?, ?)',
         )
         .run(seat.room_id, seat.id, commandId, expectedRevision, revision, room.counter, Number(released));
+      this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, released, duplicate: false };
     });
   }
@@ -436,6 +529,7 @@ export class Store {
       this.db
         .prepare('INSERT INTO lobby_receipts VALUES (?, ?, ?, ?, ?, ?)')
         .run(seat.room_id, seat.id, commandId, payloadHash, revision, room.counter);
+      this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, duplicate: false };
     });
   }
@@ -492,6 +586,7 @@ export class Store {
       this.db
         .prepare('INSERT INTO settings_receipts VALUES (?, ?, ?, ?, ?, ?)')
         .run(seat.room_id, seat.id, commandId, payloadHash, revision, room.counter);
+      this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, duplicate: false };
     });
   }
@@ -690,6 +785,7 @@ export class Store {
           'INSERT INTO game_receipts(room_id, player_id, command_id, payload_hash, revision, counter) VALUES (?, ?, ?, ?, ?, ?)',
         )
         .run(seat.room_id, seat.id, commandId, payloadHash, revision, room.counter);
+      if (!automatic) this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, duplicate: false };
     });
   }
@@ -739,6 +835,7 @@ export class Store {
           'INSERT INTO receipts(room_id, player_id, command_id, expected_revision, revision, counter) VALUES (?, ?, ?, ?, ?, ?)',
         )
         .run(seat.room_id, seat.id, commandId, expectedRevision, revision, counter);
+      this.renewRoomCode(seat.room_id);
       return { revision, counter, duplicate: false };
     });
   }

@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, PointerEvent } from 'react';
-import { constrainCamera, fitBoard, pinchScale, wheelScale, zoomAt } from './camera.js';
+import { BoardGesture, constrainCamera, fitBoard, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
 import { MATERIAL_GUTTER, MATERIAL_QUADRANTS, WORLD } from './scene.js';
 
@@ -24,9 +24,7 @@ export function BoardViewport({
   const patternId = `table-${useId().replaceAll(':', '')}`;
   const [camera, setCamera] = useState(current.current),
     [dragging, setDragging] = useState(false);
-  const pointers = useRef(new Map<number, { x: number; y: number; startX: number; startY: number }>());
-  const suppressClick = useRef(false),
-    pinch = useRef<{ distance: number; middle: { x: number; y: number } } | null>(null);
+  const gesture = useRef(new BoardGesture());
   function move(next: Camera) {
     current.current = constrainCamera(next, bounds.current);
     setCamera(current.current);
@@ -35,6 +33,14 @@ export function BoardViewport({
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
     target.current = current.current;
+  }
+  function clearGesture() {
+    const ids = gesture.current.pointerIds;
+    gesture.current.cancel();
+    setDragging(false);
+    for (const id of ids) {
+      if (viewport.current?.hasPointerCapture(id)) viewport.current.releasePointerCapture(id);
+    }
   }
   function glide(next: Camera) {
     target.current = constrainCamera(next, bounds.current);
@@ -68,6 +74,7 @@ export function BoardViewport({
     frame.current = requestAnimationFrame(step);
   }
   useEffect(() => {
+    clearGesture();
     stopGlide();
     move({ scale: 1, x: 0, y: 0 });
     target.current = current.current;
@@ -86,6 +93,7 @@ export function BoardViewport({
       const rect = element.getBoundingClientRect();
       bounds.current = { width: rect.width, height: rect.height };
       origin.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      clearGesture();
       stopGlide();
       move(current.current);
       target.current = current.current;
@@ -96,6 +104,7 @@ export function BoardViewport({
     const wheel = (event: WheelEvent) => {
       if ((event.target as Element).closest('button')) return;
       event.preventDefault();
+      if (gesture.current.pointerIds.length) return;
       const rect = element.getBoundingClientRect();
       const delta =
         event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 100 : event.deltaY;
@@ -110,81 +119,65 @@ export function BoardViewport({
     };
     element.addEventListener('wheel', wheel, { passive: false });
     const hidden = () => {
-      if (document.hidden) stopGlide();
+      if (document.hidden) {
+        clearGesture();
+        stopGlide();
+      }
+    };
+    const blurred = () => {
+      clearGesture();
+      stopGlide();
+    };
+    // Mouse contacts have no implicit capture until dragging begins. A release just
+    // outside the viewport must still retire a contact that never crossed the slop.
+    const outsideRelease = (event: globalThis.PointerEvent) => {
+      if (!gesture.current.has(event.pointerId)) return;
+      gesture.current.end(event.pointerId, current.current);
+      setDragging(gesture.current.dragging);
     };
     document.addEventListener('visibilitychange', hidden);
+    window.addEventListener('blur', blurred);
+    window.addEventListener('pointerup', outsideRelease);
+    window.addEventListener('pointercancel', outsideRelease);
     return () => {
       observer.disconnect();
       element.removeEventListener('wheel', wheel);
       document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('blur', blurred);
+      window.removeEventListener('pointerup', outsideRelease);
+      window.removeEventListener('pointercancel', outsideRelease);
+      gesture.current.cancel();
       stopGlide();
     };
   }, []);
-  function setPinch() {
-    const points = [...pointers.current.values()];
-    pinch.current =
-      points.length === 2
-        ? {
-            distance: Math.hypot(points[0]!.x - points[1]!.x, points[0]!.y - points[1]!.y),
-            middle: { x: (points[0]!.x + points[1]!.x) / 2, y: (points[0]!.y + points[1]!.y) / 2 },
-          }
-        : null;
+  function point(event: PointerEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - rect.left - rect.width / 2, y: event.clientY - rect.top - rect.height / 2 };
+  }
+  function captureGesture(event: PointerEvent<HTMLDivElement>) {
+    if (!gesture.current.dragging) return;
+    setDragging(true);
+    for (const id of gesture.current.pointerIds) {
+      if (!event.currentTarget.hasPointerCapture(id)) event.currentTarget.setPointerCapture(id);
+    }
+    event.preventDefault();
   }
   function pointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || (event.target as Element).closest('button')) return;
     stopGlide();
-    if (!pointers.current.size) suppressClick.current = false;
-    pointers.current.set(event.pointerId, {
-      x: event.clientX,
-      y: event.clientY,
-      startX: event.clientX,
-      startY: event.clientY,
-    });
-    if (pointers.current.size === 2) {
-      suppressClick.current = true;
-      setPinch();
-    }
+    gesture.current.start(event.pointerId, point(event), current.current);
+    captureGesture(event);
   }
   function pointerMove(event: PointerEvent<HTMLDivElement>) {
-    const old = pointers.current.get(event.pointerId);
-    if (!old) return;
-    const dx = event.clientX - old.x,
-      dy = event.clientY - old.y;
-    const dragged = Math.hypot(event.clientX - old.startX, event.clientY - old.startY) > 6;
-    pointers.current.set(event.pointerId, { ...old, x: event.clientX, y: event.clientY });
-    if (pointers.current.size === 2 && pinch.current) {
-      const previous = pinch.current;
-      setPinch();
-      const next = pinch.current!;
-      const rect = viewport.current!.getBoundingClientRect();
-      move(
-        zoomAt(
-          {
-            ...current.current,
-            x: current.current.x + next.middle.x - previous.middle.x,
-            y: current.current.y + next.middle.y - previous.middle.y,
-          },
-          pinchScale(current.current.scale, next.distance, previous.distance),
-          { x: next.middle.x - rect.left - rect.width / 2, y: next.middle.y - rect.top - rect.height / 2 },
-          bounds.current,
-        ),
-      );
-      suppressClick.current = true;
-    } else if (dragged || suppressClick.current) {
-      suppressClick.current = true;
-      move({ ...current.current, x: current.current.x + dx, y: current.current.y + dy });
-    }
+    if (!gesture.current.has(event.pointerId)) return;
+    const next = gesture.current.update(event.pointerId, point(event), current.current, bounds.current);
+    if (next) move(next);
     target.current = current.current;
-    if (suppressClick.current) {
-      setDragging(true);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      event.preventDefault();
-    }
+    captureGesture(event);
   }
   function release(event: PointerEvent<HTMLDivElement>) {
-    pointers.current.delete(event.pointerId);
-    pinch.current = null;
-    if (!pointers.current.size) setDragging(false);
+    gesture.current.end(event.pointerId, current.current);
+    setDragging(gesture.current.dragging);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   }
@@ -200,16 +193,26 @@ export function BoardViewport({
       onPointerMove={pointerMove}
       onPointerUp={release}
       onPointerCancel={release}
-      onLostPointerCapture={release}
+      onLostPointerCapture={(event) => {
+        // Touch initially captures its SVG hit target. Its bubbling capture-loss event
+        // during transfer to this viewport must not end the still-active gesture.
+        if (
+          gesture.current.captureLost(event.pointerId, current.current, {
+            fromViewport: event.target === event.currentTarget,
+            stillCaptured: event.currentTarget.hasPointerCapture(event.pointerId),
+          })
+        )
+          setDragging(gesture.current.dragging);
+      }}
       onClickCapture={(event) => {
-        if (suppressClick.current && !(event.target as Element).closest('button')) {
+        if (gesture.current.blocksClick(event.detail)) {
           event.preventDefault();
           event.stopPropagation();
-          suppressClick.current = false;
         }
       }}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget || !['+', '=', '-', '0'].includes(event.key)) return;
+        if (gesture.current.pointerIds.length) return;
         event.preventDefault();
         if (event.key === '0') glide({ scale: 1, x: 0, y: 0 });
         else

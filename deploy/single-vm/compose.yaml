@@ -25,6 +25,8 @@ services:
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Set the public Supabase publishable key in .env}
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?Set the public production Turnstile site key in .env}
       ALLOWED_ORIGINS: https://${CATANOVA_DOMAIN:?Set one public hostname without scheme or path in .env}
+      # Set to this deployment's private Compose subnet; never trust arbitrary forwarded IPs.
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-}
     # Port 3000 is reachable only on the Compose network, never published on the VM.
     volumes:
       - game-data:/app/data

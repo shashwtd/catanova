@@ -3,6 +3,11 @@
 .board-viewport {
   perspective: none;
   overflow: visible;
+  touch-action: none;
+  overscroll-behavior: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .board-camera {
   position: relative;
@@ -16,6 +21,9 @@
   transform-style: flat;
   filter: drop-shadow(0 7px 5px #1d211b40);
 }
+.board-camera .island {
+  touch-action: none;
+}
 .board-world-surface {
   position: fixed;
   inset: 0;
@@ -26,4 +34,7 @@
 }
 .board-viewport[data-dragging='true'] {
   cursor: grabbing;
+}
+.board-viewport[data-dragging='true'] .build-site-preview {
+  opacity: 0;
 }
