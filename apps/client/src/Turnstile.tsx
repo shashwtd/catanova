@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+let scriptAttempt = 0;
 
 export interface TurnstileOptions {
   sitekey: string;
@@ -20,7 +21,6 @@ export interface TurnstileOptions {
 }
 
 export interface TurnstileApi {
-  ready: (callback: () => void) => void;
   render: (element: HTMLElement, options: TurnstileOptions) => string | undefined;
   reset: (widgetId: string) => void;
   remove: (widgetId: string) => void;
@@ -33,17 +33,19 @@ export function createTurnstileLoader(
   timeoutMs = 12_000,
 ) {
   let loading: Promise<TurnstileApi> | undefined;
+  const callbacks = doc.defaultView as unknown as Record<string, unknown>;
   return () => {
     if (loading) return loading;
     loading = new Promise<TurnstileApi>((resolve, reject) => {
       let settled = false;
+      const callbackName = `catanovaTurnstileLoaded${++scriptAttempt}`;
       let script: HTMLScriptElement | undefined;
       const finish = (api?: TurnstileApi) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
+        delete callbacks[callbackName];
         if (script) {
-          script.removeEventListener('load', ready);
           script.removeEventListener('error', failed);
         }
         if (api) resolve(api);
@@ -55,24 +57,18 @@ export function createTurnstileLoader(
       const failed = () => finish();
       const ready = () => {
         const api = getApi();
-        if (!api) return failed();
-        try {
-          api.ready(() => finish(api));
-        } catch {
-          failed();
-        }
+        if (!api || typeof api.render !== 'function') return failed();
+        finish(api);
       };
       const timeout = setTimeout(failed, timeoutMs);
-      if (getApi()) ready();
-      else {
-        script = doc.createElement('script');
-        script.src = SCRIPT_URL;
-        script.async = true;
-        script.defer = true;
-        script.addEventListener('load', ready);
-        script.addEventListener('error', failed);
-        doc.head.append(script);
-      }
+      // The explicit API callback, registered before injection, is the readiness boundary.
+      // Calling ready() on a partially installed async API can strand the widget.
+      callbacks[callbackName] = ready;
+      script = doc.createElement('script');
+      script.src = `${SCRIPT_URL}&onload=${callbackName}`;
+      script.async = true;
+      script.addEventListener('error', failed);
+      doc.head.append(script);
     }).catch((error: unknown) => {
       loading = undefined;
       throw error;

@@ -3,14 +3,27 @@
   height: auto;
   min-height: 100dvh;
   overflow: auto;
-  background: #233d38;
+  background-color: #153344;
+  background-image:
+    url('/art/ui/surface-grain.svg'), url('/art/ui/hub-atlas.svg'),
+    radial-gradient(ellipse at 35% 10%, #376176a1, transparent 66%),
+    linear-gradient(165deg, #1b4051, #142d3a 72%, #163b42);
+  background-size:
+    128px 128px,
+    max(1280px, 100vw) auto,
+    cover,
+    cover;
+  background-position:
+    center,
+    center top,
+    center,
+    center;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
 }
-.player-home .title-scenery::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, #092720a6, transparent 32%, #0927203d 65%, #092720c4);
+.player-home .title-scenery {
+  display: none;
 }
+
 .player-hub {
   --hub-cream: #fff1cf;
   --hub-gold: #f5ce70;

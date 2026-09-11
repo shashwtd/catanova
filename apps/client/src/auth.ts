@@ -16,7 +16,7 @@ import type {
 } from '../../../packages/protocol/src/profile.js';
 import { accountApi, AccountApiError } from './account-api.js';
 import { beginGoogleSignIn, beginGuestSignIn, completeGoogleLink } from './auth-flow.js';
-import { safeEntryPath } from './navigation.js';
+import { safeEntryPath, navigationRoomReference, roomPath } from './navigation.js';
 import { FriendRequestQueue, startSocialPresence } from './social-presence.js';
 type GameIdentity = Pick<User, 'id' | 'is_anonymous'>;
 type ClientFriendsState = Omit<FriendsState, 'friends'> & {
@@ -327,7 +327,11 @@ export function useAuth() {
       window.removeEventListener('keydown', activity);
     };
   }, [account?.id, account?.isGuest, account?.registered, accessToken, installAccount, accountError]);
-  async function signIn(returnPath = location.pathname) {
+  function currentReturnPath() {
+    const reference = navigationRoomReference(location.pathname, location.search, history.state);
+    return reference ? roomPath(reference) : location.pathname;
+  }
+  async function signIn(returnPath = currentReturnPath()) {
     if (!client.current) {
       setError('Google sign-in has not been configured on this server');
       return;
@@ -351,7 +355,7 @@ export function useAuth() {
       setLoading(false);
     }
   }
-  async function signInGuest(returnPath = location.pathname, captchaToken?: string) {
+  async function signInGuest(returnPath = currentReturnPath(), captchaToken?: string) {
     if (!client.current) {
       setError('Guest accounts need Supabase to be configured');
       return;

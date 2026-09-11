@@ -74,6 +74,7 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.deepEqual(await config.json(), { auth, mode: 'authenticated' });
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
   for (const path of [
+    '/play',
     '/room/ABCD2345',
     '/room/abcd2345/',
     '/room/AB2C',

@@ -40,6 +40,7 @@ test('guest CAPTCHA exposes only a public site key and enables the required widg
   const csp = (await fetch(origin)).headers.get('content-security-policy')!;
   assert.match(csp, /script-src 'self' https:\/\/challenges.cloudflare.com/);
   assert.match(csp, /frame-src https:\/\/challenges.cloudflare.com/);
+  assert.match(csp, /connect-src [^;]*https:\/\/challenges.cloudflare.com/);
   assert.match(csp, /frame-ancestors 'none'/);
   assert.match(csp, /base-uri 'self'/);
   assert.equal(

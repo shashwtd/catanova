@@ -45,6 +45,7 @@ export type RoomState = {
   turnClock?: TurnClock;
   serverNow?: number;
   paused?: boolean;
+  launch?: { id: string; startedAt: number; deadlineAt: number; readyPlayers: string[] };
 };
 export type RoomPreview = {
   canResume?: boolean;
@@ -63,6 +64,7 @@ export type ClientMessage =
       name: string;
       roomId?: string;
       accessToken?: string;
+      preloadGame?: boolean;
       profile?: Profile;
     }
   | { type: 'increment'; commandId: string; expectedRevision: number }
@@ -70,6 +72,7 @@ export type ClientMessage =
   | { type: 'action'; commandId: string; expectedRevision: number; action: GameAction }
   | { type: 'lobby'; commandId: string; expectedRevision: number; ready: boolean; profile?: Profile }
   | { type: 'settings'; commandId: string; expectedRevision: number; settings: RoomSettings }
+  | { type: 'launchReady'; id: string; success: boolean }
   | { type: 'sync' }
   | { type: 'history'; before?: number }
   | { type: 'ping'; nonce: string };
@@ -111,6 +114,7 @@ export function parseClientMessage(input: string): ClientMessage {
       ...(roomId ? { roomId } : {}),
       ...(typeof v.accessToken === 'string' ? { accessToken: v.accessToken } : {}),
       ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
+      ...(v.preloadGame === true ? { preloadGame: true } : {}),
     };
   }
   if (
@@ -138,6 +142,11 @@ export function parseClientMessage(input: string): ClientMessage {
     return v.type === 'action'
       ? { type: 'action', ...base, action: parseGameAction(v.action) }
       : { type: v.type, ...base };
+  }
+  if (v.type === 'launchReady') {
+    if (typeof v.id !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(v.id) || typeof v.success !== 'boolean')
+      throw new Error('Invalid loading response');
+    return { type: 'launchReady', id: v.id, success: v.success };
   }
   if (v.type === 'sync') return { type: 'sync' };
   if (v.type === 'history') {

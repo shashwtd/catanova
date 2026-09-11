@@ -17,9 +17,9 @@ import type { CSSProperties } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { roomPath } from './navigation.js';
+import { roomPath, visibleRoomCode } from './navigation.js';
 
-export function Invite({ code, roomId = code }: { code: string; roomId?: string }) {
+export function Invite({ code, roomId = code ?? '' }: { code?: string; roomId?: string }) {
   const [feedback, setFeedback] = useState<{ kind: 'code' | 'link'; request: number } | null>(null);
   const [manual, setManual] = useState<'code' | 'link' | null>(null);
   const request = useRef(0);
@@ -71,7 +71,7 @@ export function Invite({ code, roomId = code }: { code: string; roomId?: string 
   return (
     <div className="room-share">
       <span className="room-code-label">Room</span>
-      <code>{code}</code>
+      {code ? <code>{code}</code> : <span className="room-code-unavailable">Share this room</span>}
       <div className="room-share-actions">
         <button type="button" aria-label="Share room" title="Share room" onClick={() => void share()}>
           <Share2 size={21} />
@@ -90,7 +90,10 @@ export function Invite({ code, roomId = code }: { code: string; roomId?: string 
           aria-label={feedback?.kind === 'code' ? 'Room code copied' : 'Copy room code'}
           title={feedback?.kind === 'code' ? 'Copied' : 'Copy room code'}
           className={feedback?.kind === 'code' ? 'copy-done' : undefined}
-          onClick={() => void copy(code, 'code')}
+          disabled={!code}
+          onClick={() => {
+            if (code) void copy(code, 'code');
+          }}
         >
           {feedback?.kind === 'code' ? <Check size={21} /> : <Copy size={21} />}
         </button>
@@ -267,7 +270,7 @@ export function Lobby({
         </div>
       </div>
       <footer className="lobby-footer">
-        <Invite code={room.roomCode ?? room.roomId} roomId={room.roomId} />
+        <Invite code={visibleRoomCode(room) ?? undefined} roomId={room.roomId} />
         <div className="lobby-launch">
           <span role="status">
             {room.players.length < 2

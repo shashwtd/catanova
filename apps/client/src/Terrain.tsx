@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { decodedGameImage, TERRAIN_ART, ENVIRONMENT_ART } from './game-assets.js';
 import type { Board } from '../../../packages/rules/src/board.js';
 import {
   HEX_SIZE,
@@ -101,17 +102,7 @@ export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boo
         powerPreference: 'low-power',
       });
       if (!gl) return;
-      const images = await Promise.all(
-        [
-          '/art/optimized/terrain-fantasy.777e0ac07117.webp',
-          '/art/optimized/environment-painted.00c506c983c0.webp',
-        ].map(async (src) => {
-          const image = new Image();
-          image.src = src;
-          await image.decode();
-          return image;
-        }),
-      );
+      const images = await Promise.all([TERRAIN_ART, ENVIRONMENT_ART].map(decodedGameImage));
       if (disposed || gl.isContextLost()) return;
       const vertex = compile(gl, gl.VERTEX_SHADER, vertexSource),
         fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentSource);
