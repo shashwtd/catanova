@@ -16,10 +16,10 @@ test('the production entry is readable before JavaScript and only public pages e
   const guide = await readFile(join(directory, 'guide', 'index.html'), 'utf8');
   const shell = await readFile(join(directory, 'app.html'), 'utf8');
   assert.equal((home.match(/<title>/g) ?? []).length, 1);
-  assert.ok(home.includes('<title>Catanova — Play with Friends</title>'));
+  assert.ok(home.includes('<title>Catanova — Build. Trade. Settle.</title>'));
   assert.ok(home.includes(`<title>${HOME_TITLE}</title>`), 'hydration must retain the public brand title');
-  assert.ok(home.includes('property="og:title" content="Catanova — Play with Friends"'));
-  assert.ok(home.includes('name="twitter:title" content="Catanova — Play with Friends"'));
+  assert.ok(home.includes('property="og:title" content="Catanova — Build. Trade. Settle."'));
+  assert.ok(home.includes('name="twitter:title" content="Catanova — Build. Trade. Settle."'));
   assert.match(home, /itemscope="" itemType="https:\/\/schema.org\/WebSite"/i);
   assert.ok(home.includes('itemProp="name" content="Catanova"'));
   assert.ok(home.includes('itemProp="url" href="https://catanova.io/"'));
@@ -46,7 +46,20 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.ok(!guide.includes('<script') && !guide.includes('/src/main.tsx'));
   for (const html of [home, guide]) {
     assert.equal((html.match(/name="description"/g) ?? []).length, 1);
-    assert.ok(html.includes('property="og:image" content="https://catanova.io/branding/social-card-v2.jpg"'));
+    assert.ok(html.includes('property="og:image" content="https://catanova.io/branding/social-card-v3.jpg"'));
+    assert.ok(
+      html.includes('name="twitter:image" content="https://catanova.io/branding/social-card-v3.jpg"'),
+    );
+    assert.ok(
+      html.includes(
+        'property="og:image:alt" content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."',
+      ),
+    );
+    assert.ok(
+      html.includes(
+        'name="twitter:image:alt" content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."',
+      ),
+    );
     assert.ok(html.includes('name="twitter:card" content="summary_large_image"'));
     assert.ok(html.includes('sizes="48x48"') && html.includes('rel="apple-touch-icon"'));
     assert.ok(!html.includes('sb_publishable_') && !html.includes('supabase.co'));
@@ -87,7 +100,8 @@ test('discovery assets are real files with declared icon and social dimensions',
   const ico = await readFile(join(root, 'branding/favicon.ico'));
   assert.equal(ico.readUInt16LE(2), 1);
   assert.ok(ico.readUInt16LE(4) >= 1);
-  const jpeg = await readFile(join(root, 'branding/social-card-v2.jpg'));
+  const jpeg = await readFile(join(root, 'branding/social-card-v3.jpg'));
+  assert.ok(jpeg.length < 220_000, 'the social preview must stay below 220,000 bytes');
   assert.equal(jpeg.readUInt16BE(0), 0xffd8);
   let offset = 2,
     dimensions: number[] | undefined;

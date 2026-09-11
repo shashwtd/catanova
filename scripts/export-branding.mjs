@@ -1,7 +1,23 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
+import { rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Isolate font discovery/cache so a sandboxed export never scans the user's fonts.
+if (!process.env.FONTCONFIG_FILE) {
+  const cache = await mkdtemp(path.join(tmpdir(), 'catanova-preview-fonts-'));
+  const xml = (value) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
+  const config = path.join(cache, 'fonts.conf');
+  await writeFile(
+    config,
+    `<fontconfig><dir>${xml(path.join(project, 'node_modules/@fontsource/barlow/files'))}</dir><cachedir>${xml(cache)}</cachedir></fontconfig>`,
+  );
+  process.env.FONTCONFIG_FILE = config;
+  process.on('exit', () => rmSync(cache, { recursive: true, force: true }));
+}
 
 // Prefer a normal Sharp installation. SHARP_MODULE can point to a bundled Sharp entry point.
 const sharp = await import('sharp')
@@ -11,14 +27,12 @@ const sharp = await import('sharp')
   })
   .then((module) => module.default);
 
-const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicDir = path.join(project, 'apps/client/public');
 const destination = path.join(publicDir, 'branding');
 const inputs = {
   mark: path.join(project, 'assets/source-art/branding/catanova-mark-v2.png'),
   logo: path.join(project, 'assets/source-art/branding/catanova-logo-v2.png'),
   scenery: path.join(project, 'assets/source-art/title-landscape.png'),
-  social: path.join(project, 'assets/source-art/branding/social-card-v2.png'),
 };
 const cream = '#f5ebd0';
 const transparent = { r: 0, g: 0, b: 0, alpha: 0 };
@@ -32,24 +46,87 @@ const sourceHashes = await Promise.all(
 await mkdir(destination, { recursive: true });
 
 async function exportSocialPreview() {
-  const file = path.join(destination, 'social-card-v2.jpg');
-  await sharp(inputs.social)
-    .rotate()
-    .resize(1200, 630, { fit: 'cover', position: 'centre' })
-    .flatten({ background: cream })
+  // All placement, text and masking are authored here; no generated banner is used.
+  const width = 1200,
+    height = 630;
+  const file = path.join(destination, 'social-card-v3.jpg');
+  const logo = await sharp(inputs.logo)
+    .resize(1044)
+    .ensureAlpha()
+    .composite([
+      {
+        input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1044" height="348">
+      <defs><filter id="soft"><feGaussianBlur stdDeviation="9"/></filter></defs>
+      <rect x="9" y="9" width="1026" height="330" fill="white" filter="url(#soft)"/>
+    </svg>`),
+        blend: 'dest-in',
+      },
+    ])
+    .png()
+    .toBuffer();
+  const landscape = await sharp(inputs.scenery)
+    .resize(width, 340, { fit: 'cover', position: 'centre' })
+    .ensureAlpha()
+    .composite([
+      {
+        input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340">
+      <defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+        <stop stop-color="white" stop-opacity="0"/>
+        <stop offset=".28" stop-color="white" stop-opacity=".32"/>
+        <stop offset=".6" stop-color="white"/>
+      </linearGradient></defs>
+      <rect width="1200" height="340" fill="url(#fade)"/>
+    </svg>`),
+        blend: 'dest-in',
+      },
+    ])
+    .png()
+    .toBuffer();
+  // The existing bundled game font keeps text consistent across export machines.
+  const label = async (text, size, color) =>
+    sharp({
+      text: {
+        text: `<span foreground="${color}">${text}</span>`,
+        font: `Barlow SemiBold ${size}`,
+        dpi: 72,
+        fontfile: path.join(project, 'node_modules/@fontsource/barlow/files/barlow-latin-600-normal.woff'),
+        rgba: true,
+      },
+    })
+      .png()
+      .toBuffer({ resolveWithObject: true });
+  const tagline = await label('Build. Trade. Settle.', 42, '#245348');
+  const domain = await label('catanova.io', 23, '#ffffff');
+  const footer = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="100">
+    <defs><linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#123d37" stop-opacity="0"/>
+      <stop offset="1" stop-color="#123d37" stop-opacity=".78"/>
+    </linearGradient></defs><rect width="1200" height="100" fill="url(#shade)"/>
+  </svg>`);
+  await sharp({ create: { width, height, channels: 3, background: cream } })
+    .composite([
+      { input: logo, left: 78, top: 15 },
+      { input: landscape, left: 0, top: 290 },
+      { input: tagline.data, left: Math.round((width - tagline.info.width) / 2), top: 358 },
+      { input: footer, left: 0, top: 530 },
+      { input: domain.data, left: Math.round((width - domain.info.width) / 2), top: 579 },
+    ])
     .removeAlpha()
-    .jpeg({ quality: 85, mozjpeg: true, chromaSubsampling: '4:2:0' })
+    .jpeg({ quality: 88, mozjpeg: true, chromaSubsampling: '4:4:4' })
     .toFile(file);
   const metadata = await sharp(file).metadata();
   const bytes = (await stat(file)).size;
-  if (metadata.width !== 1200 || metadata.height !== 630 || metadata.hasAlpha)
-    throw new Error('Unexpected social-card-v2 geometry or alpha');
+  if (metadata.width !== width || metadata.height !== height || metadata.hasAlpha)
+    throw new Error('Unexpected social-card-v3 geometry or alpha');
   if (bytes > 220_000) throw new Error('Social preview exceeds its 220 KB transfer budget');
-  const sourceHash = createHash('sha256')
-    .update(await readFile(inputs.social))
-    .digest('hex');
-  if (sourceHash !== sourceHashes[3]) throw new Error('Social preview master changed');
-  console.log(`social-card-v2.jpg: 1200×630, ${bytes} bytes, opaque`);
+  for (const [index, source] of Object.values(inputs).entries())
+    if (
+      createHash('sha256')
+        .update(await readFile(source))
+        .digest('hex') !== sourceHashes[index]
+    )
+      throw new Error('Branding source changed during export');
+  console.log(`social-card-v3.jpg: ${width}×${height}, ${bytes} bytes, opaque, code-composed`);
 }
 
 // Update the versioned link preview without needlessly rewriting the existing icon exports.

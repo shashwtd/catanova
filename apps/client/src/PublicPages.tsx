@@ -14,7 +14,7 @@ export const REPOSITORY_URL = 'https://github.com/shashwtd/catanova';
 export const PUBLIC_PAGES = [
   {
     path: '/',
-    title: 'Catanova — Play with Friends',
+    title: 'Catanova — Build. Trade. Settle.',
     description:
       'Build, trade and settle an island together. A free online Catan alternative for 2–4 friends, with private multiplayer rooms. Play in your browser.',
   },
@@ -38,21 +38,21 @@ export function PublicMetadata({ page }: { page: (typeof PUBLIC_PAGES)[number] }
       <meta property="og:title" content={page.title} />
       <meta property="og:description" content={page.description} />
       <meta property="og:url" content={`${SITE_URL}${page.path}`} />
-      <meta property="og:image" content={`${SITE_URL}/branding/social-card-v2.jpg`} />
+      <meta property="og:image" content={`${SITE_URL}/branding/social-card-v3.jpg`} />
       <meta property="og:image:type" content="image/jpeg" />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
       <meta
         property="og:image:alt"
-        content="Catanova — Build. Trade. Play with friends. A sunlit island harbor beneath the golden Catanova logo."
+        content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."
       />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={page.title} />
       <meta name="twitter:description" content={page.description} />
-      <meta name="twitter:image" content={`${SITE_URL}/branding/social-card-v2.jpg`} />
+      <meta name="twitter:image" content={`${SITE_URL}/branding/social-card-v3.jpg`} />
       <meta
         name="twitter:image:alt"
-        content="Catanova — Build. Trade. Play with friends. A sunlit island harbor beneath the golden Catanova logo."
+        content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."
       />
       <link rel="icon" type="image/x-icon" href="/branding/favicon.ico" />
       <link rel="icon" type="image/png" sizes="48x48" href="/branding/favicon-48.png" />
