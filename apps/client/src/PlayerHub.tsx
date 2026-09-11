@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { useAuth } from './auth.js';
 import { Avatar, ProfileEditor } from './Profile.js';
@@ -90,6 +91,8 @@ export function PlayerHub({
   games,
   busy,
   initialJoin = false,
+  invitationCount = 0,
+  notifications,
   onCreate,
   onJoin,
   onResume,
@@ -102,6 +105,8 @@ export function PlayerHub({
   games: PlayerGameState;
   busy: boolean;
   initialJoin?: boolean;
+  invitationCount?: number;
+  notifications?: ReactNode;
   onCreate: () => void;
   onJoin: (code: string) => Promise<void>;
   onResume: (roomId: string) => void;
@@ -118,7 +123,7 @@ export function PlayerHub({
   useEffect(() => {
     if (joining) field.current?.focus();
   }, [joining]);
-  const requests = auth.friends.incoming.length;
+  const requests = auth.friends.incoming.length + invitationCount;
   const resumable = games.data?.games.find((game) => game.resumable);
   return (
     <section className="player-hub" aria-label="Player lobby">
@@ -131,7 +136,7 @@ export function PlayerHub({
           <Avatar profile={auth.profile} />
           <span>
             <strong>{auth.profile.name}</strong>
-            {auth.account?.isGuest ? <small>Guest</small> : <small>Your profile</small>}
+            {auth.account?.isGuest && <small>Guest</small>}
           </span>
         </button>
         <nav className="hub-navigation" aria-label="Player menu">
@@ -145,7 +150,7 @@ export function PlayerHub({
         <div className="hub-header-tools">
           <button
             className="hub-social-button"
-            aria-label={requests ? `Friends, ${requests} requests` : 'Friends'}
+            aria-label={requests ? `Friends, ${requests} invitations and requests` : 'Friends'}
             onClick={onFriends}
           >
             <Users size={24} />
@@ -157,6 +162,7 @@ export function PlayerHub({
           </button>
         </div>
       </header>
+      {notifications}
       {tab === 'lobby' ? (
         <div className="hub-lobby-content">
           <section className="hub-character" aria-label="Your player">
@@ -174,6 +180,85 @@ export function PlayerHub({
             <PlayerStats stats={games.data?.stats} />
           </section>
           <div className="hub-sidebar">
+            <section className="hub-room-actions" aria-label="Play">
+              <h1>Gather your crew</h1>
+              <div className="hub-play-controls">
+                {joining ? (
+                  <form
+                    className="hub-join-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (busy) return;
+                      const normalized = normalizeRoomReference(code);
+                      if (!validRoomCode(normalized)) {
+                        setJoinError('Enter a valid room code.');
+                        return;
+                      }
+                      setJoinError('');
+                      void onJoin(normalized);
+                    }}
+                  >
+                    <label htmlFor="hub-room-code">Room code</label>
+                    <input
+                      ref={field}
+                      id="hub-room-code"
+                      value={code}
+                      onChange={(event) => {
+                        setCode(event.target.value.toUpperCase());
+                        setJoinError('');
+                      }}
+                      placeholder="AB2C"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      maxLength={8}
+                      aria-invalid={!!joinError}
+                      aria-describedby={joinError ? 'hub-join-error' : undefined}
+                    />
+                    <button className="hub-join-submit" disabled={busy} type="submit" aria-label="Join room">
+                      {busy ? <GameLoader compact /> : <ArrowRight size={22} />}
+                    </button>
+                    <button
+                      className="hub-tool"
+                      type="button"
+                      aria-label="Cancel joining"
+                      disabled={busy}
+                      onClick={() => {
+                        setJoining(false);
+                        setJoinError('');
+                      }}
+                    >
+                      <X size={19} />
+                    </button>
+                    {joinError && (
+                      <span id="hub-join-error" role="alert">
+                        {joinError}
+                      </span>
+                    )}
+                  </form>
+                ) : (
+                  <button
+                    className="hub-room-button hub-join-button"
+                    disabled={busy}
+                    onClick={() => setJoining(true)}
+                  >
+                    Join room <ArrowRight size={20} />
+                  </button>
+                )}
+                {resumable && !joining && (
+                  <button
+                    className="hub-resume-button"
+                    disabled={busy}
+                    onClick={() => onResume(resumable.roomId)}
+                  >
+                    Resume game <History size={21} />
+                  </button>
+                )}
+                <button className="hub-room-button hub-create-button" disabled={busy} onClick={onCreate}>
+                  {busy ? <GameLoader compact label="Opening room…" /> : <Plus size={24} />} Create room
+                </button>
+              </div>
+            </section>
             <MatchHistory
               state={games}
               compact
@@ -210,74 +295,6 @@ export function PlayerHub({
           </a>
           <button className="hub-tool" onClick={onSignOut} aria-label="Sign out">
             <LogOut size={21} />
-          </button>
-        </div>
-        <div className="hub-play-controls">
-          {joining ? (
-            <form
-              className="hub-join-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (busy) return;
-                const normalized = normalizeRoomReference(code);
-                if (!validRoomCode(normalized)) {
-                  setJoinError('Enter a valid room code.');
-                  return;
-                }
-                setJoinError('');
-                void onJoin(normalized);
-              }}
-            >
-              <label htmlFor="hub-room-code">Room code</label>
-              <input
-                ref={field}
-                id="hub-room-code"
-                value={code}
-                onChange={(event) => {
-                  setCode(event.target.value.toUpperCase());
-                  setJoinError('');
-                }}
-                placeholder="AB2C"
-                autoComplete="off"
-                autoCapitalize="characters"
-                spellCheck={false}
-                maxLength={8}
-                aria-invalid={!!joinError}
-                aria-describedby={joinError ? 'hub-join-error' : undefined}
-              />
-              <button className="hub-join-submit" disabled={busy} type="submit" aria-label="Join room">
-                {busy ? <GameLoader compact /> : <ArrowRight size={22} />}
-              </button>
-              <button
-                className="hub-tool"
-                type="button"
-                aria-label="Cancel joining"
-                disabled={busy}
-                onClick={() => {
-                  setJoining(false);
-                  setJoinError('');
-                }}
-              >
-                <X size={19} />
-              </button>
-              {joinError && (
-                <span id="hub-join-error" role="alert">
-                  {joinError}
-                </span>
-              )}
-            </form>
-          ) : (
-            <button className="hub-join-button" disabled={busy} onClick={() => setJoining(true)}>
-              Join room <ArrowRight size={20} />
-            </button>
-          )}
-          {resumable && !joining && (
-            <button className="hub-resume-button" disabled={busy} onClick={() => onResume(resumable.roomId)}>
-              Resume game <History size={21} />
-            </button>
-          )}
-          <button className="gold-button hub-create-button" disabled={busy} onClick={onCreate}>
-            {busy ? <GameLoader compact label="Opening room…" /> : <Plus size={24} />} Create room
           </button>
         </div>
       </footer>

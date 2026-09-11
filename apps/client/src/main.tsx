@@ -23,7 +23,7 @@ import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
 import { preloadGameAssets } from './game-assets.js';
 import { useRoomInvites } from './useRoomInvites.js';
-import { RoomInviteInbox } from './RoomInvitePanel.js';
+import { RoomInviteNotice } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
@@ -105,10 +105,12 @@ import './friends-drawer.css';
 import './room-lobby.css';
 import './history-mobile.css';
 import './resource-counters.css';
+import './lounge.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
   LAST_SEAT_KEY = 'catanova.last-seat.v1';
+const designPreview = import.meta.env.DEV && location.pathname === '/dev/lounge';
 // Consume the OAuth choice once per page load, outside React renders (including StrictMode).
 const arrivalLocation = entryLocation();
 const arrivalInvite = navigationRoomReference(
@@ -116,7 +118,7 @@ const arrivalInvite = navigationRoomReference(
   arrivalLocation.search,
   history.state,
 );
-const arrivalIntent = takeEntryIntent(sessionStorage);
+const arrivalIntent = designPreview ? 'home' : takeEntryIntent(sessionStorage);
 function readJSON<T>(storage: Storage, key: string): T | undefined {
   try {
     const value = storage.getItem(key);
@@ -252,8 +254,12 @@ function App() {
   const roomInvites = useRoomInvites(
     auth.account?.id,
     auth.accessToken,
-    auth.canPlay && !!auth.account && !auth.account.isGuest && !g,
+    auth.canPlay && !!auth.account && !auth.account.isGuest,
   );
+  const incomingInvites = roomInvites.incoming.filter(
+    (incoming) => incoming.roomId !== room?.roomId && incoming.roomId !== invite,
+  );
+  const roomEntryBlocked = room ? 'Leave your current room to join another.' : undefined;
   const [assetProgress, setAssetProgress] = useState(0);
   const [launchVisualExpired, setLaunchVisualExpired] = useState(false);
   const connected = status === 'connected',
@@ -274,6 +280,17 @@ function App() {
   }, [!!g, feedback.sound]);
   const actionPhase = myTurn && g?.phase === 'actions';
   const networkBusy = status === 'connecting' || status === 'reconnecting';
+  const invitationNotice = (
+    <RoomInviteNotice
+      invitations={incomingInvites}
+      busy={!!roomInvites.busy || busy || networkBusy}
+      blockedReason={roomEntryBlocked}
+      error={roomInvites.error}
+      onOpen={openInvitation}
+      onDismiss={(id) => void roomInvites.dismiss(id)}
+      onShowAll={() => setPanel('friends')}
+    />
+  );
   const placementReady = placementValid(placement, g, room?.roomId, me);
   useEffect(() => {
     const change = () => setFullscreen(!!document.fullscreenElement);
@@ -896,6 +913,8 @@ function App() {
           games={playerGames}
           busy={busy || networkBusy}
           initialJoin={entry === 'join'}
+          invitationCount={incomingInvites.length}
+          notifications={panel === 'friends' ? null : invitationNotice}
           onCreate={() => void enterRoom('create')}
           onJoin={(value) => enterRoom('join', value)}
           onResume={resumeGame}
@@ -905,16 +924,7 @@ function App() {
           onSignOut={() => void signOut()}
         />
       )}
-      {playerHome && roomInvites.incoming.length > 0 && (
-        <div className="hub-invitations">
-          <RoomInviteInbox
-            invitations={roomInvites.incoming}
-            busy={!!roomInvites.busy}
-            onOpen={openInvitation}
-            onDismiss={(id) => void roomInvites.dismiss(id)}
-          />
-        </div>
-      )}
+      {!playerHome && panel !== 'friends' && <div className="room-notifications">{invitationNotice}</div>}
       {!room && !playerHome && (
         <EntryScreen
           auth={auth}
@@ -1269,6 +1279,7 @@ function App() {
           room={room && !g ? room : undefined}
           invites={roomInvites}
           onOpenRoom={openInvitation}
+          roomEntryBlocked={roomEntryBlocked}
         />
       )}
       {panel === 'leave' && (
@@ -1293,4 +1304,9 @@ function App() {
     </main>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+const root = createRoot(document.getElementById('root')!);
+if (designPreview) {
+  void import('./dev/LoungePreview.js').then(({ LoungePreview }) => root.render(<LoungePreview />));
+} else {
+  root.render(<App />);
+}

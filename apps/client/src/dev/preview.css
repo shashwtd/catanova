@@ -1,0 +1,46 @@
+.preview-switcher {
+  position: fixed;
+  bottom: 6px;
+  left: 8px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #897b52;
+  border-radius: 7px;
+  background: #172920;
+  color: #f8ebcd;
+  font:
+    12px Barlow,
+    sans-serif;
+}
+.preview-switcher span {
+  padding-inline: 6px;
+}
+.preview-switcher button {
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  background: #344d3d;
+  text-transform: capitalize;
+}
+.preview-switcher button[aria-pressed='true'] {
+  color: #302a1b;
+  background: #dfc07e;
+}
+.design-preview.player-home .player-hub {
+  padding-bottom: 60px;
+}
+@media (max-width: 650px) {
+  .preview-switcher {
+    bottom: 2px;
+    left: 2px;
+    font-size: 11px;
+  }
+  .preview-switcher span {
+    display: none;
+  }
+}

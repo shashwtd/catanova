@@ -193,3 +193,12 @@ test('guests keep the same player lobby and profile but have a clear account-lin
   const regular = renderHub();
   assert.ok(!regular.includes('Link Google to add friends.'));
 });
+
+test('room invitations contribute to the friends badge and appear before the main hub content', () => {
+  const html = renderHub({
+    invitationCount: 2,
+    notifications: createElement('aside', { 'aria-label': 'Game invitation' }, 'Mossling invited you'),
+  });
+  assert.ok(html.includes('Friends, 2 invitations and requests'));
+  assert.ok(html.indexOf('Mossling invited you') < html.indexOf('hub-lobby-content'));
+});
