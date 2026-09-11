@@ -49,6 +49,8 @@ The [isolated recovery check](verify-recovery.mjs) prepares a two-client fixture
 
 ## Deploy a reviewed update
 
+Merging a pull request into `main` does **not** deploy it. The GitHub workflow runs checks only; there is no Azure deployment job or server auto-pull. A merge already updates `main`, so no second push is needed. Deploy the reviewed merge commit with the process below.
+
 Finish active games where possible and record the current commit and image ID before updating. Confirm a recent successful off-VM backup; a manual run uses `systemctl start catanova-backup.service`. Check its result before proceeding.
 
 Enter the **reviewed full commit hash** below. This subshell stops on failure, refuses a dirty checkout, fetches the source, updates only the revision in the external environment file, builds the new game image, and replaces the container. The database and certificate volumes remain in place.

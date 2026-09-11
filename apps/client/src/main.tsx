@@ -16,12 +16,15 @@ import { useGameAttention } from './useGameAttention.js';
 import { FantasyTransition } from './FantasyTransition.js';
 import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
 import { useAuth, entryLocation } from './auth.js';
-import { Avatar, ProfileEditor } from './Profile.js';
+import { Avatar } from './Profile.js';
 import { Lobby, Invite } from './Lobby.js';
 import { EntryScreen } from './EntryScreen.js';
 import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
 import { FriendsPanel } from './FriendsPanel.js';
+import { PlayerHub, PlayerProfile } from './PlayerHub.js';
+import { usePlayerGames } from './usePlayerGames.js';
+import { showPlayerHome } from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
 import { ConnectionPanel } from './ConnectionPanel.js';
 import { BoardViewport } from './BoardViewport.js';
@@ -87,6 +90,7 @@ import './awards.css';
 import './game-guidance.css';
 import './mobile-layout.css';
 import './disconnect.css';
+import './player-hub.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -215,6 +219,12 @@ function App() {
     player = g?.players.find((p) => p.id === me),
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me && !player?.resigned;
+  const playerHome = !room && showPlayerHome(auth, invite);
+  const playerGames = usePlayerGames(
+    auth.account?.id,
+    auth.accessToken,
+    auth.canPlay && (!g || !!g.winner || panel === 'profile'),
+  );
   const connected = status === 'connected',
     disabled = !connected || busy || feedback.presentationBusy || !!player?.resigned || !!room?.paused,
     hand = player?.hand ?? emptyHand();
@@ -494,7 +504,7 @@ function App() {
     e.preventDefault();
     await enterRoom(kind);
   }
-  async function enterRoom(kind: 'create' | 'join') {
+  async function enterRoom(kind: 'create' | 'join', requestedCode?: string) {
     setError('');
     if (!auth.canPlay) {
       await auth.signIn(invite ? roomPath(invite) : '/');
@@ -505,7 +515,7 @@ function App() {
       setError('Enter your name');
       return;
     }
-    const target = normalizeRoomReference((entry === 'invite' ? invite : code) ?? '');
+    const target = normalizeRoomReference(requestedCode ?? (entry === 'invite' ? invite : code) ?? '');
     if (kind === 'join' && (!target || !validRoomCode(target))) {
       setError('Enter a four-character room code');
       return;
@@ -526,6 +536,14 @@ function App() {
   }
   async function signOut() {
     if (await auth.signOut()) home(true);
+  }
+  function resumeGame(roomId: string) {
+    if (room || busy || networkBusy || !auth.canPlay) return;
+    setPanel(null);
+    setError('');
+    sessionStorage.removeItem(OUTBOX_KEY);
+    setBusy(true);
+    connect(newSession(auth.profile.name, roomId, auth.profile));
   }
   function chooseRobber(hex: number) {
     if (!g || !me || disabled || !myTurn || g.phase !== 'robber' || hex === g.robber) return;
@@ -592,7 +610,7 @@ function App() {
             : (gameNotice?.prompt ?? '');
   return (
     <main
-      className={`game-world ${g ? 'playing' : room ? 'lobby' : 'entry-world'}`}
+      className={`game-world ${g ? 'playing' : room ? 'lobby' : playerHome ? 'player-home' : 'entry-world'}`}
       data-motion={reducedMotion ? 'reduced' : 'full'}
       onClickCapture={(e) => {
         const button = (e.target as HTMLElement).closest('button');
@@ -724,7 +742,23 @@ function App() {
           )}
         </div>
       )}
-      {!room && (
+      {playerHome && (
+        <PlayerHub
+          key={auth.account?.id}
+          auth={auth}
+          games={playerGames}
+          busy={busy || networkBusy}
+          initialJoin={entry === 'join'}
+          onCreate={() => void enterRoom('create')}
+          onJoin={(value) => enterRoom('join', value)}
+          onResume={resumeGame}
+          onProfile={() => setPanel('profile')}
+          onFriends={() => setPanel('friends')}
+          onSettings={() => setPanel('settings')}
+          onSignOut={() => void signOut()}
+        />
+      )}
+      {!room && !playerHome && (
         <EntryScreen
           auth={auth}
           entry={entry}
@@ -1043,18 +1077,22 @@ function App() {
               <p className="muted">Change your avatar and username in the lobby before your next game.</p>
             </>
           ) : (
-            <ProfileEditor
-              initial={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
+            <PlayerProfile
+              key={auth.account?.id ?? 'local'}
+              auth={auth}
+              profile={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
+              games={playerGames}
               busy={busy}
-              checkUsername={auth.config?.mode === 'authenticated' ? auth.checkUsername : undefined}
+              resumeDisabled={!!room || networkBusy}
               onSave={saveProfile}
+              onResume={resumeGame}
             />
           )}
         </Dialog>
       )}
       {panel === 'friends' && (
         <Dialog title="Friends" onClose={() => setPanel(null)}>
-          <FriendsPanel auth={auth} />
+          <FriendsPanel key={auth.account?.id} auth={auth} />
         </Dialog>
       )}
       {panel === 'leave' && (
