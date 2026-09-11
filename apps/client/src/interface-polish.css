@@ -1105,3 +1105,11 @@
     height: 23px;
   }
 }
+
+.trade-offer-allowance {
+  margin: 10px 0 0;
+  color: #74664d;
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.5;
+}

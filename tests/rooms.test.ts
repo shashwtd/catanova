@@ -140,7 +140,7 @@ test('lobby leave frees capacity, transfers hosting and revokes the old seat wit
   assert.equal(receipt.revision, 2);
   assert.equal(store.snapshot(host.room_id).players[0]!.id, seats[1]!.id);
   assert.equal(store.snapshot(host.room_id).players.length, 3);
-  assert.throws(() => store.enter('resume', session.token, session.name, host.room_id), /left this lobby/);
+  assert.throws(() => store.enter('resume', session.token, session.name, host.room_id), /permanently left/);
   assert.deepEqual(store.leave(host, 'leave-this-lobby', 1), { ...receipt, duplicate: true });
   assert.throws(() => store.leave(host, 'leave-this-lobby', 2), /different intent/);
   assert.throws(() => store.leave(host, 'earlier-accepted-command', 2), /already used/);
@@ -171,7 +171,7 @@ test('failed lobby leave is rolled back and can be retried with the same command
   assert.equal(store.snapshot(host.room_id).players.length, 0);
 });
 
-test('intentional leave stops reconnecting; active-game seats and state remain resumable', async (t) => {
+test('intentional leave stops reconnecting and permanently resigns a live seat without removing its board pieces', async (t) => {
   const server = await startServer({ port: 0, databasePath: ':memory:' });
   const clients: Connection[] = [];
   t.after(async () => {
@@ -203,15 +203,22 @@ test('intentional leave stops reconnecting; active-game seats and state remain r
   await until(() => !!host.state?.game);
   const saved = structuredClone(server.store.loadGame(host.session.roomId!)!);
   const left = await host.leave();
-  assert.equal(left.released, false);
+  assert.equal(left.released, true);
   await until(() => host.status === 'closed');
   assert.equal(server.store.snapshot(host.session.roomId!).players.length, 3);
-  assert.deepEqual(server.store.loadGame(host.session.roomId!), saved);
+  const after = server.store.loadGame(host.session.roomId!)!;
+  assert.equal(after.players.find((p) => p.id === host.playerId)!.resigned, true);
+  assert.deepEqual(after.roads, saved.roads);
+  assert.deepEqual(after.buildings, saved.buildings);
+  assert.equal(after.winner, null, 'two remaining players continue');
   const resumed = new Connection(server.url, { ...host.session });
   clients.push(resumed);
+  let resumeError = '';
+  resumed.subscribe((message) => {
+    if (message.type === 'error') resumeError = message.code;
+  });
   resumed.start();
-  await until(() => resumed.status === 'connected');
-  assert.equal(resumed.playerId, host.playerId);
-  assert.equal(resumed.state!.revision, left.revision);
-  assert.deepEqual(server.store.loadGame(host.session.roomId!), saved);
+  await until(() => resumeError === 'SEAT_LEFT');
+  assert.equal(resumed.status, 'closed');
+  assert.deepEqual(server.store.loadGame(host.session.roomId!), after);
 });

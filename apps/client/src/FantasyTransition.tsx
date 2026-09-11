@@ -1,4 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
+import type { RoomPlayer } from '../../../packages/protocol/src/index.js';
+import { Avatar } from './Profile.js';
+import { GameLoader } from './GameLoader.js';
 import type { CSSProperties } from 'react';
 
 export const FANTASY_TRANSITION_MS = 760;
@@ -9,27 +12,37 @@ export function FantasyTransition({
   id,
   onComplete,
   reducedMotion = false,
+  waiting = false,
+  players = [],
+  readyPlayers = [],
+  progress = 0,
 }: {
   id: string;
   onComplete?: () => void;
   reducedMotion?: boolean;
+  waiting?: boolean;
+  players?: RoomPlayer[];
+  readyPlayers?: string[];
+  progress?: number;
 }) {
   const paintId = useId().replaceAll(':', '');
   const complete = useRef(onComplete);
   complete.current = onComplete;
   useEffect(() => {
+    if (waiting) return;
     const quiet = reducedMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const timer = window.setTimeout(
       () => complete.current?.(),
       quiet ? FANTASY_REDUCED_MS : FANTASY_TRANSITION_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [id, reducedMotion]);
+  }, [id, reducedMotion, waiting]);
   return (
     <div
       key={id}
-      className={`fantasy-transition ${reducedMotion ? 'fantasy-transition-reduced' : ''}`}
-      aria-hidden="true"
+      className={`fantasy-transition ${waiting ? 'is-loading' : ''} ${reducedMotion ? 'fantasy-transition-reduced' : ''}`}
+      role="status"
+      aria-label={waiting ? 'Preparing the island' : 'Entering the game'}
       data-transition-id={id}
       style={{ '--fantasy-duration': `${FANTASY_TRANSITION_MS}ms` } as CSSProperties}
     >
@@ -64,6 +77,21 @@ export function FantasyTransition({
           </g>
         </svg>
       ))}
+      {waiting && (
+        <div className="island-loading">
+          <GameLoader label="Preparing the island…" />
+          <div className="island-loading-players">
+            {players.map((p) => (
+              <div key={p.id} className={readyPlayers.includes(p.id) ? 'is-ready' : ''}>
+                <Avatar profile={p.profile} />
+                <strong>{p.name}</strong>
+                <span>{readyPlayers.includes(p.id) ? 'Ready' : 'Loading'}</span>
+              </div>
+            ))}
+          </div>
+          <progress value={progress} max={1} aria-label="Game art loaded" />
+        </div>
+      )}
       <svg className="fantasy-compass" viewBox="0 0 100 100">
         <path d="M50 5L57 39L83 17L61 43L95 50L61 57L83 83L57 61L50 95L43 61L17 83L39 57L5 50L39 43L17 17L43 39Z" />
         <circle cx="50" cy="50" r="13" />

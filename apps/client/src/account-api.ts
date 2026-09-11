@@ -5,6 +5,7 @@ import type {
   UsernameAvailability,
 } from '../../../packages/protocol/src/profile.js';
 import type { FriendPresenceState, PlayerGames } from '../../../packages/protocol/src/player-hub.js';
+import type { RoomInvite, RoomInvitesState } from '../../../packages/protocol/src/room-invites.js';
 
 export class AccountApiError extends Error {
   constructor(
@@ -46,6 +47,12 @@ export async function accountRequest<T>(
   return value as T;
 }
 export const accountApi = {
+  roomInvites: (token: string | undefined, signal?: AbortSignal) =>
+    accountRequest<RoomInvitesState>(token, '/api/account/room-invites', 'GET', undefined, signal),
+  sendRoomInvite: (token: string | undefined, roomId: string, other: string, signal?: AbortSignal) =>
+    accountRequest<RoomInvite>(token, '/api/account/room-invites', 'POST', { roomId, other }, signal),
+  dismissRoomInvite: (token: string | undefined, id: string, signal?: AbortSignal) =>
+    accountRequest<{ dismissed: true }>(token, '/api/account/room-invites', 'DELETE', { id }, signal),
   get: (token: string | undefined) => accountRequest<Account>(token, '/api/account'),
   touch: (token: string | undefined) => accountRequest<Account>(token, '/api/account/activity', 'POST'),
   presence: (token: string | undefined, signal?: AbortSignal) =>

@@ -207,5 +207,18 @@ test('new-match curtain has two opposing cloud shapes and a bounded reduced-moti
   assert.equal([...html.matchAll(/class="fantasy-clouds fantasy-clouds-/g)].length, 2);
   assert.match(html, /translate\(700 0\) scale\(-1 1\)/);
   assert.ok(FANTASY_TRANSITION_MS >= 600 && FANTASY_TRANSITION_MS <= 850);
-  assert.match(html, /aria-hidden="true"/);
+  assert.match(html, /aria-label="Entering the game"/);
+  const loading = renderToStaticMarkup(
+    createElement(FantasyTransition, {
+      id: 'loading',
+      waiting: true,
+      players: [{ id: 'a', name: 'Captain', connected: true }],
+      readyPlayers: ['a'],
+      progress: 1,
+    }),
+  );
+  assert.match(loading, /is-loading/);
+  assert.match(loading, /Preparing the island/);
+  assert.match(loading, /Captain/);
+  assert.match(loading, /Game art loaded/);
 });

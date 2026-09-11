@@ -27,9 +27,7 @@ export function PlayerRail({
     fallback.current = { server: room.serverNow, local: Date.now() };
   const serverNow = now + (clockOffset ?? fallback.current.server - fallback.current.local);
   const counting =
-    !room.paused &&
-    !game.winner &&
-    room.players.some((seat) => !seat.connected && seat.resignAt !== undefined);
+    game.phase !== 'finished' && room.players.some((seat) => !seat.connected && seat.resignAt !== undefined);
   useEffect(() => {
     if (!counting) return;
     const update = () => setNow(Date.now());
@@ -45,7 +43,7 @@ export function PlayerRail({
     <aside className="player-rail" aria-label="Players">
       {game.players.map((p, i) => {
         const seat = room.players.find((s) => s.id === p.id),
-          active = game.players[game.active]?.id === p.id && !game.winner && !p.resigned,
+          active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
           activity = playerTurnActivity(game, p.id),
           road = game.longestRoad === p.id,
           army = game.largestArmy === p.id;
@@ -128,7 +126,7 @@ export function PlayerRail({
               </div>
               <DisconnectStatus
                 resigned={p.resigned}
-                deadline={!seat?.connected && !game.winner ? seat?.resignAt : undefined}
+                deadline={!seat?.connected && game.phase !== 'finished' ? seat?.resignAt : undefined}
                 now={serverNow}
                 paused={room.paused}
               />

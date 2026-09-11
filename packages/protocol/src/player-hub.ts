@@ -1,6 +1,6 @@
 import type { FriendsState, Profile, PublicAccount } from './profile.js';
 
-export type MatchOutcome = 'playing' | 'won' | 'lost' | 'resigned';
+export type MatchOutcome = 'playing' | 'won' | 'lost' | 'resigned' | 'abandoned';
 export type MatchPlayer = {
   /** A seat ID in this match, never the opponent's authentication ID. */
   id: string;
@@ -22,7 +22,7 @@ export type MatchSummary = {
   resumable: boolean;
 };
 export type PlayerGames = {
-  /** Played means completed matches, including losses after resignation. */
+  /** Played means matches with a winner, including losses after resignation; abandoned games do not count. */
   stats: { played: number; wins: number };
   games: MatchSummary[];
   nextCursor: string | null;

@@ -74,6 +74,7 @@ export class Connection {
       onMetrics?: (metrics: NetworkMetrics) => void;
       accessToken?: () => Promise<string | undefined>;
       pending?: PendingCommand;
+      preloadGame?: boolean;
       minRetryMs?: number;
       maxRetryMs?: number;
       pingIntervalMs?: number;
@@ -182,6 +183,7 @@ export class Connection {
           type,
           version: PROTOCOL_VERSION,
           ...this.session,
+          ...(this.options.preloadGame ? { preloadGame: true } : {}),
           ...(accessToken ? { accessToken } : {}),
         });
       } catch {
@@ -325,6 +327,9 @@ export class Connection {
       this.pending = { message, resolve, reject };
       this.send(message);
     });
+  }
+  launchReady(id: string, success: boolean) {
+    this.send({ type: 'launchReady', id, success });
   }
   increment() {
     return this.submit({ type: 'increment' });

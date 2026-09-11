@@ -120,41 +120,73 @@ test('batch resignations are atomic, retry safe, preserve pieces and release a t
   }
 });
 
-test('all players offline pauses clocks and grace; a human return grants fresh time without simulating missed turns', () => {
+test('all players offline freezes gameplay but continuous grace closes the match without a winner', () => {
   let now = 1000000;
   const store = new Store(':memory:', { now: () => now, random: () => 0.34, trackPresence: true });
   try {
     const { roomId, seats } = room(store, 3, true);
     for (const seat of seats) store.setConnected(seat, false);
     const before = store.loadGame(roomId)!;
-    now += 86400000;
     assert.equal(store.snapshot(roomId).paused, true);
-    assert.deepEqual(store.dueRooms(), []);
-    assert.equal(store.expireRoom(roomId), false);
-    assert.deepEqual(store.loadGame(roomId), before);
-    store.setConnected(seats[0]!, true);
-    assert.equal(store.snapshot(roomId).paused, undefined);
-    assert.equal(store.clock(roomId)!.deadlineAt, now + 90000);
-    assert.equal(presenceOf(store, seats[1]!).resignAt, now + RECONNECT_GRACE_MS);
-    assert.equal(store.expireRoom(roomId), false);
     now += 90000;
-    for (let i = 0; i < 20; i++) store.expireRoom(roomId);
-    assert.equal(store.loadGame(roomId)!.turn, before.turn + 1);
-    assert.equal(store.history(roomId).entries.filter((e) => e.automatic && e.kind === 'roll').length, 1);
-    assert.equal(store.clock(roomId)!.deadlineAt, now + 90000);
+    for (let i = 0; i < 20; i++) assert.equal(store.expireRoom(roomId), false);
+    assert.deepEqual(store.loadGame(roomId), before);
+    assert.deepEqual(store.dueRooms(), []);
+    now += RECONNECT_GRACE_MS;
+    assert.deepEqual(store.dueRooms(), [roomId]);
+    assert.equal(store.expireRoom(roomId), true);
+    const after = store.loadGame(roomId)!;
+    assert.equal(after.phase, 'finished');
+    assert.equal(after.winner, null);
+    assert.equal(after.finishReason, 'abandoned');
+    assert.equal(after.turn, before.turn);
+    assert.deepEqual(after.roads, before.roads);
+    assert.deepEqual(after.buildings, before.buildings);
+    assert.equal(store.clock(roomId), undefined);
+    assert.deepEqual(store.dueRooms(), []);
+    now += 86400000;
+    for (let i = 0; i < 20; i++) assert.equal(store.expireRoom(roomId), false);
+    store.setConnected(seats[0]!, true);
+    assert.deepEqual(store.loadGame(roomId), after, 'returning cannot resurrect the abandoned game');
+    assert.equal(store.history(roomId).entries.filter((e) => e.automatic && e.kind === 'roll').length, 0);
+    conserved(after);
   } finally {
     store.close();
   }
 });
 
-test('restart does not forfeit offline players and retains board, ledger and seat ownership', () => {
+test('a return before the deadline gives a fresh turn clock without renewing anyone else’s absence', () => {
+  let now = 1000000;
+  const store = new Store(':memory:', { now: () => now, trackPresence: true });
+  try {
+    const { roomId, seats } = room(store, 3, true);
+    for (const seat of seats) store.setConnected(seat, false);
+    const deadline = presenceOf(store, seats[1]!).resignAt;
+    now += 60000;
+    store.setConnected(seats[0]!, true);
+    assert.equal(store.snapshot(roomId).paused, undefined);
+    assert.equal(store.clock(roomId)!.deadlineAt, now + 90000);
+    assert.equal(presenceOf(store, seats[1]!).resignAt, deadline);
+    store.setConnected(seats[0]!, false);
+    now += 30000;
+    store.setConnected(seats[0]!, true);
+    assert.equal(presenceOf(store, seats[1]!).resignAt, deadline);
+    now = deadline!;
+    store.expireRoom(roomId);
+    assert.equal(store.loadGame(roomId)!.winner, seats[0]!.id);
+    assert.equal(store.loadGame(roomId)!.finishReason, 'resignation');
+  } finally {
+    store.close();
+  }
+});
+
+test('server outage gives previously online players recovery grace and preserves the board, ledger and seat', () => {
   const dir = mkdtempSync(join(tmpdir(), 'catanova-presence-')),
     path = join(dir, 'game.sqlite');
   let now = 1000000,
     store = new Store(path, { now: () => now, trackPresence: true });
   try {
     const { roomId, seats, sessions } = room(store, 3, true);
-    store.setConnected(seats[1]!, false);
     const game = store.loadGame(roomId)!,
       history = store.history(roomId);
     store.close();
@@ -164,13 +196,40 @@ test('restart does not forfeit offline players and retains board, ledger and sea
     assert.equal(store.expireRoom(roomId), false);
     assert.deepEqual(store.loadGame(roomId), game);
     assert.deepEqual(store.history(roomId), history);
+    const deadline = presenceOf(store, seats[1]!).resignAt;
+    assert.equal(deadline, now + RECONNECT_GRACE_MS);
     const seat = store.enter('resume', sessions[0]!.token, sessions[0]!.name, roomId);
     store.setConnected(seat, true);
     assert.equal(seat.id, seats[0]!.id);
-    assert.equal(presenceOf(store, seats[1]!).resignAt, now + RECONNECT_GRACE_MS);
+    assert.equal(presenceOf(store, seats[1]!).resignAt, deadline);
     assert.equal(store.clock(roomId)!.deadlineAt, now + 90000);
-    assert.equal(store.expireRoom(roomId), false);
     assert.deepEqual(store.loadGame(roomId), game);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('already disconnected deadlines survive repeated restarts and expire without a returning player', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'catanova-grace-')),
+    path = join(dir, 'game.sqlite');
+  let now = 1000000,
+    store = new Store(path, { now: () => now, trackPresence: true });
+  try {
+    const { roomId, seats } = room(store, 2, true);
+    for (const seat of seats) store.setConnected(seat, false);
+    const deadline = presenceOf(store, seats[0]!).resignAt;
+    for (let i = 0; i < 2; i++) {
+      store.close();
+      now += 60000;
+      store = new Store(path, { now: () => now, trackPresence: true });
+      assert.equal(presenceOf(store, seats[0]!).resignAt, deadline);
+      assert.equal(store.expireRoom(roomId), false);
+    }
+    now = deadline!;
+    assert.equal(store.expireRoom(roomId), true);
+    assert.equal(store.loadGame(roomId)!.finishReason, 'abandoned');
+    assert.equal(store.loadGame(roomId)!.winner, null);
   } finally {
     store.close();
     rmSync(dir, { recursive: true, force: true });
@@ -521,4 +580,225 @@ test('real disconnected sockets publish a deadline and the scheduler broadcasts 
   assert.equal(a.state!.game!.winner, a.playerId);
   assert.equal(a.state!.game!.finishReason, 'resignation');
   assert.equal(server.store.history(a.session.roomId!).entries.filter((e) => e.kind === 'resign').length, 1);
+});
+
+test('staggered all-offline deadlines never hand an absent survivor an arbitrary win', () => {
+  let now = 1000000;
+  const store = new Store(':memory:', { now: () => now, trackPresence: true });
+  try {
+    const { roomId, seats } = room(store, 2, true);
+    store.setConnected(seats[0]!, false);
+    const firstDeadline = presenceOf(store, seats[0]!).resignAt!;
+    now += 60000;
+    store.setConnected(seats[1]!, false);
+    const lastDeadline = presenceOf(store, seats[1]!).resignAt!;
+    now = firstDeadline;
+    store.expireRoom(roomId);
+    const waiting = store.loadGame(roomId)!;
+    assert.equal(waiting.players[0]!.resigned, true);
+    assert.equal(waiting.winner, null);
+    assert.notEqual(waiting.phase, 'finished');
+    assert.equal(store.snapshot(roomId).paused, true);
+    assert.equal(presenceOf(store, seats[1]!).resignAt, lastDeadline);
+    store.setConnected(seats[0]!, true);
+    assert.equal(store.snapshot(roomId).paused, true, 'a resigned spectator cannot restart autoplay');
+    now = lastDeadline;
+    store.expireRoom(roomId);
+    assert.equal(store.loadGame(roomId)!.winner, null);
+    assert.equal(store.loadGame(roomId)!.finishReason, 'abandoned');
+    assert.equal(store.history(roomId).entries.filter((e) => e.automatic && e.kind === 'roll').length, 0);
+  } finally {
+    store.close();
+  }
+});
+
+test('a sole surviving player returning before their own deadline wins by resignation, without rolling', () => {
+  let now = 1000000;
+  const store = new Store(':memory:', { now: () => now, trackPresence: true });
+  try {
+    const { roomId, seats } = room(store, 2, true);
+    store.setConnected(seats[0]!, false);
+    now += 60000;
+    store.setConnected(seats[1]!, false);
+    now += 120000;
+    store.expireRoom(roomId);
+    assert.equal(store.loadGame(roomId)!.winner, null);
+    store.setConnected(seats[1]!, true);
+    assert.equal(store.loadGame(roomId)!.winner, seats[1]!.id);
+    assert.equal(store.loadGame(roomId)!.finishReason, 'resignation');
+    assert.equal(store.clock(roomId), undefined);
+    assert.equal(store.history(roomId).entries.filter((e) => e.automatic && e.kind === 'roll').length, 0);
+  } finally {
+    store.close();
+  }
+});
+
+test('explicit Leave immediately and permanently resigns, atomically releases the seat, and preserves final results', () => {
+  let now = 1000000;
+  const store = new Store(':memory:', { now: () => now, trackPresence: true });
+  try {
+    const { roomId, seats, sessions } = room(store, 2, true);
+    for (const seat of seats)
+      store.db.prepare('UPDATE seats SET user_id=? WHERE id=?').run(seat.name, seat.id);
+    const before = store.loadGame(roomId)!,
+      revision = store.snapshot(roomId).revision;
+    store.db.exec(
+      "CREATE TEMP TRIGGER fail_leave BEFORE INSERT ON leave_receipts BEGIN SELECT RAISE(ABORT,'Leave unavailable'); END",
+    );
+    assert.throws(() => store.leave(seats[1]!, 'manual-leave', revision), /Leave unavailable/);
+    assert.deepEqual(store.loadGame(roomId), before);
+    assert.equal(store.snapshot(roomId).revision, revision);
+    assert.equal(store.hasAccountSeat(roomId, seats[1]!.name), true);
+    store.db.exec('DROP TRIGGER fail_leave');
+    const receipt = store.leave(seats[1]!, 'manual-leave', revision);
+    assert.equal(receipt.released, true);
+    assert.equal(receipt.revision, revision + 1);
+    assert.equal(store.loadGame(roomId)!.winner, seats[0]!.id);
+    assert.equal(store.loadGame(roomId)!.players[1]!.resigned, true);
+    assert.equal(store.hasAccountSeat(roomId, seats[1]!.name), false);
+    assert.equal(
+      store.snapshot(roomId).players.length,
+      2,
+      'the departed player keeps their identity on the board',
+    );
+    assert.deepEqual(store.loadGame(roomId)!.roads, before.roads);
+    assert.deepEqual(store.loadGame(roomId)!.buildings, before.buildings);
+    assert.equal(store.leave(seats[1]!, 'manual-leave', revision).duplicate, true);
+    assert.throws(
+      () =>
+        store.enter('resume', sessions[1]!.token, seats[1]!.name, roomId, {
+          id: seats[1]!.name,
+          name: seats[1]!.name,
+          expiresAt: now + 1000,
+        }),
+      /permanently left/,
+    );
+    const records = store.accountGames(seats[1]!.name);
+    assert.equal(records.games[0]!.outcome, 'resigned');
+    assert.equal(records.games[0]!.resumable, false);
+    assert.deepEqual(records.stats, { played: 1, wins: 0 });
+    const finalGame = store.loadGame(roomId)!;
+    store.leave(seats[0]!, 'winner-leaves', store.snapshot(roomId).revision);
+    assert.deepEqual(store.loadGame(roomId), finalGame, 'leaving a finished game never changes who won');
+    assert.deepEqual(store.accountGames(seats[0]!.name).stats, { played: 1, wins: 1 });
+    assert.equal(store.history(roomId).entries.filter((e) => e.kind === 'leave').length, 2);
+    conserved(finalGame);
+  } finally {
+    store.close();
+  }
+});
+
+test('manual Leave preserves rule-valid progress through setup, discard, robber and free-road obligations', () => {
+  for (const phase of ['setupSettlement', 'setupRoad', 'discard', 'robber', 'freeRoads'] as const) {
+    const store = new Store(':memory:', { now: () => 1000000, trackPresence: true });
+    try {
+      const { roomId, seats } = room(store, 3, false, true);
+      const game = store.loadGame(roomId)!;
+      game.phase = phase;
+      if (phase === 'setupRoad') {
+        const vertex = gameView(game, seats[0]!.id).legal.settlements[0] ?? 0;
+        game.setupVertex = vertex;
+        game.buildings[vertex] = { player: seats[0]!.id, kind: 'settlement' };
+      } else if (!phase.startsWith('setup')) {
+        game.turn = 2;
+        game.returnPhase = 'actions';
+        game.dice = [3, 4];
+        if (phase === 'freeRoads') game.freeRoads = 2;
+        if (phase === 'discard') {
+          game.players[0]!.hand.wood = 8;
+          game.bank.wood -= 8;
+          game.players[1]!.hand.brick = 8;
+          game.bank.brick -= 8;
+          game.discards = { [seats[0]!.id]: 4, [seats[1]!.id]: 4 };
+        }
+      }
+      // Exercise legacy saved mandatory phases through the same durable lifecycle path.
+      store.db.prepare('DELETE FROM game_events WHERE room_id=?').run(roomId);
+      store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(game), roomId);
+      store.leave(seats[0]!, 'phase-leave', store.snapshot(roomId).revision);
+      let after = store.loadGame(roomId)!;
+      assert.equal(after.players[0]!.resigned, true, phase);
+      assert.deepEqual(after.roads, game.roads);
+      assert.deepEqual(after.buildings, game.buildings);
+      assert.equal(after.winner, null);
+      if (phase === 'discard') {
+        assert.deepEqual(after.discards, { [seats[1]!.id]: 4 });
+        store.action(seats[1]!, 'remaining-discard', store.snapshot(roomId).revision, {
+          kind: 'discard',
+          resources: { ...emptyHand(), brick: 4 },
+        });
+        after = store.loadGame(roomId)!;
+      }
+      assert.equal(activePlayer(after).id, seats[1]!.id);
+      if (phase === 'robber' || phase === 'discard') assert.equal(after.phase, 'robber');
+      else if (phase.startsWith('setup')) assert.equal(after.phase, 'setupSettlement');
+      else {
+        assert.equal(after.phase, 'roll');
+        assert.equal(after.freeRoads, 0);
+      }
+      conserved(after);
+    } finally {
+      store.close();
+    }
+  }
+});
+
+test('legacy long-running paused saves receive one migration grace and end honestly without rewinding history', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'catanova-legacy-paused-')),
+    path = join(dir, 'game.sqlite');
+  let now = 1000000,
+    store = new Store(path, { now: () => now, trackPresence: true });
+  try {
+    const { roomId, seats } = room(store, 2, true);
+    for (const seat of seats)
+      store.db.prepare('UPDATE seats SET user_id=? WHERE id=?').run(seat.name, seat.id);
+    const legacy = store.loadGame(roomId)!;
+    legacy.turn = 600;
+    store.db.prepare('DELETE FROM game_events WHERE room_id=?').run(roomId);
+    store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(legacy), roomId);
+    store.db.prepare('UPDATE room_presence SET state=?,next_deadline=NULL WHERE room_id=?').run(
+      JSON.stringify({
+        pausedAt: now - 86400000,
+        seats: Object.fromEntries(
+          seats.map((s) => [
+            s.id,
+            { disconnectedAt: now - 86400000, resignAt: now - 86400000 + RECONNECT_GRACE_MS },
+          ]),
+        ),
+      }),
+      roomId,
+    );
+    const revision = store.snapshot(roomId).revision;
+    store.close();
+    now += 86400000;
+    store = new Store(path, { now: () => now, trackPresence: true });
+    assert.equal(store.expireRoom(roomId), false);
+    assert.deepEqual(store.loadGame(roomId), legacy);
+    assert.equal(store.snapshot(roomId).revision, revision);
+    const deadline = presenceOf(store, seats[0]!).resignAt!;
+    assert.equal(deadline, now + RECONNECT_GRACE_MS);
+    store.close();
+    now += 60000;
+    store = new Store(path, { now: () => now, trackPresence: true });
+    assert.equal(presenceOf(store, seats[0]!).resignAt, deadline, 'the migration grace happens once');
+    now = deadline;
+    store.expireRoom(roomId);
+    const after = store.loadGame(roomId)!;
+    assert.equal(after.turn, 600);
+    assert.equal(after.finishReason, 'abandoned');
+    assert.deepEqual(after.roads, legacy.roads);
+    assert.deepEqual(after.buildings, legacy.buildings);
+    const history = store.history(roomId).entries;
+    assert.equal(history.filter((e) => e.kind === 'legacy').length, 1);
+    assert.equal(history.filter((e) => e.kind === 'abandoned').length, 1);
+    const record = store.accountGames(seats[0]!.name);
+    assert.equal(record.games[0]!.outcome, 'abandoned');
+    assert.equal(record.games[0]!.resumable, false);
+    assert.equal(record.games[0]!.finishedAt, now);
+    assert.equal(record.games[0]!.turns, 600);
+    assert.deepEqual(record.stats, { played: 0, wins: 0 });
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

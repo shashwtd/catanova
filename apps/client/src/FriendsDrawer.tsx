@@ -2,9 +2,24 @@ import { useEffect, useId, useRef } from 'react';
 import type { useAuth } from './auth.js';
 import { Users, X } from './GameIcons.js';
 import { FriendsPanel } from './FriendsPanel.js';
+import type { RoomState } from '../../../packages/protocol/src/index.js';
+import type { RoomInvitesController } from './useRoomInvites.js';
+import { RoomInvitePanel, RoomInviteInbox } from './RoomInvitePanel.js';
 
 /** Native modality keeps focus and touch interactions inside the drawer. */
-export function FriendsDrawer({ auth, onClose }: { auth: ReturnType<typeof useAuth>; onClose: () => void }) {
+export function FriendsDrawer({
+  auth,
+  onClose,
+  room,
+  invites,
+  onOpenRoom,
+}: {
+  auth: ReturnType<typeof useAuth>;
+  onClose: () => void;
+  room?: RoomState;
+  invites?: RoomInvitesController;
+  onOpenRoom?: (roomId: string) => void;
+}) {
   const dialog = useRef<HTMLDialogElement>(null),
     surface = useRef<HTMLDivElement>(null),
     onCloseRef = useRef(onClose),
@@ -68,12 +83,36 @@ export function FriendsDrawer({ auth, onClose }: { auth: ReturnType<typeof useAu
           <span className="friends-drawer-emblem" aria-hidden="true">
             <Users size={33} />
           </span>
-          <h2 id={headingId}>Friends</h2>
-          <button type="button" className="friends-drawer-close" aria-label="Close friends" onClick={close}>
+          <h2 id={headingId}>{room ? 'Invite friends' : 'Friends'}</h2>
+          <button
+            type="button"
+            className="friends-drawer-close"
+            aria-label={room ? 'Close invitations' : 'Close friends'}
+            onClick={close}
+          >
             <X size={24} />
           </button>
         </header>
-        <FriendsPanel auth={auth} />
+        {room ? (
+          <RoomInvitePanel
+            key={`${auth.account?.id}:${room.roomId}`}
+            auth={auth}
+            room={room}
+            invites={invites}
+          />
+        ) : (
+          <>
+            {invites && onOpenRoom && (
+              <RoomInviteInbox
+                invitations={invites.incoming}
+                busy={!!invites.busy}
+                onOpen={onOpenRoom}
+                onDismiss={(id) => void invites.dismiss(id)}
+              />
+            )}
+            <FriendsPanel auth={auth} />
+          </>
+        )}
       </div>
     </dialog>
   );

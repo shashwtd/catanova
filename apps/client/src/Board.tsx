@@ -354,7 +354,7 @@ export function Board({
               data-robber-selected={canMoveRobber && h.id === selectedRobberHex}
               role={canMoveRobber ? 'button' : undefined}
               tabIndex={canMoveRobber ? 0 : undefined}
-              aria-label={`${name}${h.number ? `, ${h.number}, ${pips(h.number)} production pips` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
+              aria-label={`${name}${h.number ? `, ${h.number}${game?.diceMode === 'flat' ? ', one chance in eleven' : `, ${pips(h.number)} production pips`}` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
               onClick={() => canMoveRobber && onRobber(h.id)}
               onKeyDown={(e) =>
                 keyActivate(e, () => {
@@ -386,16 +386,18 @@ export function Board({
               )}
               {h.number > 0 && (
                 <g
-                  className={`number-token ${[6, 8].includes(h.number) ? 'red-number' : ''}`}
+                  className={`number-token ${game?.diceMode !== 'flat' && [6, 8].includes(h.number) ? 'red-number' : ''}`}
                   transform={`translate(${x},${y + 14})`}
                 >
                   <circle r="20" />
                   <text textAnchor="middle" y="5">
                     {h.number}
                   </text>
-                  <text className="pips" textAnchor="middle" y="14">
-                    {'•'.repeat(pips(h.number))}
-                  </text>
+                  {game?.diceMode !== 'flat' && (
+                    <text className="pips" textAnchor="middle" y="14">
+                      {'•'.repeat(pips(h.number))}
+                    </text>
+                  )}
                 </g>
               )}
               {h.id === (game?.robber ?? board.hexes.find((h) => h.terrain === 'desert')!.id) && (

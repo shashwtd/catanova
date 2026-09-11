@@ -9,7 +9,7 @@ import { useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
-import { GameSettings } from './GameSettings.js';
+import { GameSettings, GameInfo } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -21,10 +21,20 @@ import { Lobby, Invite } from './Lobby.js';
 import { EntryScreen } from './EntryScreen.js';
 import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
+import { preloadGameAssets } from './game-assets.js';
+import { useRoomInvites } from './useRoomInvites.js';
+import { RoomInviteInbox } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
-import { showPlayerHome } from './navigation.js';
+import {
+  showPlayerHome,
+  browserRoomPath,
+  roomNavigationState,
+  navigationRoomReference,
+  accountHomePath,
+  previewJoinReference,
+} from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
 import { ConnectionPanel } from './ConnectionPanel.js';
 import { BoardViewport } from './BoardViewport.js';
@@ -93,13 +103,19 @@ import './disconnect.css';
 import './player-hub.css';
 import './friends-drawer.css';
 import './room-lobby.css';
+import './history-mobile.css';
+import './resource-counters.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
   LAST_SEAT_KEY = 'catanova.last-seat.v1';
 // Consume the OAuth choice once per page load, outside React renders (including StrictMode).
 const arrivalLocation = entryLocation();
-const arrivalInvite = invitationCode(arrivalLocation.pathname, arrivalLocation.search);
+const arrivalInvite = navigationRoomReference(
+  arrivalLocation.pathname,
+  arrivalLocation.search,
+  history.state,
+);
 const arrivalIntent = takeEntryIntent(sessionStorage);
 function readJSON<T>(storage: Storage, key: string): T | undefined {
   try {
@@ -180,6 +196,11 @@ function App() {
   const feedback = useFeedback(preferences, reducedMotion);
   const [transitionId, setTransitionId] = useState<string | null>(null);
   const connection = useRef<Connection | null>(null);
+  const admissionEpoch = useRef(0);
+  const accountIdentity = auth.user?.id ?? (auth.config?.mode === 'local' ? 'local' : null);
+  const currentIdentity = useRef(accountIdentity);
+  currentIdentity.current = accountIdentity;
+  const connectedIdentity = useRef<string | null>(null);
   const [metrics, setMetrics] = useState(initialMetrics);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
     [historyHasMore, setHistoryHasMore] = useState(false);
@@ -202,6 +223,7 @@ function App() {
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
+      | 'info'
       | 'settings'
       | 'trade'
       | 'rules'
@@ -225,10 +247,24 @@ function App() {
   const playerGames = usePlayerGames(
     auth.account?.id,
     auth.accessToken,
-    auth.canPlay && (!g || !!g.winner || panel === 'profile'),
+    auth.canPlay && (!g || g.phase === 'finished' || panel === 'profile'),
   );
+  const roomInvites = useRoomInvites(
+    auth.account?.id,
+    auth.accessToken,
+    auth.canPlay && !!auth.account && !auth.account.isGuest && !g,
+  );
+  const [assetProgress, setAssetProgress] = useState(0);
+  const [launchVisualExpired, setLaunchVisualExpired] = useState(false);
   const connected = status === 'connected',
-    disabled = !connected || busy || feedback.presentationBusy || !!player?.resigned || !!room?.paused,
+    disabled =
+      !connected ||
+      busy ||
+      !!room?.launch ||
+      !!transitionId ||
+      feedback.presentationBusy ||
+      !!player?.resigned ||
+      !!room?.paused,
     hand = player?.hand ?? emptyHand();
   const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
     feedback.sound.playAttention(cue),
@@ -282,6 +318,9 @@ function App() {
   }
 
   function home(released = false) {
+    admissionEpoch.current++;
+    initialInvite.current = null;
+    connectedIdentity.current = null;
     const old = connection.current;
     connection.current = null;
     old?.stop();
@@ -308,9 +347,11 @@ function App() {
     setPreviewLoading(false);
     setPreviewError('');
     setEntry('home');
-    history.replaceState(null, '', '/');
+    history.replaceState(null, '', accountHomePath(auth));
   }
   function connect(session: Session, pending?: PendingCommand) {
+    admissionEpoch.current++;
+    connectedIdentity.current = currentIdentity.current;
     const old = connection.current;
     connection.current = null;
     old?.stop();
@@ -324,6 +365,7 @@ function App() {
       session,
       {
         pending,
+        preloadGame: true,
         accessToken: auth.accessToken,
         onMetrics: (value) => {
           if (connection.current === c) setMetrics(value);
@@ -352,7 +394,7 @@ function App() {
         if (next && c.playerId) {
           feedback.accept(previousSnapshot, next, c.playerId, message.type === 'welcome');
           if (message.type === 'state' && previousSnapshot && !previousSnapshot.game && next.game) {
-            setTransitionId(`${next.roomId}:${next.revision}`);
+            setTransitionId(previousSnapshot.launch?.id ?? `${next.roomId}:${next.revision}`);
             feedback.sound.play('development');
           } else if (
             !next.game &&
@@ -365,7 +407,8 @@ function App() {
         }
         setRoom(next);
         setMe(c.playerId ?? undefined);
-        if (message.type === 'welcome' && next) history.replaceState(null, '', roomPath(next.roomId));
+        if (message.type === 'welcome' && next)
+          history.replaceState(roomNavigationState(next), '', browserRoomPath(next));
       }
       if (message.type === 'history') {
         if (message.before !== undefined || !historyLoaded.current) setHistoryHasMore(message.hasMore);
@@ -410,9 +453,82 @@ function App() {
   }, [auth.canPlay, auth.user?.id]);
   useEffect(() => () => connection.current?.stop(), []);
   useEffect(() => {
-    if (!auth.loading && auth.config?.mode === 'authenticated' && !auth.user && connection.current)
+    if (!room || room.game) return;
+    // Requests are cached and shared with the actual launch and WebGL renderer.
+    void preloadGameAssets().catch(() => {});
+  }, [room?.roomId]);
+  useEffect(() => {
+    const launchId = room?.launch?.id;
+    const c = connection.current;
+    if (!launchId || !c || !connected) return;
+    let active = true;
+    setAssetProgress(0);
+    void preloadGameAssets((ready, total) => {
+      if (active) setAssetProgress(ready / total);
+    }).then(
+      () => {
+        if (active && connection.current === c) c.launchReady(launchId, true);
+      },
+      () => {
+        if (active && connection.current === c) c.launchReady(launchId, false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [room?.launch?.id, connected]);
+  useEffect(() => {
+    setLaunchVisualExpired(false);
+    const launch = room?.launch;
+    if (!launch) return;
+    const serverTime = room.serverNow ?? Date.now() + (metrics.clockOffsetMs ?? 0);
+    const remaining = Math.max(0, Math.min(10_000, launch.deadlineAt - serverTime));
+    const timer = setTimeout(() => {
+      setLaunchVisualExpired(true);
+      connection.current?.sync();
+    }, remaining + 500);
+    return () => clearTimeout(timer);
+  }, [room?.launch?.id]);
+
+  useEffect(() => {
+    if (auth.loading || room || invite || location.pathname === '/auth/callback') return;
+    const destination = accountHomePath(auth);
+    if (location.pathname === '/' || location.pathname === '/play')
+      history.replaceState(null, '', destination);
+  }, [auth.loading, auth.canPlay, auth.config?.mode, room?.roomId, invite]);
+  useEffect(() => {
+    const navigate = () => {
+      const path = location.pathname,
+        search = location.search,
+        binding = history.state;
+      const reference = navigationRoomReference(path, search, binding);
+      if (room && reference === room.roomId) return;
       home(false);
-  }, [auth.loading, auth.user?.id]);
+      history.replaceState(binding, '', path + search);
+      initialInvite.current = reference;
+      setInvite(reference);
+      setEntry(reference ? 'invite' : 'home');
+    };
+    window.addEventListener('popstate', navigate);
+    return () => window.removeEventListener('popstate', navigate);
+  }, [room?.roomId, auth.canPlay]);
+  function openInvitation(reference: string) {
+    if (room) return;
+    home(false);
+    initialInvite.current = reference;
+    setInvite(reference);
+    setEntry('invite');
+    setPreviewRoom(null);
+    history.pushState(null, '', roomPath(reference));
+  }
+
+  useEffect(() => {
+    if (!auth.loading && connection.current && connectedIdentity.current !== accountIdentity) home(false);
+  }, [auth.loading, accountIdentity]);
+  useEffect(() => {
+    admissionEpoch.current++;
+    if (!connection.current) setBusy(false);
+  }, [accountIdentity]);
   useEffect(() => {
     if (auth.profile.name) setName(auth.profile.name);
   }, [auth.profile.name]);
@@ -468,18 +584,21 @@ function App() {
     const timer = setTimeout(() => setToast(''), 2200);
     return () => clearTimeout(timer);
   }, [toast]);
-  async function act(action: GameAction) {
+  async function act(action: GameAction, propagateFailure = false) {
     const c = connection.current;
-    if (!c || disabled) return;
+    if (!c || disabled) return false;
     setBusy(true);
     setError('');
     try {
       await c.action(action);
       setMode(null);
       setRobberHex(null);
+      return true;
     } catch (e) {
       if (connection.current === c)
         setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Action failed');
+      if (propagateFailure) throw e;
+      return false;
     } finally {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
@@ -488,7 +607,7 @@ function App() {
     const c = connection.current;
     if (!c || busy) return;
     if (!connected) {
-      home(false);
+      setError('Reconnect to confirm leaving the game.');
       return;
     }
     setBusy(true);
@@ -517,7 +636,11 @@ function App() {
       setError('Enter your name');
       return;
     }
-    const target = normalizeRoomReference(requestedCode ?? (entry === 'invite' ? invite : code) ?? '');
+    if (busy || networkBusy || room) return;
+    const attempt = ++admissionEpoch.current;
+    const owner = accountIdentity;
+    const current = () => admissionEpoch.current === attempt && currentIdentity.current === owner;
+    let target = normalizeRoomReference(requestedCode ?? (entry === 'invite' ? invite : code) ?? '');
     if (kind === 'join' && (!target || !validRoomCode(target))) {
       setError('Enter a four-character room code');
       return;
@@ -526,12 +649,31 @@ function App() {
     localStorage.setItem('catanova.name', chosenName);
     setBusy(true);
     try {
+      if (kind === 'join') {
+        let resolved = previewJoinReference(target, previewRoom);
+        if (!resolved) {
+          const token = auth.user ? await auth.accessToken() : undefined;
+          if (!current()) return;
+          const response = await fetch(`/api/rooms/${target}`, {
+            ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+          });
+          if (!response.ok)
+            throw new Error(response.status === 404 ? 'Room not found' : 'Room unavailable. Try again.');
+          resolved = previewJoinReference(target, (await response.json()) as RoomPreview);
+          if (!current()) return;
+        }
+        if (!resolved) throw new Error('The room link changed. Open it again.');
+        target = resolved;
+      }
+      if (!current()) return;
       const profile =
         auth.config?.mode === 'authenticated'
           ? auth.profile
           : await auth.saveProfile({ ...auth.profile, name: chosenName });
+      if (!current()) return;
       connect(newSession(profile.name, kind === 'join' ? target : undefined, profile));
     } catch (e) {
+      if (!current()) return;
       setError(e instanceof Error ? e.message : 'Could not save profile');
       setBusy(false);
     }
@@ -638,7 +780,7 @@ function App() {
           </BoardViewport>
         </div>
       )}
-      {!g && <div className="title-scenery" aria-hidden="true" />}
+      {!g && !room && !playerHome && <div className="title-scenery" aria-hidden="true" />}
       {g && (
         <nav className="side-controls game-controls" aria-label="Current game tools">
           <IconButton
@@ -673,13 +815,16 @@ function App() {
           >
             <CircleHelp />
           </IconButton>
+          <IconButton label="Game info" active={panel === 'info'} onClick={() => setPanel('info')}>
+            <GameIcon name="info" />
+          </IconButton>
           <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
             <Settings2 />
           </IconButton>
           <IconButton
             label="Leave room"
             disabled={busy}
-            onClick={() => (!g.winner ? setPanel('leave') : void leave())}
+            onClick={() => (g.phase !== 'finished' ? setPanel('leave') : void leave())}
           >
             <DoorOpen />
           </IconButton>
@@ -760,6 +905,16 @@ function App() {
           onSignOut={() => void signOut()}
         />
       )}
+      {playerHome && roomInvites.incoming.length > 0 && (
+        <div className="hub-invitations">
+          <RoomInviteInbox
+            invitations={roomInvites.incoming}
+            busy={!!roomInvites.busy}
+            onOpen={openInvitation}
+            onDismiss={(id) => void roomInvites.dismiss(id)}
+          />
+        </div>
+      )}
       {!room && !playerHome && (
         <EntryScreen
           auth={auth}
@@ -783,7 +938,7 @@ function App() {
               entry === 'invite'
                 ? savedInviteSeat
                   ? last
-                  : newSession(auth.profile.name, invite!, auth.profile)
+                  : newSession(auth.profile.name, previewRoom?.roomId ?? invite!, auth.profile)
                 : last;
             if (seat) connect(seat);
           }}
@@ -798,11 +953,11 @@ function App() {
         <Lobby
           room={room}
           me={me}
-          busy={busy}
+          busy={busy || !!room.launch}
           connected={connected}
           onReady={(v) => void ready(v)}
           onStart={() => void act({ kind: 'start' })}
-          onInvite={() => setPanel('invite')}
+          onInvite={() => setPanel('friends')}
           onFriends={auth.config?.mode === 'authenticated' ? () => setPanel('friends') : undefined}
           onLeave={() => void leave()}
           onEdit={() => setPanel('profile')}
@@ -930,7 +1085,7 @@ function App() {
               </button>
             </div>
           </div>
-          {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => void act(a)} />}
+          {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />}
           {(panel === 'trade' || panel === 'journal') && (
             <aside
               className={`game-panel floating-panel ${panel === 'trade' ? 'trade-panel' : 'journal-panel'}`}
@@ -943,7 +1098,7 @@ function App() {
                 </IconButton>
               </div>
               {panel === 'trade' && me && (
-                <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => void act(a)} />
+                <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />
               )}
               {panel === 'journal' && (
                 <MoveHistory
@@ -1026,12 +1181,26 @@ function App() {
           onAwardStart={feedback.announceAward}
         />
       )}
-      {transitionId && (
+      {room?.launch && (launchVisualExpired || !connected) && (
+        <div className="reconnect-banner" role="status">
+          Loading interrupted. Reconnect to check the room.
+        </div>
+      )}
+      {((room?.launch && connected && !launchVisualExpired) || transitionId) && (
         <FantasyTransition
-          id={transitionId}
+          id={room?.launch?.id ?? transitionId!}
+          waiting={!!room?.launch}
+          players={room?.players}
+          readyPlayers={room?.launch?.readyPlayers}
+          progress={assetProgress}
           reducedMotion={reducedMotion}
           onComplete={() => setTransitionId(null)}
         />
+      )}
+      {panel === 'info' && room && (
+        <Dialog title="Game info" onClose={() => setPanel(null)}>
+          <GameInfo room={room} />
+        </Dialog>
       )}
       {panel === 'settings' && (
         <Dialog title="Settings" onClose={() => setPanel(null)}>
@@ -1093,20 +1262,23 @@ function App() {
         </Dialog>
       )}
       {panel === 'friends' && (
-        <FriendsDrawer key={auth.account?.id} auth={auth} onClose={() => setPanel(null)} />
+        <FriendsDrawer
+          key={auth.account?.id}
+          auth={auth}
+          onClose={() => setPanel(null)}
+          room={room && !g ? room : undefined}
+          invites={roomInvites}
+          onOpenRoom={openInvitation}
+        />
       )}
       {panel === 'leave' && (
         <Dialog title="Leave game?" compact onClose={() => setPanel(null)}>
-          <p className="muted">
-            {player?.resigned
-              ? 'You can come back to watch.'
-              : 'Return within 3 minutes to keep playing. If everyone leaves, the game pauses.'}
-          </p>
+          <p className="muted">Leaving resigns your seat. You cannot rejoin this game.</p>
           <div className="dialog-actions">
             <button className="dark-button" onClick={() => setPanel(null)}>
               Cancel
             </button>
-            <button className="gold-button" disabled={busy} onClick={() => void leave()}>
+            <button className="gold-button" disabled={busy || !connected} onClick={() => void leave()}>
               <DoorOpen />
               Leave
             </button>

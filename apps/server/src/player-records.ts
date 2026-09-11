@@ -73,18 +73,19 @@ export class PlayerRecords {
             );
     // A legacy import has a save date, not necessarily a finish date. Do not invent one.
     const finishEntry =
-      game.winner && old?.finished_at == null
+      game.phase === 'finished' && old?.finished_at == null
         ? (currentEntry ??
           (this.db
             .prepare(
-              "SELECT public_entry FROM game_events WHERE room_id=? AND json_extract(state,'$.winner') IS NOT NULL ORDER BY revision LIMIT 1",
+              "SELECT public_entry FROM game_events WHERE room_id=? AND json_extract(state,'$.phase')='finished' ORDER BY revision LIMIT 1",
             )
             .get(roomId)?.public_entry as string | undefined))
         : undefined;
     const finish = finishEntry ? (JSON.parse(finishEntry) as HistoryEntry) : undefined;
-    const finishedAt = game.winner
-      ? (old?.finished_at ?? (finish?.kind === 'legacy' ? null : timestamp(finishEntry)))
-      : null;
+    const finishedAt =
+      game.phase === 'finished'
+        ? (old?.finished_at ?? (finish?.kind === 'legacy' ? null : timestamp(finishEntry)))
+        : null;
     const seats = this.db
       .prepare('SELECT id,user_id,profile,departed FROM seats WHERE room_id=?')
       .all(roomId) as {
@@ -130,20 +131,23 @@ export class PlayerRecords {
     for (const player of game.players) {
       const seat = seats.find((s) => s.id === player.id);
       if (!seat?.user_id) continue;
-      const outcome: MatchOutcome = player.resigned
-        ? 'resigned'
-        : game.winner === player.id
-          ? 'won'
-          : game.winner
-            ? 'lost'
-            : 'playing';
+      const outcome: MatchOutcome =
+        game.finishReason === 'abandoned'
+          ? 'abandoned'
+          : player.resigned
+            ? 'resigned'
+            : game.winner === player.id
+              ? 'won'
+              : game.winner
+                ? 'lost'
+                : 'playing';
       insert.run(
         roomId,
         player.id,
         seat.user_id,
         score(game, player, true),
         outcome,
-        Number(!game.winner && !player.resigned && !seat.departed),
+        Number(game.phase !== 'finished' && !player.resigned && !seat.departed),
       );
     }
   }

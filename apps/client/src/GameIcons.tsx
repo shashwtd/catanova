@@ -24,6 +24,7 @@ export const GAME_ICON_NAMES = [
   'plus',
   'back',
   'help',
+  'info',
   'fullscreen',
   'minimize',
   'crown',
@@ -58,6 +59,12 @@ const c = {
   light: '#f7edce',
 };
 const paths: Record<GameIconName, ReactNode> = {
+  info: (
+    <>
+      <path fill={c.blue} d="M16 2C7 2 2 8 2 16s5 14 14 14 14-6 14-14S25 2 16 2Z" />
+      <path fill={c.light} stroke="none" d="M14 14h5v10h-5Zm0-7h5v4h-5Z" />
+    </>
+  ),
   dice: (
     <>
       <path fill={c.paper} d="M4 7q0-2 2-2l13 1q2 0 2 2l-1 13q0 2-2 2L5 22q-2 0-2-2Z" />

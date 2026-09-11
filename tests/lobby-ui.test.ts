@@ -181,8 +181,9 @@ test('room timer controls are editable only by the host before play and expose a
     ),
     'p0',
   );
-  assert.ok(duration(render('p0'))!.includes('disabled=""'));
-  assert.ok(render('p0').includes('Set before the game.'));
+  assert.equal(duration(render('p0')), undefined, 'started-game settings contain personal audio only');
+  assert.match(render('p0'), /Effects volume/);
+  assert.match(render('p0'), /Music volume/);
 });
 
 test('profile editing presents names and twelve fantasy portraits without the removed accent or frame selectors', () => {

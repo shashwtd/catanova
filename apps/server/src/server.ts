@@ -16,6 +16,8 @@ import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
 import { RuleError } from '../../../packages/rules/src/game.js';
 import { serveClient } from './static.js';
+import { GameLaunch } from './game-launch.js';
+import { RoomInviteService } from './room-invites.js';
 import { AccountPresence } from './account-presence.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
@@ -68,6 +70,7 @@ export async function startServer(
       : (options.captcha?.siteKey ?? process.env.TURNSTILE_SITE_KEY)?.trim();
   const captcha = siteKey ? { siteKey } : undefined;
   const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now, trackPresence: true });
+  const roomInvites = accounts ? new RoomInviteService(store, accounts, now) : undefined;
   let closing = false;
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -92,7 +95,14 @@ export async function startServer(
         const authorization = request.headers.authorization;
         const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
         const url = new URL(request.url, 'http://localhost');
-        if (['/api/account/games', '/api/account/presence', '/api/friends'].includes(url.pathname)) {
+        if (
+          [
+            '/api/account/games',
+            '/api/account/presence',
+            '/api/account/room-invites',
+            '/api/friends',
+          ].includes(url.pathname)
+        ) {
           const access = hubRequests.consume(clientAddress(request), now());
           if (!access.allowed) {
             response.setHeader('Retry-After', String(access.retryAfter));
@@ -144,6 +154,12 @@ export async function startServer(
           result = account;
         } else if (request.method === 'GET' && url.pathname === '/api/friends')
           result = accountPresence.friends(await accounts.friends(token), now());
+        else if (request.method === 'GET' && url.pathname === '/api/account/room-invites')
+          result = await roomInvites!.list(token);
+        else if (request.method === 'POST' && url.pathname === '/api/account/room-invites')
+          result = await roomInvites!.send(token, await body());
+        else if (request.method === 'DELETE' && url.pathname === '/api/account/room-invites')
+          result = await roomInvites!.dismiss(token, await body());
         else if (request.method === 'GET' && url.pathname === '/api/friends/search')
           result = await accounts.search(token, url.searchParams.get('q') ?? '');
         else if (request.method === 'POST' && url.pathname === '/api/friends') {
@@ -291,6 +307,7 @@ export async function startServer(
   const sessions = new Map<WebSocket, Seat>();
   const activeSeats = new Map<string, WebSocket>();
   const alive = new Set<WebSocket>();
+  const preloadClients = new WeakSet<WebSocket>();
   function send(ws: WebSocket, message: ServerMessage) {
     if (ws.readyState !== WebSocket.OPEN) return;
     if (ws.bufferedAmount > 128 * 1024) {
@@ -303,6 +320,7 @@ export async function startServer(
     const state = store.snapshot(roomId, viewer);
     return {
       ...state,
+      ...(launches.view(roomId) ? { launch: launches.view(roomId) } : {}),
       players: state.players.map((p) => ({
         ...p,
         connected: activeSeats.get(p.id)?.readyState === WebSocket.OPEN,
@@ -324,6 +342,29 @@ export async function startServer(
       }
     }
   }
+  const launches = new GameLaunch({
+    now,
+    state: (roomId) => snapshot(roomId, ''),
+    changed: broadcast,
+    failed: (launch, message) => {
+      for (const [ws, seat] of sessions)
+        if (seat.room_id === launch.roomId)
+          send(ws, {
+            type: 'error',
+            code: 'LAUNCH_CANCELLED',
+            message,
+            ...(seat.id === launch.hostId ? { commandId: launch.commandId } : {}),
+          });
+    },
+    commit: (launch) => {
+      const ws = activeSeats.get(launch.hostId);
+      const seat = ws && sessions.get(ws);
+      if (!ws || !seat) throw new Error('Host disconnected');
+      const receipt = store.action(seat, launch.commandId, launch.revision, { kind: 'start' });
+      send(ws, { type: 'ack', commandId: launch.commandId, ...receipt });
+      broadcast(launch.roomId);
+    },
+  });
   http.on('upgrade', (request, socket, head) => {
     const origin = request.headers.origin;
     const origins = options.allowedOrigins ?? [];
@@ -468,6 +509,7 @@ export async function startServer(
             accountIdentity = identity;
             setAuthDeadline();
           }
+          launches.cancel(seat.room_id);
           const oldSocket = activeSeats.get(seat.id);
           store.setConnected(seat, true);
           if (oldSocket && oldSocket !== ws) {
@@ -476,6 +518,7 @@ export async function startServer(
             oldSocket.close(4001, 'Seat resumed elsewhere');
           }
           sessions.set(ws, seat);
+          if (message.preloadGame) preloadClients.add(ws);
           activeSeats.set(seat.id, ws);
           if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
           clearTimeout(handshakeTimeout);
@@ -490,6 +533,10 @@ export async function startServer(
           const seat = sessions.get(ws);
           if (!seat) throw new ProtocolError('NOT_JOINED', 'Join or resume before sending actions');
           assertSession(seat);
+          if (message.type === 'launchReady') {
+            launches.ready(seat.room_id, seat.id, message.id, message.success);
+            return;
+          }
           if (message.type === 'ping') {
             const revision = store.db.prepare('SELECT revision FROM rooms WHERE id = ?').get(seat.room_id)!
               .revision as number;
@@ -540,6 +587,7 @@ export async function startServer(
             }
           }
           if (message.type === 'lobby') {
+            launches.cancel(seat.room_id);
             commandId = message.commandId;
             const receipt = store.lobby(
               seat,
@@ -554,6 +602,7 @@ export async function startServer(
             return;
           }
           if (message.type === 'settings') {
+            launches.cancel(seat.room_id);
             commandId = message.commandId;
             const receipt = store.configureSettings(
               seat,
@@ -567,9 +616,9 @@ export async function startServer(
             return;
           }
           if (message.type === 'leave') {
+            launches.cancel(seat.room_id);
             commandId = message.commandId;
             const receipt = store.leave(seat, commandId, message.expectedRevision);
-            store.setConnected(seat, false);
             sessions.delete(ws);
             activeSeats.delete(seat.id);
             send(ws, { type: 'ack', commandId, ...receipt });
@@ -591,6 +640,30 @@ export async function startServer(
               .players.every((p) => activeSeats.get(p.id)?.readyState === WebSocket.OPEN)
           )
             throw new ProtocolError('NOT_CONNECTED', 'Wait for every player to reconnect');
+          if (
+            message.type === 'action' &&
+            message.action.kind === 'start' &&
+            !store.loadGame(seat.room_id) &&
+            preloadClients.has(ws)
+          ) {
+            if (
+              store.snapshot(seat.room_id).players.some((p) => {
+                const client = activeSeats.get(p.id);
+                return !client || !preloadClients.has(client);
+              })
+            )
+              throw new ProtocolError(
+                'CLIENT_UPDATE_REQUIRED',
+                'Ask every player to refresh Catanova before starting',
+              );
+            launches.begin({
+              roomId: seat.room_id,
+              hostId: seat.id,
+              commandId: message.commandId,
+              revision: message.expectedRevision,
+            });
+            return;
+          }
           const receipt =
             message.type === 'action'
               ? store.action(seat, message.commandId, message.expectedRevision, message.action)
@@ -631,6 +704,7 @@ export async function startServer(
       sessions.delete(ws);
       if (seat && activeSeats.get(seat.id) === ws) {
         activeSeats.delete(seat.id);
+        if (!closing) launches.cancel(seat.room_id);
         if (!closing) {
           try {
             store.setConnected(seat, false);
@@ -653,6 +727,10 @@ export async function startServer(
     }
   }, options.heartbeatMs ?? 15000);
   heartbeat.unref();
+  const launchScheduler = setInterval(() => {
+    if (!closing) launches.tick();
+  }, 100);
+  launchScheduler.unref();
   const clockErrors = new Set<string>();
   const clockScheduler = setInterval(() => {
     if (closing) return;
@@ -696,6 +774,8 @@ export async function startServer(
     });
   } catch (error) {
     clearInterval(heartbeat);
+    clearInterval(launchScheduler);
+    launches.clear();
     clearInterval(clockScheduler);
     wss.close();
     store.close();
@@ -710,6 +790,8 @@ export async function startServer(
     async close() {
       closing = true;
       clearInterval(heartbeat);
+      clearInterval(launchScheduler);
+      launches.clear();
       clearInterval(clockScheduler);
       for (const ws of wss.clients) ws.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));

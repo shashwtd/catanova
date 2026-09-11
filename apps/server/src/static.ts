@@ -84,7 +84,11 @@ export async function serveClient(
     const url = new URL(request.url ?? '/', 'http://localhost');
     path = decodeURIComponent(url.pathname);
     search = url.search;
-    privateEntry = path === '/auth/callback' || /^\/room\//i.test(path) || url.searchParams.has('room');
+    privateEntry =
+      path === '/play' ||
+      path === '/auth/callback' ||
+      /^\/room\//i.test(path) ||
+      url.searchParams.has('room');
   } catch {
     response.writeHead(400).end();
     return;
@@ -108,6 +112,7 @@ export async function serveClient(
   const roomReference = /^\/room\/([^/]+)\/?$/i.exec(path)?.[1];
   const isAppRoute =
     path === '/' ||
+    path === '/play' ||
     path === '/auth/callback' ||
     (!!roomReference && isRoomReference(normalizeRoomReference(roomReference)));
   const assetPath = isAppRoute
@@ -163,7 +168,7 @@ export async function serveClient(
     response.setHeader('Referrer-Policy', 'same-origin');
     response.setHeader(
       'Content-Security-Policy',
-      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''};${captchaEnabled ? ' frame-src https://challenges.cloudflare.com;' : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:${authOrigin ? ' ' + new URL(authOrigin).origin : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''};${captchaEnabled ? ' frame-src https://challenges.cloudflare.com;' : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${authOrigin ? ' ' + new URL(authOrigin).origin : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
     );
     response.setHeader(
       'Cache-Control',

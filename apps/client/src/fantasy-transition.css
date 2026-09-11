@@ -99,3 +99,85 @@
     animation-duration: 160ms;
   }
 }
+
+.fantasy-transition.is-loading .fantasy-clouds,
+.fantasy-transition.is-loading .fantasy-mist {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+.fantasy-transition.is-loading .fantasy-compass {
+  display: none;
+}
+.island-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  color: #31554e;
+}
+.island-loading .game-loader {
+  color: #31554e;
+}
+.island-loading-players {
+  display: flex;
+  justify-content: center;
+  gap: clamp(16px, 4vw, 46px);
+}
+.island-loading-players > div {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: 100px;
+  text-align: center;
+}
+.island-loading-players .avatar-medallion {
+  width: 68px;
+  height: 68px;
+  border: 2px solid #a9b9a7;
+  box-shadow: 0 4px 0 #718c772e;
+}
+.island-loading-players .is-ready .avatar-medallion {
+  border-color: #5a9272;
+}
+.island-loading-players strong {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 18px;
+}
+.island-loading-players span {
+  font-size: 13px;
+  color: #587269;
+}
+.island-loading progress {
+  appearance: none;
+  width: min(290px, 70vw);
+  height: 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: #49665322;
+}
+.island-loading progress::-webkit-progress-bar {
+  background: #49665322;
+}
+.island-loading progress::-webkit-progress-value {
+  background: #699c77;
+  border-radius: 8px;
+}
+.island-loading progress::-moz-progress-bar {
+  background: #699c77;
+}
+@media (max-width: 480px) {
+  .island-loading-players {
+    display: grid;
+    grid-template-columns: repeat(2, 100px);
+    gap: 22px;
+  }
+}

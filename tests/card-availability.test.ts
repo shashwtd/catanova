@@ -101,14 +101,15 @@ test('Road Building and Year of Plenty explain unavailable inventory instead of 
   assert.equal(cardLockReason(plenty, emptyBank, 'p0'), null, 'the last bank resource may still be taken');
 });
 
-test('resource cards keep accessible names without visible labels or hover popups; empty cards remain static', () => {
+test('compact resource counters keep accessible names and flight anchors without card shapes or hover popups', () => {
   const hand = { ...emptyHand(), wood: 2, wheat: 1 };
   const html = renderToStaticMarkup(
     createElement(ResourceHand, { hand, pulse: {}, reducedMotion: false, onHover: () => {} }),
   );
   assert.equal([...html.matchAll(/data-resource-card=/g)].length, 5);
-  assert.equal([...html.matchAll(/class="[^"]*\bempty-card\b/g)].length, 3);
-  assert.equal([...html.matchAll(/class="[^"]*\bstatic-card\b/g)].length, 3);
+  assert.equal([...html.matchAll(/data-empty="true"/g)].length, 3);
+  assert.equal([...html.matchAll(/class="resource-counter"/g)].length, 5);
+  assert.ok(!html.includes('card-finish') && !html.includes('hand-slot'));
   assert.equal([...html.matchAll(/role="tooltip"/g)].length, 0);
   assert.equal([...html.matchAll(/aria-describedby=/g)].length, 0);
   for (const resource of RESOURCES) {
@@ -171,6 +172,18 @@ test('resource hover audio works with reduced motion and stays silent for empty 
     wood({ pointerType: 'touch' });
     assert.equal(sounds, before + 1, 'empty cards and touch do not play a hover cue');
   }
+});
+
+test('resource arrival updates pulse their number while reduced motion keeps the count static', () => {
+  const hand = { ...emptyHand(), wood: 12 };
+  const render = (reducedMotion: boolean) =>
+    renderToStaticMarkup(
+      createElement(ResourceHand, { hand, pulse: { wood: 'arrival-1' }, reducedMotion, onHover: () => {} }),
+    );
+  assert.equal([...render(false).matchAll(/\bis-animating\b/g)].length, 1);
+  assert.equal([...render(true).matchAll(/\bis-animating\b/g)].length, 0);
+  assert.match(render(true), /aria-label="12 Timber"/);
+  assert.match(render(false), /data-resource-card="wood"/);
 });
 
 test('development purchase is a separate buy slot with a visible three-resource price and legal disabled state', () => {
