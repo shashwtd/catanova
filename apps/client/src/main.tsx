@@ -21,7 +21,7 @@ import { Lobby, Invite } from './Lobby.js';
 import { EntryScreen } from './EntryScreen.js';
 import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
-import { FriendsPanel } from './FriendsPanel.js';
+import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
 import { showPlayerHome } from './navigation.js';
@@ -91,6 +91,7 @@ import './game-guidance.css';
 import './mobile-layout.css';
 import './disconnect.css';
 import './player-hub.css';
+import './friends-drawer.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -1091,9 +1092,7 @@ function App() {
         </Dialog>
       )}
       {panel === 'friends' && (
-        <Dialog title="Friends" onClose={() => setPanel(null)}>
-          <FriendsPanel key={auth.account?.id} auth={auth} />
-        </Dialog>
+        <FriendsDrawer key={auth.account?.id} auth={auth} onClose={() => setPanel(null)} />
       )}
       {panel === 'leave' && (
         <Dialog title="Leave game?" compact onClose={() => setPanel(null)}>
