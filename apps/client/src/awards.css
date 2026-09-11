@@ -1,0 +1,244 @@
+/* Compact public competition counts, with the award's +2 attached to its owner. */
+.player-profile .profile-achievements {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+.player-profile .profile-achievement {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 21px;
+  padding: 1px 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #d7ddc8;
+  font-size: 13px;
+  line-height: 1;
+}
+.player-profile .profile-achievement .game-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.player-profile .profile-achievement b {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: #f2e9d4;
+}
+.player-profile .profile-achievement.held {
+  border-color: #e7bf6b85;
+  background: linear-gradient(130deg, #9b703d5c, #443c2945);
+  color: #ffe5a2;
+}
+.player-profile .profile-achievement.held b {
+  color: #ffe5a2;
+}
+.player-profile .profile-achievement.held.army-award {
+  border-color: #a0cbd291;
+  background: linear-gradient(130deg, #557b8361, #34465340);
+}
+.player-profile .profile-achievement small {
+  padding-left: 3px;
+  border-left: 1px solid #efcf7b55;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffe5a2;
+}
+
+/* transitions.dev toast: a readable celebration that never blocks a move. */
+:root {
+  --toast-open: 350ms;
+  --toast-close: 250ms;
+  --toast-distance: 16px;
+  --toast-blur: 2px;
+  --toast-scale: 0.97;
+  --toast-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.t-toast {
+  opacity: 0;
+  transform: translateY(var(--toast-distance)) scale(var(--toast-scale));
+  filter: blur(var(--toast-blur));
+  will-change: transform, opacity, filter;
+  transition:
+    opacity var(--toast-close) var(--toast-ease),
+    transform var(--toast-close) var(--toast-ease),
+    filter var(--toast-close) var(--toast-ease);
+}
+.t-toast.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition:
+    opacity var(--toast-open) var(--toast-ease),
+    transform var(--toast-open) var(--toast-ease),
+    filter var(--toast-open) var(--toast-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-toast {
+    transition: none !important;
+  }
+}
+.award-celebration-layer {
+  position: fixed;
+  z-index: 75;
+  top: max(80px, 11vh);
+  left: 62px;
+  right: var(--hud-right, 258px);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.award-celebration {
+  position: relative;
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  width: min(100%, 430px);
+  padding: 17px 19px;
+  overflow: hidden;
+  border: 1px solid #e7c06a99;
+  border-radius: 13px;
+  background:
+    radial-gradient(ellipse at 12% 0%, #84714761, transparent 65%),
+    linear-gradient(145deg, #293e36f7, #142d2bf7);
+  box-shadow:
+    0 8px 28px #0d1c2477,
+    inset 0 1px #fff0b52b;
+  color: #fff0c8;
+}
+.award-celebration::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ffe7a1, transparent);
+}
+.award-emblem {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 64px;
+  border-radius: 45%;
+  background: radial-gradient(ellipse, #edbc5640, transparent 70%);
+  filter: drop-shadow(0 2px 2px #10262380);
+}
+.award-emblem .game-icon {
+  width: 48px;
+  height: 48px;
+}
+.award-celebration-copy {
+  min-width: 0;
+}
+.award-celebration .award-recipient {
+  display: block;
+  font:
+    600 13px/1.2 Barlow,
+    sans-serif;
+  color: #ecddba;
+  overflow-wrap: anywhere;
+}
+.award-celebration h2 {
+  margin: 3px 0 7px;
+  color: #ffe7a6;
+  font:
+    700 20px/1.2 Cinzel,
+    serif;
+}
+.award-celebration p {
+  margin: 0 0 3px;
+  color: #fff5db;
+  font:
+    500 13px/1.3 Barlow,
+    sans-serif;
+}
+.award-celebration p b {
+  font-size: 16px;
+}
+.award-celebration small {
+  display: block;
+  color: #c7ccba;
+  font:
+    400 11px/1.3 Barlow,
+    sans-serif;
+}
+.award-celebration .award-transfer {
+  margin-top: 4px;
+  color: #d7c799;
+}
+.award-points {
+  position: static;
+  align-self: center;
+  color: #ffe8a1;
+}
+.award-points .t-badge-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  align-self: center;
+  color: #ffe8a1;
+}
+.award-points b {
+  font:
+    700 26px/1 Barlow,
+    sans-serif;
+}
+.award-points span {
+  font-size: 11px;
+}
+.award-static,
+.award-static .t-badge,
+.award-static .t-badge-dot {
+  animation: none !important;
+  transition: none !important;
+}
+@media (max-width: 700px) {
+  .player-profile .profile-achievements {
+    justify-content: center;
+    gap: 2px;
+    margin-top: 3px;
+  }
+  .player-profile .profile-achievement {
+    min-height: 17px;
+    padding: 1px 2px;
+    gap: 2px;
+  }
+  .player-profile .profile-achievement .game-icon {
+    width: 12px;
+    height: 12px;
+  }
+  .player-profile .profile-achievement b {
+    font-size: 12px;
+  }
+  .player-profile .profile-achievement small {
+    font-size: 9px;
+    padding-left: 2px;
+  }
+  .award-celebration-layer {
+    left: 12px;
+    right: 12px;
+    top: 75px;
+  }
+  .award-celebration {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    gap: 9px;
+    padding: 13px;
+  }
+  .award-emblem {
+    width: 42px;
+    height: 48px;
+  }
+  .award-emblem .game-icon {
+    width: 38px;
+    height: 38px;
+  }
+  .award-celebration h2 {
+    font-size: 18px;
+  }
+}

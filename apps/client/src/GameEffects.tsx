@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Sparkles } from './GameIcons.js';
+import { Route, Shield, Sparkles } from './GameIcons.js';
 import { ResourceIcon } from './Board.js';
 import { DevelopmentArt } from './DevelopmentCards.js';
 import { DiceThrow } from './DiceThrow.js';
-import type { FeedbackEvent, FlightIntent } from './feedback.js';
+import type { AwardCelebration, FeedbackEvent, FlightIntent } from './feedback.js';
 import { resourceFlightStart, RESOURCE_FLIGHT_MS, PROFILE_GAIN_DWELL_MS } from './useFeedback.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 type Flight = FlightIntent & { key: string; x: number; y: number; dx: number; dy: number; delay: number };
@@ -44,11 +44,17 @@ export function GameEffects({
   reducedMotion,
   activity,
   lastDice,
+  awards = [],
+  onAwardComplete,
+  onAwardStart,
 }: {
   event: FeedbackEvent | null;
   reducedMotion: boolean;
   activity: boolean;
   lastDice?: readonly [number, number] | null;
+  awards?: readonly AwardCelebration[];
+  onAwardComplete?: (id: string) => void;
+  onAwardStart?: () => void;
 }) {
   const [flights, setFlights] = useState<Flight[]>([]),
     [badges, setBadges] = useState<GainBadge[]>([]);
@@ -155,6 +161,15 @@ export function GameEffects({
   const notice = event?.notices.find((s) => /played |wins |claimed /.test(s)) ?? event?.notices[0];
   return (
     <>
+      {awards[0] && (
+        <AwardToast
+          key={awards[0].id}
+          award={awards[0]}
+          reducedMotion={reducedMotion}
+          onComplete={onAwardComplete}
+          onStart={onAwardStart}
+        />
+      )}
       {dice && (
         <DiceThrow
           key={dice.id}
@@ -223,5 +238,84 @@ export function GameEffects({
         </div>
       )}
     </>
+  );
+}
+
+const AWARD_READ_MS = 4500;
+export function AwardToast({
+  award,
+  reducedMotion,
+  onComplete,
+  onStart,
+}: {
+  award: AwardCelebration;
+  reducedMotion: boolean;
+  onComplete?: (id: string) => void;
+  onStart?: () => void;
+}) {
+  const node = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const callbacks = useRef({ onComplete, onStart });
+  callbacks.current = { onComplete, onStart };
+  useEffect(() => {
+    const element = node.current;
+    if (!element) return;
+    // Read the same close clock as CSS; the queue advances only after this toast leaves.
+    const closeValue = getComputedStyle(element).getPropertyValue('--toast-close').trim();
+    const closeTime = reducedMotion
+      ? 0
+      : Number.parseFloat(closeValue) * (closeValue.endsWith('ms') ? 1 : 1000);
+    const frame = requestAnimationFrame(() => {
+      setOpen(true);
+      callbacks.current.onStart?.();
+    });
+    const close = setTimeout(() => setOpen(false), AWARD_READ_MS);
+    const finish = setTimeout(
+      () => callbacks.current.onComplete?.(award.id),
+      AWARD_READ_MS + (Number.isFinite(closeTime) ? closeTime : 250),
+    );
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(close);
+      clearTimeout(finish);
+    };
+  }, [award.id]);
+  return (
+    <div className="award-celebration-layer">
+      <div
+        ref={node}
+        className={`award-celebration t-toast ${open ? 'is-open' : ''} ${reducedMotion ? 'award-static' : ''}`}
+        data-award={award.kind}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <div className="award-emblem" aria-hidden="true">
+          {award.kind === 'longestRoad' ? <Route size={44} /> : <Shield size={44} />}
+        </div>
+        <div className="award-celebration-copy">
+          <span className="award-recipient">
+            {award.playerName} {award.previousPlayerName ? 'takes' : 'earns'}
+          </span>
+          <h2>{award.name}</h2>
+          <p>
+            <b>{award.count}</b>{' '}
+            {award.kind === 'longestRoad' ? 'roads in one continuous route' : 'Knights played'}
+          </p>
+          <small>
+            {award.kind === 'longestRoad' ? 'Longest route' : 'Most Knights played'} · minimum {award.minimum}
+          </small>
+          {award.previousPlayerName && (
+            <small className="award-transfer">Previously held by {award.previousPlayerName}</small>
+          )}
+        </div>
+        <span className="award-points t-badge" data-open={open}>
+          <span className="t-badge-dot">
+            <b>+2</b>
+            <span>points</span>
+          </span>
+        </span>
+      </div>
+    </div>
   );
 }

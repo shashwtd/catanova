@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveFeedback, publicProduction } from '../apps/client/src/feedback.js';
+import { deriveAwardCelebrations, deriveFeedback, publicProduction } from '../apps/client/src/feedback.js';
 import { PresentationBuffer, presentationHold } from '../apps/client/src/useFeedback.js';
 import { nextDicePresentation } from '../apps/client/src/GameEffects.js';
 import { DEFAULT_PREFERENCES, parsePreferences } from '../apps/client/src/preferences.js';
@@ -411,13 +411,17 @@ test('actual trades have a public sound for observers, while Monopoly and sugges
   assert.ok(!built.event.sounds.includes('trade') && !built.event.sounds.includes('knight'));
 });
 
-test('awards and win cues follow the committed state, with no extra turn cue for another player', () => {
+test('award celebrations and win cues follow the committed state without duplicate award or turn sounds', () => {
   const game = setup(),
     before = snapshot(game, 10),
     after = structuredClone(before);
   after.revision++;
   after.game!.longestRoad = 'p0';
-  assert.ok(deriveFeedback(before, after, 'p0')!.sounds.includes('award'));
+  assert.equal(deriveAwardCelebrations(before, after)[0]!.name, 'Longest Road');
+  assert.ok(
+    !deriveFeedback(before, after, 'p0')!.sounds.includes('award'),
+    'the displayed award toast owns its cue',
+  );
   const won = structuredClone(after);
   won.revision++;
   won.game!.winner = 'p0';
@@ -498,7 +502,7 @@ test('saved preferences accept only known booleans and a finite clamped volume',
       activity: false,
       extra: true,
     }),
-    { sound: false, volume: 1 },
+    { sound: false, volume: 1, music: false, musicVolume: 0.3 },
   );
   assert.equal(parsePreferences({ volume: -0.5 }).volume, 0);
   assert.equal(parsePreferences({ volume: 0.37 }).volume, 0.37);

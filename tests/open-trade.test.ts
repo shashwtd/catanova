@@ -241,3 +241,94 @@ test('new trade commands canonicalize at the protocol boundary and reject invali
   for (const player of ['', 'x'.repeat(81), 42, null])
     assert.throws(() => parseGameAction({ kind: 'acceptProposal', tradeId: 0, player }));
 });
+
+test('declines are scoped to one offer, cannot exchange cards, and close only after every other player declines', () => {
+  const base = setup();
+  let game = move(base, { kind: 'offerTrade', give: hand({ wood: 2 }), want: hand({ sheep: 1 }) });
+  const tradeId = game.trade!.id;
+  const saved = structuredClone(game);
+  assert.throws(() => move(game, { kind: 'declineTrade', tradeId }), /no longer available/);
+  assert.throws(
+    () => move(game, { kind: 'declineTrade', tradeId: tradeId + 1 }, 'p1'),
+    /no longer available/,
+  );
+  assert.throws(() => move(game, { kind: 'declineTrade', tradeId }, 'outsider'), /Not a player/);
+  assert.deepEqual(game, saved);
+  for (const phase of ['roll', 'discard', 'robber', 'freeRoads', 'finished'] as const)
+    assert.throws(() => move({ ...game, phase }, { kind: 'declineTrade', tradeId }, 'p1'));
+  game = move(game, { kind: 'declineTrade', tradeId }, 'p1');
+  assert.deepEqual(game.trade!.declinedBy, ['p1']);
+  assert.throws(() => move(game, { kind: 'declineTrade', tradeId }, 'p1'), /already declined/);
+  assert.throws(() => move(game, { kind: 'acceptTrade', tradeId }, 'p1'), /already declined/);
+  assert.deepEqual(
+    game.players.map((p) => p.hand),
+    base.players.map((p) => p.hand),
+  );
+  for (const viewer of seats) assert.deepEqual(gameView(game, viewer.id).trade!.declinedBy, ['p1']);
+  const renewed = move(game, { kind: 'offerTrade', give: hand({ wood: 1 }), want: hand({ sheep: 1 }) });
+  assert.equal(renewed.trade!.declinedBy, undefined);
+  assert.notEqual(renewed.trade!.id, tradeId);
+  assert.throws(() => move(renewed, { kind: 'declineTrade', tradeId }, 'p1'), /no longer available/);
+  assert.equal(move(renewed, { kind: 'acceptTrade', tradeId: renewed.trade!.id }, 'p1').trade, null);
+  game = move(game, { kind: 'declineTrade', tradeId }, 'p2');
+  assert.ok(game.trade, 'one remaining player must still have their opportunity');
+  game = move(game, { kind: 'declineTrade', tradeId }, 'p3');
+  assert.equal(game.trade, null);
+  assert.equal(game.log.at(-1)!.text, 'Trade closed: everyone declined.');
+  assert.deepEqual(
+    game.players.map((p) => p.hand),
+    base.players.map((p) => p.hand),
+  );
+  assert.throws(() => move(game, { kind: 'acceptTrade', tradeId }, 'p3'), /no longer available/);
+  conserved(game);
+});
+
+test('declining an open offer withdraws only that player’s proposal and prevents future responses to that offer', () => {
+  let game = open();
+  const tradeId = game.trade!.id;
+  game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
+  game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ wheat: 1 }) }, 'p2');
+  game = move(game, { kind: 'declineTrade', tradeId }, 'p1');
+  assert.deepEqual(game.trade!.proposals, [{ player: 'p2', give: hand({ wheat: 1 }) }]);
+  assert.throws(
+    () => move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1'),
+    /already declined/,
+  );
+  assert.throws(() => move(game, { kind: 'acceptProposal', tradeId, player: 'p1' }), /no longer available/);
+  game = move(game, { kind: 'acceptProposal', tradeId, player: 'p2', expectedGive: hand({ wheat: 1 }) });
+  assert.equal(game.trade, null);
+  assert.equal(game.players[2]!.hand.wood, 2);
+  conserved(game);
+});
+
+test('accepting a reviewed counteroffer cannot silently accept replacement cards', () => {
+  let game = open();
+  const tradeId = game.trade!.id;
+  game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
+  const reviewed = {
+    kind: 'acceptProposal' as const,
+    tradeId,
+    player: 'p1',
+    expectedGive: hand({ sheep: 1 }),
+  };
+  game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ ore: 2 }) }, 'p1');
+  const saved = structuredClone(game);
+  assert.throws(() => move(game, reviewed), /proposal changed/);
+  assert.deepEqual(game, saved);
+  game = move(game, { ...reviewed, expectedGive: hand({ ore: 2 }) });
+  assert.equal(game.players[0]!.hand.ore, 2);
+  assert.equal(game.trade, null);
+  conserved(game);
+  for (const action of [{ kind: 'declineTrade', tradeId: 0 }, reviewed]) {
+    assert.deepEqual(parseGameAction({ ...action, spoofedPlayer: 'p3' }), action);
+    assert.deepEqual(
+      parseClientMessage(
+        JSON.stringify({ type: 'action', commandId: 'trade-response', expectedRevision: 3, action }),
+      ),
+      { type: 'action', commandId: 'trade-response', expectedRevision: 3, action },
+    );
+  }
+  for (const tradeId of [-1, 1.5, Infinity, '1'])
+    assert.throws(() => parseGameAction({ kind: 'declineTrade', tradeId }));
+  assert.throws(() => parseGameAction({ ...reviewed, expectedGive: { ...emptyHand(), ore: -1 } }));
+});

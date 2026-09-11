@@ -128,6 +128,7 @@ export function Board({
   glowHexes = [],
   effectId,
   pendingBuild = null,
+  selectedRobberHex = null,
 }: {
   board: Island;
   game?: GameView;
@@ -139,6 +140,7 @@ export function Board({
   glowHexes?: readonly number[];
   effectId?: string;
   pendingBuild?: BuildAction | null;
+  selectedRobberHex?: number | null;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
   const coast = useMemo(() => coastline(board), [board.seed]);
@@ -349,6 +351,7 @@ export function Board({
             <g
               key={h.id}
               className={`terrain-hit ${canMoveRobber ? 'robber-target' : ''}`}
+              data-robber-selected={canMoveRobber && h.id === selectedRobberHex}
               role={canMoveRobber ? 'button' : undefined}
               tabIndex={canMoveRobber ? 0 : undefined}
               aria-label={`${name}${h.number ? `, ${h.number}, ${pips(h.number)} production pips` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
@@ -538,12 +541,21 @@ export function Board({
               aria-label={`Build road on edge ${id + 1}`}
               className="legal-road"
               data-build-site="road"
+              data-guided={setupRoad || game?.phase === 'freeRoads' || mode === 'road'}
               data-pending={pending?.kind === 'road' && pending.edge === id}
               transform={transform}
               onClick={() => onAction({ kind: 'road', edge: id })}
               onKeyDown={(e) => keyActivate(e, () => onAction({ kind: 'road', edge: id }))}
             >
               <line className="road-hit" x1={-length / 2} y1="0" x2={length / 2} y2="0" />
+              <line
+                className="site-guide road-site-guide"
+                x1={-length / 2 + 4}
+                y1="0"
+                x2={length / 2 - 4}
+                y2="0"
+                aria-hidden="true"
+              />
               <g className="build-site-preview" aria-hidden="true">
                 <RoadShape length={length} color={color(me!)} />
               </g>
@@ -561,11 +573,17 @@ export function Board({
               aria-label={`Build ${kind} at corner ${id + 1}`}
               className="legal-vertex"
               data-build-site={kind}
+              data-guided={setupSettlement || mode === kind}
               data-pending={pending?.kind === kind && pending.vertex === id}
               onClick={() => onAction({ kind, vertex: id })}
               onKeyDown={(e) => keyActivate(e, () => onAction({ kind, vertex: id }))}
             >
               <circle className="vertex-hit" r="21" />
+              <circle
+                className="site-guide vertex-site-guide"
+                r={kind === 'city' ? 18 : 10}
+                aria-hidden="true"
+              />
               <g className="build-site-preview" aria-hidden="true">
                 <BuildingShape city={kind === 'city'} color={color(me!)} />
               </g>

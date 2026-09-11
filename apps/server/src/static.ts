@@ -19,11 +19,14 @@ const types: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
+  '.m4a': 'audio/mp4',
+  '.wav': 'audio/wav',
 };
 
 type Encoding = 'br' | 'gzip' | 'identity';
 const textAsset = /\.(?:html|js|css|svg|json|xml|txt|webmanifest)$/i;
 const immutableArt = /^\/art\/optimized\/[a-z0-9][a-z0-9_-]*\.[a-f0-9]{12}\.webp$/;
+const immutableAudio = /^\/audio\/(?:sfx|music)\/[a-zA-Z0-9][a-zA-Z0-9_-]*\.[a-f0-9]{12}\.(?:wav|m4a)$/;
 
 /** Prefer prebuilt encodings by client quality; implicit identity is a fallback. */
 function encodings(header: string | undefined): Encoding[] {
@@ -159,7 +162,7 @@ export async function serveClient(
     );
     response.setHeader(
       'Cache-Control',
-      path.startsWith('/assets/') || immutableArt.test(path)
+      path.startsWith('/assets/') || immutableArt.test(path) || immutableAudio.test(path)
         ? 'public, max-age=31536000, immutable'
         : 'no-cache',
     );

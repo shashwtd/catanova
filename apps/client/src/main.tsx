@@ -1,5 +1,5 @@
 import { IncomingTrade, TradePanel } from './TradePanel.js';
-import { ResourcePicker, ResourceSummary } from './ResourcePicker.js';
+import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
 import { isBuildAction, placementValid } from './placement.js';
@@ -11,6 +11,8 @@ import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
 import { GameSettings } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
+import { RobberFlow } from './RobberFlow.js';
+import { useGameAttention } from './useGameAttention.js';
 import { FantasyTransition } from './FantasyTransition.js';
 import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
 import { useAuth, entryLocation } from './auth.js';
@@ -31,6 +33,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   History,
+  GameIcon,
   Settings2,
   ArrowRight,
   Castle,
@@ -55,8 +58,8 @@ import '@fontsource/barlow/latin-600.css';
 import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
-import { emptyHand, robberVictims, total } from '../../../packages/rules/src/game.js';
-import type { GameAction, Hand } from '../../../packages/rules/src/game.js';
+import { emptyHand } from '../../../packages/rules/src/game.js';
+import type { GameAction } from '../../../packages/rules/src/game.js';
 import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
@@ -78,6 +81,9 @@ import './room-experience.css';
 import './landing.css';
 import './hud-layout.css';
 import './settings.css';
+import './trade-polish.css';
+import './awards.css';
+import './game-guidance.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -198,8 +204,7 @@ function App() {
       | 'friends'
       | null
     >(null);
-  const [robberHex, setRobberHex] = useState<number | null>(null),
-    [selected, setSelected] = useState<Hand>(emptyHand);
+  const [robberHex, setRobberHex] = useState<number | null>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
   const [isFullscreen, setFullscreen] = useState(!!document.fullscreenElement);
 
@@ -210,6 +215,12 @@ function App() {
   const connected = status === 'connected',
     disabled = !connected || busy || feedback.presentationBusy,
     hand = player?.hand ?? emptyHand();
+  const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
+    feedback.sound.playAttention(cue),
+  );
+  useEffect(() => {
+    feedback.sound.setScene(g ? 'game' : 'menu');
+  }, [!!g, feedback.sound]);
   const actionPhase = myTurn && g?.phase === 'actions';
   const networkBusy = status === 'connecting' || status === 'reconnecting';
   const placementReady = placementValid(placement, g, room?.roomId, me);
@@ -429,7 +440,6 @@ function App() {
   useEffect(() => {
     setMode(null);
     setRobberHex(null);
-    setSelected(emptyHand());
   }, [g?.phase, g?.turn]);
   useEffect(() => {
     if (!toast) return;
@@ -445,7 +455,6 @@ function App() {
       await c.action(action);
       setMode(null);
       setRobberHex(null);
-      if (action.kind === 'playCard') setSelected(emptyHand());
     } catch (e) {
       if (connection.current === c)
         setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Action failed');
@@ -509,9 +518,9 @@ function App() {
     if (await auth.signOut()) home(true);
   }
   function chooseRobber(hex: number) {
-    if (!g || !me) return;
-    if (!robberVictims(g, me, hex).length) void act({ kind: 'robber', hex });
-    else setRobberHex(hex);
+    if (!g || !me || disabled || !myTurn || g.phase !== 'robber' || hex === g.robber) return;
+    setRobberHex(hex);
+    setPanel(null);
   }
   async function fullscreen() {
     try {
@@ -560,27 +569,14 @@ function App() {
     setName(canonical.name);
     setPanel(null);
   }
-  const phaseText = !g
-    ? ''
-    : g.winner
-      ? `${g.players.find((p) => p.id === g.winner)?.name} wins`
-      : g.phase === 'discard'
-        ? g.discards[me ?? '']
-          ? `Discard ${g.discards[me!]} cards`
-          : ''
-        : !myTurn
+  const phaseText =
+    !g || ['discard', 'robber'].includes(g.phase)
+      ? ''
+      : mode && myTurn && g.phase === 'actions'
+        ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
+        : g.phase === 'actions'
           ? ''
-          : g.phase === 'setupSettlement'
-            ? 'Place a settlement'
-            : g.phase === 'setupRoad'
-              ? 'Place a road'
-              : g.phase === 'robber'
-                ? 'Move the robber'
-                : g.phase === 'freeRoads'
-                  ? `Place ${g.freeRoads} free road${g.freeRoads === 1 ? '' : 's'}`
-                  : mode
-                    ? `Place ${mode === 'city' ? 'a city' : `a ${mode}`}`
-                    : '';
+          : (gameNotice?.prompt ?? '');
   return (
     <main
       className={`game-world ${g ? 'playing' : room ? 'lobby' : 'entry-world'}`}
@@ -601,6 +597,7 @@ function App() {
               me={me}
               mode={mode}
               disabled={disabled}
+              selectedRobberHex={robberHex}
               pendingBuild={placementReady ? placement?.action : null}
               onAction={previewPlacement}
               onRobber={chooseRobber}
@@ -766,6 +763,20 @@ function App() {
         <>
           {phaseText && (
             <div className="action-prompt" role="status" key={`${g.turn}:${g.phase}:${mode}`}>
+              {gameNotice && (
+                <GameIcon
+                  name={
+                    mode === 'city'
+                      ? 'city'
+                      : mode === 'road'
+                        ? 'road'
+                        : mode === 'settlement'
+                          ? 'settlement'
+                          : gameNotice.icon
+                  }
+                  size={20}
+                />
+              )}
               <span>{phaseText}</span>
               {mode && (
                 <IconButton
@@ -939,54 +950,31 @@ function App() {
               </div>
             </aside>
           )}
-          {g.phase === 'discard' && !!g.discards[me ?? ''] && (
-            <aside className="required-action floating-panel">
-              <div className="panel-heading">
-                <h2>Discard {g.discards[me!]} cards</h2>
-                <TurnTimer
-                  room={room!}
-                  me={me}
-                  discard
-                  offset={metrics.clockOffsetMs}
-                  connected={connected}
-                  onWarning={() => feedback.sound.play('warning')}
-                />
-              </div>
-              <ResourcePicker value={selected} onChange={setSelected} max={hand} label="Discard" />
-              <button
-                className="gold-button"
-                disabled={disabled || total(selected) !== g.discards[me!]}
-                onClick={() => act({ kind: 'discard', resources: selected })}
-              >
-                Discard {total(selected)}/{g.discards[me!]}
-              </button>
-            </aside>
-          )}
-          {robberHex !== null && myTurn && g.phase === 'robber' && (
-            <aside className="required-action floating-panel">
-              <div className="panel-heading">
-                <h2>Steal from</h2>
-                <IconButton label="Choose another tile" onClick={() => setRobberHex(null)}>
-                  <X />
-                </IconButton>
-              </div>
-              {robberVictims(g, me!, robberHex).map((id) => (
-                <button
-                  className="dark-button"
-                  key={id}
-                  disabled={disabled}
-                  onClick={() => act({ kind: 'robber', hex: robberHex, victim: id })}
-                >
-                  {g.players.find((p) => p.id === id)?.name}
-                  <ArrowRight />
-                </button>
-              ))}
-            </aside>
+          {room && (
+            <RobberFlow
+              room={room}
+              me={me}
+              selectedHex={robberHex}
+              onSelectHex={setRobberHex}
+              onAction={(a) => void act(a)}
+              disabled={disabled}
+              connected={connected}
+              offset={metrics.clockOffsetMs}
+              onWarning={() => feedback.sound.play('warning')}
+            />
           )}
         </>
       )}
       {g && (
-        <GameEffects event={feedback.event} lastDice={g.dice} reducedMotion={reducedMotion} activity={true} />
+        <GameEffects
+          event={feedback.event}
+          lastDice={g.dice}
+          reducedMotion={reducedMotion}
+          activity={true}
+          awards={feedback.awards}
+          onAwardComplete={feedback.finishAward}
+          onAwardStart={feedback.announceAward}
+        />
       )}
       {transitionId && (
         <FantasyTransition

@@ -1,0 +1,19 @@
+The Bard's Tale — RandomMind
+
+This recording is dedicated to the public domain under CC0 1.0 Universal.
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Legal code: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+Original creator's release:
+https://opengameart.org/content/medieval-the-bards-tale
+
+Source loop:
+https://opengameart.org/sites/default/files/Loop_The_Bards_Tale.wav
+
+Catanova distributes the complete creator-provided loop as a compressed AAC
+file, bards-tale.895a05b93cf9.m4a. No composition, arrangement, crop, or tempo changes were
+made. This credit does not imply the composer's endorsement of Catanova.
+
+See docs/audio/MUSIC.md in the source repository for provenance and encoding
+details. The repository's code license does not replace this asset's CC0
+dedication.

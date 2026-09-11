@@ -66,6 +66,15 @@ test('affordable board sites are focusable without a toolbar selection, and a se
   const sites = [...html.matchAll(/<g[^>]*data-build-site=[^>]*>/g)];
   assert.ok(sites.every(([site]) => site.includes('role="button"') && site.includes('tabindex="0"')));
   assert.equal([...html.matchAll(/class="build-site-preview"/g)].length, sites.length);
+  assert.equal(
+    [...html.matchAll(/data-guided="true"/g)].length,
+    0,
+    'affordability alone never highlights everything',
+  );
+  for (const kind of ['road', 'settlement', 'city'] as const) {
+    const guided = render(view, { mode: kind });
+    assert.equal([...guided.matchAll(/data-guided="true"/g)].length, siteCount(guided, kind));
+  }
 });
 
 test('no placement targets survive missing resources, disabled input, another player, or a non-build phase', () => {
@@ -86,6 +95,7 @@ test('setup and free-road phases expose their mandatory legal kind regardless of
   const initial = game();
   const setup = gameView(initial, 'a');
   assert.equal(siteCount(render(setup, { mode: 'city' }), 'settlement'), setup.legal.settlements.length);
+  assert.equal([...render(setup).matchAll(/data-guided="true"/g)].length, setup.legal.settlements.length);
   const placed = applyAction(
     initial,
     'a',
@@ -95,6 +105,7 @@ test('setup and free-road phases expose their mandatory legal kind regardless of
   const road = gameView(placed, 'a');
   assert.ok(road.legal.roads.length > 0);
   assert.equal(siteCount(render(road, { mode: 'city' }), 'road'), road.legal.roads.length);
+  assert.equal([...render(road).matchAll(/data-guided="true"/g)].length, road.legal.roads.length);
   assert.equal(siteCount(render(road), 'settlement'), 0);
   const free = actionGame();
   free.phase = 'freeRoads';
@@ -104,6 +115,22 @@ test('setup and free-road phases expose their mandatory legal kind regardless of
   assert.ok(freeView.legal.roads.length > 0);
   assert.equal(siteCount(render(freeView, { mode: 'settlement' }), 'road'), freeView.legal.roads.length);
   assert.equal(siteCount(render(freeView), 'city'), 0);
+  assert.equal([...render(freeView).matchAll(/data-guided="true"/g)].length, freeView.legal.roads.length);
+});
+
+test('robber phase highlights every other tile and keeps the selected destination separate from the committed robber', () => {
+  const g = actionGame();
+  g.phase = 'robber';
+  const view = gameView(g, 'a');
+  const target = (g.robber + 1) % g.board.hexes.length;
+  const html = render(view, { selectedRobberHex: target });
+  assert.equal([...html.matchAll(/class="terrain-hit robber-target"/g)].length, 18);
+  assert.equal([...html.matchAll(/data-robber-selected="true"/g)].length, 1);
+  assert.equal(view.robber, g.robber);
+  assert.equal(
+    [...render(view, { disabled: true, selectedRobberHex: target }).matchAll(/robber-target"/g)].length,
+    0,
+  );
 });
 
 test('draft road, settlement, and city ghosts leave authoritative pieces unchanged and reject stale sites', () => {

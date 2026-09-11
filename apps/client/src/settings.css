@@ -69,6 +69,9 @@
   gap: 16px;
   margin-top: 12px;
 }
+.settings-music {
+  margin-top: 22px;
+}
 .settings-mute {
   display: grid;
   place-items: center;

@@ -39,6 +39,11 @@ test('one server serves client assets and same-origin WebSockets without exposin
   await writeFile(join(client, 'site.webmanifest'), '{"name":"Catanova"}');
   await writeFile(join(client, 'assets', 'game-123.js'), 'export const game = true;');
   await writeFile(join(client, 'assets', 'font-123.woff2'), 'test font');
+  await mkdir(join(client, 'audio', 'sfx'), { recursive: true });
+  await mkdir(join(client, 'audio', 'music'), { recursive: true });
+  await writeFile(join(client, 'audio', 'sfx', 'diceContact.123456abcdef.wav'), 'test wav');
+  await writeFile(join(client, 'audio', 'music', 'theme.123456abcdef.m4a'), 'test aac');
+  await writeFile(join(client, 'audio', 'music', 'theme.m4a'), 'unversioned aac');
   await writeFile(join(dir, 'private.txt'), 'must remain private');
   const auth = { url: 'https://configured-project.supabase.co', publishableKey: 'sb_publishable_test' };
   const server = await startServer({ port: 0, databasePath: ':memory:', clientDirectory: client, auth });
@@ -94,6 +99,17 @@ test('one server serves client assets and same-origin WebSockets without exposin
   const asset = await fetch(`${origin}/assets/game-123.js`);
   assert.match(asset.headers.get('cache-control')!, /immutable/);
   assert.match(asset.headers.get('content-type')!, /javascript/);
+  for (const [path, type] of [
+    ['/audio/sfx/diceContact.123456abcdef.wav', 'audio/wav'],
+    ['/audio/music/theme.123456abcdef.m4a', 'audio/mp4'],
+  ]) {
+    const audio = await fetch(origin + path);
+    assert.equal(audio.status, 200);
+    assert.equal(audio.headers.get('content-type'), type);
+    assert.match(audio.headers.get('cache-control')!, /max-age=31536000, immutable/);
+    assert.equal(audio.headers.get('content-encoding'), null);
+  }
+  assert.equal((await fetch(origin + '/audio/music/theme.m4a')).headers.get('cache-control'), 'no-cache');
   const cached = await fetch(origin, { headers: { 'If-None-Match': response.headers.get('etag')! } });
   assert.equal(cached.status, 304);
   assert.equal(await cached.text(), '');

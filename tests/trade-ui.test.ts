@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TradePanel, IncomingTrade } from '../apps/client/src/TradePanel.js';
+import { BankTrade, TradePanel, IncomingTrade } from '../apps/client/src/TradePanel.js';
 import { ResourcePicker, ResourceChoice } from '../apps/client/src/ResourcePicker.js';
 import { MoveHistory, historyTokens, historyTurns } from '../apps/client/src/MoveHistory.js';
 import { activePlayer, applyAction, createGame, emptyHand, gameView } from '../packages/rules/src/game.js';
@@ -278,6 +278,56 @@ test('history replacement icons retain accessible names for piece and developmen
     assert.ok(
       token && token.includes('role="img"'),
       `${label} needs a semantic accessible wrapper around its decorative icon`,
+    );
+  }
+});
+
+function side(html: string, label: 'You give' | 'You get') {
+  return [
+    ...html.matchAll(new RegExp(`<section[^>]*aria-label="${label}"[^>]*>([\\s\\S]*?)</section>`, 'g')),
+  ].map((match) => match[1]!);
+}
+test('exact and open trade summaries consistently use the viewer’s give/get perspective', () => {
+  let game = move(setup(), { kind: 'offerTrade', give: hand({ wood: 2 }), want: hand({ sheep: 1 }) });
+  const maker = panel(gameView(game, 'p0'), 'p0');
+  const responder = incoming(gameView(game, 'p1'), 'p1');
+  assert.match(side(maker, 'You give')[0]!, /aria-label="2 Timber"/);
+  assert.match(side(maker, 'You get')[0]!, /aria-label="1 Sheep"/);
+  assert.match(side(responder, 'You give')[0]!, /aria-label="1 Sheep"/);
+  assert.match(side(responder, 'You get')[0]!, /aria-label="2 Timber"/);
+  assert.ok(button(responder, 'Decline'));
+  assert.ok(button(incoming(gameView(game, 'p1'), 'p1', true), 'Decline').includes('disabled=""'));
+  game = move(game, { kind: 'openTrade', give: hand({ wood: 2 }) });
+  const tradeId = game.trade!.id;
+  game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
+  const reply = incoming(gameView(game, 'p1'), 'p1');
+  assert.match(side(reply, 'You give')[0]!, /aria-label="1 Sheep"/);
+  assert.match(side(reply, 'You get')[0]!, /aria-label="2 Timber"/);
+  const offers = panel(gameView(game, 'p0'), 'p0');
+  assert.match(side(offers, 'You give')[1]!, /aria-label="2 Timber"/);
+  assert.match(side(offers, 'You get')[1]!, /aria-label="1 Sheep"/);
+  game = move(game, { kind: 'declineTrade', tradeId }, 'p1');
+  assert.equal(incoming(gameView(game, 'p1'), 'p1'), '', 'declined offer must stay hidden from that player');
+  assert.match(panel(gameView(game, 'p0'), 'p0'), /Bob declined/);
+  assert.ok(
+    button(incoming(gameView(game, 'p2'), 'p2'), 'Make an offer'),
+    'another player can still respond',
+  );
+});
+
+test('bank trade clearly previews the local payment and return, with no number spinners or off-turn selection', () => {
+  const game = setup();
+  const view = gameView(game, 'p0');
+  const render = (game: GameView, disabled = false) =>
+    renderToStaticMarkup(createElement(BankTrade, { game, me: 'p0', disabled, onAction: () => {} }));
+  const html = render(view);
+  assert.match(side(html, 'You give')[0]!, new RegExp(`aria-label="${view.legal.rates.wood} Timber"`));
+  assert.match(side(html, 'You get')[0]!, /aria-label="1 Clay"/);
+  assert.ok(!/<input\b|<select\b|type="number"/.test(html));
+  for (const markup of [render(view, true), render({ ...view, active: 1 })]) {
+    assert.ok(
+      buttons(markup).every((candidate) => candidate.includes('disabled=""')),
+      'bank choices and commit all lock',
     );
   }
 });

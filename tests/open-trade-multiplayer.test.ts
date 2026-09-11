@@ -226,3 +226,114 @@ test('four real clients publish proposals, reconnect privately, and recover one 
   );
   conserved(accepted);
 });
+
+test('declines commit atomically, remain rejected after restart, and all-declined closure has one durable receipt', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'catanova-decline-'));
+  const path = join(directory, 'game.sqlite');
+  let store = new Store(path);
+  t.after(() => {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const session = newSession('Alice');
+  const host = store.enter('create', session.token, session.name);
+  for (const name of ['Bob', 'Cara']) store.enter('join', newSession(name).token, name, host.room_id);
+  const base = fixture(store, host.room_id);
+  const bob = { ...base.players[1]!, room_id: host.room_id };
+  const cara = { ...base.players[2]!, room_id: host.room_id };
+  let revision = store.action(host, 'offer-before-declines', store.snapshot(host.room_id).revision, {
+    kind: 'offerTrade',
+    give: hand({ wood: 2 }),
+    want: hand({ sheep: 1 }),
+  }).revision;
+  const tradeId = store.loadGame(host.room_id)!.trade!.id;
+  const decline = { kind: 'declineTrade' as const, tradeId };
+  const before = structuredClone(store.loadGame(host.room_id)!);
+  store.db.exec(
+    "CREATE TEMP TRIGGER fail_decline_receipt BEFORE INSERT ON game_receipts BEGIN SELECT RAISE(ABORT,'Decline receipt failure'); END",
+  );
+  assert.throws(() => store.action(bob, 'bob-declines', revision, decline), /Decline receipt failure/);
+  assert.deepEqual(store.loadGame(host.room_id), before);
+  assert.equal(store.snapshot(host.room_id).revision, revision);
+  store.db.exec('DROP TRIGGER fail_decline_receipt');
+  const firstRevision = revision;
+  revision = store.action(bob, 'bob-declines', revision, decline).revision;
+  const declined = structuredClone(store.loadGame(host.room_id)!);
+  store.close();
+  store = new Store(path);
+  assert.deepEqual(store.loadGame(host.room_id), declined);
+  assert.equal(store.action(bob, 'bob-declines', firstRevision, decline).duplicate, true);
+  assert.throws(
+    () => store.action(bob, 'stale-accept', firstRevision, { kind: 'acceptTrade', tradeId }),
+    /State changed/,
+  );
+  assert.throws(
+    () => store.action(bob, 'declined-accept', revision, { kind: 'acceptTrade', tradeId }),
+    /already declined/,
+  );
+  assert.throws(() => store.action(bob, 'second-decline', revision, decline), /already declined/);
+  const closingRevision = revision;
+  revision = store.action(cara, 'cara-closes', revision, decline).revision;
+  assert.equal(store.loadGame(host.room_id)!.trade, null);
+  store.close();
+  store = new Store(path);
+  assert.equal(store.action(cara, 'cara-closes', closingRevision, decline).duplicate, true);
+  assert.equal(store.snapshot(host.room_id).revision, revision);
+  assert.equal(
+    store.history(host.room_id).entries.filter((entry) => entry.kind === 'declineTrade').length,
+    2,
+  );
+  assert.deepEqual(
+    store.loadGame(host.room_id)!.players.map((p) => p.hand),
+    base.players.map((p) => p.hand),
+  );
+  conserved(store.loadGame(host.room_id)!);
+});
+
+test('two connected players synchronize the last decline and a reconnected player cannot accept the closed offer', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'catanova-decline-wire-'));
+  let server = await startServer({ port: 0, databasePath: join(directory, 'game.sqlite'), auth: null });
+  const port = server.port;
+  const clients: Connection[] = [];
+  t.after(async () => {
+    clients.forEach((client) => client.stop());
+    await server.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const host = new Connection(server.url, newSession('Alice'), { minRetryMs: 30, maxRetryMs: 100 });
+  clients.push(host);
+  host.start();
+  await until(() => host.status === 'connected');
+  const guest = new Connection(server.url, newSession('Bob', host.session.roomId), {
+    minRetryMs: 30,
+    maxRetryMs: 100,
+  });
+  clients.push(guest);
+  guest.start();
+  await until(() => clients.every((client) => client.state?.players.length === 2));
+  const game = fixture(server.store, host.session.roomId!);
+  const actor = clients.find((client) => client.playerId === game.players[0]!.id)!;
+  const recipient = clients.find((client) => client !== actor)!;
+  let ack = await actor.action({ kind: 'offerTrade', give: hand({ wood: 2 }), want: hand({ sheep: 1 }) });
+  await until(() => clients.every((client) => client.state!.revision === ack.revision));
+  const tradeId = recipient.state!.game!.trade!.id;
+  ack = await recipient.action({ kind: 'declineTrade', tradeId });
+  await until(() =>
+    clients.every((client) => client.state!.revision === ack.revision && client.state!.game!.trade === null),
+  );
+  await server.close();
+  server = await startServer({ port, databasePath: join(directory, 'game.sqlite'), auth: null });
+  await until(() =>
+    clients.every((client) => client.status === 'connected' && client.state!.game!.trade === null),
+  );
+  await assert.rejects(recipient.action({ kind: 'acceptTrade', tradeId }), /no longer available/);
+  assert.equal(
+    server.store.history(host.session.roomId!).entries.filter((entry) => entry.kind === 'declineTrade')
+      .length,
+    1,
+  );
+  assert.deepEqual(
+    server.store.loadGame(host.session.roomId!)!.players.map((p) => p.hand),
+    game.players.map((p) => p.hand),
+  );
+});

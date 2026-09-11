@@ -1,5 +1,7 @@
 import type { Preferences } from './preferences.js';
 import { DICE_IMPACT_MS } from './DiceThrow.js';
+import { AUDIO_SAMPLES } from './audio-samples.js';
+export const MUSIC_URL = '/audio/music/bards-tale.895a05b93cf9.m4a';
 export type SoundCue =
   | 'ui'
   | 'hover'
@@ -28,7 +30,7 @@ export type SoundNote = {
   wave: OscillatorType | 'noise';
   filter?: number;
 };
-/** Short original layered foley/chimes. No downloaded samples or continuously running audio. */
+/** Small offline/failed-download fallback; recorded foley takes precedence when available. */
 export function soundScore(cue: SoundCue): SoundNote[] {
   const tone = (
     frequency: number,
@@ -118,6 +120,71 @@ export function soundScore(cue: SoundCue): SoundNote[] {
       return [tone(440, 0, 0.2, 0.05), tone(554, 0.08, 0.23, 0.06)];
   }
 }
+type Sample = keyof typeof AUDIO_SAMPLES;
+export type SampleLayer = { sample: Sample; at: number; gain: number; rate?: number; duration?: number };
+/** The physical contacts use the same timeline as the visible dice. */
+export function soundLayers(cue: SoundCue): SampleLayer[] {
+  const layer = (sample: Sample, at = 0, gain = 0.65, rate = 1, duration?: number): SampleLayer => ({
+    sample,
+    at,
+    gain,
+    rate,
+    ...(duration === undefined ? {} : { duration }),
+  });
+  switch (cue) {
+    case 'ui':
+      return [layer('paperPlace', 0, 0.15, 1.2, 0.13)];
+    case 'hover':
+      return [layer('paperSlide', 0, 0.18, 1.2, 0.14)];
+    case 'dice':
+      return [
+        layer('diceRattle', 0.025, 0.38),
+        ...DICE_IMPACT_MS.flatMap((at, i) => [
+          layer('diceContact', at / 1000, 0.78 - i * 0.14, 1 + i * 0.04, 0.14),
+          layer('wood', at / 1000 + 0.019, 0.15 - i * 0.027, 1.14 - i * 0.025, 0.1),
+        ]),
+      ];
+    case 'road':
+      return [layer('plank', 0, 0.7), layer('wood', 0.1, 0.26, 1.12)];
+    case 'settlement':
+      return [layer('wood', 0, 0.67, 1.03), layer('wood', 0.19, 0.61, 0.97), layer('wood', 0.39, 0.78, 1.07)];
+    case 'city':
+      return [
+        layer('woodHeavy', 0, 0.82, 0.94),
+        layer('stone', 0.16, 0.35, 0.84),
+        layer('woodHeavy', 0.36, 0.76, 1.02),
+        layer('wood', 0.56, 0.55, 0.89),
+      ];
+    case 'gain':
+      return [layer('paperSlide', 0, 0.5), layer('paperPlace', 0.15, 0.46, 1.04)];
+    case 'spend':
+      return [layer('paperFan', 0, 0.56, 1.12), layer('paperPlace', 0.18, 0.3)];
+    case 'trade':
+      return [
+        layer('paperSlide', 0, 0.57),
+        layer('paperFan', 0.12, 0.4, 1.15),
+        layer('paperPlace', 0.34, 0.52),
+      ];
+    case 'development':
+      return [layer('paperFan', 0, 0.32), layer('magic', 0.09, 0.51)];
+    case 'knight':
+      return [layer('steel', 0, 0.66), layer('woodHeavy', 0.17, 0.42), layer('magic', 0.15, 0.27, 0.84)];
+    case 'robber':
+      return [layer('cloth', 0, 0.47), layer('woodHeavy', 0.2, 0.39, 0.76)];
+    case 'turn':
+      return [layer('turn', 0, 0.73)];
+    case 'award':
+      return [layer('award', 0, 0.77), layer('magic', 0.66, 0.37, 1.12)];
+    case 'win':
+      return [layer('award', 0, 0.77), layer('turn', 0.88, 0.72)];
+    case 'warning':
+      return [layer('wood', 0, 0.45, 1.3), layer('wood', 0.19, 0.38, 1.12)];
+    case 'error':
+      return [layer('woodHeavy', 0, 0.34, 0.72)];
+    case 'join':
+      return [layer('join', 0, 0.44)];
+  }
+}
 export class SoundEngine {
   private context?: AudioContext;
   private master?: GainNode;
@@ -129,6 +196,18 @@ export class SoundEngine {
   private generation = 0;
   private last = new Map<SoundCue, number>();
   private unlocked = false;
+  private samples = new Map<Sample, AudioBuffer>();
+  private sampleLoads = new Map<Sample, Promise<void>>();
+  private sampleRetryAfter = new Map<Sample, number>();
+  private requests = new Set<AbortController>();
+  private scene: 'menu' | 'game' = 'menu';
+  private music?: AudioBufferSourceNode;
+  private musicGain?: GainNode;
+  private musicBuffer?: AudioBuffer;
+  private musicLoading?: Promise<void>;
+  private musicOffset = 0;
+  private musicStarted = 0;
+  private musicRetryAfter = 0;
   constructor(private preferences: () => Preferences) {}
   private enabled() {
     const p = this.preferences();
@@ -136,6 +215,14 @@ export class SoundEngine {
   }
   private hidden() {
     return typeof document !== 'undefined' && document.hidden;
+  }
+  private wantsMusic() {
+    const p = this.preferences();
+    return this.unlocked && p.music && p.musicVolume > 0 && this.scene === 'game' && !this.hidden();
+  }
+  setScene(scene: 'menu' | 'game') {
+    this.scene = scene;
+    this.refresh();
   }
   private async wake(context: AudioContext) {
     // Wait for a pending idle suspension, otherwise a fresh cue could start just
@@ -161,8 +248,9 @@ export class SoundEngine {
     });
   }
   async unlock() {
-    if (!this.enabled() || this.hidden() || typeof AudioContext === 'undefined') return;
+    if (this.hidden() || typeof AudioContext === 'undefined') return;
     this.unlocked = true;
+    if (!this.enabled() && !this.wantsMusic()) return;
     const generation = this.generation;
     try {
       this.context ??= new AudioContext({ latencyHint: 'interactive' });
@@ -174,30 +262,135 @@ export class SoundEngine {
       const context = this.context;
       await this.wake(context);
       if (context !== this.context) return;
-      if (generation !== this.generation || !this.enabled() || this.hidden()) {
+      if (generation !== this.generation || (!this.enabled() && !this.wantsMusic()) || this.hidden()) {
         this.sleepWhenIdle(0);
         return;
       }
       this.refresh();
+      if (this.enabled()) this.warmSamples(context);
       this.sleepWhenIdle(1200);
     } catch {
       /* Audio support must never block a game action. */
     }
   }
   refresh() {
+    if (!this.context && this.unlocked && !this.hidden() && (this.enabled() || this.wantsMusic())) {
+      void this.unlock();
+      return;
+    }
     if (this.context && this.context.state !== 'closed' && this.master)
       this.master.gain.setTargetAtTime(
         this.enabled() ? this.preferences().volume * 0.6 : 0,
         this.context.currentTime,
         0.025,
       );
-    if (!this.enabled()) this.silence();
+    if (!this.enabled()) this.stopEffects();
+    if (this.wantsMusic()) void this.startMusic();
+    else this.stopMusic();
+    if (!this.enabled() && !this.wantsMusic()) this.suspend();
   }
   private sleepWhenIdle(ms: number) {
     clearTimeout(this.idle);
     this.idle = setTimeout(() => {
-      if (!this.voices.size) this.suspend();
+      if (!this.voices.size && !this.music) this.suspend();
     }, ms);
+  }
+  private async download(url: string, context: AudioContext, timeoutMs = 8000): Promise<AudioBuffer> {
+    const controller = new AbortController();
+    this.requests.add(controller);
+    const timeout = setTimeout(
+      () => controller.abort(new DOMException('Audio download timed out', 'TimeoutError')),
+      timeoutMs,
+    );
+    try {
+      const response = await fetch(url, { signal: controller.signal, cache: 'force-cache', priority: 'low' });
+      if (!response.ok) throw new Error('Audio unavailable');
+      return await context.decodeAudioData(await response.arrayBuffer());
+    } finally {
+      clearTimeout(timeout);
+      this.requests.delete(controller);
+    }
+  }
+  private warmSamples(context: AudioContext) {
+    for (const sample of Object.keys(AUDIO_SAMPLES) as Sample[]) {
+      if (
+        this.samples.has(sample) ||
+        this.sampleLoads.has(sample) ||
+        performance.now() < (this.sampleRetryAfter.get(sample) ?? 0)
+      )
+        continue;
+      const loading = this.download(AUDIO_SAMPLES[sample].url, context)
+        .then((buffer) => {
+          if (this.context === context) this.samples.set(sample, buffer);
+        })
+        .catch((error: unknown) => {
+          if (this.context === context && !(error instanceof Error && error.name === 'AbortError'))
+            this.sampleRetryAfter.set(sample, performance.now() + 30000);
+        })
+        .finally(() => {
+          if (this.sampleLoads.get(sample) === loading) this.sampleLoads.delete(sample);
+        });
+      this.sampleLoads.set(sample, loading);
+    }
+  }
+  private async startMusic() {
+    const context = this.context;
+    if (!context || !this.wantsMusic() || performance.now() < this.musicRetryAfter) return;
+    if (this.music && this.musicGain) {
+      this.musicGain.gain.setTargetAtTime(this.preferences().musicVolume * 0.32, context.currentTime, 0.15);
+      return;
+    }
+    if (this.musicLoading) return this.musicLoading;
+    let cancelled = false;
+    const loading = (async () => {
+      try {
+        const buffer = this.musicBuffer ?? (await this.download(MUSIC_URL, context, 60000));
+        if (this.context !== context || !this.wantsMusic()) return;
+        this.musicBuffer = buffer;
+        await this.wake(context);
+        if (this.context !== context) return;
+        if (!this.wantsMusic()) {
+          this.sleepWhenIdle(0);
+          return;
+        }
+        const source = context.createBufferSource();
+        const gain = context.createGain();
+        source.buffer = this.musicBuffer;
+        source.loop = true;
+        gain.gain.setValueAtTime(0, context.currentTime);
+        gain.gain.setTargetAtTime(this.preferences().musicVolume * 0.32, context.currentTime, 0.3);
+        source.connect(gain);
+        gain.connect(context.destination);
+        this.music = source;
+        this.musicGain = gain;
+        this.musicStarted = context.currentTime;
+        source.start(0, this.musicOffset % this.musicBuffer.duration);
+      } catch (error) {
+        // No music device, blocked download, or decode failure must delay play or retry in a loop.
+        cancelled = error instanceof Error && error.name === 'AbortError';
+        if (this.context === context && !cancelled) this.musicRetryAfter = performance.now() + 30000;
+      }
+    })();
+    this.musicLoading = loading;
+    await loading;
+    if (this.musicLoading === loading) this.musicLoading = undefined;
+    if (cancelled && this.context === context && this.wantsMusic()) void this.startMusic();
+  }
+  private stopMusic() {
+    if (this.music) {
+      if (this.context && this.musicBuffer)
+        this.musicOffset =
+          (this.musicOffset + Math.max(0, this.context.currentTime - this.musicStarted)) %
+          this.musicBuffer.duration;
+      try {
+        this.music.stop();
+      } catch {}
+      this.music.disconnect();
+      this.music = undefined;
+      this.musicGain?.disconnect();
+      this.musicGain = undefined;
+    }
+    if (!this.voices.size) this.sleepWhenIdle(0);
   }
   private release(source: AudioScheduledSourceNode) {
     const voice = this.voices.get(source);
@@ -221,7 +414,14 @@ export class SoundEngine {
     return this.noise;
   }
   play(cue: SoundCue) {
-    if (!this.unlocked || !this.enabled() || !this.context || !this.master || this.hidden()) return;
+    this.playCue(cue, false);
+  }
+  playAttention(cue: 'turn' | 'warning') {
+    this.playCue(cue, true);
+  }
+  private playCue(cue: SoundCue, attention: boolean) {
+    if (!this.unlocked || !this.enabled() || !this.context || !this.master || (!attention && this.hidden()))
+      return;
     const now = performance.now(),
       last = this.last.get(cue) ?? -Infinity;
     if (now - last < (cue === 'hover' ? 180 : cue === 'ui' ? 35 : 70)) return;
@@ -232,12 +432,49 @@ export class SoundEngine {
       try {
         await this.wake(ctx);
         if (ctx !== this.context) return;
-        if (generation !== this.generation || !this.enabled() || this.hidden()) {
+        if (generation !== this.generation || !this.enabled() || (!attention && this.hidden())) {
           this.sleepWhenIdle(0);
           return;
         }
         clearTimeout(this.idle);
         const start = ctx.currentTime + 0.006;
+        const layers = soundLayers(cue);
+        if (layers.every(({ sample }) => this.samples.has(sample))) {
+          for (const layer of layers) {
+            if (this.voices.size >= 48) break;
+            const source = ctx.createBufferSource(),
+              gain = ctx.createGain(),
+              filter = ctx.createBiquadFilter();
+            source.buffer = this.samples.get(layer.sample)!;
+            source.playbackRate.value = layer.rate ?? 1;
+            const duration = Math.min(
+              layer.duration ?? Infinity,
+              source.buffer.duration / source.playbackRate.value,
+            );
+            filter.type = 'lowpass';
+            filter.frequency.value = 14000;
+            gain.gain.setValueAtTime(layer.gain, start + layer.at);
+            gain.gain.setTargetAtTime(0.0001, start + layer.at + Math.max(0.01, duration - 0.018), 0.006);
+            source.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.master!);
+            this.voices.set(source, { gain, filter });
+            source.onended = () => {
+              this.release(source);
+              this.sleepWhenIdle(650);
+            };
+            try {
+              source.start(start + layer.at);
+              source.stop(start + layer.at + duration);
+            } catch (error) {
+              this.release(source);
+              throw error;
+            }
+          }
+          return;
+        }
+        // Never play a downloaded cue late: use the immediate fallback for this event only.
+        if (!this.hidden()) this.warmSamples(ctx);
         for (const note of soundScore(cue)) {
           if (this.voices.size >= 48) break;
           const source = note.wave === 'noise' ? ctx.createBufferSource() : ctx.createOscillator();
@@ -280,7 +517,7 @@ export class SoundEngine {
       }
     })();
   }
-  silence() {
+  private stopEffects() {
     this.generation++;
     clearTimeout(this.idle);
     this.last.clear();
@@ -290,6 +527,11 @@ export class SoundEngine {
       } catch {}
       this.release(source);
     }
+  }
+  silence() {
+    this.stopEffects();
+    this.stopMusic();
+    for (const controller of this.requests) controller.abort();
     this.suspend();
   }
   dispose() {
@@ -299,6 +541,13 @@ export class SoundEngine {
     this.context = undefined;
     this.master = undefined;
     this.noise = undefined;
+    this.samples.clear();
+    this.sampleLoads.clear();
+    this.sampleRetryAfter.clear();
+    this.musicBuffer = undefined;
+    this.musicLoading = undefined;
+    this.musicOffset = 0;
+    this.musicRetryAfter = 0;
     this.unlocked = false;
     this.resuming = undefined;
     this.suspending = undefined;

@@ -39,9 +39,15 @@ export function GameSettings({
     timerLocked = !editable || busy || saving,
     changed = draft.turnTimerSeconds !== (room?.settings ?? DEFAULT_ROOM_SETTINGS).turnTimerSeconds;
   const lastVolume = useRef(preferences.volume || DEFAULT_PREFERENCES.volume);
+  const lastMusicVolume = useRef(preferences.musicVolume || DEFAULT_PREFERENCES.musicVolume);
+  const musicMuted = !preferences.music || preferences.musicVolume === 0;
+  const musicPercent = musicMuted ? 0 : Math.round(preferences.musicVolume * 100);
   useEffect(() => {
     if (preferences.volume > 0) lastVolume.current = preferences.volume;
   }, [preferences.volume]);
+  useEffect(() => {
+    if (preferences.musicVolume > 0) lastMusicVolume.current = preferences.musicVolume;
+  }, [preferences.musicVolume]);
   useEffect(
     () => setDraft(room?.settings ?? DEFAULT_ROOM_SETTINGS),
     [room?.roomId, room?.settings?.turnTimerSeconds],
@@ -88,6 +94,47 @@ export function GameSettings({
             onKeyUp={(e) => {
               if (e.key.startsWith('Arrow') || ['Home', 'End', 'PageUp', 'PageDown'].includes(e.key))
                 previewSound();
+            }}
+          />
+        </div>
+      </section>
+      <section className="settings-audio settings-music" aria-labelledby="music-label">
+        <div className="settings-row-heading">
+          <label id="music-label" htmlFor="music-volume">
+            Music
+          </label>
+          <output htmlFor="music-volume">{musicMuted ? 'Off' : `${musicPercent}%`}</output>
+        </div>
+        <div className="settings-volume-control">
+          <button
+            type="button"
+            className="settings-mute"
+            aria-label="Mute music"
+            aria-pressed={musicMuted}
+            onClick={() =>
+              update(
+                musicMuted
+                  ? { music: true, musicVolume: preferences.musicVolume || lastMusicVolume.current }
+                  : { music: false },
+              )
+            }
+          >
+            {musicMuted ? <VolumeX /> : <Volume2 />}
+          </button>
+          <input
+            className="settings-range"
+            id="music-volume"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            aria-label="Music volume"
+            aria-valuetext={musicMuted ? 'Off' : `${musicPercent} percent`}
+            style={{ '--range-fill': `${musicPercent}%` } as CSSProperties}
+            value={musicPercent}
+            onChange={(e) => {
+              const musicVolume = Number(e.target.value) / 100;
+              update({ musicVolume, music: musicVolume > 0 });
             }}
           />
         </div>

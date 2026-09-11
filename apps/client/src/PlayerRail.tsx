@@ -82,36 +82,32 @@ export function PlayerRail({
                   <b>{p.cardCount}</b>
                 </span>
               </div>
+              <div className="profile-achievements" aria-label="Award progress">
+                <span
+                  className={`profile-achievement ${road ? 'held road-award' : ''}`}
+                  aria-label={`${road ? 'Longest Road, plus 2 victory points' : 'Longest route'}, ${p.roadLength} connected roads`}
+                  title={`Longest Road · ${p.roadLength} connected roads · ${road ? '+2 points' : 'At least 5 to claim'}`}
+                >
+                  <Route size={15} />
+                  <b>{p.roadLength}</b>
+                  {road && <small>+2</small>}
+                </span>
+                <span
+                  className={`profile-achievement ${army ? 'held army-award' : ''}`}
+                  aria-label={`${army ? 'Largest Army, plus 2 victory points' : 'Knights played'}, ${p.knights} Knights played`}
+                  title={`Largest Army · ${p.knights} Knights played · ${army ? '+2 points' : 'At least 3 to claim'}`}
+                >
+                  <Shield size={15} />
+                  <b>{p.knights}</b>
+                  {army && <small>+2</small>}
+                </span>
+              </div>
             </div>
-            {(road || army || game.winner === p.id) && (
+            {game.winner === p.id && (
               <div className="profile-awards">
-                {road && (
-                  <span
-                    key="road"
-                    className="award-ribbon road-award"
-                    aria-label="Longest Road, plus 2 victory points"
-                    title="Longest Road · +2 points"
-                  >
-                    <Route />
-                    <b>+2</b>
-                  </span>
-                )}
-                {army && (
-                  <span
-                    key="army"
-                    className="award-ribbon army-award"
-                    aria-label="Largest Army, plus 2 victory points"
-                    title="Largest Army · +2 points"
-                  >
-                    <Shield />
-                    <b>+2</b>
-                  </span>
-                )}
-                {game.winner === p.id && (
-                  <span className="award-ribbon winner" title="Winner">
-                    <Trophy />
-                  </span>
-                )}
+                <span className="award-ribbon winner" title="Winner">
+                  <Trophy />
+                </span>
               </div>
             )}
           </article>

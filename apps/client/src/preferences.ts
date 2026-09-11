@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-export type Preferences = { sound: boolean; volume: number };
-export const DEFAULT_PREFERENCES: Preferences = { sound: true, volume: 0.55 };
+export type Preferences = { sound: boolean; volume: number; music: boolean; musicVolume: number };
+export const DEFAULT_PREFERENCES: Preferences = { sound: true, volume: 0.55, music: false, musicVolume: 0.3 };
 /** Ignore retired display options so old saved settings cannot hide gameplay feedback. */
 export function parsePreferences(input: unknown): Preferences {
   const p = input && typeof input === 'object' ? (input as Partial<Preferences>) : {};
@@ -8,6 +8,11 @@ export function parsePreferences(input: unknown): Preferences {
     sound: typeof p.sound === 'boolean' ? p.sound : true,
     volume:
       typeof p.volume === 'number' && Number.isFinite(p.volume) ? Math.max(0, Math.min(1, p.volume)) : 0.55,
+    music: typeof p.music === 'boolean' ? p.music : false,
+    musicVolume:
+      typeof p.musicVolume === 'number' && Number.isFinite(p.musicVolume)
+        ? Math.max(0, Math.min(1, p.musicVolume))
+        : 0.3,
   };
 }
 export function usePreferences() {

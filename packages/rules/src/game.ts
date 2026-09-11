@@ -10,7 +10,7 @@ export type Player = { id: string; name: string; hand: Hand; cards: Card[]; knig
 export type Building = { player: string; kind: 'settlement' | 'city' };
 export type Phase = 'setupSettlement' | 'setupRoad' | 'roll' | 'actions' | 'discard' | 'robber' | 'freeRoads' | 'finished';
 export type TradeProposal = { player: string; give: Hand };
-export type Trade = { id: number; player: string; give: Hand; want: Hand; open?: boolean; proposals?: TradeProposal[] };
+export type Trade = { id: number; player: string; give: Hand; want: Hand; open?: boolean; proposals?: TradeProposal[]; declinedBy?: string[] };
 export type Game = {
   schema: 1; ruleset: string; board: Board; players: Player[]; bank: Hand;
   buildings: Record<number, Building>; roads: Record<number, string>; robber: number;
@@ -33,8 +33,8 @@ export type GameAction =
   | { kind: 'openTrade'; give: Hand }
   | { kind: 'proposeTrade'; tradeId: number; give: Hand }
   | { kind: 'withdrawProposal'; tradeId: number }
-  | { kind: 'acceptProposal'; tradeId: number; player: string }
-  | { kind: 'acceptTrade'; tradeId: number }
+  | { kind: 'acceptProposal'; tradeId: number; player: string; expectedGive?: Hand }
+  | { kind: 'acceptTrade' | 'declineTrade'; tradeId: number }
   | { kind: 'playCard'; cardId: string; resources?: Hand; resource?: Resource };
 export class RuleError extends Error { readonly code = 'ILLEGAL_ACTION'; }
 function requireRule(condition: unknown, message: string): asserts condition { if (!condition) throw new RuleError(message); }
@@ -69,8 +69,8 @@ export function parseGameAction(input: unknown): GameAction {
     case 'offerTrade': return { kind: a.kind, give: hand(a.give), want: hand(a.want) };
     case 'openTrade': return { kind: a.kind, give: hand(a.give) };
     case 'proposeTrade': return { kind: a.kind, tradeId: index(a.tradeId, Number.MAX_SAFE_INTEGER), give: hand(a.give) };
-    case 'acceptTrade': case 'withdrawProposal': return { kind: a.kind, tradeId: index(a.tradeId, Number.MAX_SAFE_INTEGER) };
-    case 'acceptProposal': return { kind: a.kind, tradeId: index(a.tradeId, Number.MAX_SAFE_INTEGER), player: id(a.player) };
+    case 'acceptTrade': case 'declineTrade': case 'withdrawProposal': return { kind: a.kind, tradeId: index(a.tradeId, Number.MAX_SAFE_INTEGER) };
+    case 'acceptProposal': return { kind: a.kind, tradeId: index(a.tradeId, Number.MAX_SAFE_INTEGER), player: id(a.player), ...(a.expectedGive === undefined ? {} : { expectedGive: hand(a.expectedGive) }) };
     case 'playCard': return { kind: a.kind, cardId: id(a.cardId), ...(a.resources === undefined ? {} : { resources: hand(a.resources) }), ...(a.resource === undefined ? {} : { resource: resource(a.resource) }) };
     default: throw new RuleError('Unknown action');
   }
@@ -175,9 +175,23 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     if (!Object.keys(g.discards).length) g.phase = 'robber';
     return g;
   }
+  if (a.kind === 'declineTrade') {
+    requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && g.trade.player === activePlayer(g).id, 'That trade is no longer available');
+    const offer = g.trade;
+    requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
+    offer.declinedBy = [...(offer.declinedBy ?? []), p.id];
+    if (offer.proposals) offer.proposals = offer.proposals.filter(proposal => proposal.player !== p.id);
+    log(g, `${p.name} declined the trade offer.`);
+    if (g.players.every(other => other.id === offer.player || offer.declinedBy!.includes(other.id))) {
+      g.trade = null;
+      log(g, 'Trade closed: everyone declined.');
+    }
+    return g;
+  }
   if (a.kind === 'proposeTrade' || a.kind === 'withdrawProposal') {
     requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && g.trade.open && g.trade.player === activePlayer(g).id, 'That open trade is no longer available');
     const offer = g.trade;
+    requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
     if (a.kind === 'proposeTrade') {
       requireRule(total(a.give) > 0 && RESOURCES.every(r => !a.give[r] || !offer.give[r]), 'Offer cards with no resource on both sides');
       requireRule(canPay(p.hand, a.give), 'You do not have the proposed cards');
@@ -194,7 +208,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     requireRule(g.phase === 'actions' && isActive && g.trade?.id === a.tradeId && g.trade.open && g.trade.player === p.id, 'That proposal is no longer available');
     const offer = g.trade, proposal = offer.proposals?.find(proposal => proposal.player === a.player);
     const responder = g.players.find(other => other.id === a.player && other.id !== p.id);
-    requireRule(proposal && responder, 'That proposal is no longer available');
+    requireRule(proposal && responder && !offer.declinedBy?.includes(a.player), 'That proposal is no longer available');
+    requireRule(!a.expectedGive || RESOURCES.every(r => a.expectedGive![r] === proposal.give[r]), 'That proposal changed; review the new cards');
     requireRule(canPay(p.hand, offer.give) && canPay(responder.hand, proposal.give), 'A player no longer has the offered cards');
     transfer(p.hand, responder.hand, offer.give); transfer(responder.hand, p.hand, proposal.give);
     log(g, `${p.name} traded ${resourceText(offer.give)} to ${responder.name} for ${resourceText(proposal.give)}.`); g.trade = null; return g;
@@ -202,6 +217,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   if (a.kind === 'acceptTrade') {
     requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && !g.trade.open && g.trade.player === activePlayer(g).id, 'That trade is no longer available');
     const maker = activePlayer(g), offer = g.trade;
+    requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
     requireRule(canPay(maker.hand, offer.give) && canPay(p.hand, offer.want), 'A player no longer has the offered cards');
     transfer(maker.hand, p.hand, offer.give); transfer(p.hand, maker.hand, offer.want);
     log(g, `${maker.name} traded ${resourceText(offer.give)} to ${p.name} for ${resourceText(offer.want)}.`); g.trade = null; return g;

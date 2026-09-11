@@ -1,0 +1,139 @@
+/* Trade direction is always relative to the local player's hand. */
+.trade-exchange {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 7px;
+  margin: 10px 0;
+}
+.trade-exchange > .game-icon {
+  align-self: center;
+  width: 18px;
+  color: #c6c4ab;
+}
+.trade-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #c8bb9555;
+  border-radius: 9px;
+  background: #283c45;
+}
+.trade-side > strong {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+.trade-side-give {
+  border-color: #d8986559;
+  background: #75473227;
+}
+.trade-side-give > strong {
+  color: #f2c69e;
+}
+.trade-side-get {
+  border-color: #74baa260;
+  background: #326c5429;
+}
+.trade-side-get > strong {
+  color: #b4edce;
+}
+.trade-side .resource-summary {
+  gap: 4px 7px;
+}
+.trade-side .resource-summary .sprite {
+  width: 29px;
+  height: 32px;
+}
+.trade-side .resource-summary b {
+  font-size: 18px;
+}
+.trade-undecided {
+  color: #c2cabb;
+  font-size: 12px;
+}
+.trade-content .trade-review-button,
+.trade-notice > .trade-review-button {
+  width: 100%;
+  justify-content: center;
+}
+.trade-counteroffer.counteroffer {
+  display: block;
+  padding: 11px;
+}
+.trade-counteroffer > strong {
+  display: block;
+  max-width: none;
+  font-size: 13px;
+}
+.trade-confirmation {
+  width: 100%;
+  padding: 10px;
+  margin-top: 9px;
+  border: 1px solid #e7ce8c80;
+  border-radius: 10px;
+  background: #142d39;
+}
+.trade-confirmation > strong {
+  color: #f3dfae;
+  font-size: 13px;
+}
+.trade-confirmation .trade-side {
+  padding: 7px;
+}
+.trade-confirmation .offer-actions {
+  margin-top: 10px;
+}
+.trade-decline-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 34px;
+  margin-top: 10px;
+  border: 1px solid #d0998966;
+  border-radius: 8px;
+  background: #613c3c33;
+  color: #efc1b5;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.trade-decline-button:hover:not(:disabled) {
+  background: #9c534c55;
+  border-color: #e2a290;
+}
+.trade-decline-button:focus-visible {
+  outline: 2px solid #eed7a7;
+  outline-offset: 3px;
+}
+.trade-decline-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.trade-declines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  margin: 10px 0;
+}
+.trade-declines > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #d8aca0;
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .trade-side {
+    padding: 8px;
+  }
+  .trade-exchange {
+    gap: 5px;
+    grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+  }
+}

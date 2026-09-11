@@ -264,14 +264,16 @@ export function deriveFeedback(
     event.sounds.push('development');
   if (!dice && !event.sites.length && traded(before, g, lines)) event.sounds.push('trade');
   if (g.winner && !before.winner) event.sounds.push('win');
-  else if (
-    (g.longestRoad && g.longestRoad !== before.longestRoad) ||
-    (g.largestArmy && g.largestArmy !== before.largestArmy)
-  )
-    event.sounds.push('award');
-  if (g.turn !== before.turn && g.players[g.active]?.id === me) event.sounds.push('turn');
   event.notices = lines
     .filter((s) => !s.endsWith("'s turn.") && !before.players.some((player) => rollFaces(s, player.name)))
+    .filter(
+      (s) =>
+        !g.players.some((player) =>
+          ['Longest Road', 'Largest Army'].some(
+            (award) => s === `${player.name} claimed ${award} (+2 points).`,
+          ),
+        ),
+    )
     .map((s) => s.replace(/ on edge \d+| at corner \d+/g, ''));
   if (!event.notices.length && g.turn !== before.turn)
     event.notices = [`${g.players[g.active]!.name}'s turn`];
@@ -279,4 +281,64 @@ export function deriveFeedback(
   event.glowHexes = [...new Set(event.glowHexes)];
   event.flights = event.flights.slice(0, 16);
   return event;
+}
+
+export type AwardCelebration = {
+  id: string;
+  kind: 'longestRoad' | 'largestArmy';
+  name: 'Longest Road' | 'Largest Army';
+  playerId: string;
+  playerName: string;
+  previousPlayerName?: string;
+  count: number;
+  minimum: number;
+};
+/** Award ownership and its counts are public; private development cards are never inspected. */
+export function deriveAwardCelebrations(previous: RoomState | null, next: RoomState): AwardCelebration[] {
+  if (!previous?.game || !next.game || previous.roomId !== next.roomId || next.revision <= previous.revision)
+    return [];
+  const before = previous.game,
+    game = next.game;
+  return (['longestRoad', 'largestArmy'] as const).flatMap((kind) => {
+    const owner = game[kind];
+    if (!owner || owner === before[kind]) return [];
+    const player = game.players.find((p) => p.id === owner);
+    if (!player) return [];
+    return [
+      {
+        id: `${next.roomId}:${next.revision}:${kind}`,
+        kind,
+        name: kind === 'longestRoad' ? 'Longest Road' : 'Largest Army',
+        playerId: owner,
+        playerName: player.name,
+        previousPlayerName: before.players.find((p) => p.id === before[kind])?.name,
+        count: kind === 'longestRoad' ? player.roadLength : player.knights,
+        minimum: kind === 'longestRoad' ? 5 : 3,
+      },
+    ];
+  });
+}
+/** Separate from coalesced card effects: a fast move cannot erase an award or its later transfer. */
+export class AwardPresentationQueue {
+  private items: AwardCelebration[] = [];
+  private roomId = '';
+  private revision = -1;
+  observe(previous: RoomState | null, next: RoomState, live = true): readonly AwardCelebration[] {
+    const changedRoom = !!this.roomId && this.roomId !== next.roomId;
+    if (!live || !previous?.game || changedRoom) this.items = [];
+    if (this.roomId === next.roomId && next.revision <= this.revision) return this.items;
+    this.roomId = next.roomId;
+    this.revision = next.revision;
+    if (live && !changedRoom) this.items = [...this.items, ...deriveAwardCelebrations(previous, next)];
+    return this.items;
+  }
+  finish(id: string): readonly AwardCelebration[] {
+    if (this.items[0]?.id === id) this.items = this.items.slice(1);
+    return this.items;
+  }
+  reset() {
+    this.items = [];
+    this.roomId = '';
+    this.revision = -1;
+  }
 }

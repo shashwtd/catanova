@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import type { Hand } from '../../../packages/rules/src/game.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
-import { deriveFeedback } from './feedback.js';
-import type { FeedbackEvent } from './feedback.js';
+import { AwardPresentationQueue, deriveFeedback } from './feedback.js';
+import type { AwardCelebration, FeedbackEvent } from './feedback.js';
 import { SoundEngine } from './sound.js';
 import type { Preferences } from './preferences.js';
 import { DICE_READABLE_MS } from './DiceThrow.js';
@@ -68,6 +68,14 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     [hand, setHand] = useState<Hand | null>(null),
     [pulse, setPulse] = useState<Partial<Record<Resource, string>>>({});
   const [presentationBusy, setPresentationBusy] = useState(false);
+  const [awards, setAwards] = useState<readonly AwardCelebration[]>([]);
+  const awardQueue = useRef(new AwardPresentationQueue());
+  const clearAwards = useCallback(() => {
+    awardQueue.current.reset();
+    setAwards([]);
+  }, []);
+  const finishAward = useCallback((id: string) => setAwards(awardQueue.current.finish(id)), []);
+  const announceAward = useCallback(() => sound.play('award'), [sound]);
   const buffer = useRef(new PresentationBuffer());
   const present = useRef<(previous: RoomState, next: RoomState, me: string) => void>(() => {});
   const timers = useRef(new Set<ReturnType<typeof setTimeout>>()),
@@ -89,25 +97,35 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
   }, []);
   const reset = useCallback(() => {
     clear();
+    clearAwards();
     setHand(null);
     last.current = '';
     sound.silence();
-  }, [clear, sound]);
+  }, [clear, clearAwards, sound]);
   useEffect(() => {
     sound.refresh();
     if (reducedMotion) {
       clear();
       setHand(null);
     }
-  }, [preferences.sound, preferences.volume, reducedMotion, sound, clear]);
+  }, [
+    preferences.sound,
+    preferences.volume,
+    preferences.music,
+    preferences.musicVolume,
+    reducedMotion,
+    sound,
+    clear,
+  ]);
   useEffect(() => {
     const unlock = () => void sound.unlock();
     const hide = () => {
       if (document.hidden) {
         clear();
+        clearAwards();
         setHand(null);
         sound.silence();
-      }
+      } else sound.refresh();
     };
     document.addEventListener('pointerdown', unlock, { passive: true });
     document.addEventListener('keydown', unlock);
@@ -119,7 +137,7 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
       for (const timer of timers.current) clearTimeout(timer);
       sound.dispose();
     };
-  }, [sound, clear]);
+  }, [sound, clear, clearAwards]);
   present.current = (previous, next, me) => {
     const nextEvent = deriveFeedback(previous, next, me);
     if (!nextEvent) return;
@@ -183,19 +201,27 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
   const accept = useCallback(
     (previous: RoomState | null, next: RoomState, me: string, welcome = false) => {
       const currentHand = next.game?.players.find((p) => p.id === me)?.hand;
-      if (welcome || !previous?.game || document.hidden) {
+      const baseline = welcome || !previous?.game || previous.roomId !== next.roomId;
+      if (baseline || document.hidden) {
         clear();
-        sound.silence();
+        setAwards(awardQueue.current.observe(previous, next, false));
+        // Hiding already silenced ambience. Later background snapshots must not cut
+        // short the separate, deduplicated turn/required-action attention cue.
+        if (baseline) {
+          sound.silence();
+          if (!document.hidden) sound.refresh();
+        }
         setHand(currentHand ? { ...currentHand } : null);
         last.current = `${next.roomId}:${next.revision}`;
         return;
       }
       if (next.revision <= previous.revision || last.current === `${next.roomId}:${next.revision}`) return;
       last.current = `${next.roomId}:${next.revision}`;
+      setAwards(awardQueue.current.observe(previous, next));
       const ready = buffer.current.offer(previous, next, me, performance.now());
       if (ready) present.current(ready.previous, ready.next, ready.me);
     },
     [clear, sound],
   );
-  return { event, hand, pulse, sound, accept, reset, presentationBusy };
+  return { event, hand, pulse, sound, accept, reset, presentationBusy, awards, finishAward, announceAward };
 }
