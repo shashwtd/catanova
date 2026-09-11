@@ -12,39 +12,60 @@ import {
   Users,
   WifiOff,
 } from './GameIcons.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { roomPath } from './navigation.js';
 
 export function Invite({ code, roomId = code }: { code: string; roomId?: string }) {
-  const [feedback, setFeedback] = useState('');
-  const [showLink, setShowLink] = useState(false);
+  const [feedback, setFeedback] = useState<{ kind: 'code' | 'link'; request: number } | null>(null);
+  const [manual, setManual] = useState<'code' | 'link' | null>(null);
+  const request = useRef(0);
+  const target = `${roomId}:${code}`;
+  const currentTarget = useRef(target);
+  currentTarget.current = target;
+  useEffect(() => {
+    setFeedback(null);
+    setManual(null);
+    return () => {
+      request.current++;
+    };
+  }, [target]);
   useEffect(() => {
     if (!feedback) return;
-    const timer = setTimeout(() => setFeedback(''), 2500);
+    const timer = setTimeout(() => setFeedback(null), 2500);
     return () => clearTimeout(timer);
   }, [feedback]);
   const url = () => `${location.origin}${roomPath(roomId)}`;
-  async function copy(value: string, message: string) {
+  async function copy(value: string, kind: 'code' | 'link') {
+    const id = ++request.current;
+    setFeedback(null);
+    setManual(null);
     try {
       await navigator.clipboard.writeText(value);
-      setFeedback(message);
+      if (id === request.current && currentTarget.current === target) setFeedback({ kind, request: id });
     } catch {
-      setShowLink(true);
-      setFeedback('Select the code or link to copy it');
+      if (id === request.current && currentTarget.current === target) setManual(kind);
     }
   }
   async function share() {
+    const id = ++request.current;
+    setFeedback(null);
     if (!navigator.share) {
-      setShowLink((value) => !value);
+      setManual((value) => (value === 'link' ? null : 'link'));
       return;
     }
     try {
       await navigator.share({ title: 'Join my Catanova room', url: url() });
     } catch (error) {
-      if (!(error instanceof Error && error.name === 'AbortError')) setShowLink(true);
+      if (
+        !(error instanceof Error && error.name === 'AbortError') &&
+        id === request.current &&
+        currentTarget.current === target
+      )
+        setManual('link');
     }
   }
   return (
@@ -57,35 +78,42 @@ export function Invite({ code, roomId = code }: { code: string; roomId?: string 
         </button>
         <button
           type="button"
-          aria-label="Copy invite link"
-          title="Copy invite link"
-          onClick={() => void copy(url(), 'Link copied')}
+          aria-label={feedback?.kind === 'link' ? 'Invite link copied' : 'Copy invite link'}
+          title={feedback?.kind === 'link' ? 'Copied' : 'Copy invite link'}
+          className={feedback?.kind === 'link' ? 'copy-done' : undefined}
+          onClick={() => void copy(url(), 'link')}
         >
-          <Link size={21} />
+          {feedback?.kind === 'link' ? <Check size={21} /> : <Link size={21} />}
         </button>
         <button
           type="button"
-          aria-label="Copy room code"
-          title="Copy room code"
-          onClick={() => void copy(code, 'Code copied')}
+          aria-label={feedback?.kind === 'code' ? 'Room code copied' : 'Copy room code'}
+          title={feedback?.kind === 'code' ? 'Copied' : 'Copy room code'}
+          className={feedback?.kind === 'code' ? 'copy-done' : undefined}
+          onClick={() => void copy(code, 'code')}
         >
-          <Copy size={21} />
+          {feedback?.kind === 'code' ? <Check size={21} /> : <Copy size={21} />}
         </button>
       </div>
-      {showLink && (
+      {manual && (
         <input
           className="share-link-field"
-          aria-label="Room invite link"
+          aria-label={manual === 'code' ? 'Room code to copy' : 'Room invite link'}
           readOnly
-          value={typeof location === 'undefined' ? roomPath(roomId) : url()}
+          autoFocus
+          value={manual === 'code' ? code : typeof location === 'undefined' ? roomPath(roomId) : url()}
           onFocus={(event) => event.currentTarget.select()}
         />
       )}
-      {feedback && (
-        <span className="copy-feedback" role="status">
-          {feedback}
-        </span>
-      )}
+      <span className="room-share-status" role="status" aria-live="polite">
+        {feedback
+          ? feedback.kind === 'code'
+            ? 'Room code copied'
+            : 'Invite link copied'
+          : manual
+            ? 'Select the value and copy it'
+            : ''}
+      </span>
     </div>
   );
 }
@@ -122,9 +150,9 @@ export function Lobby({
     <section className="lobby-screen room-lobby" aria-label="Room lobby">
       <header className="lobby-heading">
         {self && (
-          <button className="lobby-self" onClick={onEdit} aria-label="Edit your profile">
+          <button type="button" className="lobby-self" onClick={onEdit} aria-label="Your profile">
             <Avatar profile={self.profile ?? defaultProfile(self.name)} />
-            <strong>{self.name}</strong>
+            <strong title={self.name}>{self.name}</strong>
           </button>
         )}
         <div className="lobby-tools">
@@ -154,13 +182,46 @@ export function Lobby({
       </header>
       <div className="lobby-center">
         <div className="lobby-caption">
-          <h1>Your crew</h1>
-          <span>{room.players.length}/4</span>
+          <h1>Game room</h1>
+          <div className="lobby-room-options">
+            <span>2–4 players</span>
+            <button
+              type="button"
+              className="lobby-timer"
+              onClick={onSettings}
+              aria-label={
+                room.settings?.turnTimerSeconds
+                  ? `Turn timer: ${room.settings.turnTimerSeconds} seconds. Game settings`
+                  : 'Turn timer off. Game settings'
+              }
+            >
+              <Clock3 size={18} />
+              <span>
+                Turn timer{' '}
+                <b>{room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'Off'}</b>
+              </span>
+            </button>
+          </div>
         </div>
-        <div className="lobby-seats">
-          {Array.from({ length: 4 }, (_, i) => {
-            const p = room.players[i];
-            return p ? (
+        <div className={`lobby-seats ${room.players.length === 4 ? 'lobby-full' : ''}`}>
+          {room.players.length < 3 ? (
+            <button
+              type="button"
+              className="lobby-invite-tile"
+              aria-label="Invite player"
+              title="Invite player"
+              onClick={onInvite}
+            >
+              <Plus size={32} />
+            </button>
+          ) : room.players.length < 4 ? (
+            <span className="lobby-invite-spacer" aria-hidden="true" />
+          ) : null}
+          <div
+            className="lobby-player-line"
+            style={{ '--room-player-count': room.players.length } as CSSProperties}
+          >
+            {room.players.map((p, i) => (
               <article
                 className={`lobby-seat ${p.id === me ? 'self' : ''} ${!p.connected ? 'seat-offline' : ''}`}
                 key={p.id}
@@ -174,7 +235,7 @@ export function Lobby({
                     </span>
                   )}
                 </div>
-                <strong>{p.name}</strong>
+                <strong title={p.name}>{p.name}</strong>
                 <span className={`ready-status ${p.ready ? 'ready' : ''}`}>
                   {!p.connected ? (
                     'Disconnected'
@@ -190,23 +251,20 @@ export function Lobby({
                   )}
                 </span>
               </article>
-            ) : (
-              <button
-                key={i}
-                className="lobby-seat open-seat"
-                aria-label="Invite player"
-                title="Invite player"
-                onClick={onInvite}
-              >
-                <Plus size={36} />
-              </button>
-            );
-          })}
+            ))}
+          </div>
+          {room.players.length < 4 && (
+            <button
+              type="button"
+              className="lobby-invite-tile"
+              aria-label="Invite player"
+              title="Invite player"
+              onClick={onInvite}
+            >
+              <Plus size={32} />
+            </button>
+          )}
         </div>
-        <button className="lobby-timer" onClick={onSettings}>
-          <Clock3 size={16} />
-          {room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'No timer'}
-        </button>
       </div>
       <footer className="lobby-footer">
         <Invite code={room.roomCode ?? room.roomId} roomId={room.roomId} />

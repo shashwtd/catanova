@@ -92,6 +92,7 @@ import './mobile-layout.css';
 import './disconnect.css';
 import './player-hub.css';
 import './friends-drawer.css';
+import './room-lobby.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',

@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TurnTimer } from '../apps/client/src/TurnTimer.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
-import { Lobby } from '../apps/client/src/Lobby.js';
+import { Invite, Lobby } from '../apps/client/src/Lobby.js';
 import { GameSettings } from '../apps/client/src/GameSettings.js';
 import { ProfileEditor } from '../apps/client/src/Profile.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
@@ -72,6 +72,56 @@ test('nonhosts can ready or unready and cannot start the room', () => {
   room.players[1]!.ready = true;
   const ready = buttons(renderLobby(room, 'p1')).find((button) => text(button) === 'Not ready')!;
   assert.ok(ready.includes('aria-pressed="true"'));
+});
+
+test('room gathering shows actual players with small invitations instead of four mandatory-looking slots', () => {
+  for (const count of [1, 2, 3, 4]) {
+    const room = lobby();
+    room.players = Array.from({ length: count }, (_, i) => ({
+      id: `p${i}`,
+      name: `Player${i}`,
+      profile: defaultProfile(`Player${i}`),
+      connected: true,
+      ready: i !== 0,
+    }));
+    const html = renderLobby(room, 'p0');
+    assert.equal([...html.matchAll(/<article\b/g)].length, count);
+    assert.equal(
+      buttons(html).filter((button) => button.includes('aria-label="Invite player"')).length,
+      Math.min(2, 4 - count),
+    );
+    assert.ok(html.includes('2–4 players'));
+    assert.ok(!html.includes('Your crew') && !html.includes('open-seat'));
+    assert.ok(!html.includes(`${count}/4`));
+    const start = buttons(html).find((button) => text(button) === 'Start game')!;
+    assert.equal(start.includes('disabled=""'), count === 1);
+  }
+});
+
+test('room options name the turn timer explicitly and long player names remain accessible', () => {
+  const room = lobby();
+  room.players[1]!.name = 'Alexandria of the Northern Isles';
+  let html = renderLobby(room, 'p0');
+  assert.match(html, /aria-label="Turn timer: 90 seconds\. Game settings"/);
+  assert.match(html, /title="Alexandria of the Northern Isles"/);
+  assert.match(html, /aria-label="Your profile"/);
+  room.settings = { turnTimerSeconds: null };
+  html = renderLobby(room, 'p1');
+  assert.match(html, /aria-label="Turn timer off\. Game settings"/);
+  assert.ok(html.includes('Turn timer <b>Off</b>'));
+});
+
+test('sharing keeps three distinct controls and a screen-reader status without an extra visible feedback row', () => {
+  const html = renderToStaticMarkup(
+    createElement(Invite, { code: 'AB2C', roomId: '9bfec3ad-0a2c-47d1-bfe5-735a3e2dc25f' }),
+  );
+  const controls = buttons(html);
+  assert.equal(controls.length, 3);
+  for (const label of ['Share room', 'Copy invite link', 'Copy room code'])
+    assert.equal(controls.filter((button) => button.includes(`aria-label="${label}"`)).length, 1);
+  assert.match(html, /<code>AB2C<\/code>/);
+  assert.match(html, /class="room-share-status" role="status" aria-live="polite"/);
+  assert.ok(!html.includes('copy-feedback') && !html.includes('share-link-field'));
 });
 
 test('readiness, minimum seats, connection and pending commands all gate the host Start control', () => {
