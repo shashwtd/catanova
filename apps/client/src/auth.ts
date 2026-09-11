@@ -10,6 +10,7 @@ import {
 import type { Account, Profile, UsernameAvailability } from '../../../packages/protocol/src/profile.js';
 import { accountApi, AccountApiError } from './account-api.js';
 import { beginGoogleSignIn, beginGuestSignIn, completeGoogleLink } from './auth-flow.js';
+type GameIdentity = Pick<User, 'id' | 'is_anonymous'>;
 export type RuntimeConfig = {
   auth: { url: string; publishableKey: string } | null;
   mode: 'local' | 'authenticated';
@@ -35,12 +36,12 @@ export function entryLocation() {
 export function useAuth() {
   const signingIn = useRef(false);
   const client = useRef<BrowserAuthClient | null>(null),
-    currentUser = useRef<User | null>(null);
+    currentUser = useRef<GameIdentity | null>(null);
   const mounted = useRef(true),
     version = useRef(0),
     configRef = useRef<RuntimeConfig | null>(null);
   const [config, setConfig] = useState<RuntimeConfig | null>(null),
-    [user, setUser] = useState<User | null>(null);
+    [user, setUser] = useState<GameIdentity | null>(null);
   const [loading, setLoading] = useState(true),
     [account, setAccount] = useState<Account | null>(null);
   const [error, setError] = useState(''),
@@ -153,8 +154,10 @@ export function useAuth() {
         if (!active) return;
         const request = ++version.current;
         const changed = currentUser.current?.id !== nextUser?.id;
-        currentUser.current = nextUser;
-        setUser(nextUser);
+        // Provider metadata is not a game profile; keep only the account identity here.
+        const identity = nextUser ? { id: nextUser.id, is_anonymous: nextUser.is_anonymous } : null;
+        currentUser.current = identity;
+        setUser(identity);
         if (changed || !nextUser) {
           setAccount(null);
           setFriends(emptyFriends());
@@ -346,7 +349,6 @@ export function useAuth() {
     account,
     friends,
     guestExpired,
-    googleAvatarUrl: account?.googleAvatarUrl ?? null,
     needsOnboarding: !!user && !!account && !account.registered,
     saveProfile,
     accessToken,

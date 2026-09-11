@@ -5,11 +5,16 @@ import { ProfileEditor } from './Profile.js';
 type Auth = ReturnType<typeof useAuth>;
 
 export function AccountSetup({ auth }: { auth: Auth }) {
-  const initial = auth.account?.profile ?? defaultProfile(auth.account?.username ?? '');
+  const initial = {
+    ...(auth.account?.profile ?? defaultProfile('')),
+    // A provider's old display name is not a chosen Catanova username.
+    name: auth.account?.username ?? '',
+    username: auth.account?.username ?? undefined,
+  };
   return (
     <section className="account-setup" aria-labelledby="account-setup-title">
       <h2 id="account-setup-title">Set up your account</h2>
-      <p className="account-intro">Choose a unique username and a portrait before joining the table.</p>
+      <p className="account-intro">Pick a username. You can change your avatar anytime in the lobby.</p>
       {auth.account?.isGuest && (
         <p className="account-note">Playing as a guest. You can link Google later and keep this username.</p>
       )}
@@ -18,7 +23,6 @@ export function AccountSetup({ auth }: { auth: Auth }) {
         initial={initial}
         busy={auth.loading}
         checkUsername={auth.checkUsername}
-        googleAvatarUrl={auth.googleAvatarUrl}
         submitLabel="Continue"
         onSave={async (profile) => {
           await auth.saveProfile(profile);

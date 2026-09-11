@@ -1,11 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check } from './GameIcons.js';
-import {
-  AVATAR_COUNT,
-  defaultProfile,
-  isGoogleAvatarUrl,
-  validUsername,
-} from '../../../packages/protocol/src/profile.js';
+import { AVATAR_COUNT, defaultProfile, validUsername } from '../../../packages/protocol/src/profile.js';
 import type { Profile, UsernameAvailability } from '../../../packages/protocol/src/profile.js';
 const AVATAR_NAMES = [
   'Fox cartographer',
@@ -25,14 +20,37 @@ const AVATAR_ROWS = [0, 350, 698, 1086];
 export type { UsernameAvailability } from '../../../packages/protocol/src/profile.js';
 export type CheckUsername = (name: string) => Promise<UsernameAvailability>;
 
-function httpsPhoto(value: string | null | undefined) {
-  try {
-    if (!isGoogleAvatarUrl(value)) return null;
-    const url = new URL(value ?? '');
-    return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
-  } catch {
-    return null;
-  }
+type UsernameCheck = {
+  name: string;
+  status: 'checking' | 'available' | 'unavailable' | 'error';
+  reason?: string;
+};
+/** An already selected game avatar needs no extra click after the username is verified. */
+export function canSaveProfile(
+  profile: Profile,
+  requiresUsernameCheck: boolean,
+  availability: UsernameCheck | null,
+) {
+  const username = profile.name.trim();
+  return (
+    !!username &&
+    (!requiresUsernameCheck ||
+      (validUsername(username) && availability?.name === username && availability.status === 'available'))
+  );
+}
+
+/** Only the game cosmetics are editable or sent back, even from a legacy profile payload. */
+export function gameProfileDraft(profile: Profile): Profile {
+  return {
+    name: profile.name,
+    ...(profile.username === undefined ? {} : { username: profile.username }),
+    avatar:
+      Number.isInteger(profile.avatar) && profile.avatar >= 0 && profile.avatar < AVATAR_COUNT
+        ? profile.avatar
+        : 0,
+    accent: profile.accent,
+    frame: profile.frame,
+  };
 }
 export function Avatar({
   profile = defaultProfile(),
@@ -41,8 +59,6 @@ export function Avatar({
   profile?: Profile;
   className?: string;
 }) {
-  const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
-  const photo = profile.avatarSource === 'google' ? httpsPhoto(profile.avatarUrl) : null;
   const avatar =
     Number.isInteger(profile.avatar) && profile.avatar >= 0 && profile.avatar < AVATAR_COUNT
       ? profile.avatar
@@ -52,24 +68,14 @@ export function Avatar({
     height = AVATAR_ROWS[row + 1]! - top;
   return (
     <span className={`avatar-medallion ${className}`}>
-      {photo && failedPhoto !== photo ? (
-        <img
-          className="avatar-photo"
-          src={photo}
-          alt={`${profile.name}'s avatar`}
-          referrerPolicy="no-referrer"
-          onError={() => setFailedPhoto(photo)}
-        />
-      ) : (
-        <svg
-          viewBox={`${(avatar % 4) * 362} ${top} 362 ${height}`}
-          preserveAspectRatio="xMidYMid slice"
-          role="img"
-          aria-label={`${profile.name}'s avatar`}
-        >
-          <image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp" width="1448" height="1086" />
-        </svg>
-      )}
+      <svg
+        viewBox={`${(avatar % 4) * 362} ${top} 362 ${height}`}
+        preserveAspectRatio="xMidYMid slice"
+        role="img"
+        aria-label={`${profile.name}'s avatar`}
+      >
+        <image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp" width="1448" height="1086" />
+      </svg>
     </span>
   );
 }
@@ -78,34 +84,27 @@ export function ProfileEditor({
   onSave,
   busy,
   checkUsername,
-  googleAvatarUrl,
   submitLabel = 'Save profile',
 }: {
   initial: Profile;
   onSave: (profile: Profile) => Promise<void>;
   busy: boolean;
   checkUsername?: CheckUsername;
-  googleAvatarUrl?: string | null;
   submitLabel?: string;
 }) {
-  const [draft, setDraft] = useState(initial),
+  const [draft, setDraft] = useState(() => gameProfileDraft(initial)),
     [saving, setSaving] = useState(false),
     [error, setError] = useState(''),
     [retry, setRetry] = useState(0),
-    [availability, setAvailability] = useState<{
-      name: string;
-      status: 'checking' | 'available' | 'unavailable' | 'error';
-      reason?: string;
-    } | null>(null);
+    [availability, setAvailability] = useState<UsernameCheck | null>(null);
   const checkVersion = useRef(0),
     checkRef = useRef(checkUsername),
     availabilityId = useId();
   checkRef.current = checkUsername;
   const username = draft.name.trim(),
     usernameValid = validUsername(username),
-    photo = httpsPhoto(googleAvatarUrl),
     disabled = busy || saving,
-    checked = availability?.name === username && availability.status === 'available';
+    ready = canSaveProfile(draft, !!checkUsername, availability);
   useEffect(() => {
     const version = ++checkVersion.current;
     if (!checkRef.current || !usernameValid) {
@@ -153,15 +152,14 @@ export function ProfileEditor({
       className="profile-editor"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (disabled || !username || (checkUsername && (!usernameValid || !checked))) return;
+        if (disabled || !ready) return;
         setSaving(true);
         setError('');
         try {
           await onSave({
-            ...draft,
+            ...gameProfileDraft(draft),
             name: username,
             ...(checkUsername ? { username } : {}),
-            ...(draft.avatarSource === 'google' && photo ? { avatarUrl: photo } : {}),
           });
         } catch (e) {
           setError(e instanceof Error ? e.message : 'Could not save');
@@ -212,22 +210,9 @@ export function ProfileEditor({
           )}
         </div>
       )}
-      {photo && (
-        <button
-          className="google-photo-choice"
-          type="button"
-          disabled={disabled}
-          aria-pressed={draft.avatarSource === 'google'}
-          onClick={() => setDraft({ ...draft, avatarSource: 'google', avatarUrl: photo })}
-        >
-          <Avatar profile={{ ...draft, avatarSource: 'google', avatarUrl: photo }} />
-          <span>Use my Google photo</span>
-          {draft.avatarSource === 'google' && <Check size={17} />}
-        </button>
-      )}
       <div className="avatar-choices" aria-label="Choose avatar">
         {Array.from({ length: AVATAR_COUNT }, (_, i) => {
-          const selected = i === draft.avatar && draft.avatarSource !== 'google';
+          const selected = i === draft.avatar;
           return (
             <button
               type="button"
@@ -236,16 +221,12 @@ export function ProfileEditor({
               className={selected ? 'selected' : ''}
               aria-label={AVATAR_NAMES[i]}
               aria-pressed={selected}
-              onClick={() =>
-                setDraft({ ...draft, avatar: i, avatarSource: 'generated', avatarUrl: undefined })
-              }
+              onClick={() => setDraft({ ...draft, avatar: i })}
             >
               <Avatar
                 profile={{
                   ...draft,
                   avatar: i,
-                  avatarSource: 'generated',
-                  avatarUrl: undefined,
                   frame: 'plain',
                 }}
               />
@@ -258,10 +239,7 @@ export function ProfileEditor({
           {error}
         </p>
       )}
-      <button
-        className="gold-button"
-        disabled={disabled || !username || (!!checkUsername && (!usernameValid || !checked))}
-      >
+      <button className="gold-button" disabled={disabled || !ready}>
         {saving ? 'Saving…' : submitLabel}
         <Check size={17} />
       </button>

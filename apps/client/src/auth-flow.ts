@@ -33,7 +33,8 @@ export async function beginGoogleSignIn(
   }
   const { data, error } = await client.auth.getSession();
   if (error) throw error;
-  const options = { redirectTo, queryParams: { prompt: 'select_account' } };
+  // `scopes` appends to Supabase's Google defaults; the provider's singular `scope` replaces them.
+  const options = { redirectTo, queryParams: { scope: 'openid email', prompt: 'select_account' } };
   if (data.session?.user.is_anonymous && !expiredGuest) {
     const { user, access_token, refresh_token } = data.session;
     storage.setItem(LINK_KEY, JSON.stringify({ id: user.id, access_token, refresh_token }));

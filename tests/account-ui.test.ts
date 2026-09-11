@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AccountSetup } from '../apps/client/src/AccountSetup.js';
 import { FriendsPanel, FriendSearchResults } from '../apps/client/src/FriendsPanel.js';
-import { Avatar, ProfileEditor } from '../apps/client/src/Profile.js';
+import { Avatar, ProfileEditor, canSaveProfile, gameProfileDraft } from '../apps/client/src/Profile.js';
 import type { useAuth } from '../apps/client/src/auth.js';
 import { defaultProfile, emptyFriends } from '../packages/protocol/src/profile.js';
 import type { Account, Profile, PublicAccount } from '../packages/protocol/src/profile.js';
@@ -24,13 +24,11 @@ function authFor(isGuest = false): Auth {
     isGuest,
     registered: true,
     profile: defaultProfile('Captain'),
-    googleAvatarUrl: photo,
     lastActiveAt: '2026-09-09T00:00:00Z',
     expiresAt: null,
   };
   return {
     account,
-    googleAvatarUrl: photo,
     loading: false,
     friends: emptyFriends(),
     checkUsername: async () => ({ available: true }),
@@ -41,23 +39,39 @@ function authFor(isGuest = false): Auth {
 }
 const buttons = (html: string) => html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [];
 
-test('Google avatars use the verified HTTPS image with no referrer and unsafe URLs retain a generated portrait', () => {
-  const profile = { ...defaultProfile('Captain'), avatarSource: 'google' as const, avatarUrl: photo };
-  const html = renderToStaticMarkup(createElement(Avatar, { profile }));
-  assert.match(html, /class="avatar-photo"/);
-  assert.match(html, /referrerPolicy="no-referrer"/i);
-  assert.ok(html.includes(photo));
-  assert.ok(!html.includes('<image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp"'));
+test('legacy Google avatars always render the chosen game portrait without requesting a provider photo', () => {
   for (const avatarUrl of [
+    photo,
     'http://lh3.googleusercontent.com/a/photo',
     'javascript:alert(1)',
     'https://example.com/photo',
     'https://lh3.googleusercontent.com.evil.example/photo',
   ]) {
-    const fallback = renderToStaticMarkup(createElement(Avatar, { profile: { ...profile, avatarUrl } }));
-    assert.ok(fallback.includes('<image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp"'));
-    assert.ok(!fallback.includes('class="avatar-photo"'));
+    const profile = { ...defaultProfile('Captain'), avatar: 6, avatarSource: 'google' as const, avatarUrl };
+    const html = renderToStaticMarkup(createElement(Avatar, { profile }));
+    assert.ok(html.includes('<image href="/art/optimized/avatars-fantasy.6bf04e83341a.webp"'));
+    assert.match(html, /viewBox="724 350 362 348"/);
+    assert.ok(!html.includes('<img') && !html.includes('avatar-photo'));
+    assert.ok(!html.includes(avatarUrl));
   }
+});
+
+test('profile edits strip obsolete provider fields while retaining the chosen username and avatar', () => {
+  const legacy = {
+    ...defaultProfile('Captain'),
+    username: 'Captain',
+    avatar: 8,
+    avatarSource: 'google' as const,
+    avatarUrl: photo,
+    full_name: 'Private Provider Name',
+  };
+  assert.deepEqual(gameProfileDraft(legacy), {
+    ...defaultProfile('Captain'),
+    username: 'Captain',
+    avatar: 8,
+  });
+  assert.equal(gameProfileDraft({ ...legacy, avatar: 99 }).avatar, 0);
+  assert.ok(!JSON.stringify(gameProfileDraft(legacy)).includes(photo));
 });
 
 test('username setup starts without a selected name and cannot submit before the availability check', () => {
@@ -79,25 +93,90 @@ test('username setup starts without a selected name and cannot submit before the
   assert.ok(html.includes('You can link Google later and keep this username.'));
 });
 
-test('the optional Google choice and all twelve generated portraits retain one clear selected avatar', () => {
+test('the editor offers exactly twelve game portraits and selects the stored game avatar for legacy profiles', () => {
+  const legacy = {
+    ...defaultProfile('Captain'),
+    avatar: 9,
+    avatarSource: 'google' as const,
+    avatarUrl: photo,
+  };
   const html = renderToStaticMarkup(
     createElement(ProfileEditor, {
-      initial: { ...defaultProfile('Captain'), avatarSource: 'google', avatarUrl: photo },
+      initial: legacy,
       busy: false,
       onSave: async () => {},
-      googleAvatarUrl: photo,
       checkUsername: async () => ({ available: true }),
       submitLabel: 'Continue',
     }),
   );
-  assert.equal([...html.matchAll(/aria-pressed=/g)].length, 13);
+  assert.equal([...html.matchAll(/aria-pressed=/g)].length, 12);
   assert.equal([...html.matchAll(/aria-pressed="true"/g)].length, 1);
-  assert.ok(html.includes('Use my Google photo'));
+  assert.ok(!html.includes('Use my Google photo') && !html.includes(photo));
   assert.ok(html.includes('Mushroom wanderer'));
+  assert.ok(
+    buttons(html)
+      .find((button) => button.includes('Tide trader'))
+      ?.includes('aria-pressed="true"'),
+  );
   assert.ok(
     buttons(html)
       .find((button) => button.includes('Continue'))
       ?.includes('disabled=""'),
+  );
+});
+
+test('account setup never prefills a provider display name, even from an older profile', () => {
+  const auth = authFor();
+  auth.account!.username = null;
+  auth.account!.registered = false;
+  auth.account!.profile = { ...defaultProfile('Private Provider Name'), avatar: 7 };
+  const html = renderToStaticMarkup(createElement(AccountSetup, { auth }));
+  assert.match(html, /value=""/);
+  assert.ok(!html.includes('Private Provider Name'));
+  assert.ok(
+    buttons(html)
+      .find((button) => button.includes('Goblin merchant'))
+      ?.includes('aria-pressed="true"'),
+  );
+  auth.account!.username = 'ChosenCaptain';
+  const chosen = renderToStaticMarkup(createElement(AccountSetup, { auth }));
+  assert.match(chosen, /value="ChosenCaptain"/);
+  assert.ok(!chosen.includes('Private Provider Name'));
+});
+
+test('Google onboarding ignores real name, photo and email metadata and needs only a verified chosen username', () => {
+  const auth = authFor();
+  auth.account!.username = null;
+  auth.account!.registered = false;
+  auth.account!.profile = null;
+  const realName = 'Private Provider Name';
+  const email = 'private-person@example.com';
+  Object.assign(auth, {
+    user: {
+      id: 'me',
+      email,
+      user_metadata: { name: realName, full_name: realName, email, picture: photo, avatar_url: photo },
+      identities: [{ provider: 'google', identity_data: { full_name: realName, email, avatar_url: photo } }],
+    },
+  });
+  const html = renderToStaticMarkup(createElement(AccountSetup, { auth }));
+  for (const privateValue of [realName, email, photo]) assert.ok(!html.includes(privateValue));
+  assert.match(html, /value=""/);
+  assert.equal([...html.matchAll(/aria-pressed="true"/g)].length, 1);
+  assert.ok(
+    buttons(html)
+      .find((button) => button.includes('Fox cartographer'))
+      ?.includes('aria-pressed="true"'),
+  );
+  const draft = gameProfileDraft(defaultProfile('MyCaptain'));
+  assert.equal(draft.avatar, 0, 'the default game portrait is already selected');
+  assert.equal(canSaveProfile(draft, true, null), false);
+  assert.equal(canSaveProfile(draft, true, { name: 'MyCaptain', status: 'checking' }), false);
+  assert.equal(canSaveProfile(draft, true, { name: 'OtherName', status: 'available' }), false);
+  assert.equal(
+    canSaveProfile(draft, true, { name: 'MyCaptain', status: 'available' }),
+    true,
+    'a verified username may continue without changing the default avatar',
   );
 });
 

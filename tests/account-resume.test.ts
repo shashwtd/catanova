@@ -6,7 +6,7 @@ import type { Identity } from '../apps/server/src/auth.js';
 const account = (id: string, name: string): Identity => ({
   id,
   name,
-  profile: { ...defaultProfile(name), username: name, avatarSource: 'generated' },
+  profile: { ...defaultProfile(name), username: name },
   expiresAt: Date.now() + 3600000,
 });
 test('resuming a lobby refreshes canonical account profile atomically, retains seat ownership and clears old Ready', () => {

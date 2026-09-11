@@ -269,13 +269,13 @@ export function EntryScreen({
                   )}
                   {local && (
                     <label className="field">
-                      Name
+                      Username
                       <input
                         autoComplete="nickname"
                         maxLength={32}
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="Name"
+                        placeholder="Username"
                         required
                       />
                     </label>

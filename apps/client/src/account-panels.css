@@ -86,42 +86,6 @@
   font-size: inherit;
   text-decoration: underline;
 }
-.avatar-medallion .avatar-photo {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  aspect-ratio: 1;
-  border-radius: 9%;
-  object-fit: cover;
-}
-.google-photo-choice {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  margin: 2px 0 14px;
-  padding: 7px 10px;
-  border: 1px solid #a5beb357;
-  border-radius: 8px;
-  background: #203b4677;
-  color: #e5dfc8;
-  text-align: left;
-  font-size: 13px;
-}
-.google-photo-choice .avatar-medallion {
-  flex: none;
-  width: 40px;
-  height: 40px;
-}
-.google-photo-choice[aria-pressed='true'] {
-  border-color: #d9ba7f;
-  background: #42554d;
-}
-.google-photo-choice > .game-icon {
-  margin-left: auto;
-}
 .profile-editor .avatar-choices {
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;

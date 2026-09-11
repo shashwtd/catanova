@@ -9,6 +9,10 @@ const ids = [
   '00000000-0000-4000-8000-000000000004',
 ];
 const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+const avatarPatch = readFileSync(
+  new URL('../supabase/patches/20260911_game_avatars_only.sql', import.meta.url),
+  'utf8',
+);
 async function fixture(t: { after: (run: () => Promise<void>) => void }) {
   const db = new PGlite();
   t.after(() => db.close());
@@ -25,6 +29,7 @@ async function fixture(t: { after: (run: () => Promise<void>) => void }) {
         id,
         'google',
         {
+          full_name: 'Private Legal Name',
           picture: 'https://lh3.googleusercontent.com/a/verified',
           avatar_url: 'https://evil.example/spoofed',
         },
@@ -158,10 +163,14 @@ test('guest expiry is exactly seven inactive days, cleanup releases the name wit
   );
 });
 
-test('Google linking preserves guest identity, username and avatar while verified identity data controls Google photo selection', async (t) => {
+test('Google linking preserves chosen identity and uses provider membership without importing names or photos', async (t) => {
   const db = await fixture(t);
   const before = await save(db, ids[3]!, 'Wanderer');
-  await assert.rejects(save(db, ids[3]!, 'Wanderer', 'google'), /GOOGLE_PHOTO_UNAVAILABLE/);
+  assert.deepEqual(
+    (await save(db, ids[3]!, 'Wanderer', 'google')).profile,
+    before.profile,
+    'legacy photo selections become the saved game avatar',
+  );
   await db.query('update auth.users set is_anonymous=false where id=$1', [ids[3]]);
   await db.query('insert into auth.identities(user_id,provider,identity_data) values($1,$2,$3)', [
     ids[3],
@@ -174,22 +183,25 @@ test('Google linking preserves guest identity, username and avatar while verifie
   assert.equal(linked.profile.avatar, 3);
   assert.equal(linked.isGuest, false);
   assert.equal(linked.expiresAt, null);
-  assert.equal(linked.googleAvatarUrl, 'https://lh3.googleusercontent.com/a/linked');
+  assert.ok(!('googleAvatarUrl' in linked));
+  assert.ok(!('avatarUrl' in linked.profile) && !('avatarSource' in linked.profile));
   await assert.rejects(
     rpc(db, ids[3]!, 'catanova_friends', [], true),
     /GOOGLE_REQUIRED/,
     'an old anonymous JWT cannot use upgraded privileges',
   );
-  const photo = await rpc(db, ids[3]!, 'catanova_profile_save', ['Wanderer', 3, 'google'], false);
-  assert.equal(photo.profile.avatarUrl, linked.googleAvatarUrl);
+  const canonical = await rpc(db, ids[3]!, 'catanova_profile_save', ['Wanderer', 3, 'google'], false);
+  assert.deepEqual(canonical.profile, before.profile);
   await db.query('update auth.identities set identity_data=$1 where user_id=$2', [
     { picture: 'https://evil.example/avatar' },
     ids[3],
   ]);
-  assert.equal((await rpc(db, ids[3]!, 'catanova_account_get', [], false)).googleAvatarUrl, null);
-  await assert.rejects(
-    rpc(db, ids[3]!, 'catanova_profile_save', ['Wanderer', 3, 'google'], false),
-    /GOOGLE_PHOTO_UNAVAILABLE/,
+  assert.deepEqual((await rpc(db, ids[3]!, 'catanova_account_get', [], false)).profile, before.profile);
+  await db.exec('alter table auth.identities drop column identity_data');
+  assert.deepEqual(
+    (await rpc(db, ids[3]!, 'catanova_profile_save', ['Wanderer', 3, 'google'], false)).profile,
+    before.profile,
+    'no provider photo/name metadata is needed',
   );
 });
 
@@ -300,4 +312,66 @@ test('scoped durable request budgets bound friend request/cancel cycling and use
     1,
     'idempotent rerun retains profiles and friendships',
   );
+});
+
+test('hosted avatar patch erases only old photo settings, keeps private permissions and is safe to rerun', async (t) => {
+  const db = await fixture(t);
+  await save(db, ids[0]!, 'Captain');
+  await save(db, ids[1]!, 'Builder');
+  await rpc(db, ids[0]!, 'catanova_friend_action', ['request', ids[1]]);
+  await rpc(db, ids[1]!, 'catanova_friend_action', ['accept', ids[0]]);
+  await db.exec(`alter table public.catanova_profiles drop constraint catanova_profiles_avatar_source_check;
+    alter table public.catanova_profiles drop constraint catanova_profiles_no_google_photo;
+    update public.catanova_profiles set avatar_source='google',google_avatar_url='https://lh3.googleusercontent.com/a/private';`);
+  const before = (
+    await db.query(
+      'select id,username,avatar,is_guest,created_at,last_active_at from public.catanova_profiles order by id',
+    )
+  ).rows;
+  const friendsBefore = (await db.query('select * from public.catanova_friendships')).rows;
+  const authBefore = (await db.query('select * from auth.identities order by user_id')).rows;
+  await db.exec(avatarPatch);
+  await db.exec(avatarPatch);
+  assert.deepEqual(
+    (
+      await db.query(
+        'select id,username,avatar,is_guest,created_at,last_active_at from public.catanova_profiles order by id',
+      )
+    ).rows,
+    before,
+  );
+  assert.deepEqual((await db.query('select * from public.catanova_friendships')).rows, friendsBefore);
+  assert.deepEqual((await db.query('select * from auth.identities order by user_id')).rows, authBefore);
+  assert.deepEqual(
+    (await db.query('select distinct avatar_source,google_avatar_url from public.catanova_profiles')).rows,
+    [{ avatar_source: 'generated', google_avatar_url: null }],
+  );
+  await assert.rejects(
+    db.exec(
+      "update public.catanova_profiles set google_avatar_url='https://lh3.googleusercontent.com/a/reintroduced'",
+    ),
+    /check constraint/,
+  );
+  await assert.rejects(
+    db.exec("update public.catanova_profiles set avatar_source='google'"),
+    /check constraint/,
+  );
+  const current = await rpc(db, ids[0]!, 'catanova_account_get');
+  assert.equal(current.username, 'Captain');
+  assert.ok(!('googleAvatarUrl' in current));
+  assert.deepEqual(Object.keys(current.profile).sort(), ['accent', 'avatar', 'frame', 'name', 'username']);
+  const friends = await rpc(db, ids[0]!, 'catanova_friends');
+  assert.equal(friends.friends[0].username, 'Builder');
+  assert.ok(!JSON.stringify(friends).includes('avatarUrl'));
+  await assert.rejects(asUser(db, ids[0]!, 'select * from public.catanova_profiles'), /permission denied/);
+  await assert.rejects(
+    asUser(db, ids[0]!, 'select catanova_private.require_account(false)'),
+    /permission denied/,
+  );
+  await db.exec('set role anon');
+  await assert.rejects(
+    db.exec("select public.catanova_profile_save('Intruder',0,'generated')"),
+    /permission denied/,
+  );
+  await db.exec('reset role');
 });

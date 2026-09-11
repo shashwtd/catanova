@@ -108,6 +108,14 @@ test('Google sign-in links a live anonymous identity; permanent sign-in uses OAu
     ['link'],
   );
   assert.equal(JSON.parse(guest.storage.getItem(LINK_KEY)!).id, 'guest');
+  const googleRequest = {
+    provider: 'google',
+    options: {
+      redirectTo: 'https://game.test/auth/callback',
+      queryParams: { scope: 'openid email', prompt: 'select_account' },
+    },
+  };
+  assert.deepEqual(guest.calls[0]!.args, googleRequest);
   const user = fixture(session('permanent', false));
   user.storage.setItem(
     LINK_KEY,
@@ -119,6 +127,10 @@ test('Google sign-in links a live anonymous identity; permanent sign-in uses OAu
     ['oauth'],
   );
   assert.equal(user.storage.getItem(LINK_KEY), null);
+  assert.deepEqual(user.calls[0]!.args, googleRequest);
+  const signedOut = fixture(null);
+  await beginGoogleSignIn(signedOut.client, signedOut.storage, 'https://game.test/auth/callback');
+  assert.deepEqual(signedOut.calls, [{ kind: 'oauth', args: googleRequest }]);
 });
 test('an expired guest starts regular Google OAuth without linking the tombstoned identity', async () => {
   const f = fixture(session('expired', true));
@@ -128,6 +140,13 @@ test('an expired guest starts regular Google OAuth without linking the tombstone
     ['signout', 'oauth'],
   );
   assert.deepEqual(f.calls[0]!.args, { scope: 'local' });
+  assert.deepEqual(f.calls[1]!.args, {
+    provider: 'google',
+    options: {
+      redirectTo: 'https://game.test/auth/callback',
+      queryParams: { scope: 'openid email', prompt: 'select_account' },
+    },
+  });
   assert.equal(f.storage.getItem(LINK_KEY), null);
 });
 test('a successful link keeps the same account ID and refreshes the anonymous JWT', async () => {

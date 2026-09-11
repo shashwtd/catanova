@@ -9,12 +9,20 @@ create table if not exists public.catanova_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text check (username is null or username ~ '^[A-Za-z0-9_]{3,20}$'),
   avatar integer not null default 0 check (avatar between 0 and 11),
-  avatar_source text not null default 'generated' check (avatar_source in ('generated','google')),
+  -- Deprecated storage columns remain so applying this schema does not change the row type.
+  avatar_source text not null default 'generated' check (avatar_source = 'generated'),
   google_avatar_url text,
   is_guest boolean not null,
   created_at timestamptz not null default now(),
   last_active_at timestamptz not null default now()
 );
+-- Preserve every account, chosen username/avatar, timestamp and friendship; discard only old photo settings.
+update public.catanova_profiles set avatar_source='generated',google_avatar_url=null
+  where avatar_source<>'generated' or google_avatar_url is not null;
+alter table public.catanova_profiles drop constraint if exists catanova_profiles_avatar_source_check;
+alter table public.catanova_profiles add constraint catanova_profiles_avatar_source_check check (avatar_source='generated');
+alter table public.catanova_profiles drop constraint if exists catanova_profiles_no_google_photo;
+alter table public.catanova_profiles add constraint catanova_profiles_no_google_photo check (google_avatar_url is null);
 create unique index if not exists catanova_username_unique on public.catanova_profiles(lower(username)) where username is not null;
 create index if not exists catanova_guest_expiry on public.catanova_profiles(last_active_at) where is_guest;
 create table if not exists catanova_private.expired_guests (
@@ -87,7 +95,7 @@ create or replace function catanova_private.require_account(p_touch boolean defa
 returns public.catanova_profiles language plpgsql security definer set search_path = '' as $$
 declare
   v_id uuid := auth.uid(); v_guest boolean; v_created timestamptz; v_google boolean;
-  v_photo text; v_profile public.catanova_profiles;
+  v_profile public.catanova_profiles;
 begin
   if v_id is null then raise exception 'AUTH_REQUIRED'; end if;
   -- auth.users and auth.identities are provider-owned; raw_user_meta_data is deliberately not trusted.
@@ -104,12 +112,9 @@ begin
     select * into v_profile from public.catanova_profiles where id = v_id for update;
   end if;
   if v_profile.is_guest and v_profile.last_active_at <= now() - interval '7 days' then raise exception 'GUEST_EXPIRED'; end if;
-  select coalesce(i.identity_data->>'picture', i.identity_data->>'avatar_url') into v_photo
-    from auth.identities i where i.user_id = v_id and i.provider = 'google' limit 1;
-  if v_photo is not null and v_photo !~ '^https://lh[0-9]+[.]googleusercontent[.]com/' then v_photo := null; end if;
-  -- Successful Google linking upgrades this same row and leaves its username/cosmetics unchanged.
-  if v_profile.is_guest is distinct from v_guest or v_profile.google_avatar_url is distinct from v_photo or p_touch then
-    update public.catanova_profiles set is_guest = v_guest, google_avatar_url = v_photo,
+  -- Google proves identity only. Linking preserves this row and its chosen game identity.
+  if v_profile.is_guest is distinct from v_guest or p_touch then
+    update public.catanova_profiles set is_guest = v_guest,
       last_active_at = case when p_touch then now() else last_active_at end
       where id = v_id returning * into v_profile;
   end if;
@@ -120,16 +125,14 @@ $$;
 create or replace function catanova_private.profile_json(p public.catanova_profiles) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select case when p.username is null then null else jsonb_build_object(
-    'name',p.username,'username',p.username,'avatar',p.avatar,'accent','sea','frame','rope',
-    'avatarSource',case when p.avatar_source = 'google' and p.google_avatar_url is not null then 'google' else 'generated' end
-  ) || case when p.avatar_source = 'google' and p.google_avatar_url is not null
-      then jsonb_build_object('avatarUrl',p.google_avatar_url) else '{}'::jsonb end end;
+    'name',p.username,'username',p.username,'avatar',p.avatar,'accent','sea','frame','rope'
+  ) end;
 $$;
 create or replace function catanova_private.account_json(p public.catanova_profiles) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('id',p.id,'username',p.username,'isGuest',p.is_guest,
     'registered',p.username is not null,'profile',catanova_private.profile_json(p),
-    'googleAvatarUrl',p.google_avatar_url,'lastActiveAt',p.last_active_at,
+    'lastActiveAt',p.last_active_at,
     'expiresAt',case when p.is_guest then p.last_active_at + interval '7 days' else null end);
 $$;
 create or replace function public.catanova_account_get() returns jsonb
@@ -167,9 +170,9 @@ begin
   if v_name is null or v_name !~ '^[A-Za-z0-9_]{3,20}$' then raise exception 'USERNAME_INVALID'; end if;
   if p_avatar is null or p_avatar < 0 or p_avatar > 11 then raise exception 'AVATAR_INVALID'; end if;
   if p_avatar_source is null or p_avatar_source not in ('generated','google') then raise exception 'AVATAR_INVALID'; end if;
-  if p_avatar_source = 'google' and (p.is_guest or p.google_avatar_url is null) then raise exception 'GOOGLE_PHOTO_UNAVAILABLE'; end if;
   begin
-    update public.catanova_profiles set username=v_name,avatar=p_avatar,avatar_source=p_avatar_source
+    -- Retain this argument for old clients, but never select or load a provider photo.
+    update public.catanova_profiles set username=v_name,avatar=p_avatar,avatar_source='generated',google_avatar_url=null
       where id=p.id returning * into p;
   exception when unique_violation then raise exception 'USERNAME_TAKEN'; end;
   return catanova_private.account_json(p);

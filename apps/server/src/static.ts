@@ -158,7 +158,7 @@ export async function serveClient(
     response.setHeader('Referrer-Policy', 'same-origin');
     response.setHeader(
       'Content-Security-Policy',
-      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''};${captchaEnabled ? ' frame-src https://challenges.cloudflare.com;' : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' ws: wss:${authOrigin ? ' ' + new URL(authOrigin).origin : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''};${captchaEnabled ? ' frame-src https://challenges.cloudflare.com;' : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:${authOrigin ? ' ' + new URL(authOrigin).origin : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
     );
     response.setHeader(
       'Cache-Control',

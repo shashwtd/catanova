@@ -147,6 +147,17 @@ test('profile validation rejects unavailable cosmetic IDs and runtime config rej
   assert.throws(() => parseProfile({ ...defaultProfile(), avatar: 12 }));
   assert.throws(() => parseProfile({ ...defaultProfile(), accent: '__proto__' }));
   assert.throws(() => parseProfile({ ...defaultProfile(), frame: '<script>' }));
+  const chosen = { ...defaultProfile('Captain'), username: 'Captain', avatar: 5 };
+  for (const avatarUrl of [
+    'https://lh3.googleusercontent.com/a/old',
+    'javascript:old-photo',
+    { invalid: true },
+  ])
+    assert.deepEqual(
+      parseProfile({ ...chosen, avatarSource: 'google', avatarUrl, full_name: 'Private Name' }),
+      chosen,
+    );
+
   const oldUrl = process.env.SUPABASE_URL,
     oldKey = process.env.SUPABASE_PUBLISHABLE_KEY;
   try {
@@ -185,7 +196,6 @@ test('Supabase verifier requires verified Auth identity and a live registered ac
       const profile = {
         ...defaultProfile('Verified_name'),
         username: 'Verified_name',
-        avatarSource: 'generated',
       };
       res.end(
         JSON.stringify({
@@ -194,7 +204,6 @@ test('Supabase verifier requires verified Auth identity and a live registered ac
           registered,
           username: registered ? 'Verified_name' : null,
           profile: registered ? profile : null,
-          googleAvatarUrl: null,
           lastActiveAt: new Date().toISOString(),
           expiresAt: anonymous ? new Date(Date.now() + (guestExpired ? -1 : 86400000)).toISOString() : null,
         }),
@@ -230,7 +239,7 @@ test('Supabase verifier requires verified Auth identity and a live registered ac
   assert.equal(guest.isGuest, true);
   assert.ok(guest.guestExpiresAt! > Date.now());
   registered = false;
-  await assert.rejects(verify(valid), /username and avatar/);
+  await assert.rejects(verify(valid), /username before playing/);
   registered = true;
   guestExpired = true;
   await assert.rejects(verify(valid), /expired/);

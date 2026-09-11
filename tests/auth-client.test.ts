@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 import { createBrowserAuthClient } from '../apps/client/src/auth-client.js';
+import { beginGoogleSignIn, LINK_KEY } from '../apps/client/src/auth-flow.js';
 
 const config = { url: 'https://saved-project.supabase.test', publishableKey: 'sb_publishable_test' };
 const storageKey = 'sb-saved-project-auth-token';
@@ -9,6 +10,11 @@ const storageKey = 'sb-saved-project-auth-token';
 function fixture() {
   const values = new Map<string, string>();
   const storage = {
+    get length() {
+      return values.size;
+    },
+    key: (index: number) => [...values.keys()][index] ?? null,
+    clear: () => values.clear(),
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => void values.set(key, value),
     removeItem: (key: string) => void values.delete(key),
@@ -19,6 +25,8 @@ function fixture() {
     calls.push({ url, headers: new Headers(init?.headers), body: JSON.parse(String(init?.body ?? '{}')) });
     assert.ok(url.startsWith(`${config.url}/auth/v1/`));
     if (url.endsWith('/logout?scope=local')) return new Response(null, { status: 204 });
+    if (url.includes('/user/identities/authorize?'))
+      return Response.json({ url: 'https://accounts.google.com/o/oauth2/v2/auth?fixture=link' });
     assert.ok(url.endsWith('/signup') || url.includes('/token?grant_type='), `Unexpected request: ${url}`);
     const permanent = url.endsWith('grant_type=pkce');
     return Response.json({
@@ -74,6 +82,51 @@ test('the smaller auth client resumes and refreshes a session saved by supabase-
   assert.equal(f.calls[0]!.body.refresh_token, 'saved-refresh-token');
   assert.equal(f.calls[0]!.headers.get('apikey'), config.publishableKey);
   assert.equal(f.calls[0]!.headers.get('Authorization'), `Bearer ${config.publishableKey}`);
+});
+
+test('real auth client sends only the email identity scope override for both Google entry paths and keeps PKCE', async (t) => {
+  for (const guest of [false, true]) {
+    const f = fixture();
+    t.after(() => f.legacy.auth.stopAutoRefresh());
+    const client = createBrowserAuthClient(config, f.transport);
+    t.after(() => client.auth.stopAutoRefresh());
+    if (guest) await client.auth.signInAnonymously();
+    f.calls.length = 0;
+    let redirect: URL | undefined;
+    const original = client.auth.signInWithOAuth.bind(client.auth);
+    client.auth.signInWithOAuth = async (credentials) => {
+      const result = await original({
+        ...credentials,
+        options: { ...credentials.options, skipBrowserRedirect: true },
+      });
+      if (result.data.url) redirect = new URL(result.data.url);
+      return result;
+    };
+    await beginGoogleSignIn(client, f.transport.storage, 'https://game.test/auth/callback');
+    const authorization = guest ? new URL(f.calls[0]!.url) : redirect!;
+    assert.ok(authorization);
+    assert.equal(authorization.pathname, guest ? '/auth/v1/user/identities/authorize' : '/auth/v1/authorize');
+    assert.equal(authorization.searchParams.get('provider'), 'google');
+    assert.equal(authorization.searchParams.get('scope'), 'openid email');
+    assert.equal(
+      authorization.searchParams.get('scopes'),
+      null,
+      'Additional scopes append to provider defaults',
+    );
+    assert.equal(authorization.searchParams.get('prompt'), 'select_account');
+    assert.equal(authorization.searchParams.get('redirect_to'), 'https://game.test/auth/callback');
+    assert.equal(authorization.searchParams.get('code_challenge_method'), 's256');
+    assert.ok(authorization.searchParams.get('code_challenge'));
+    assert.ok(f.values.get(`${storageKey}-code-verifier`));
+    if (guest) {
+      assert.equal(f.calls.length, 1);
+      assert.equal(f.calls[0]!.headers.get('Authorization'), 'Bearer guest-session-token');
+      assert.equal(
+        JSON.parse(f.transport.storage.getItem(LINK_KEY)!).id,
+        '00000000-0000-4000-8000-000000000001',
+      );
+    } else assert.equal(f.calls.length, 0);
+  }
 });
 
 test('Google PKCE started before an update completes with the smaller auth client', async (t) => {

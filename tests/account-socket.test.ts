@@ -24,14 +24,13 @@ function deferred<T>() {
   return { promise, resolve };
 }
 async function fixture(t: TestContext, isGuest = false) {
-  const profile = { ...defaultProfile('Captain'), username: 'Captain', avatarSource: 'generated' as const };
+  const profile = { ...defaultProfile('Captain'), username: 'Captain' };
   const account: Account = {
     id: 'account-captain',
     username: 'Captain',
     isGuest,
     registered: true,
     profile,
-    googleAvatarUrl: null,
     lastActiveAt: new Date().toISOString(),
     expiresAt: isGuest ? new Date(Date.now() + 7 * 86400000).toISOString() : null,
   };

@@ -421,15 +421,6 @@
 .landing-panel .username-feedback[data-status='error'] {
   color: #a34735;
 }
-.landing-panel .google-photo-choice {
-  color: #45583f;
-  background: #e7e6ce;
-  border-color: #9cab897a;
-}
-.landing-panel .google-photo-choice[aria-pressed='true'] {
-  background: #d6dfbd;
-  border-color: #6b8c58;
-}
 .guest-check {
   text-align: center;
 }

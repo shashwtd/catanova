@@ -1026,14 +1026,13 @@ function App() {
                 <Avatar profile={room?.players.find((p) => p.id === me)?.profile ?? auth.profile} />
                 <strong>{player?.name}</strong>
               </div>
-              <p className="muted">Change your avatar and name in the lobby before your next game.</p>
+              <p className="muted">Change your avatar and username in the lobby before your next game.</p>
             </>
           ) : (
             <ProfileEditor
               initial={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
               busy={busy}
               checkUsername={auth.config?.mode === 'authenticated' ? auth.checkUsername : undefined}
-              googleAvatarUrl={auth.googleAvatarUrl}
               onSave={saveProfile}
             />
           )}

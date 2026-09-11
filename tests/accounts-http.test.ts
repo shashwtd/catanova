@@ -22,7 +22,12 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
     lastActiveAt: new Date().toISOString(),
     expiresAt: null as string | null,
   };
-  const state = { error: '', lastRpc: '', lastArgs: {} as Record<string, unknown> };
+  const state = {
+    error: '',
+    lastRpc: '',
+    lastArgs: {} as Record<string, unknown>,
+    replies: {} as Record<string, unknown>,
+  };
   const supabase = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     assert.equal(req.headers.apikey, 'sb_publishable_fixture');
@@ -66,7 +71,7 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
       if (state.lastArgs.p_avatar_source === 'google')
         Object.assign(account.profile, { avatarUrl: account.googleAvatarUrl });
     }
-    res.end(JSON.stringify(account));
+    res.end(JSON.stringify(Object.hasOwn(state.replies, req.url!) ? state.replies[req.url!] : account));
   });
   supabase.listen(0, '127.0.0.1');
   await once(supabase, 'listening');
@@ -131,7 +136,7 @@ test('account HTTP API reports missing account schema and denies unregistered/ex
   assert.equal(f.server.store.db.prepare('select count(*) as n from seats').get()!.n, 0);
   assert.equal(f.server.store.db.prepare('select count(*) as n from rooms').get()!.n, 0);
 });
-test('profile endpoint sends only canonical input to scoped RPC, ignores forged photo URLs and reports unique-name conflicts', async (t) => {
+test('profile endpoint always requests a generated avatar, strips provider data and reports unique-name conflicts', async (t) => {
   const f = await fixture(t);
   const updated = await f.request('/api/account/profile', 'PUT', {
     ...defaultProfile('Explorer'),
@@ -141,9 +146,10 @@ test('profile endpoint sends only canonical input to scoped RPC, ignores forged 
     avatarUrl: 'https://evil.example/collect',
   });
   assert.equal(updated.status, 200);
-  assert.deepEqual(f.state.lastArgs, { p_username: 'Explorer', p_avatar: 7, p_avatar_source: 'google' });
+  assert.deepEqual(f.state.lastArgs, { p_username: 'Explorer', p_avatar: 7, p_avatar_source: 'generated' });
   const account = await updated.json();
-  assert.equal(account.profile.avatarUrl, 'https://lh3.googleusercontent.com/a/verified');
+  assert.ok(!('googleAvatarUrl' in account));
+  assert.ok(!('avatarUrl' in account.profile) && !('avatarSource' in account.profile));
   assert.equal(account.profile.name, 'Explorer');
   f.state.error = 'USERNAME_TAKEN';
   const conflict = await f.request('/api/account/profile', 'PUT', {
@@ -159,4 +165,56 @@ test('profile endpoint sends only canonical input to scoped RPC, ignores forged 
   assert.equal((await friends.json()).code, 'GOOGLE_REQUIRED');
   const unauthorized = await fetch(`http://127.0.0.1:${f.server.port}/api/account`);
   assert.equal(unauthorized.status, 401);
+});
+
+test('legacy RPC and saved-profile Google fields never leave account, friend or socket responses', async (t) => {
+  const f = await fixture(t);
+  Object.assign(f.account.profile!, {
+    avatarSource: 'google',
+    avatarUrl: 'javascript:legacy-photo',
+    name: 'Captain',
+    avatar: 9,
+  });
+  Object.assign(f.account, {
+    googleAvatarUrl: { untrusted: true },
+    full_name: 'Private Legal Name',
+    email: 'private@example.invalid',
+  });
+  const account = await (await f.request('/api/account')).json();
+  assert.equal(account.username, 'Captain');
+  assert.equal(account.profile.avatar, 9);
+  assert.equal(account.profile.name, 'Captain');
+  for (const field of ['googleAvatarUrl', 'full_name', 'email']) assert.ok(!(field in account));
+  for (const field of ['avatarSource', 'avatarUrl']) assert.ok(!(field in account.profile));
+  const peer = { ...f.account, profile: f.account.profile };
+  f.state.replies['/rest/v1/rpc/catanova_friends'] = { friends: [peer], incoming: [], outgoing: [] };
+  f.state.replies['/rest/v1/rpc/catanova_friend_search'] = [peer];
+  const friends = await (await f.request('/api/friends')).json();
+  assert.deepEqual(friends.friends[0], {
+    id: account.id,
+    username: 'Captain',
+    isGuest: false,
+    profile: account.profile,
+  });
+  const found = await (await f.request('/api/friends/search?q=Cap')).json();
+  assert.ok(
+    !JSON.stringify(found).includes('avatarUrl') && !JSON.stringify(found).includes('Private Legal Name'),
+  );
+  const admitted = await f.handshake();
+  assert.equal(admitted.type, 'welcome');
+  assert.ok(
+    !JSON.stringify(admitted).includes('avatarUrl') &&
+      !JSON.stringify(admitted).includes('Private Legal Name'),
+  );
+  assert.equal(admitted.state.players[0].profile.avatar, 9);
+  delete (f.account as Partial<typeof f.account>).googleAvatarUrl;
+  delete (f.account.profile as { avatarSource?: unknown }).avatarSource;
+  delete (f.account.profile as { avatarUrl?: unknown }).avatarUrl;
+  assert.equal((await f.request('/api/account')).status, 200, 'new RPC responses need no legacy fields');
+  Object.assign(f.account.profile!, { avatar: 100 });
+  assert.equal(
+    (await f.request('/api/account')).status,
+    503,
+    'stripping unknown metadata must not skip canonical profile validation',
+  );
 });

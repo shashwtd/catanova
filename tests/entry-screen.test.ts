@@ -34,7 +34,6 @@ function authState(overrides: Partial<Auth> = {}): Auth {
     canPlay: false,
     needsOnboarding: false,
     guestExpired: false,
-    googleAvatarUrl: null,
     ...overrides,
   } as Auth;
 }
@@ -165,7 +164,6 @@ test('onboarding replaces invite entry until a unique username and avatar have b
     isGuest: true,
     registered: false,
     profile: null,
-    googleAvatarUrl: null,
     lastActiveAt: '2026-09-09T00:00:00Z',
     expiresAt: null,
   };
@@ -177,19 +175,19 @@ test('onboarding replaces invite entry until a unique username and avatar have b
   assert.ok(!buttonWith(html, 'Join room') && !buttonWith(html, 'Resume room'));
 });
 
-test('authenticated create and join paths use the profile name while local play retains its Name field', () => {
+test('authenticated create and join paths use the chosen username while local play asks for a username', () => {
   const auth = authState({ canPlay: true });
   const create = renderEntry({ auth, entry: 'create' });
   assert.ok(buttonWith(create, 'Create room'));
-  assert.ok(!create.includes('>Name<input') && !create.includes('>Room code<input'));
+  assert.ok(!create.includes('>Username<input') && !create.includes('>Room code<input'));
   const join = renderEntry({ auth, entry: 'join', code: 'ABCDEFG2' });
   assert.ok(join.includes('>Room code<input') && join.includes('value="ABCDEFG2"'));
-  assert.ok(!join.includes('>Name<input'));
+  assert.ok(!join.includes('>Username<input'));
   const local = renderEntry({
     auth: authState({ canPlay: true, config: { mode: 'local', auth: null } }),
     entry: 'create',
   });
-  assert.ok(local.includes('>Name<input'));
+  assert.ok(local.includes('>Username<input'));
 });
 
 test('invite entry waits for preview and blocks full or started rooms, while saved seats can resume', () => {

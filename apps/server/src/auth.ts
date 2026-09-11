@@ -78,7 +78,7 @@ export function createVerifier(config: AuthConfig): VerifyIdentity {
     if (account.id !== user.id)
       throw new ProtocolError('AUTH_MISMATCH', 'Account identity did not match the verified session');
     if (!account.registered || !account.profile)
-      throw new ProtocolError('ONBOARDING_REQUIRED', 'Choose your username and avatar before playing');
+      throw new ProtocolError('ONBOARDING_REQUIRED', 'Choose your username before playing');
     const guestExpiresAt = account.expiresAt ? Date.parse(account.expiresAt) : undefined;
     if (exp * 1000 <= Date.now()) throw new ProtocolError('AUTH_REQUIRED', 'Please sign in again');
     if (guestExpiresAt !== undefined && guestExpiresAt <= Date.now())
