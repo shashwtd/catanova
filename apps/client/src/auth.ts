@@ -7,11 +7,21 @@ import {
   parseProfile,
   validUsername,
 } from '../../../packages/protocol/src/profile.js';
-import type { Account, Profile, UsernameAvailability } from '../../../packages/protocol/src/profile.js';
+import type {
+  Account,
+  FriendsState,
+  Profile,
+  PublicAccount,
+  UsernameAvailability,
+} from '../../../packages/protocol/src/profile.js';
 import { accountApi, AccountApiError } from './account-api.js';
 import { beginGoogleSignIn, beginGuestSignIn, completeGoogleLink } from './auth-flow.js';
 import { safeEntryPath } from './navigation.js';
+import { FriendRequestQueue, startSocialPresence } from './social-presence.js';
 type GameIdentity = Pick<User, 'id' | 'is_anonymous'>;
+type ClientFriendsState = Omit<FriendsState, 'friends'> & {
+  friends: (PublicAccount & { online?: boolean })[];
+};
 export type RuntimeConfig = {
   auth: { url: string; publishableKey: string } | null;
   mode: 'local' | 'authenticated';
@@ -33,6 +43,7 @@ export function entryLocation() {
 }
 export function useAuth() {
   const signingIn = useRef(false);
+  const friendRequests = useRef(new FriendRequestQueue<ClientFriendsState>());
   const client = useRef<BrowserAuthClient | null>(null),
     currentUser = useRef<GameIdentity | null>(null);
   const mounted = useRef(true),
@@ -45,12 +56,14 @@ export function useAuth() {
   const [error, setError] = useState(''),
     [guestExpired, setGuestExpired] = useState(false);
   const [profile, setProfile] = useState(localProfile),
-    [friends, setFriends] = useState(emptyFriends);
+    [friends, setFriends] = useState<ClientFriendsState>(emptyFriends);
   const reloadProfile = useRef<() => Promise<void>>(async () => {});
   const accessToken = useCallback(async () => {
     if (!client.current) return undefined;
     const { data, error } = await client.current.auth.getSession();
     if (error || !data.session) throw new AccountApiError('AUTH_REQUIRED', 'Please sign in again');
+    if (data.session.user.id !== currentUser.current?.id)
+      throw new AccountApiError('AUTH_REQUIRED', 'Your account session changed. Try again.');
     return data.session.access_token;
   }, []);
   const installAccount = useCallback((next: Account, expected: string) => {
@@ -67,6 +80,7 @@ export function useAuth() {
     if (!mounted.current) return;
     setError(e instanceof Error ? e.message : 'Account unavailable');
     if (e instanceof AccountApiError && e.code === 'GUEST_EXPIRED') {
+      friendRequests.current.reset();
       setGuestExpired(true);
       setAccount(null);
       setFriends(emptyFriends());
@@ -75,11 +89,28 @@ export function useAuth() {
   const refreshFriends = useCallback(async () => {
     const id = currentUser.current?.id;
     if (!id || currentUser.current?.is_anonymous) {
-      setFriends(emptyFriends());
+      friendRequests.current.reset();
+      if (mounted.current) setFriends(emptyFriends());
       return;
     }
-    const next = await accountApi.friends(await accessToken());
-    if (mounted.current && currentUser.current?.id === id) setFriends(next);
+    return friendRequests.current.read(
+      async (signal) => {
+        const token = await accessToken();
+        if (signal.aborted || currentUser.current?.id !== id)
+          throw new Error('Your account session changed. Try again.');
+        return accountApi.friends(token, signal);
+      },
+      (next) => {
+        if (mounted.current && currentUser.current?.id === id) setFriends(next);
+      },
+      () => {
+        if (mounted.current && currentUser.current?.id === id)
+          setFriends((current) => ({
+            ...current,
+            friends: current.friends.map(({ online: _, ...friend }) => friend),
+          }));
+      },
+    );
   }, [accessToken]);
   const saveProfile = useCallback(
     async (input: Profile) => {
@@ -94,7 +125,10 @@ export function useAuth() {
       const id = currentUser.current?.id;
       if (!id) throw new AccountApiError('AUTH_REQUIRED', 'Please sign in again');
       try {
-        const next = await accountApi.save(await accessToken(), valid);
+        const token = await accessToken();
+        if (!mounted.current || currentUser.current?.id !== id)
+          throw new Error('Your account session changed. Try again.');
+        const next = await accountApi.save(token, valid);
         if (!installAccount(next, id) || !next.profile)
           throw new Error('Your account session changed. Try again.');
         setError('');
@@ -124,8 +158,20 @@ export function useAuth() {
   const mutateFriend = useCallback(
     async (action: 'request' | 'accept' | 'decline' | 'cancel' | 'remove', other: string) => {
       const id = currentUser.current?.id;
-      const next = await accountApi.friendAction(await accessToken(), action, other);
-      if (mounted.current && currentUser.current?.id === id) setFriends(next);
+      if (!id || currentUser.current?.is_anonymous)
+        throw new AccountApiError('AUTH_REQUIRED', 'Link Google to add friends.');
+      await friendRequests.current.write(
+        async (signal) => {
+          const token = await accessToken();
+          // Never execute an earlier account's action using a newly switched account's token.
+          if (signal.aborted || currentUser.current?.id !== id)
+            throw new Error('Your account session changed. Try again.');
+          return accountApi.friendAction(token, action, other, signal);
+        },
+        (next) => {
+          if (mounted.current && currentUser.current?.id === id) setFriends(next);
+        },
+      );
     },
     [accessToken],
   );
@@ -157,6 +203,7 @@ export function useAuth() {
         currentUser.current = identity;
         setUser(identity);
         if (changed || !nextUser) {
+          friendRequests.current.reset();
           setAccount(null);
           setFriends(emptyFriends());
           setGuestExpired(false);
@@ -225,10 +272,19 @@ export function useAuth() {
     return () => {
       active = false;
       mounted.current = false;
+      friendRequests.current.reset();
       ++version.current;
       unsubscribe();
     };
   }, [accessToken, installAccount, accountError, refreshFriends]);
+  useEffect(() => {
+    if (!account?.registered || guestExpired) return;
+    const owner = account.id;
+    return startSocialPresence(async (signal) => {
+      const token = await accessToken();
+      if (!signal.aborted && currentUser.current?.id === owner) await accountApi.presence(token, signal);
+    }, document);
+  }, [account?.id, account?.registered, guestExpired, accessToken]);
   useEffect(() => {
     if (!account?.registered || account.isGuest) return;
     const refresh = () => {
@@ -236,9 +292,13 @@ export function useAuth() {
     };
     const interval = setInterval(refresh, 30000);
     window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
     };
   }, [account?.id, account?.registered, account?.isGuest, refreshFriends]);
   useEffect(() => {
@@ -330,6 +390,7 @@ export function useAuth() {
       }
     }
     ++version.current;
+    friendRequests.current.reset();
     currentUser.current = null;
     setUser(null);
     setAccount(null);

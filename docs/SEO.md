@@ -18,7 +18,7 @@ These dashboard actions require the owner's authenticated accounts. Repository c
 
 ## Keep the brand first
 
-The home title is **Catanova — Play with Friends**. Its single-line visible description mentions a Catan alternative and the real two-to-four-player scope. The longer search description explains free browser play and private multiplayer rooms. There are no “number one,” popularity, rating or perfect-reliability claims.
+The home title is **Catanova — Build. Trade. Settle.**, including the browser tab and social title. Its single-line visible description mentions a Catan alternative and the real two-to-four-player scope. The longer search description explains free browser play and private multiplayer rooms. There are no “number one,” popularity, rating or perfect-reliability claims.
 
 The guide answers concrete questions about mixed phone/computer rooms, two-player rules, accounts, costs, trading and reconnecting. It explains that Catanova is independent and unofficial. This makes the mechanics discoverable without crowding the game menu or publishing thin keyword pages.
 
@@ -35,7 +35,7 @@ Google says ordinary SEO practices also apply to its AI search features and requ
 ## Technical behavior to preserve
 
 - The production build prerenders the actual homepage. The guide is a standalone HTML page with no game bundle.
-- Each public page has its own title, description and canonical, plus Open Graph/large-card preview metadata. The optimized 1200 × 630 social image can be fetched without authentication.
+- Each public page has its own title, description and canonical, plus Open Graph/large-card preview metadata. The code-composed, optimized 1200 × 630 social image at `/branding/social-card-v3.jpg` can be fetched without authentication. Its alt text is “Catanova — Build. Trade. Settle. Golden logo above a sunny island coast.”
 - Room URLs, legacy `?room=` invitations, authentication callbacks, APIs and health checks retain `X-Robots-Tag: noindex, nofollow`. Search directives do not replace authentication.
 - Unknown URLs return 404. `/guide` and alternate index paths redirect to their canonical addresses. Compression, cache validators and optimized art remain enabled.
 - No cookies, usernames, saved-room identifiers or Supabase credentials are embedded into public HTML or the sitemap. Keep development/staging sites private or host-wide noindex.

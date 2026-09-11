@@ -1,10 +1,10 @@
 import type {
   Account,
-  FriendsState,
   PublicAccount,
   Profile,
   UsernameAvailability,
 } from '../../../packages/protocol/src/profile.js';
+import type { FriendPresenceState, PlayerGames } from '../../../packages/protocol/src/player-hub.js';
 
 export class AccountApiError extends Error {
   constructor(
@@ -19,6 +19,7 @@ export async function accountRequest<T>(
   path: string,
   method = 'GET',
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   if (!token) throw new AccountApiError('AUTH_REQUIRED', 'Please sign in again');
   let response: Response;
@@ -30,7 +31,7 @@ export async function accountRequest<T>(
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(12000),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000),
     });
   } catch {
     throw new AccountApiError('ACCOUNT_UNAVAILABLE', 'Could not reach your account. Try again.');
@@ -47,16 +48,28 @@ export async function accountRequest<T>(
 export const accountApi = {
   get: (token: string | undefined) => accountRequest<Account>(token, '/api/account'),
   touch: (token: string | undefined) => accountRequest<Account>(token, '/api/account/activity', 'POST'),
+  presence: (token: string | undefined, signal?: AbortSignal) =>
+    accountRequest<{ online: true }>(token, '/api/account/presence', 'POST', undefined, signal),
+  games: (token: string | undefined, cursor?: string, signal?: AbortSignal) =>
+    accountRequest<PlayerGames>(
+      token,
+      `/api/account/games${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+      'GET',
+      undefined,
+      signal,
+    ),
   save: (token: string | undefined, profile: Profile) =>
     accountRequest<Account>(token, '/api/account/profile', 'PUT', profile),
   username: (token: string | undefined, name: string) =>
     accountRequest<UsernameAvailability>(token, `/api/account/username?name=${encodeURIComponent(name)}`),
-  friends: (token: string | undefined) => accountRequest<FriendsState>(token, '/api/friends'),
+  friends: (token: string | undefined, signal?: AbortSignal) =>
+    accountRequest<FriendPresenceState>(token, '/api/friends', 'GET', undefined, signal),
   search: (token: string | undefined, query: string) =>
     accountRequest<PublicAccount[]>(token, `/api/friends/search?q=${encodeURIComponent(query)}`),
   friendAction: (
     token: string | undefined,
     action: 'request' | 'accept' | 'decline' | 'cancel' | 'remove',
     other: string,
-  ) => accountRequest<FriendsState>(token, '/api/friends', 'POST', { action, other }),
+    signal?: AbortSignal,
+  ) => accountRequest<FriendPresenceState>(token, '/api/friends', 'POST', { action, other }, signal),
 };

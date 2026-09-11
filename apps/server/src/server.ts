@@ -16,6 +16,7 @@ import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
 import { RuleError } from '../../../packages/rules/src/game.js';
 import { serveClient } from './static.js';
+import { AccountPresence } from './account-presence.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
 function validationCommandId(input: string): string | undefined {
@@ -57,6 +58,10 @@ export async function startServer(
   );
   const lookups = new RoomAccessLimit(60);
   const admissions = new RoomAccessLimit(30);
+  const hubRequests = new RoomAccessLimit(120);
+  const historyRequests = new RoomAccessLimit(30);
+  const presenceRequests = new RoomAccessLimit(12);
+  const accountPresence = new AccountPresence();
   const siteKey =
     options.captcha === null
       ? undefined
@@ -87,6 +92,13 @@ export async function startServer(
         const authorization = request.headers.authorization;
         const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
         const url = new URL(request.url, 'http://localhost');
+        if (['/api/account/games', '/api/account/presence', '/api/friends'].includes(url.pathname)) {
+          const access = hubRequests.consume(clientAddress(request), now());
+          if (!access.allowed) {
+            response.setHeader('Retry-After', String(access.retryAfter));
+            throw accountFailure('ACCOUNT_RATE_LIMIT');
+          }
+        }
         const body = async () => {
           let value = '';
           for await (const chunk of request) {
@@ -97,7 +109,33 @@ export async function startServer(
         };
         let result: unknown;
         if (request.method === 'GET' && url.pathname === '/api/account') result = await accounts.get(token);
-        else if (request.method === 'POST' && url.pathname === '/api/account/activity')
+        else if (
+          (request.method === 'GET' && url.pathname === '/api/account/games') ||
+          (request.method === 'POST' && url.pathname === '/api/account/presence')
+        ) {
+          // Supabase verifies the caller's JWT and returns only that caller's account through RLS.
+          // A supplied user ID is never an authority to read someone else's matches or publish presence.
+          const account = await accounts.get(token);
+          const expiresAt = account.expiresAt === null ? Infinity : Date.parse(account.expiresAt);
+          if (expiresAt <= now()) throw accountFailure('GUEST_EXPIRED');
+          if (!account.registered || !account.profile) throw accountFailure('ONBOARDING_REQUIRED');
+          const access = (url.pathname.endsWith('/games') ? historyRequests : presenceRequests).consume(
+            account.id,
+            now(),
+          );
+          if (!access.allowed) {
+            response.setHeader('Retry-After', String(access.retryAfter));
+            throw accountFailure('ACCOUNT_RATE_LIMIT');
+          }
+          if (url.pathname.endsWith('/games'))
+            result = await store.accountGamesAsync(account.id, url.searchParams.get('cursor') ?? undefined, {
+              cancelled: () => response.destroyed || closing,
+            });
+          else {
+            accountPresence.touch(account.id, now(), expiresAt);
+            result = { online: true };
+          }
+        } else if (request.method === 'POST' && url.pathname === '/api/account/activity')
           result = await accounts.touch(token);
         else if (request.method === 'GET' && url.pathname === '/api/account/username')
           result = await accounts.username(token, url.searchParams.get('name') ?? '');
@@ -105,14 +143,17 @@ export async function startServer(
           const account = await accounts.save(token, await body());
           result = account;
         } else if (request.method === 'GET' && url.pathname === '/api/friends')
-          result = await accounts.friends(token);
+          result = accountPresence.friends(await accounts.friends(token), now());
         else if (request.method === 'GET' && url.pathname === '/api/friends/search')
           result = await accounts.search(token, url.searchParams.get('q') ?? '');
         else if (request.method === 'POST' && url.pathname === '/api/friends') {
           const value = await body();
           if (typeof value.action !== 'string' || typeof value.other !== 'string')
             throw accountFailure('FRIEND_INVALID');
-          result = await accounts.friendAction(token, value.action, value.other);
+          result = accountPresence.friends(
+            await accounts.friendAction(token, value.action, value.other),
+            now(),
+          );
         } else {
           response.writeHead(404).end();
           return;
@@ -303,7 +344,11 @@ export async function startServer(
     const address = clientAddress(request);
     alive.add(ws);
     ws.on('error', () => ws.terminate());
-    ws.on('pong', () => alive.add(ws));
+    ws.on('pong', () => {
+      alive.add(ws);
+      if (accountIdentity && sessions.has(ws))
+        accountPresence.touch(accountIdentity.id, now(), accountIdentity.expiresAt);
+    });
     const handshakeTimeout = setTimeout(() => {
       if (!sessions.has(ws)) ws.close(1008, 'Join a room first');
     }, 12000);
@@ -432,6 +477,7 @@ export async function startServer(
           }
           sessions.set(ws, seat);
           activeSeats.set(seat.id, ws);
+          if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
           clearTimeout(handshakeTimeout);
           send(ws, {
             type: 'welcome',

@@ -1,21 +1,22 @@
 # Branding exports
 
-Browser icons are technical exports of the approved Catanova mark. The current social preview is a new sunny coastal composition generated using the approved wordmark and title scenery as references. Its original master and generation prompt are preserved; the approved logo and icon sources are unchanged.
+Browser icons are technical exports of the approved Catanova mark. The current social preview is composed entirely by `scripts/export-branding.mjs`: existing logo and scenery, explicit layout and fades, and typeset text. No image generator is used for this version. The reused artwork retains its original provenance.
 
 ## Files
 
 All image exports live in [`apps/client/public/branding`](../apps/client/public/branding/).
 
-| File                   | Dimensions           | Format and use                                                         |
-| ---------------------- | -------------------- | ---------------------------------------------------------------------- |
-| `favicon.ico`          | 16, 32, 48 px frames | ICO with transparent PNG frames for browser tabs                       |
-| `favicon-48.png`       | 48 × 48              | Transparent indexed PNG; small browser icon                            |
-| `favicon-96.png`       | 96 × 96              | Transparent indexed PNG; larger browser icon                           |
-| `apple-touch-icon.png` | 180 × 180            | Opaque cream PNG; home-screen icon                                     |
-| `icon-192.png`         | 192 × 192            | Opaque cream PNG; web manifest icon                                    |
-| `icon-512.png`         | 512 × 512            | Opaque cream PNG; web manifest icon                                    |
-| `social-card.jpg`      | 1200 × 630           | Opaque JPEG; full wordmark, factual tagline and coastal scenery        |
-| `social-card-v2.jpg`   | 1200 × 630           | Current opaque JPEG; golden wordmark and a sunny harbor, 195,696 bytes |
+| File                   | Dimensions           | Format and use                                                             |
+| ---------------------- | -------------------- | -------------------------------------------------------------------------- |
+| `favicon.ico`          | 16, 32, 48 px frames | ICO with transparent PNG frames for browser tabs                           |
+| `favicon-48.png`       | 48 × 48              | Transparent indexed PNG; small browser icon                                |
+| `favicon-96.png`       | 96 × 96              | Transparent indexed PNG; larger browser icon                               |
+| `apple-touch-icon.png` | 180 × 180            | Opaque cream PNG; home-screen icon                                         |
+| `icon-192.png`         | 192 × 192            | Opaque cream PNG; web manifest icon                                        |
+| `icon-512.png`         | 512 × 512            | Opaque cream PNG; web manifest icon                                        |
+| `social-card.jpg`      | 1200 × 630           | Opaque JPEG; full wordmark, factual tagline and coastal scenery            |
+| `social-card-v2.jpg`   | 1200 × 630           | Previous generated banner; retained for already shared URLs                |
+| `social-card-v3.jpg`   | 1200 × 630           | Current code-composed JPEG; logo, typeset tagline and coast, 183,574 bytes |
 
 [`site.webmanifest`](../apps/client/public/site.webmanifest) supplies the app name, root launch URL, colors and two app-icon sizes. Its icons use `purpose: any`, with padding around the mark. It does not claim maskable icons or add offline gameplay, a service worker, or a disconnected server mode.
 
@@ -24,10 +25,12 @@ All image exports live in [`apps/client/public/branding`](../apps/client/public/
 - [Approved transparent mark](../assets/source-art/branding/catanova-mark-v2.png): 1254 × 1254. The exports use the approved display bounds `145, 105, 983, 1113` to remove unused margins, preserve the entire spark and mark, and fit it proportionally into a square.
 - [Approved full logo](../assets/source-art/branding/catanova-logo-v2.png): 2172 × 724, with its original opaque cream background. The legacy social card places a proportional 1080-pixel-wide copy onto a 1200 × 630 cream canvas.
 - [Existing title scenery](../assets/source-art/title-landscape.png): proportionally cropped into the legacy social card's lower strip, with a gradual alpha fade into the cream canvas.
-- [Current preview master](../assets/source-art/branding/social-card-v2.png): 1731 × 908, copied unchanged from the built-in image generator. [Its provenance](art/social-preview-provenance.json) records the exact prompt, both references, hashes and delivery settings. This is an illustration, not a game screenshot. The master is excluded from Docker and never downloaded by players.
+- [Previous generated preview master](../assets/source-art/branding/social-card-v2.png): 1731 × 908, copied unchanged from the built-in image generator. [Its provenance](art/social-preview-provenance.json) records the exact prompt, both references, hashes and delivery settings. This is an illustration, not a game screenshot. The master is excluded from Docker and never downloaded by players.
 - [Original branding provenance](art/logo-concepts/provenance-v2.json) and [art documentation](ART.md) remain the sources for artwork authorship and generation history. These exports do not change the AI-generated artwork's provenance.
 
-Both previews say “Build. Trade. Play with friends.” without player counts, rankings or performance claims. The legacy image uses typeset Arial with a system sans-serif fallback; font rasterization can vary between export machines. The current preview's text is part of its generated master and needs no fonts during export. The old URL remains available while metadata uses the versioned new image URL so preview services can refresh their cached artwork.
+The current preview says “Build. Trade. Settle.” and “catanova.io”, typeset using the bundled Barlow SemiBold font. The full approved logo is resized proportionally; a small feather at its paper edges removes the rectangular seam. The scenery fills the bottom of the canvas with a controlled fade. Text remains inside comfortable margins. The export uses an isolated temporary font cache, removed on exit, and does not scan the user's font library.
+
+The two previous URLs remain available for already shared links. Metadata now points to `social-card-v3.jpg`. The editable source is the export script; no additional generated master is needed.
 
 Source PNG SHA-256 values:
 
@@ -58,6 +61,6 @@ The script imports `sharp` normally. If Sharp is supplied by a separate local ru
 SHARP_MODULE=/absolute/path/to/sharp/dist/index.cjs node scripts/export-branding.mjs
 ```
 
-Sharp is only an export-time tool. It is not imported by the application or needed to serve the committed exports. The script writes only the generated image files under `public/branding`; the manifest is maintained separately. PNGs use a 256-color palette and maximum lossless compression. The legacy JPEG uses quality 88 and full chroma resolution. The current JPEG uses quality 85 and 4:2:0 chroma, with a 220 KB limit; the inspected result is 195.7 KB, 92.4% smaller than its PNG master. Existing runtime artwork remains at the previously approved WebP settings rather than undergoing another lossy compression pass.
+Sharp is only an export-time tool. It is not imported by the application or needed to serve the committed exports. The script writes only exported image files under `public/branding`; the manifest is maintained separately. PNGs use a 256-color palette and maximum lossless compression. The current JPEG uses quality 88 with full 4:4:4 chroma resolution to preserve lettering, with a 220 KB limit. The inspected result is 183,574 bytes. Existing runtime artwork remains at its previously approved WebP settings.
 
 Each export verifies icon dimensions, transparent versus opaque alpha, the ICO's PNG-frame sizes, the social image's dimensions, and unchanged source hashes. Inspect the resulting favicon, launcher icon and social card before committing an updated export; these checks do not replace an artwork review.

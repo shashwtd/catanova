@@ -10,7 +10,7 @@ Two-player rooms use the same board, resource supply, building costs, turn flow 
 
 **Status: early hosted playtest.** The browser game supports setup, dice and production, discards and the robber, building, bank/port and player trades, development cards, Longest Road, Largest Army, and victory. VM reboot and isolated two-client recovery checks passed; real login testing, capacity and continuous availability are not established. [Current scope and differences](docs/PLAYTEST.md).
 
-The welcome screen leads with **Create room** and **Join room**, followed by Google or guest access when needed. A brighter [Catanova mark and full wordmark](docs/art/logo-concepts/README.md) sit over the game's own coastal scenery.
+The signed-out welcome screen leads with **Create room** and **Join room**, followed by Google or guest access when needed. Signed-in players have a separate lobby with their profile, completed-game record, recent matches and a friends drawer. A brighter [Catanova mark and full wordmark](docs/art/logo-concepts/README.md) sit over the game's own coastal scenery. [Player lobby and history](docs/PLAYER_LOBBY.md).
 
 Guest signups support Cloudflare Turnstile, validated by Supabase. Google sign-in stays direct. [Authentication and CAPTCHA setup](docs/AUTH.md).
 
@@ -63,7 +63,7 @@ node --env-file=.env dist/apps/server/src/index.js
 
 Same-origin browser connections work automatically. `ALLOWED_ORIGINS` permits additional exact origins, useful during development.
 
-**Supabase Google/guest accounts, unique usernames and private friends are implemented.** When self-hosting, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google and anonymous sign-ins, enable manual identity linking, and run the [fresh-project account schema](supabase/schema.sql) as described in [authentication setup](docs/AUTH.md). Players choose a unique username and a game portrait or verified Google photo before entering a room. Guests expire after seven days of inactivity and can link Google while retaining the same account and username; friends require Google. Opening the same invite can recover an account-owned seat. Real Google sign-in and guest Turnstile sessions remain checks for the hosted release.
+**Supabase Google/guest accounts, unique usernames and private friends are implemented.** When self-hosting, set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, enable Google and anonymous sign-ins, enable manual identity linking, and run the [fresh-project account schema](supabase/schema.sql) as described in [authentication setup](docs/AUTH.md). Players choose their own unique username and a game portrait; Google names and photos are not used. Guests expire after seven days of inactivity and can link Google while retaining the same account and username; friends require Google. Opening the same invite or selecting an unfinished match in history can recover an account-owned seat. Real Google sign-in and guest Turnstile sessions remain checks for the hosted release.
 
 With no auth configuration, local development uses the existing seat-token playtest mode, clearly labeled in the menu. Production refuses to start without authentication unless local playtesting is explicitly enabled. The loopback-only Compose example makes that choice explicit. Configured guests use Supabase anonymous accounts and the [implemented seven-day guest policy](docs/GUEST_ACCESS.md); local playtest tokens do not reserve global usernames.
 

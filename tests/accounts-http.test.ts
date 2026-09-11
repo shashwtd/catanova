@@ -195,6 +195,7 @@ test('legacy RPC and saved-profile Google fields never leave account, friend or 
     username: 'Captain',
     isGuest: false,
     profile: account.profile,
+    online: false,
   });
   const found = await (await f.request('/api/friends/search?q=Cap')).json();
   assert.ok(

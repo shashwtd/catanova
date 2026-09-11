@@ -18,6 +18,14 @@ export function shouldResume(saved: Session | undefined, invite: string | null):
 }
 export const roomPath = (reference: string) => `/room/${normalizeRoomReference(reference)}`;
 
+/** Account setup and explicit invitations finish before the ordinary signed-in home. */
+export function showPlayerHome(
+  auth: { canPlay: boolean; config: { mode: string } | null; account: { registered: boolean } | null },
+  invite: string | null,
+): boolean {
+  return auth.canPlay && auth.config?.mode === 'authenticated' && !!auth.account?.registered && !invite;
+}
+
 /** OAuth may return only to a local room route, never a stored external URL. */
 export function safeEntryPath(value: string): string {
   const match = /^\/room\/([^/?#]+)\/?(?:\?[^#]*)?$/.exec(value);

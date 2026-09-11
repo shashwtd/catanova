@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AccountSetup } from '../apps/client/src/AccountSetup.js';
-import { FriendsPanel, FriendSearchResults } from '../apps/client/src/FriendsPanel.js';
+import {
+  FriendsPanel,
+  FriendSearchResults,
+  FriendRemovalConfirmation,
+  FriendSearchSequence,
+} from '../apps/client/src/FriendsPanel.js';
+import { FriendsDrawer } from '../apps/client/src/FriendsDrawer.js';
 import { Avatar, ProfileEditor, canSaveProfile, gameProfileDraft } from '../apps/client/src/Profile.js';
 import type { useAuth } from '../apps/client/src/auth.js';
 import { defaultProfile, emptyFriends } from '../packages/protocol/src/profile.js';
@@ -195,7 +201,7 @@ test('friends lists expose explicit accept, decline, cancel and remove actions',
   for (const label of [
     'Received requests',
     'Sent requests',
-    'Your friends',
+    'Players',
     'Accept Mason&#x27;s friend request',
     'Decline Mason&#x27;s friend request',
     'Cancel friend request to Fox',
@@ -241,4 +247,117 @@ test('search results prevent adding guests and duplicate relationships, while es
     assert.ok(!buttons(html).some((button) => button.includes(`Add ${name} as a friend`)));
   assert.ok(html.includes('Request sent') && html.includes('Request received'));
   assert.ok(html.includes('&lt;script&gt;') && !html.includes('<script>'));
+});
+
+test('friends drawer has one clear title, a native modal, and a labelled search with its own clear space', () => {
+  const html = renderToStaticMarkup(createElement(FriendsDrawer, { auth: authFor(), onClose: () => {} }));
+  assert.match(html, /<dialog[^>]+class="friends-drawer"[^>]+aria-labelledby=/);
+  assert.equal([...html.matchAll(/<h2[^>]*>Friends<\/h2>/g)].length, 1);
+  assert.match(html, /aria-label="Close friends"/);
+  assert.match(html, /<form[^>]+role="search"/);
+  assert.match(html, /<label for="[^"]+">Find a player<\/label>/);
+  assert.match(html, /type="search"[^>]+maxLength="20"/);
+  assert.ok(html.indexOf('roster-fixed') < html.indexOf('roster-scroll'));
+  assert.ok(!html.includes('Your friends'));
+});
+
+test('confirmed friends show explicit server presence while unknown and pending presence stays unknown', () => {
+  const auth = authFor();
+  const pendingPlayer = { ...person('RequestPlayer'), online: true };
+  const searchPlayer = { ...person('SearchPlayer'), online: true };
+  auth.friends = {
+    friends: [
+      { ...person('OnlinePlayer'), online: true },
+      { ...person('OfflinePlayer'), online: false },
+      person('UnknownPlayer'),
+    ],
+    incoming: [pendingPlayer],
+    outgoing: [],
+  };
+  const html = renderToStaticMarkup(createElement(FriendsPanel, { auth }));
+  assert.equal([...html.matchAll(/class="roster-presence"/g)].length, 2);
+  assert.equal([...html.matchAll(/data-online="true"/g)].length, 1);
+  assert.equal([...html.matchAll(/data-online="false"/g)].length, 1);
+  assert.ok(html.includes('UnknownPlayer') && html.includes('RequestPlayer'));
+  const search = renderToStaticMarkup(
+    createElement(FriendSearchResults, {
+      results: [searchPlayer],
+      friendships: auth.friends,
+      busy: false,
+      onRequest: () => {},
+    }),
+  );
+  assert.ok(!search.includes('roster-presence'));
+});
+
+test('removing a friend begins with an icon and requires a named, separate confirmation', () => {
+  const auth = authFor();
+  auth.friends.friends = [person('Sailor')];
+  const html = renderToStaticMarkup(createElement(FriendsPanel, { auth }));
+  const remove = buttons(html).find((button) => button.includes('Remove Sailor from friends'))!;
+  assert.match(remove, /<svg/);
+  assert.match(remove, /aria-expanded="false"/);
+  assert.ok(!remove.includes('>Remove<'));
+  assert.ok(!html.includes('from your friends?'));
+  const confirmation = renderToStaticMarkup(
+    createElement(FriendRemovalConfirmation, {
+      account: person('Sailor'),
+      busy: false,
+      onCancel: () => {},
+      onConfirm: () => {},
+    }),
+  );
+  assert.match(confirmation, /role="group" aria-labelledby=/);
+  assert.ok(confirmation.includes('<strong>Sailor</strong> from your friends?'));
+  assert.ok(
+    buttons(confirmation)
+      .find((button) => button.includes('Keep friend'))
+      ?.includes('autofocus=""'),
+  );
+  assert.ok(buttons(confirmation).some((button) => button.includes('>Remove<')));
+  const pending = renderToStaticMarkup(
+    createElement(FriendRemovalConfirmation, {
+      account: person('Sailor'),
+      busy: true,
+      onCancel: () => {},
+      onConfirm: () => {},
+    }),
+  );
+  assert.ok(buttons(pending).every((button) => button.includes('disabled=""')));
+});
+
+test('cleared, edited and abandoned searches cannot overwrite newer search results or errors', async () => {
+  const sequence = new FriendSearchSequence();
+  let visible = '';
+  let finishOld!: (value: string) => void;
+  let failOld!: (error: Error) => void;
+  const search = async (response: Promise<string>) => {
+    const version = sequence.start();
+    try {
+      const value = await response;
+      if (sequence.isCurrent(version)) visible = value;
+    } catch (error) {
+      if (sequence.isCurrent(version)) visible = (error as Error).message;
+    }
+  };
+  const old = search(
+    new Promise((resolve) => {
+      finishOld = resolve;
+    }),
+  );
+  sequence.invalidate(); // Input was edited before the first response arrived.
+  await search(Promise.resolve('new username'));
+  finishOld('old username');
+  await old;
+  assert.equal(visible, 'new username');
+  const failed = search(
+    new Promise((_, reject) => {
+      failOld = reject;
+    }),
+  );
+  sequence.invalidate(); // Clearing the input or leaving this account cancels the request lifetime.
+  visible = '';
+  failOld(new Error('late error'));
+  await failed;
+  assert.equal(visible, '');
 });
