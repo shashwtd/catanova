@@ -1,3 +1,4 @@
+import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
 import {
   Check,
   Clock3,
@@ -10,6 +11,7 @@ import {
   Settings2,
   Share2,
   Users,
+  Trophy,
   WifiOff,
 } from './GameIcons.js';
 import { useEffect, useRef, useState } from 'react';
@@ -187,7 +189,10 @@ export function Lobby({
         <div className="lobby-caption">
           <h1>Game room</h1>
           <div className="lobby-room-options">
-            <span>2–4 players</span>
+            <button className="lobby-goal" onClick={onSettings} aria-label="Points to win. Game settings">
+              <Trophy size={18} />
+              <span>{room.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS} points</span>
+            </button>
             <button
               type="button"
               className="lobby-timer"

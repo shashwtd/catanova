@@ -1,14 +1,15 @@
+import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
 import { COSTS } from '../../../packages/rules/src/index.js';
 import { ArrowRight, Castle, Dices, House, Route, ScrollText, Shield, Trophy } from './GameIcons.js';
 import { ResourceSummary } from './ResourcePicker.js';
 
-export function QuickRules() {
+export function QuickRules({ victoryPoints = DEFAULT_VICTORY_POINTS }: { victoryPoints?: number }) {
   return (
     <div className="rules-book">
       <div className="rules-victory">
         <Trophy size={32} />
         <div>
-          <strong>First to 10 victory points</strong>
+          <strong>First to {victoryPoints} victory points</strong>
           <p>Win on your turn.</p>
         </div>
       </div>

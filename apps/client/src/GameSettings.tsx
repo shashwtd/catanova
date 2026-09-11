@@ -1,3 +1,8 @@
+import {
+  DEFAULT_VICTORY_POINTS,
+  MIN_VICTORY_POINTS,
+  MAX_VICTORY_POINTS,
+} from '../../../packages/rules/src/victory.js';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowLeftRight, Check, Clock3, Dices, Trophy, Volume2, VolumeX } from './GameIcons.js';
@@ -40,7 +45,9 @@ export function GameSettings({
     timerLocked = !editable || busy || saving,
     changed =
       draft.turnTimerSeconds !== (room?.settings ?? DEFAULT_ROOM_SETTINGS).turnTimerSeconds ||
-      (draft.diceMode ?? 'classic') !== (room?.settings?.diceMode ?? 'classic');
+      (draft.diceMode ?? 'classic') !== (room?.settings?.diceMode ?? 'classic') ||
+      (draft.victoryPoints ?? DEFAULT_VICTORY_POINTS) !==
+        (room?.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS);
   const lastVolume = useRef(preferences.volume || DEFAULT_PREFERENCES.volume);
   const lastMusicVolume = useRef(preferences.musicVolume || DEFAULT_PREFERENCES.musicVolume);
   const musicMuted = !preferences.music || preferences.musicVolume === 0;
@@ -53,7 +60,7 @@ export function GameSettings({
   }, [preferences.musicVolume]);
   useEffect(
     () => setDraft(room?.settings ?? DEFAULT_ROOM_SETTINGS),
-    [room?.roomId, room?.settings?.turnTimerSeconds, room?.settings?.diceMode],
+    [room?.roomId, room?.settings?.turnTimerSeconds, room?.settings?.diceMode, room?.settings?.victoryPoints],
   );
   return (
     <div className="settings-content settings-menu">
@@ -207,6 +214,36 @@ export function GameSettings({
                 : 'Play at your own pace.'
               : 'Chosen by the host.'}
           </p>
+          <section className="settings-goal" aria-labelledby="victory-target-label">
+            <div className="settings-row-heading">
+              <label id="victory-target-label" htmlFor="victory-target">
+                <Trophy /> Points to win
+              </label>
+              <output htmlFor="victory-target">{draft.victoryPoints ?? DEFAULT_VICTORY_POINTS}</output>
+            </div>
+            <input
+              id="victory-target"
+              type="range"
+              className="settings-range"
+              min={MIN_VICTORY_POINTS}
+              max={MAX_VICTORY_POINTS}
+              step={1}
+              value={draft.victoryPoints ?? DEFAULT_VICTORY_POINTS}
+              disabled={timerLocked}
+              aria-valuetext={`${draft.victoryPoints ?? DEFAULT_VICTORY_POINTS} victory points`}
+              style={
+                {
+                  '--range-fill': `${(((draft.victoryPoints ?? DEFAULT_VICTORY_POINTS) - MIN_VICTORY_POINTS) / (MAX_VICTORY_POINTS - MIN_VICTORY_POINTS)) * 100}%`,
+                } as CSSProperties
+              }
+              onChange={(event) => setDraft({ ...draft, victoryPoints: Number(event.target.value) })}
+            />
+            <div className="settings-timer-stops">
+              <span>{MIN_VICTORY_POINTS}</span>
+              <span>10 · Standard</span>
+              <span>{MAX_VICTORY_POINTS}</span>
+            </div>
+          </section>
           <fieldset className="settings-dice" disabled={timerLocked}>
             <legend>
               <Dices /> Dice
@@ -278,7 +315,9 @@ export function GameInfo({ room }: { room: RoomState }) {
           <dt>
             <Trophy /> Goal
           </dt>
-          <dd>10 points on your turn</dd>
+          <dd>
+            {room.game?.victoryPoints ?? settings.victoryPoints ?? DEFAULT_VICTORY_POINTS} points on your turn
+          </dd>
         </div>
         <div>
           <dt>

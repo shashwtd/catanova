@@ -202,3 +202,11 @@ test('room invitations contribute to the friends badge and appear before the mai
   assert.ok(html.includes('Friends, 2 invitations and requests'));
   assert.ok(html.indexOf('Mossling invited you') < html.indexOf('hub-lobby-content'));
 });
+
+test('the hub presents the player identity once rather than repeating it in the header', () => {
+  const html = renderHub();
+  const header = html.match(/<header class="hub-header">([\s\S]*?)<\/header>/)?.[1] ?? '';
+  assert.ok(!header.includes('FernCaptain'));
+  assert.ok(!header.includes('avatar-medallion'));
+  assert.ok(html.includes('hub-character-portrait') && html.includes('View FernCaptain'));
+});

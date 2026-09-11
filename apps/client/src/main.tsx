@@ -1298,7 +1298,7 @@ function App() {
       )}
       {panel === 'rules' && (
         <Dialog title="Rules" onClose={() => setPanel(null)}>
-          <QuickRules />
+          <QuickRules victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints} />
         </Dialog>
       )}
     </main>

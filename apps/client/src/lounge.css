@@ -80,19 +80,33 @@
   padding-block: 12px 28px;
 }
 .hub-character {
-  width: min(370px, 100%);
+  width: min(430px, 100%);
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  column-gap: 22px;
+  justify-items: start;
   justify-self: center;
-  padding: 34px 18px 26px;
+  padding: 26px;
   border: 1px solid var(--game-trim);
-  border-radius: 18px;
+  border-radius: 14px;
   background: var(--game-panel-fill);
   box-shadow: var(--game-panel-shadow);
+}
+.hub-brand .landing-logo {
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  filter: none;
+}
+.hub-character-portrait {
+  grid-row: 1;
+  align-self: center;
 }
 .hub-character-rays {
   display: none;
 }
 .hub-character-portrait .avatar-medallion {
-  width: clamp(140px, 18vw, 225px);
+  width: 84px;
   height: auto;
   aspect-ratio: 1;
   border-width: 2px;
@@ -102,10 +116,12 @@
     0 12px 15px #101b1960;
 }
 .hub-character-name {
-  margin-top: 21px;
-  padding: 0 12px 17px;
+  margin: 0;
+  padding: 0;
   min-width: 0;
   width: 100%;
+  text-align: left;
+  font-size: 25px;
   clip-path: none;
   border: 0;
   background: none;
@@ -152,12 +168,29 @@
   color: var(--game-cream);
 }
 .hub-character .player-record {
-  margin: 2px 0 0;
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin: 14px 0 0;
   gap: 0;
   text-shadow: none;
 }
 .hub-character .player-record > div {
-  padding-inline: 12px;
+  padding-inline: 10px;
+  min-width: 0;
+  grid-template-columns: 22px auto;
+  column-gap: 6px;
+}
+.hub-character .player-record > div:first-child {
+  padding-left: 0;
+}
+.hub-character .player-record dt > svg {
+  width: 22px;
+}
+.hub-character .player-record dd {
+  font-size: 26px;
+}
+.hub-character .player-record dt > span {
+  font-size: 11px;
 }
 .hub-sidebar {
   max-width: 550px;
@@ -437,11 +470,11 @@
     padding: 12px;
   }
   .hub-lobby-content {
-    grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 22px;
   }
   .hub-character {
-    padding: 28px 12px 24px;
+    padding: 26px;
   }
   .hub-room-actions {
     padding: 23px 18px;
@@ -491,6 +524,8 @@
     text-align: left;
   }
   .hub-character .player-record {
+    grid-column: 2;
+    justify-self: start;
     margin-top: 12px;
   }
   .hub-character .player-record > div {
@@ -567,5 +602,41 @@
   }
   .hub-character .player-record > div {
     grid-template-columns: auto;
+  }
+}
+
+/* Notices overlay the lounge instead of adding another row to the layout. */
+.player-hub > .invitation-notice {
+  position: fixed;
+  z-index: 45;
+  top: max(100px, calc(env(safe-area-inset-top) + 84px));
+  right: max(24px, env(safe-area-inset-right));
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 180px);
+  overflow-y: auto;
+}
+.settings-goal {
+  margin-top: 22px;
+}
+.room-lobby .lobby-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--game-gold);
+  background: none;
+  border: 0;
+  min-height: 44px;
+  padding: 6px 4px;
+  font:
+    600 14px Barlow,
+    sans-serif;
+}
+@media (max-width: 850px) {
+  .hub-sidebar {
+    justify-self: center;
+  }
+  .player-hub > .invitation-notice {
+    top: max(168px, calc(env(safe-area-inset-top) + 152px));
+    right: max(16px, env(safe-area-inset-right));
   }
 }

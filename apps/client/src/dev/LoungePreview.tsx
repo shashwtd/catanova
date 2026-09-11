@@ -115,6 +115,7 @@ export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
   const [panel, setPanel] = useState<'profile' | 'settings' | 'friends' | null>(null);
   const [profile, setProfile] = useState<Profile>(seats[0]!.profile);
+  const [settings, setSettings] = useState(room.settings);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [showInvite, setShowInvite] = useState(false);
   const auth = {
@@ -173,6 +174,7 @@ export function LoungePreview() {
   );
   const currentRoom = {
     ...room,
+    settings,
     players: [{ ...seats[0]!, name: profile.name, profile }, ...seats.slice(1)],
   };
   return (
@@ -299,7 +301,7 @@ export function LoungePreview() {
             room={screen === 'lobby' ? currentRoom : null}
             me={me}
             busy={false}
-            save={async () => {}}
+            save={async (next) => setSettings(next)}
             previewSound={noop}
           />
         </PreviewDialog>

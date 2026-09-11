@@ -1075,7 +1075,7 @@ export class Store {
           ),
           room.board.seed,
           this.random,
-          { diceMode: this.settings(seat.room_id).diceMode ?? 'classic' },
+          this.settings(seat.room_id),
         );
       } else {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');

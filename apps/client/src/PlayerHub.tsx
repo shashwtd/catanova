@@ -128,17 +128,9 @@ export function PlayerHub({
   return (
     <section className="player-hub" aria-label="Player lobby">
       <header className="hub-header">
-        <button
-          className="hub-header-profile"
-          onClick={onProfile}
-          aria-label={`View ${auth.profile.name}'s profile`}
-        >
-          <Avatar profile={auth.profile} />
-          <span>
-            <strong>{auth.profile.name}</strong>
-            {auth.account?.isGuest && <small>Guest</small>}
-          </span>
-        </button>
+        <div className="hub-brand">
+          <BrandLogo mark />
+        </div>
         <nav className="hub-navigation" aria-label="Player menu">
           <button aria-current={tab === 'lobby' ? 'page' : undefined} onClick={() => setTab('lobby')}>
             Lobby
@@ -148,6 +140,11 @@ export function PlayerHub({
           </button>
         </nav>
         <div className="hub-header-tools">
+          {tab === 'history' && (
+            <button className="hub-tool" aria-label="Your profile" onClick={onProfile}>
+              <Pencil />
+            </button>
+          )}
           <button
             className="hub-social-button"
             aria-label={requests ? `Friends, ${requests} invitations and requests` : 'Friends'}
@@ -170,12 +167,13 @@ export function PlayerHub({
             <button
               className="hub-character-portrait"
               onClick={onProfile}
-              aria-label="Open your player profile"
+              aria-label={`View ${auth.profile.name}'s profile`}
             >
               <Avatar profile={auth.profile} />
             </button>
             <div className="hub-character-name">
               <span>{auth.profile.name}</span>
+              {auth.account?.isGuest && <small className="hub-guest-label">Guest</small>}
             </div>
             <PlayerStats stats={games.data?.stats} />
           </section>
