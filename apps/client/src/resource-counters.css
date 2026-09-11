@@ -1,0 +1,110 @@
+/* Resources are small table counters. Development cards retain the card treatment. */
+.resource-hand.resource-counters,
+.playing .resource-hand.resource-counters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 9px;
+  width: 350px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 2px 6px;
+}
+.resource-counter-anchor {
+  min-width: 0;
+}
+.resource-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 48px;
+  user-select: none;
+}
+.resource-counter-art {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 42px;
+  filter: drop-shadow(0 2px 2px #160f12a0);
+}
+.resource-counter-art .sprite {
+  width: 32px;
+  height: 32px;
+}
+.resource-counter-value {
+  justify-content: center;
+  flex: none;
+  width: 2ch;
+  white-space: nowrap;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff5d9;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 2px #191211;
+}
+.resource-counter[data-empty='true'] .resource-counter-art {
+  filter: saturate(0.25) brightness(0.7) drop-shadow(0 1px 1px #160f1270);
+}
+.resource-counter[data-empty='true'] .resource-counter-value {
+  color: #aaa091;
+}
+@media (hover: hover) and (pointer: fine) {
+  .resource-counter[data-empty='false']:hover .resource-counter-art {
+    filter: brightness(1.12) drop-shadow(0 2px 3px #160f12a0);
+  }
+}
+@media (max-width: 1000px) {
+  .resource-hand.resource-counters,
+  .playing .resource-hand.resource-counters {
+    width: 285px;
+    gap: 5px;
+  }
+  .resource-counter {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 60px;
+  }
+  .resource-counter-art,
+  .resource-counter-art .sprite {
+    width: 32px;
+    height: 32px;
+  }
+  .resource-counter-value {
+    font-size: 25px;
+  }
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .resource-hand.resource-counters,
+  .playing .resource-hand.resource-counters {
+    width: 200px;
+    gap: 5px;
+    padding-bottom: 0;
+  }
+  .resource-counter {
+    flex-direction: column;
+    min-height: 54px;
+    gap: 2px;
+  }
+  .resource-counter-art,
+  .resource-counter-art .sprite {
+    width: 29px;
+    height: 29px;
+  }
+  .resource-counter-value {
+    font-size: 22px;
+  }
+}
+@media (max-width: 380px) {
+  .resource-hand.resource-counters,
+  .playing .resource-hand.resource-counters {
+    width: 170px;
+    gap: 3px;
+  }
+  .resource-counter-value {
+    font-size: 20px;
+  }
+}

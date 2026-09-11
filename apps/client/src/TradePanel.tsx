@@ -1,12 +1,45 @@
-import { useEffect, useState } from 'react';
-import { canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
+import { useEffect, useRef, useState } from 'react';
+import {
+  canPay,
+  emptyHand,
+  total,
+  tradeOffersRemaining,
+  TRADE_OFFER_LIMIT,
+} from '../../../packages/rules/src/game.js';
 import type { GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { ArrowLeftRight, Check, Plus, X } from './GameIcons.js';
 import { ResourceChoice, ResourcePicker, ResourceSummary } from './ResourcePicker.js';
+import { TradeSubmission } from './trade-submission.js';
+import type { TradeSender } from './trade-submission.js';
 
-type Props = { game: GameView; me: string; disabled: boolean; onAction: (action: GameAction) => void };
+type Props = {
+  game: GameView;
+  me: string;
+  disabled: boolean;
+  onAction: TradeSender;
+};
+
+function useTradeAction(disabled: boolean, send: Props['onAction']) {
+  const latch = useRef(new TradeSubmission()),
+    [pending, setPending] = useState(false),
+    [error, setError] = useState('');
+  const submit = async (action: GameAction): Promise<boolean> => {
+    if (disabled || latch.current.pending) return false;
+    setPending(true);
+    setError('');
+    try {
+      return await latch.current.run(action, send);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not send the trade. Please retry.');
+      return false;
+    } finally {
+      setPending(false);
+    }
+  };
+  return { submit, pending, error };
+}
 
 /** Both columns always describe the person looking at this interface. */
 function TradeExchange({ give, get }: { give: Hand | null; get: Hand | null }) {
@@ -59,15 +92,15 @@ function ConfirmTrade({
         <strong>Confirm your trade</strong>
         <TradeExchange give={give} get={get} />
         <div className="offer-actions">
-          <button className="text-button" onClick={() => setReviewed(null)}>
+          <button className="text-button" disabled={disabled} onClick={() => setReviewed(null)}>
             Back
           </button>
           <button
             className="gold-button"
             disabled={disabled}
-            onClick={() => {
-              onAction(action);
-              setReviewed(null);
+            onClick={async () => {
+              if ((await onAction(action)) !== false)
+                setReviewed((current) => (current === fingerprint ? null : current));
             }}
           >
             <Check />
@@ -91,10 +124,17 @@ function ConfirmTrade({
 }
 
 export function BankTrade({ game, me, disabled, onAction }: Props) {
+  const command = useTradeAction(disabled, onAction);
   const [bankGive, setBankGive] = useState<Resource>('wood');
   const [bankReceive, setBankReceive] = useState<Resource>('brick');
-  const hand = game.players.find((p) => p.id === me)?.hand ?? emptyHand();
-  const locked = disabled || game.players[game.active]?.id !== me || game.phase !== 'actions';
+  const player = game.players.find((p) => p.id === me);
+  const hand = player?.hand ?? emptyHand();
+  const locked =
+    disabled ||
+    command.pending ||
+    !!player?.resigned ||
+    game.players[game.active]?.id !== me ||
+    game.phase !== 'actions';
   const give = { ...emptyHand(), [bankGive]: game.legal.rates[bankGive] };
   const get = { ...emptyHand(), [bankReceive]: 1 };
   return (
@@ -119,21 +159,38 @@ export function BankTrade({ game, me, disabled, onAction }: Props) {
         give={give}
         get={get}
         disabled={locked || bankGive === bankReceive || !canPay(hand, give) || !game.bank[bankReceive]}
-        onAction={onAction}
+        onAction={command.submit}
         label={`Trade ${game.legal.rates[bankGive]}:1`}
       />
+      {command.error && (
+        <p role="alert" className="entry-error">
+          {command.error}
+        </p>
+      )}
     </div>
   );
 }
 
 export function TradePanel({ game, me, disabled, onAction }: Props) {
+  const command = useTradeAction(disabled, onAction);
   const [tab, setTab] = useState<'players' | 'bank'>('players');
   const [give, setGive] = useState<Hand>(emptyHand);
   const [want, setWant] = useState<Hand>(emptyHand);
   const [open, setOpen] = useState(false);
-  const hand = game.players.find((p) => p.id === me)?.hand ?? emptyHand();
-  const locked = disabled || game.players[game.active]?.id !== me || game.phase !== 'actions';
+  const player = game.players.find((p) => p.id === me);
+  const hand = player?.hand ?? emptyHand();
+  const locked =
+    disabled ||
+    command.pending ||
+    !!player?.resigned ||
+    game.players[game.active]?.id !== me ||
+    game.phase !== 'actions';
   const trade = game.trade?.player === me ? game.trade : null;
+  const remaining = tradeOffersRemaining(game);
+  const unchanged =
+    !!trade &&
+    !!trade.open === open &&
+    RESOURCES.every((r) => trade.give[r] === give[r] && (open || trade.want[r] === want[r]));
   const requestLimit = Object.fromEntries(RESOURCES.map((r) => [r, give[r] ? 0 : 19])) as Hand;
   return (
     <div className="trade-content">
@@ -146,7 +203,7 @@ export function TradePanel({ game, me, disabled, onAction }: Props) {
         </button>
       </div>
       {tab === 'bank' ? (
-        <BankTrade game={game} me={me} disabled={disabled} onAction={onAction} />
+        <BankTrade game={game} me={me} disabled={disabled} onAction={command.submit} />
       ) : (
         <div role="tabpanel" aria-label="Player trade">
           <ResourcePicker
@@ -190,12 +247,26 @@ export function TradePanel({ game, me, disabled, onAction }: Props) {
           {!!total(give) && <TradeExchange give={give} get={open ? null : want} />}
           <button
             className="gold-button trade-submit"
-            disabled={locked || !total(give) || !canPay(hand, give) || (!open && !total(want))}
-            onClick={() => onAction(open ? { kind: 'openTrade', give } : { kind: 'offerTrade', give, want })}
+            disabled={
+              locked ||
+              !remaining ||
+              unchanged ||
+              !total(give) ||
+              !canPay(hand, give) ||
+              (!open && !total(want))
+            }
+            onClick={() =>
+              void command.submit(open ? { kind: 'openTrade', give } : { kind: 'offerTrade', give, want })
+            }
           >
             <ArrowLeftRight />
-            {trade ? 'Update offer' : 'Offer trade'}
+            {command.pending ? 'Sending…' : unchanged ? 'Offer sent' : trade ? 'Update offer' : 'Offer trade'}
           </button>
+          <p className="trade-offer-allowance" aria-live="polite">
+            {remaining
+              ? `${remaining} of ${TRADE_OFFER_LIMIT} offers left this turn`
+              : 'All 5 offers used. You can still finish this trade or use the bank.'}
+          </p>
           {trade && (
             <section className="live-offer" aria-label="Your current offer">
               <div className="offer-heading">
@@ -203,7 +274,7 @@ export function TradePanel({ game, me, disabled, onAction }: Props) {
                 <button
                   className="text-button"
                   disabled={locked}
-                  onClick={() => onAction({ kind: 'cancelTrade' })}
+                  onClick={() => void command.submit({ kind: 'cancelTrade' })}
                 >
                   <X size={15} />
                   Withdraw
@@ -245,7 +316,7 @@ export function TradePanel({ game, me, disabled, onAction }: Props) {
                               !canPay(hand, trade.give) ||
                               !!trade.declinedBy?.includes(proposal.player)
                             }
-                            onAction={onAction}
+                            onAction={command.submit}
                           />
                         </div>
                       );
@@ -259,22 +330,34 @@ export function TradePanel({ game, me, disabled, onAction }: Props) {
           )}
         </div>
       )}
+      {command.error && (
+        <p role="alert" className="entry-error">
+          {command.error}
+        </p>
+      )}
     </div>
   );
 }
 
 /** Replies are possible only to the active player's live offer, without opening the Trade action. */
 export function IncomingTrade({ game, me, disabled, onAction }: Props) {
+  const command = useTradeAction(disabled, onAction);
+  const locked = disabled || command.pending;
   const trade = game.trade;
-  const hand = game.players.find((p) => p.id === me)?.hand ?? emptyHand();
+  const player = game.players.find((p) => p.id === me);
+  const hand = player?.hand ?? emptyHand();
   const [give, setGive] = useState<Hand>(emptyHand);
   const [expanded, setExpanded] = useState(false);
+  const activeOffer = useRef('');
+  activeOffer.current = `${me}:${trade?.id}`;
   useEffect(() => {
     setGive(emptyHand());
     setExpanded(false);
-  }, [trade?.id]);
+  }, [me, trade?.id]);
   if (
     !trade ||
+    !player ||
+    player.resigned ||
     trade.player === me ||
     trade.player !== game.players[game.active]?.id ||
     game.phase !== 'actions' ||
@@ -301,8 +384,8 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
               <span>Waiting for {name}</span>
               <button
                 className="text-button"
-                disabled={disabled}
-                onClick={() => onAction({ kind: 'withdrawProposal', tradeId: trade.id })}
+                disabled={locked}
+                onClick={() => void command.submit({ kind: 'withdrawProposal', tradeId: trade.id })}
               >
                 Withdraw
               </button>
@@ -315,23 +398,26 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
                 value={give}
                 onChange={setGive}
                 max={limits}
-                disabled={disabled}
+                disabled={locked}
               />
               <div className="offer-actions">
-                <button className="text-button" onClick={() => setExpanded(false)}>
+                <button className="text-button" disabled={locked} onClick={() => setExpanded(false)}>
                   Cancel
                 </button>
                 <button
                   className="gold-button"
                   disabled={
-                    disabled ||
+                    locked ||
                     !total(give) ||
                     !canPay(hand, give) ||
                     RESOURCES.some((r) => give[r] && trade.give[r])
                   }
-                  onClick={() => {
-                    onAction({ kind: 'proposeTrade', tradeId: trade.id, give });
-                    setExpanded(false);
+                  onClick={async () => {
+                    const offer = `${me}:${trade.id}`;
+                    if (await command.submit({ kind: 'proposeTrade', tradeId: trade.id, give })) {
+                      // An acknowledgement for an old offer must not close a newer draft.
+                      if (activeOffer.current === offer) setExpanded(false);
+                    }
                   }}
                 >
                   <Check />
@@ -342,7 +428,7 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
           ) : (
             <button
               className="gold-button"
-              disabled={disabled}
+              disabled={locked}
               onClick={() => {
                 setGive(proposal?.give ?? emptyHand());
                 setExpanded(true);
@@ -358,19 +444,24 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
           action={{ kind: 'acceptTrade', tradeId: trade.id }}
           give={trade.want}
           get={trade.give}
-          disabled={disabled || !canPay(hand, trade.want)}
-          onAction={onAction}
+          disabled={locked || !canPay(hand, trade.want)}
+          onAction={command.submit}
           label="Accept trade"
         />
       )}
       <button
         className="trade-decline-button"
-        disabled={disabled}
-        onClick={() => onAction({ kind: 'declineTrade', tradeId: trade.id })}
+        disabled={locked}
+        onClick={() => void command.submit({ kind: 'declineTrade', tradeId: trade.id })}
       >
         <X size={15} />
         Decline
       </button>
+      {command.error && (
+        <p role="alert" className="entry-error">
+          {command.error}
+        </p>
+      )}
     </aside>
   );
 }

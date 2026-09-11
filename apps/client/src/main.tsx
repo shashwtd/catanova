@@ -9,7 +9,7 @@ import { useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
-import { GameSettings } from './GameSettings.js';
+import { GameSettings, GameInfo } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -93,6 +93,8 @@ import './disconnect.css';
 import './player-hub.css';
 import './friends-drawer.css';
 import './room-lobby.css';
+import './history-mobile.css';
+import './resource-counters.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -202,6 +204,7 @@ function App() {
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
+      | 'info'
       | 'settings'
       | 'trade'
       | 'rules'
@@ -468,18 +471,21 @@ function App() {
     const timer = setTimeout(() => setToast(''), 2200);
     return () => clearTimeout(timer);
   }, [toast]);
-  async function act(action: GameAction) {
+  async function act(action: GameAction, propagateFailure = false) {
     const c = connection.current;
-    if (!c || disabled) return;
+    if (!c || disabled) return false;
     setBusy(true);
     setError('');
     try {
       await c.action(action);
       setMode(null);
       setRobberHex(null);
+      return true;
     } catch (e) {
       if (connection.current === c)
         setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Action failed');
+      if (propagateFailure) throw e;
+      return false;
     } finally {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
@@ -672,6 +678,9 @@ function App() {
             onClick={() => setPanel(panel === 'rules' ? null : 'rules')}
           >
             <CircleHelp />
+          </IconButton>
+          <IconButton label="Game info" active={panel === 'info'} onClick={() => setPanel('info')}>
+            <GameIcon name="info" />
           </IconButton>
           <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
             <Settings2 />
@@ -930,7 +939,7 @@ function App() {
               </button>
             </div>
           </div>
-          {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => void act(a)} />}
+          {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />}
           {(panel === 'trade' || panel === 'journal') && (
             <aside
               className={`game-panel floating-panel ${panel === 'trade' ? 'trade-panel' : 'journal-panel'}`}
@@ -943,7 +952,7 @@ function App() {
                 </IconButton>
               </div>
               {panel === 'trade' && me && (
-                <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => void act(a)} />
+                <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />
               )}
               {panel === 'journal' && (
                 <MoveHistory
@@ -1033,6 +1042,11 @@ function App() {
           onComplete={() => setTransitionId(null)}
         />
       )}
+      {panel === 'info' && room && (
+        <Dialog title="Game info" onClose={() => setPanel(null)}>
+          <GameInfo room={room} />
+        </Dialog>
+      )}
       {panel === 'settings' && (
         <Dialog title="Settings" onClose={() => setPanel(null)}>
           <GameSettings
@@ -1097,9 +1111,7 @@ function App() {
       )}
       {panel === 'leave' && (
         <Dialog title="Leave game?" compact onClose={() => setPanel(null)}>
-          <p className="muted">
-            Leaving resigns your seat. You cannot rejoin this game.
-          </p>
+          <p className="muted">Leaving resigns your seat. You cannot rejoin this game.</p>
           <div className="dialog-actions">
             <button className="dark-button" onClick={() => setPanel(null)}>
               Cancel

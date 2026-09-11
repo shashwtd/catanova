@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Check, Clock3, Volume2, VolumeX } from './GameIcons.js';
+import { ArrowLeftRight, Check, Clock3, Dices, Trophy, Volume2, VolumeX } from './GameIcons.js';
 import { DEFAULT_PREFERENCES } from './preferences.js';
 import type { Preferences } from './preferences.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
@@ -10,6 +10,7 @@ import {
   TURN_TIMER_STEPS,
 } from '../../../packages/protocol/src/settings.js';
 import type { RoomSettings, TurnTimerSeconds } from '../../../packages/protocol/src/settings.js';
+import { TRADE_OFFER_LIMIT } from '../../../packages/rules/src/game.js';
 export function GameSettings({
   preferences,
   update,
@@ -37,7 +38,9 @@ export function GameSettings({
     volumePercent = muted ? 0 : Math.round(preferences.volume * 100),
     timerEnabled = draft.turnTimerSeconds !== null,
     timerLocked = !editable || busy || saving,
-    changed = draft.turnTimerSeconds !== (room?.settings ?? DEFAULT_ROOM_SETTINGS).turnTimerSeconds;
+    changed =
+      draft.turnTimerSeconds !== (room?.settings ?? DEFAULT_ROOM_SETTINGS).turnTimerSeconds ||
+      (draft.diceMode ?? 'classic') !== (room?.settings?.diceMode ?? 'classic');
   const lastVolume = useRef(preferences.volume || DEFAULT_PREFERENCES.volume);
   const lastMusicVolume = useRef(preferences.musicVolume || DEFAULT_PREFERENCES.musicVolume);
   const musicMuted = !preferences.music || preferences.musicVolume === 0;
@@ -50,7 +53,7 @@ export function GameSettings({
   }, [preferences.musicVolume]);
   useEffect(
     () => setDraft(room?.settings ?? DEFAULT_ROOM_SETTINGS),
-    [room?.roomId, room?.settings?.turnTimerSeconds],
+    [room?.roomId, room?.settings?.turnTimerSeconds, room?.settings?.diceMode],
   );
   return (
     <div className="settings-content settings-menu">
@@ -139,7 +142,7 @@ export function GameSettings({
           />
         </div>
       </section>
-      {room && (
+      {room && !room.game && (
         <section className="settings-room" aria-labelledby="timer-label">
           <div className="settings-row-heading">
             <label id="timer-label" htmlFor="turn-timer-enabled">
@@ -156,7 +159,10 @@ export function GameSettings({
                 disabled={timerLocked}
                 checked={timerEnabled}
                 onChange={(e) =>
-                  setDraft({ turnTimerSeconds: e.target.checked ? DEFAULT_TURN_TIMER_SECONDS : null })
+                  setDraft({
+                    ...draft,
+                    turnTimerSeconds: e.target.checked ? DEFAULT_TURN_TIMER_SECONDS : null,
+                  })
                 }
               />
             </label>
@@ -179,7 +185,10 @@ export function GameSettings({
                 style={{ '--range-fill': `${TURN_TIMER_STEPS.indexOf(seconds) * 25}%` } as CSSProperties}
                 value={TURN_TIMER_STEPS.indexOf(seconds)}
                 onChange={(e) =>
-                  setDraft({ turnTimerSeconds: TURN_TIMER_STEPS[Number(e.target.value)] as TurnTimerSeconds })
+                  setDraft({
+                    ...draft,
+                    turnTimerSeconds: TURN_TIMER_STEPS[Number(e.target.value)] as TurnTimerSeconds,
+                  })
                 }
               />
               <div className="settings-timer-stops" aria-hidden="true">
@@ -192,14 +201,40 @@ export function GameSettings({
             </div>
           )}
           <p className="settings-caption">
-            {room.game
-              ? 'Set before the game.'
-              : editable
-                ? timerEnabled
-                  ? 'Your turn ends when time runs out.'
-                  : 'Play at your own pace.'
-                : 'Chosen by the host.'}
+            {editable
+              ? timerEnabled
+                ? 'Your turn ends when time runs out.'
+                : 'Play at your own pace.'
+              : 'Chosen by the host.'}
           </p>
+          <fieldset className="settings-dice" disabled={timerLocked}>
+            <legend>
+              <Dices /> Dice
+            </legend>
+            {(['classic', 'flat'] as const).map((mode) => (
+              <label
+                key={mode}
+                className="settings-dice-option"
+                data-selected={(draft.diceMode ?? 'classic') === mode}
+              >
+                <input
+                  type="radio"
+                  name="dice-mode"
+                  value={mode}
+                  checked={(draft.diceMode ?? 'classic') === mode}
+                  onChange={() => setDraft({ ...draft, diceMode: mode })}
+                />
+                <span>
+                  <strong>{mode === 'classic' ? 'Classic' : 'Flat totals'}</strong>
+                  <small>
+                    {mode === 'classic'
+                      ? 'Two normal dice. 7 is most common.'
+                      : 'Each total 2–12 has the same chance. House rule.'}
+                  </small>
+                </span>
+              </label>
+            ))}
+          </fieldset>
           {editable && changed && (
             <button
               type="button"
@@ -218,7 +253,7 @@ export function GameSettings({
               }}
             >
               <Check size={18} />
-              {saving ? 'Saving…' : 'Apply timer'}
+              {saving ? 'Saving…' : 'Apply settings'}
             </button>
           )}
           {error && (
@@ -228,6 +263,54 @@ export function GameSettings({
           )}
         </section>
       )}
+    </div>
+  );
+}
+
+/** Frozen match rules live here; the in-game settings menu remains audio-only. */
+export function GameInfo({ room }: { room: RoomState }) {
+  const settings = room.settings ?? DEFAULT_ROOM_SETTINGS;
+  const flat = (room.game?.diceMode ?? settings.diceMode ?? 'classic') === 'flat';
+  return (
+    <div className="game-info-content">
+      <dl className="game-info-rules">
+        <div>
+          <dt>
+            <Trophy /> Goal
+          </dt>
+          <dd>10 points on your turn</dd>
+        </div>
+        <div>
+          <dt>
+            <Clock3 /> Turn timer
+          </dt>
+          <dd>{settings.turnTimerSeconds === null ? 'Off' : `${settings.turnTimerSeconds} seconds`}</dd>
+        </div>
+        <div>
+          <dt>
+            <Dices /> Dice
+          </dt>
+          <dd>
+            {flat ? 'Flat totals' : 'Classic'}
+            <small>
+              {flat
+                ? 'Every total from 2 to 12 has a 1 in 11 chance. This house rule changes production and robber odds.'
+                : 'Two independent six-sided dice. 7 is most likely; 2 and 12 are rarest.'}
+            </small>
+          </dd>
+        </div>
+        <div>
+          <dt>
+            <ArrowLeftRight /> Trade offers
+          </dt>
+          <dd>
+            {TRADE_OFFER_LIMIT} per turn
+            <small>
+              Catanova house rule. Each new or updated offer counts. Replies and bank or port trades do not.
+            </small>
+          </dd>
+        </div>
+      </dl>
     </div>
   );
 }

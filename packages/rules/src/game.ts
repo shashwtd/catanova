@@ -2,6 +2,8 @@ import { COSTS, DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES, SUPPLY, RULESET } f
 import type { Resource } from './index.js';
 import { generateBoard, shuffle } from './board.js';
 import type { Board } from './board.js';
+import { rollDice } from './dice.js';
+import type { DiceMode } from './dice.js';
 
 export type Hand = Record<Resource, number>;
 export type CardKind = keyof typeof DEVELOPMENT_DECK;
@@ -20,6 +22,7 @@ export type Game = {
   discards: Record<string, number>; trade: Trade | null; nextTrade: number;
   longestRoad: string | null; largestArmy: string | null; winner: string | null;
   finishReason?: 'resignation' | 'abandoned';
+  diceMode?: DiceMode; tradeOffersThisTurn?: number;
   log: { id: number; text: string }[]; nextLog: number;
 };
 export type GameAction =
@@ -77,7 +80,7 @@ export function parseGameAction(input: unknown): GameAction {
   }
 }
 
-export function createGame(seats: { id: string; name: string }[], seed: number, random: () => number): Game {
+export function createGame(seats: { id: string; name: string }[], seed: number, random: () => number, options: { diceMode?: DiceMode } = {}): Game {
   requireRule(seats.length >= 2 && seats.length <= 4, 'Start with two to four players');
   requireRule(new Set(seats.map(p => p.id)).size === seats.length, 'Seats must be unique');
   const board = generateBoard(seed);
@@ -87,12 +90,15 @@ export function createGame(seats: { id: string; name: string }[], seed: number, 
     phase: 'setupSettlement', active: 0, setupIndex: 0, setupVertex: null, turn: 0, dice: null,
     deck: shuffle(Object.entries(DEVELOPMENT_DECK).flatMap(([k, n]) => Array<CardKind>(n).fill(k as CardKind)), random), nextCard: 0,
     playedCard: false, returnPhase: 'actions', freeRoads: 0, discards: {}, trade: null, nextTrade: 0,
-    longestRoad: null, largestArmy: null, winner: null, log: [], nextLog: 0,
+    longestRoad: null, largestArmy: null, winner: null, log: [], nextLog: 0, diceMode: options.diceMode ?? 'classic', tradeOffersThisTurn: 0,
   };
   log(g, 'The island is ready. Place two settlements and roads in snake order.');
   return g;
 }
 export const activePlayer = (g: Pick<Game, 'players' | 'active'>) => g.players[g.active]!;
+/** Catanova's anti-spam house rule; responses and bank/port trades do not consume this allowance. */
+export const TRADE_OFFER_LIMIT = 5;
+export const tradeOffersRemaining = (g: Pick<Game, 'tradeOffersThisTurn'>) => Math.max(0, TRADE_OFFER_LIMIT - (g.tradeOffersThisTurn ?? 0));
 type BoardState = Pick<Game, 'board' | 'buildings' | 'roads'>;
 export function settlementSites(g: BoardState, player: string, setup = false): number[] {
   return g.board.vertices.filter(v => !g.buildings[v.id] && v.neighbors.every(n => !g.buildings[n]) && (setup || v.edges.some(e => g.roads[e] === player))).map(v => v.id);
@@ -165,7 +171,7 @@ function produce(g: Game, number: number) {
 function advanceTurn(g: Game, pendingRobber = false) {
   do { g.active = (g.active + 1) % g.players.length; } while (activePlayer(g).resigned);
   g.turn++; g.phase = pendingRobber ? 'robber' : 'roll'; g.returnPhase = 'roll';
-  g.dice = null; g.playedCard = false; g.freeRoads = 0; g.trade = null;
+  g.dice = null; g.playedCard = false; g.freeRoads = 0; g.trade = null; g.tradeOffersThisTurn = 0;
   log(g, `${activePlayer(g).name}'s turn.${pendingRobber ? ' Move the robber, then roll.' : ''}`);
 }
 
@@ -381,7 +387,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   }
   if (a.kind === 'roll') {
     requireRule(g.phase === 'roll', 'You have already rolled or must finish the current action');
-    g.dice = [1 + Math.floor(random() * 6), 1 + Math.floor(random() * 6)];
+    g.dice = rollDice(g.diceMode ?? 'classic', random);
     const sum = g.dice[0] + g.dice[1]; log(g, `${p.name} rolled ${g.dice[0]} + ${g.dice[1]} = ${sum}.`);
     if (sum === 7) {
       g.discards = Object.fromEntries(g.players.filter(other => !other.resigned && total(other.hand) > 7).map(other => [other.id, Math.floor(total(other.hand) / 2)]));
@@ -408,12 +414,16 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       log(g, `${p.name} traded ${rate} ${RESOURCE_NAMES[a.give]} for 1 ${RESOURCE_NAMES[a.receive]} at ${rate}:1.`); break;
     }
     case 'offerTrade':
+      requireRule(tradeOffersRemaining(g) > 0, 'You have used all five trade offers for this turn');
       requireRule(total(a.give) > 0 && total(a.want) > 0 && RESOURCES.every(r => !a.give[r] || !a.want[r]), 'Both sides must offer cards, with no resource on both sides');
       requireRule(canPay(p.hand, a.give), 'You do not have the offered cards');
+      g.tradeOffersThisTurn = (g.tradeOffersThisTurn ?? 0) + 1;
       g.trade = { id: g.nextTrade++, player: p.id, give: a.give, want: a.want }; log(g, `${p.name} offered ${resourceText(a.give)} for ${resourceText(a.want)}.`); break;
     case 'openTrade':
+      requireRule(tradeOffersRemaining(g) > 0, 'You have used all five trade offers for this turn');
       requireRule(total(a.give) > 0, 'Offer at least one resource card');
       requireRule(canPay(p.hand, a.give), 'You do not have the offered cards');
+      g.tradeOffersThisTurn = (g.tradeOffersThisTurn ?? 0) + 1;
       g.trade = { id: g.nextTrade++, player: p.id, give: a.give, want: emptyHand(), open: true, proposals: [] };
       log(g, `${p.name} offered ${resourceText(a.give)} and invited trade proposals.`); break;
     case 'cancelTrade': log(g, `${p.name} withdrew the trade offer.`); break;
