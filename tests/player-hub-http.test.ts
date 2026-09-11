@@ -255,7 +255,16 @@ test('authenticated game sockets also keep their owner online while playing', as
   f.advance(2);
   friends = await (await f.request('/api/friends', 'Captain')).json();
   assert.equal(friends.friends[0].online, true, 'transport pongs refresh authenticated presence');
+  // Observe authoritative transport closure before advancing the simulated clock.
+  const closed = new Promise<void>((resolve) => {
+    const original = f.server.store.setConnected.bind(f.server.store);
+    f.server.store.setConnected = (seat, connected) => {
+      original(seat, connected);
+      if (seat.id === client.playerId && !connected) resolve();
+    };
+  });
   client.stop();
+  await closed;
   f.advance(ACCOUNT_PRESENCE_TTL_MS + 1);
   friends = await (await f.request('/api/friends', 'Captain')).json();
   assert.equal(friends.friends[0].online, false);

@@ -569,7 +569,6 @@ export async function startServer(
           if (message.type === 'leave') {
             commandId = message.commandId;
             const receipt = store.leave(seat, commandId, message.expectedRevision);
-            store.setConnected(seat, false);
             sessions.delete(ws);
             activeSeats.delete(seat.id);
             send(ws, { type: 'ack', commandId, ...receipt });

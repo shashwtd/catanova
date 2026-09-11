@@ -19,8 +19,11 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
     icon: GameIconName = 'timer',
     favicon: GameStatus['favicon'] = null;
   if (game.winner || game.phase === 'finished') {
-    prompt = `${game.players.find((p) => p.id === game.winner)?.name ?? 'A player'} wins${game.finishReason === 'resignation' ? ' by resignation' : ''}!`;
-    icon = 'trophy';
+    prompt =
+      game.finishReason === 'abandoned'
+        ? 'Game ended — everyone left'
+        : `${game.players.find((p) => p.id === game.winner)?.name ?? 'A player'} wins${game.finishReason === 'resignation' ? ' by resignation' : ''}!`;
+    icon = game.finishReason === 'abandoned' ? 'history' : 'trophy';
   } else if (room?.paused) {
     prompt = 'Game paused — waiting for players';
   } else if (game.players.find((p) => p.id === me)?.resigned) {
@@ -67,6 +70,7 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
     }
   if (
     !game.winner &&
+    game.phase !== 'finished' &&
     !room?.paused &&
     !mine &&
     !game.players.find((p) => p.id === me)?.resigned &&

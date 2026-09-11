@@ -19,7 +19,11 @@ test('reconnect countdown explains the deadline and never resigns a player from 
   const expired = render({ deadline: 181000, now: 190000 });
   assert.ok(expired.includes('0:00') && !expired.includes('>Resigned<'));
   assert.equal(render({ now: 1000 }), '', 'clearing a deadline on reconnect removes the countdown');
-  assert.equal(render({ deadline: 181000, now: 1000, paused: true }), '');
+  assert.match(
+    render({ deadline: 181000, now: 1000, paused: true }),
+    /Auto-resign.*3:00/,
+    'pausing gameplay never pauses the reconnect deadline',
+  );
   assert.match(render({ resigned: true, now: 1000 }), />Resigned</);
 });
 
@@ -62,4 +66,9 @@ test('profiles and turn prompts distinguish reconnecting, paused, resigned and r
   assert.match(finished, />Resigned</);
   assert.match(finished, /Winner by resignation/);
   assert.ok(!finished.includes('Auto-resign'));
+  view.winner = null;
+  view.finishReason = 'abandoned';
+  assert.equal(gameStatus(view, 'b', room).prompt, 'Game ended — everyone left');
+  assert.equal(gameStatus(view, 'b', room).favicon, null);
+  assert.ok(!gameStatus(view, 'b', room).title.includes('wins'));
 });

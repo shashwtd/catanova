@@ -19,7 +19,7 @@ export type Game = {
   playedCard: boolean; returnPhase: 'roll' | 'actions'; freeRoads: number;
   discards: Record<string, number>; trade: Trade | null; nextTrade: number;
   longestRoad: string | null; largestArmy: string | null; winner: string | null;
-  finishReason?: 'resignation';
+  finishReason?: 'resignation' | 'abandoned';
   log: { id: number; text: string }[]; nextLog: number;
 };
 export type GameAction =
@@ -181,36 +181,82 @@ function advanceSetup(g: Game) {
 }
 
 /** Departures are a room rule, not a client game action. Apply all due seats together. */
-export function resignPlayers(state: Game, playerIds: string[]): Game {
+export function resignPlayers(
+  state: Game,
+  playerIds: string[],
+  options: { reason?: 'disconnect' | 'leave'; winnerEligibleIds?: string[] } = {},
+): Game {
   if (state.phase === 'finished') return state;
-  const departing = state.players.filter(p => !p.resigned && playerIds.includes(p.id));
-  if (!departing.length) return state;
-  requireRule(departing.length < state.players.filter(p => !p.resigned).length, 'Cannot resign every remaining player');
+  const departing = state.players.filter((p) => !p.resigned && playerIds.includes(p.id));
+  const survivors = state.players.filter((p) => !p.resigned && !playerIds.includes(p.id));
+  const eligible = (id: string) =>
+    options.winnerEligibleIds === undefined || options.winnerEligibleIds.includes(id);
+  if (!departing.length && !(survivors.length === 1 && eligible(survivors[0]!.id))) return state;
   const g = structuredClone(state);
-  for (const p of g.players) if (departing.some(other => other.id === p.id)) {
-    p.resigned = true; transfer(p.hand, g.bank, { ...p.hand }); p.cards = [];
-    delete g.discards[p.id]; log(g, `${p.name} resigned after not reconnecting.`);
-  }
+  for (const p of g.players)
+    if (departing.some((other) => other.id === p.id)) {
+      p.resigned = true;
+      transfer(p.hand, g.bank, { ...p.hand });
+      p.cards = [];
+      delete g.discards[p.id];
+      log(
+        g,
+        options.reason === 'leave'
+          ? `${p.name} left the game and resigned.`
+          : `${p.name} resigned after not reconnecting.`,
+      );
+    }
   if (g.trade) {
-    if (g.players.find(p => p.id === g.trade!.player)?.resigned) g.trade = null;
+    if (g.players.find((p) => p.id === g.trade!.player)?.resigned) g.trade = null;
     else {
-      g.trade.proposals = g.trade.proposals?.filter(proposal => !playerIds.includes(proposal.player));
-      if (g.players.every(p => p.resigned || p.id === g.trade!.player || g.trade!.declinedBy?.includes(p.id))) g.trade = null;
+      g.trade.proposals = g.trade.proposals?.filter((proposal) => !playerIds.includes(proposal.player));
+      if (
+        g.players.every((p) => p.resigned || p.id === g.trade!.player || g.trade!.declinedBy?.includes(p.id))
+      )
+        g.trade = null;
     }
   }
   updateAwards(g);
-  const remaining = g.players.filter(p => !p.resigned);
+  const remaining = g.players.filter((p) => !p.resigned);
+  if (!remaining.length) {
+    g.winner = null;
+    g.finishReason = 'abandoned';
+    g.phase = 'finished';
+    g.trade = null;
+    g.discards = {};
+    g.freeRoads = 0;
+    g.setupVertex = null;
+    log(g, 'The game ended with no winner: every player left.');
+    return g;
+  }
   if (remaining.length === 1) {
-    g.winner = remaining[0]!.id; g.finishReason = 'resignation'; g.phase = 'finished';
-    g.trade = null; g.discards = {}; g.freeRoads = 0;
-    log(g, `${remaining[0]!.name} wins by resignation.`); return g;
+    if (!eligible(remaining[0]!.id)) {
+      g.active = g.players.findIndex((p) => p.id === remaining[0]!.id);
+      g.phase = 'roll';
+      g.trade = null;
+      g.discards = {};
+      g.freeRoads = 0;
+      g.setupVertex = null;
+      return g;
+    }
+    g.winner = remaining[0]!.id;
+    g.finishReason = 'resignation';
+    g.phase = 'finished';
+    g.trade = null;
+    g.discards = {};
+    g.freeRoads = 0;
+    log(g, `${remaining[0]!.name} wins by resignation.`);
+    return g;
   }
   if (activePlayer(g).resigned) {
-    if (g.phase === 'setupSettlement' || g.phase === 'setupRoad') { g.setupIndex++; advanceSetup(g); }
-    else if (g.phase !== 'discard' || !Object.keys(g.discards).length) advanceTurn(g, g.phase === 'robber' || g.phase === 'discard');
+    if (g.phase === 'setupSettlement' || g.phase === 'setupRoad') {
+      g.setupIndex++;
+      advanceSetup(g);
+    } else if (g.phase !== 'discard' || !Object.keys(g.discards).length)
+      advanceTurn(g, g.phase === 'robber' || g.phase === 'discard');
     // Other players finish required discards before the next player moves the robber.
   } else if (g.phase === 'discard' && !Object.keys(g.discards).length) g.phase = 'robber';
-  checkWin(g);
+  if (eligible(activePlayer(g).id)) checkWin(g);
   return g;
 }
 

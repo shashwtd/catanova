@@ -7,7 +7,6 @@ export function DisconnectStatus({
   resigned,
   deadline,
   now,
-  paused = false,
 }: {
   resigned?: boolean;
   deadline?: number;
@@ -15,7 +14,7 @@ export function DisconnectStatus({
   paused?: boolean;
 }) {
   if (resigned) return <span className="profile-absence resigned-label">Resigned</span>;
-  if (deadline === undefined || paused) return null;
+  if (deadline === undefined) return null;
   const remaining = reconnectSeconds(deadline, now);
   const time = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
   return (

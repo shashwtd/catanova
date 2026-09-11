@@ -44,7 +44,7 @@ const privateRandom = () => randomInt(0, 2 ** 32) / 2 ** 32;
 export const ROOM_CODE_LEASE_MS = 30 * 24 * 60 * 60 * 1000;
 export const RECONNECT_GRACE_MS = 3 * 60 * 1000;
 type Absence = { disconnectedAt: number; resignAt: number };
-type Presence = { pausedAt?: number; seats: Record<string, Absence> };
+type Presence = { version?: 2; pausedAt?: number; seats: Record<string, Absence> };
 const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
 function codeForSlot(slot: number): string {
   let code = '';
@@ -177,13 +177,7 @@ export class Store {
       'CREATE UNIQUE INDEX IF NOT EXISTS seat_account_room ON seats(user_id, room_id) WHERE user_id IS NOT NULL AND departed = 0',
     );
     this.records = new PlayerRecords(this.db);
-    // A server outage is not a player resignation. Wait for a human before restarting clocks.
-    if (this.trackPresence)
-      this.db
-        .prepare(
-          'INSERT INTO room_presence(room_id,state,next_deadline) SELECT room_id,?,NULL FROM games WHERE 1 ON CONFLICT(room_id) DO UPDATE SET state=excluded.state,next_deadline=NULL',
-        )
-        .run(JSON.stringify({ pausedAt: this.now(), seats: {} } satisfies Presence));
+    if (this.trackPresence) this.initializePresence();
   }
   private transaction<T>(run: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
@@ -287,7 +281,7 @@ export class Store {
       }
       // Retrying a handshake after its reply was lost returns the same seat and room.
       if (existing) {
-        if (existing.departed) throw new ProtocolError('SEAT_LEFT', 'You left this lobby');
+        if (existing.departed) throw new ProtocolError('SEAT_LEFT', 'You permanently left this room');
         if (roomId && existing.room_id !== roomId)
           throw new ProtocolError('INVALID_SESSION', 'Seat belongs to another room');
         if (identity && !existing.user_id)
@@ -342,10 +336,18 @@ export class Store {
       revision: number;
       counter: number;
     };
-    const players = this.db
-      .prepare('SELECT id, name, profile, ready FROM seats WHERE room_id = ? AND departed = 0 ORDER BY rowid')
-      .all(roomId) as { id: string; name: string; profile: string | null; ready: number }[];
-    const game = viewer ? this.loadGame(roomId) : undefined;
+    const game = this.loadGame(roomId);
+    const players = (
+      this.db
+        .prepare('SELECT id, name, profile, ready, departed FROM seats WHERE room_id = ? ORDER BY rowid')
+        .all(roomId) as {
+        id: string;
+        name: string;
+        profile: string | null;
+        ready: number;
+        departed: number;
+      }[]
+    ).filter((p) => (game ? game.players.some((player) => player.id === p.id) : !p.departed));
     const presence = this.presence(roomId);
     const roomCode = this.roomCode(roomId);
     return {
@@ -357,7 +359,7 @@ export class Store {
         name: p.name,
         profile: p.profile ? (JSON.parse(p.profile) as Profile) : defaultProfile(p.name),
         ready: !!p.ready,
-        ...(presence?.pausedAt === undefined ? presence?.seats[p.id] : {}),
+        ...presence?.seats[p.id],
       })),
       ...(presence?.pausedAt !== undefined ? { paused: true } : {}),
       historyRevision: this.eventHead(roomId)?.revision ?? 0,
@@ -365,7 +367,7 @@ export class Store {
       serverNow: this.now(),
       ...(this.clock(roomId) ? { turnClock: this.clock(roomId)! } : {}),
       board: this.board(roomId),
-      ...(game ? { game: gameView(game, viewer!) } : {}),
+      ...(game && viewer ? { game: gameView(game, viewer) } : {}),
     };
   }
   board(roomId: string): Board {
@@ -450,7 +452,7 @@ export class Store {
     }
   }
   leave(seat: Seat, commandId: string, expectedRevision: number) {
-    return this.transaction(() => {
+    const receipt = this.transaction(() => {
       this.rejectSettingsReceipt(seat, commandId);
       if (
         this.db
@@ -481,20 +483,38 @@ export class Store {
       const room = this.snapshot(seat.room_id);
       if (room.revision !== expectedRevision)
         throw new ProtocolError('STALE_STATE', 'The room changed; try leaving again');
-      const released = !this.loadGame(seat.room_id);
-      const revision = room.revision + (released ? 1 : 0);
-      if (released) {
-        this.db.prepare('UPDATE seats SET departed = 1 WHERE id = ?').run(seat.id);
-        this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
-      }
+      const current = this.loadGame(seat.room_id);
+      const connected = new Set(this.connectedSeats);
+      connected.delete(seat.id);
+      this.db.prepare('UPDATE seats SET departed = 1 WHERE id = ?').run(seat.id);
+      const revision = current
+        ? this.saveLifecycle(
+            seat.room_id,
+            current,
+            resignPlayers(current, [seat.id], {
+              reason: 'leave',
+              ...(this.trackPresence ? { winnerEligibleIds: [...connected] } : {}),
+            }),
+            commandId,
+            seat.id,
+            { kind: 'leave', player: seat.id },
+            'leave',
+            false,
+            connected,
+          )
+        : room.revision + 1;
+      if (!current) this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
       this.db
         .prepare(
           'INSERT INTO leave_receipts(room_id, player_id, command_id, expected_revision, revision, counter, released) VALUES (?, ?, ?, ?, ?, ?, ?)',
         )
-        .run(seat.room_id, seat.id, commandId, expectedRevision, revision, room.counter, Number(released));
+        .run(seat.room_id, seat.id, commandId, expectedRevision, revision, room.counter, 1);
       this.renewRoomCode(seat.room_id);
-      return { revision, counter: room.counter, released, duplicate: false };
+      return { revision, counter: room.counter, released: true, duplicate: false };
     });
+    // The transport is retired only after the entire resignation and receipt commit.
+    this.connectedSeats.delete(seat.id);
+    return receipt;
   }
   profile(userId: string, name = 'Player'): Profile {
     const row = this.db.prepare('SELECT profile FROM profiles WHERE user_id = ?').get(userId) as
@@ -684,6 +704,39 @@ export class Store {
       { state: string } | undefined;
     return row ? (JSON.parse(row.state) as Presence) : undefined;
   }
+  private initializePresence() {
+    this.transaction(() => {
+      const now = this.now();
+      for (const row of this.db.prepare('SELECT room_id,state FROM games').all()) {
+        const roomId = row.room_id as string;
+        const game = JSON.parse(row.state as string) as Game;
+        if (game.phase === 'finished') {
+          this.db.prepare('DELETE FROM room_presence WHERE room_id=?').run(roomId);
+          this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
+          continue;
+        }
+        const old = this.presence(roomId);
+        // Old paused saves never had a running absence deadline. Migrate them once with
+        // a full grace. In v2, an already disconnected player's deadline survives restarts.
+        const previous = old?.version === 2 ? old : undefined;
+        const state: Presence = { version: 2, pausedAt: previous?.pausedAt ?? now, seats: {} };
+        for (const player of game.players.filter((p) => !p.resigned))
+          state.seats[player.id] = previous?.seats[player.id] ?? {
+            disconnectedAt: now,
+            resignAt: now + RECONNECT_GRACE_MS,
+          };
+        this.writePresence(roomId, state);
+      }
+    });
+  }
+  private writePresence(roomId: string, state: Presence) {
+    const deadlines = Object.values(state.seats).map((seat) => seat.resignAt);
+    this.db
+      .prepare(
+        'INSERT INTO room_presence(room_id,state,next_deadline) VALUES(?,?,?) ON CONFLICT(room_id) DO UPDATE SET state=excluded.state,next_deadline=excluded.next_deadline',
+      )
+      .run(roomId, JSON.stringify(state), deadlines.length ? Math.min(...deadlines) : null);
+  }
   private updatePresence(roomId: string, game: Game, connected = this.connectedSeats) {
     if (!this.trackPresence) return;
     if (game.phase === 'finished') {
@@ -695,21 +748,16 @@ export class Store {
     const remaining = game.players.filter((p) => !p.resigned);
     const paused = !remaining.some((p) => connected.has(p.id));
     const resumed = old?.pausedAt !== undefined && !paused;
-    const state: Presence = { seats: {} };
+    const state: Presence = { version: 2, seats: {} };
     if (paused) state.pausedAt = old?.pausedAt ?? now;
     for (const p of remaining)
       if (!connected.has(p.id)) {
-        state.seats[p.id] = (!resumed && old?.seats[p.id]) || {
+        state.seats[p.id] = old?.seats[p.id] || {
           disconnectedAt: now,
           resignAt: now + RECONNECT_GRACE_MS,
         };
       }
-    const deadlines = Object.values(state.seats).map((seat) => seat.resignAt);
-    this.db
-      .prepare(
-        'INSERT INTO room_presence(room_id,state,next_deadline) VALUES(?,?,?) ON CONFLICT(room_id) DO UPDATE SET state=excluded.state,next_deadline=excluded.next_deadline',
-      )
-      .run(roomId, JSON.stringify(state), paused || !deadlines.length ? null : Math.min(...deadlines));
+    this.writePresence(roomId, state);
     if (resumed) {
       // Nobody owes an immediate automatic move for time when nobody could see the game.
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
@@ -726,7 +774,29 @@ export class Store {
     try {
       this.transaction(() => {
         const game = this.loadGame(seat.room_id);
-        if (game) this.updatePresence(seat.room_id, game, nextConnected);
+        if (game) {
+          const next = resignPlayers(game, [], { winnerEligibleIds: [...nextConnected] });
+          if (next !== game) {
+            this.saveLifecycle(
+              seat.room_id,
+              game,
+              next,
+              'return-' +
+                hash(
+                  JSON.stringify({
+                    roomId: seat.room_id,
+                    player: seat.id,
+                    revision: this.snapshot(seat.room_id).revision,
+                  }),
+                ).slice(0, 48),
+              seat.id,
+              { kind: 'return', player: seat.id },
+              'resign',
+              false,
+              nextConnected,
+            );
+          } else this.updatePresence(seat.room_id, game, nextConnected);
+        }
       });
     } catch (error) {
       // A closed transport stays closed even if its presence write needs a retry.
@@ -742,7 +812,7 @@ export class Store {
   /** Presence expiry and the complete resulting game transition have one durable commit. */
   private expireAbsences(roomId: string): boolean {
     const presence = this.presence(roomId);
-    if (!presence || presence.pausedAt !== undefined) return false;
+    if (!presence) return false;
     const due = Object.entries(presence.seats)
       .filter(([id, absence]) => !this.connectedSeats.has(id) && absence.resignAt <= this.now())
       .map(([id]) => id);
@@ -750,46 +820,62 @@ export class Store {
     return this.transaction(() => {
       const current = this.loadGame(roomId);
       if (!current || current.phase === 'finished') return false;
-      // A sole returning spectator cannot cause all absent humans to forfeit one another.
-      if (!current.players.some((p) => !p.resigned && this.connectedSeats.has(p.id))) {
-        this.updatePresence(roomId, current);
-        return false;
-      }
-      const next = resignPlayers(current, due);
+      const next = resignPlayers(current, due, {
+        reason: 'disconnect',
+        winnerEligibleIds: [...this.connectedSeats],
+      });
       if (next === current) {
         this.updatePresence(roomId, current);
         return false;
       }
-      const room = this.db.prepare('SELECT revision FROM rooms WHERE id=?').get(roomId)!;
-      const revision = (room.revision as number) + 1;
-      if (!this.eventHead(roomId))
-        this.recordEvent(
-          roomId,
-          revision - 1,
-          'legacy-import',
-          null,
-          { kind: 'legacy' },
-          current,
-          current.log.map((e) => e.text),
-          'legacy',
-        );
-      this.recordEvent(
+      this.saveLifecycle(
         roomId,
-        revision,
-        'resign-' + hash(JSON.stringify({ roomId, revision, due })).slice(0, 48),
+        current,
+        next,
+        'resign-' +
+          hash(JSON.stringify({ roomId, revision: this.snapshot(roomId).revision, due })).slice(0, 48),
         due.length === 1 ? due[0]! : null,
         { kind: 'resign', players: due },
-        next,
-        next.log.filter((e) => e.id >= current.nextLog).map((e) => e.text),
-        'resign',
+        next.finishReason === 'abandoned' ? 'abandoned' : 'resign',
         true,
       );
-      this.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(next), roomId);
-      this.db.prepare('UPDATE rooms SET revision=? WHERE id=?').run(revision, roomId);
-      this.updateClock(roomId, next);
-      this.updatePresence(roomId, next);
       return true;
     });
+  }
+  /** Lifecycle changes and their private/public projections share the caller's transaction. */
+  private saveLifecycle(
+    roomId: string,
+    current: Game,
+    next: Game,
+    commandId: string,
+    actor: string | null,
+    action: unknown,
+    kind: string,
+    automatic: boolean,
+    connected = this.connectedSeats,
+  ) {
+    const revision =
+      (this.db.prepare('SELECT revision FROM rooms WHERE id=?').get(roomId)!.revision as number) + 1;
+    if (!this.eventHead(roomId))
+      this.recordEvent(
+        roomId,
+        revision - 1,
+        'legacy-import',
+        null,
+        { kind: 'legacy' },
+        current,
+        current.log.map((e) => e.text),
+        'legacy',
+      );
+    const lines = next.log.filter((e) => e.id >= current.nextLog).map((e) => e.text);
+    if (!lines.length && kind === 'leave')
+      lines.push(`${next.players.find((p) => p.id === actor)?.name ?? 'A player'} left the room.`);
+    this.recordEvent(roomId, revision, commandId, actor, action, next, lines, kind, automatic);
+    this.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(next), roomId);
+    this.db.prepare('UPDATE rooms SET revision=? WHERE id=?').run(revision, roomId);
+    this.updateClock(roomId, next);
+    this.updatePresence(roomId, next, connected);
+    return revision;
   }
   clock(roomId: string): TurnClock | undefined {
     const row = this.db.prepare('SELECT state FROM turn_clocks WHERE room_id = ?').get(roomId) as
@@ -877,7 +963,6 @@ export class Store {
         !game.players.some((p) => !p.resigned && this.connectedSeats.has(p.id))
       ) {
         this.transaction(() => this.updatePresence(roomId, game));
-        return presenceRecovered;
       }
     }
     let changed = this.expireAbsences(roomId) || presenceRecovered;
@@ -969,6 +1054,13 @@ export class Store {
       if (room.revision !== expectedRevision)
         throw new ProtocolError('STALE_STATE', 'State changed; review the latest snapshot and try again');
       const current = this.loadGame(seat.room_id);
+      if (
+        current &&
+        current.phase !== 'finished' &&
+        this.trackPresence &&
+        !current.players.some((p) => !p.resigned && this.connectedSeats.has(p.id))
+      )
+        throw new ProtocolError('GAME_PAUSED', 'The game is paused while everyone is disconnected');
       let next: Game;
       if (action.kind === 'start') {
         if (current) throw new ProtocolError('GAME_STARTED', 'This game is already underway');

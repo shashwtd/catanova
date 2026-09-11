@@ -11,7 +11,13 @@ export type PlayerGameState = {
   refresh: () => void;
   loadMore: () => void;
 };
-const outcomes = { playing: 'In progress', won: 'Victory', lost: 'Defeat', resigned: 'Resigned' };
+const outcomes = {
+  playing: 'In progress',
+  won: 'Victory',
+  lost: 'Defeat',
+  resigned: 'Resigned',
+  abandoned: 'Abandoned',
+};
 export function matchDate(timestamp: number | null) {
   return timestamp === null
     ? 'Earlier game'

@@ -225,7 +225,7 @@ function App() {
   const playerGames = usePlayerGames(
     auth.account?.id,
     auth.accessToken,
-    auth.canPlay && (!g || !!g.winner || panel === 'profile'),
+    auth.canPlay && (!g || g.phase === 'finished' || panel === 'profile'),
   );
   const connected = status === 'connected',
     disabled = !connected || busy || feedback.presentationBusy || !!player?.resigned || !!room?.paused,
@@ -488,7 +488,7 @@ function App() {
     const c = connection.current;
     if (!c || busy) return;
     if (!connected) {
-      home(false);
+      setError('Reconnect to confirm leaving the game.');
       return;
     }
     setBusy(true);
@@ -679,7 +679,7 @@ function App() {
           <IconButton
             label="Leave room"
             disabled={busy}
-            onClick={() => (!g.winner ? setPanel('leave') : void leave())}
+            onClick={() => (g.phase !== 'finished' ? setPanel('leave') : void leave())}
           >
             <DoorOpen />
           </IconButton>
@@ -1098,15 +1098,13 @@ function App() {
       {panel === 'leave' && (
         <Dialog title="Leave game?" compact onClose={() => setPanel(null)}>
           <p className="muted">
-            {player?.resigned
-              ? 'You can come back to watch.'
-              : 'Return within 3 minutes to keep playing. If everyone leaves, the game pauses.'}
+            Leaving resigns your seat. You cannot rejoin this game.
           </p>
           <div className="dialog-actions">
             <button className="dark-button" onClick={() => setPanel(null)}>
               Cancel
             </button>
-            <button className="gold-button" disabled={busy} onClick={() => void leave()}>
+            <button className="gold-button" disabled={busy || !connected} onClick={() => void leave()}>
               <DoorOpen />
               Leave
             </button>
