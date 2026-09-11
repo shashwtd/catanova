@@ -26,6 +26,8 @@ import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
 import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
+import { PlayerRecords, parseGamesCursor } from './player-records.js';
+import { setImmediate } from 'node:timers/promises';
 
 export class ProtocolError extends Error {
   constructor(
@@ -60,6 +62,7 @@ export class Store {
   private readonly random: () => number;
   private readonly codeRandom: (max: number) => number;
   private readonly trackPresence: boolean;
+  private readonly records: PlayerRecords;
   private connectedSeats = new Set<string>();
   private readonly pendingPresence = new Set<string>();
   private dueRoomCursor = '';
@@ -173,6 +176,7 @@ export class Store {
     this.db.exec(
       'CREATE UNIQUE INDEX IF NOT EXISTS seat_account_room ON seats(user_id, room_id) WHERE user_id IS NOT NULL AND departed = 0',
     );
+    this.records = new PlayerRecords(this.db);
     // A server outage is not a player resignation. Wait for a human before restarting clocks.
     if (this.trackPresence)
       this.db
@@ -395,6 +399,56 @@ export class Store {
       .prepare('SELECT 1 FROM seats WHERE room_id = ? AND user_id = ? AND departed = 0')
       .get(roomId, userId);
   }
+  private historyCursor(rawCursor?: string) {
+    try {
+      return parseGamesCursor(rawCursor);
+    } catch {
+      throw new ProtocolError('INVALID_HISTORY_CURSOR', 'Please reload your game history');
+    }
+  }
+  /** Synchronous helper for maintenance/tests; HTTP uses accountGamesAsync to yield between batches. */
+  accountGames(userId: string, rawCursor?: string) {
+    const cursor = this.historyCursor(rawCursor);
+    return this.transaction(() => {
+      let afterRoomId = '';
+      for (;;) {
+        const batch = this.records.backfillBatch(userId, (roomId) => this.loadGame(roomId), afterRoomId);
+        if (batch.complete) break;
+        afterRoomId = batch.afterRoomId;
+      }
+      return this.records.page(userId, this.now(), cursor);
+    });
+  }
+  /** Keep the game loop responsive while older accounts gain their index; never return partial totals. */
+  async accountGamesAsync(
+    userId: string,
+    rawCursor?: string,
+    options: {
+      maxDurationMs?: number;
+      cancelled?: () => boolean;
+    } = {},
+  ) {
+    const cursor = this.historyCursor(rawCursor),
+      deadline = performance.now() + (options.maxDurationMs ?? 2000);
+    let afterRoomId = '';
+    for (;;) {
+      if (options.cancelled?.())
+        throw new ProtocolError('ACCOUNT_UNAVAILABLE', 'Game history request was interrupted. Please retry.');
+      const result = this.transaction(() => {
+        const batch = this.records.backfillBatch(userId, (roomId) => this.loadGame(roomId), afterRoomId);
+        return { ...batch, page: batch.complete ? this.records.page(userId, this.now(), cursor) : undefined };
+      });
+      if (result.page) return result.page;
+      afterRoomId = result.afterRoomId;
+      if (performance.now() >= deadline)
+        throw new ProtocolError(
+          'ACCOUNT_UNAVAILABLE',
+          'Your older game history is still being prepared. Please retry shortly.',
+        );
+      // Every completed batch is durable. A retry continues from the remaining matches.
+      await setImmediate();
+    }
+  }
   leave(seat: Seat, commandId: string, expectedRevision: number) {
     return this.transaction(() => {
       this.rejectSettingsReceipt(seat, commandId);
@@ -502,6 +556,7 @@ export class Store {
         state,
         JSON.stringify(entry),
       );
+    this.records.record(roomId, revision, game, entry);
   }
   history(roomId: string, before = Number.MAX_SAFE_INTEGER) {
     const rows = this.db
