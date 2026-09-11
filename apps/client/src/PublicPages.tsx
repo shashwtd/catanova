@@ -14,9 +14,9 @@ export const REPOSITORY_URL = 'https://github.com/shashwtd/catanova';
 export const PUBLIC_PAGES = [
   {
     path: '/',
-    title: 'Catanova — Catan Alternative for Friends',
+    title: 'Catanova — Play with Friends',
     description:
-      'Build, trade and settle an island with friends. Catanova is an open-source Catan-style browser game for 2–4 players, with private rooms and recoverable multiplayer.',
+      'Build, trade and settle an island together. A free online Catan alternative for 2–4 friends, with private multiplayer rooms. Play in your browser.',
   },
   {
     path: '/guide/',
@@ -38,19 +38,22 @@ export function PublicMetadata({ page }: { page: (typeof PUBLIC_PAGES)[number] }
       <meta property="og:title" content={page.title} />
       <meta property="og:description" content={page.description} />
       <meta property="og:url" content={`${SITE_URL}${page.path}`} />
-      <meta property="og:image" content={`${SITE_URL}/branding/social-card.jpg`} />
+      <meta property="og:image" content={`${SITE_URL}/branding/social-card-v2.jpg`} />
       <meta property="og:image:type" content="image/jpeg" />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
       <meta
         property="og:image:alt"
-        content="Catanova's sunny island emblem and wordmark above a painted island coast"
+        content="Catanova — Build. Trade. Play with friends. A sunlit island harbor beneath the golden Catanova logo."
       />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={page.title} />
       <meta name="twitter:description" content={page.description} />
-      <meta name="twitter:image" content={`${SITE_URL}/branding/social-card.jpg`} />
-      <meta name="twitter:image:alt" content="Catanova — build, trade and play with friends" />
+      <meta name="twitter:image" content={`${SITE_URL}/branding/social-card-v2.jpg`} />
+      <meta
+        name="twitter:image:alt"
+        content="Catanova — Build. Trade. Play with friends. A sunlit island harbor beneath the golden Catanova logo."
+      />
       <link rel="icon" type="image/x-icon" href="/branding/favicon.ico" />
       <link rel="icon" type="image/png" sizes="48x48" href="/branding/favicon-48.png" />
       <link rel="icon" type="image/png" sizes="96x96" href="/branding/favicon-96.png" />
@@ -135,6 +138,7 @@ const sections = [
   ['development', 'Development cards', 'development'],
   ['winning', 'Reaching ten', 'trophy'],
   ['accounts', 'Your profile & seat', 'profile'],
+  ['questions', 'Before you play', 'help'],
 ] as const;
 
 const terrainNames: Record<Resource, string> = {
@@ -298,12 +302,10 @@ export function PublicGuide() {
               </div>
             </div>
             <details className="guide-note">
-              <summary>Two-player rooms & balanced islands</summary>
+              <summary>Balanced islands</summary>
               <p>
-                Two-player rooms are Catanova’s custom option using the same island and ten-point goal,
-                without neutral players. The default balanced map also uses custom fairness constraints.
-                Three- and four-player games are the base-game compatibility target. There is no solo mode or
-                public matchmaking.
+                The default balanced map uses Catanova’s custom fairness constraints to spread resources
+                across the island and avoid adjacent red-number tokens. Each new room gets a new island.
               </p>
             </details>
           </section>
@@ -680,12 +682,56 @@ export function PublicGuide() {
                 <GameIcon name="connection" size={38} />
                 <h3>Connection dropped?</h3>
                 <p>
-                  Let the game reconnect. Return with the same account and invite to recover your seat. The
-                  connection panel shows ping and sync status. Keep your guest session and browser storage
-                  while playing.
+                  Let the game reconnect, or return with the same account and invite before your reconnect
+                  countdown ends. The connection panel shows ping and sync status. Keep your guest session and
+                  browser storage while playing.
                 </p>
               </article>
             </div>
+            <details className="guide-note" open>
+              <summary>Disconnected players & auto-resign</summary>
+              <p>
+                While another player is connected, a disconnected player has <strong>three minutes</strong> to
+                return. Reconnecting in time cancels the countdown. Otherwise, that player automatically
+                resigns and can only watch if they return later. This is Catanova’s room rule, separate from
+                the optional turn timer.
+              </p>
+              <p>
+                Their pieces stay on the island, and their resources return to the bank. With at least two
+                players remaining, the game continues; the last remaining player wins by resignation. If
+                everyone disconnects, the game pauses. When someone returns, absent players get a fresh
+                reconnect countdown.
+              </p>
+            </details>
+          </section>
+          <section id="questions" className="guide-section">
+            <GuideHeading number="08" icon="help">
+              Before you play
+            </GuideHeading>
+            <details className="guide-note" open>
+              <summary>What is Catanova?</summary>
+              <p>
+                Catanova is a free online island-building game for friends: collect resources, trade and build
+                your way to ten points. It is an independent Catan alternative with its own artwork and
+                interface, not an official CATAN game. The project’s code is{' '}
+                <a href={REPOSITORY_URL}>available on GitHub</a>.
+              </p>
+            </details>
+            <details className="guide-note" open>
+              <summary>Can phones and computers play together?</summary>
+              <p>
+                Yes. Open catanova.io in your browser and join the same private room from a phone, tablet or
+                computer. No installation is needed. Keep an internet connection while you play.
+              </p>
+            </details>
+            <details className="guide-note" open>
+              <summary>Do we need four players?</summary>
+              <p>
+                Rooms support two to four friends. Three- and four-player games are the base-game
+                compatibility target. Two-player games are Catanova’s custom option, using the same island and
+                ten-point goal without neutral players. There are no solo bots or public matchmaking.
+              </p>
+            </details>
           </section>
           <div className="guide-ready">
             <div>

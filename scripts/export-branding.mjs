@@ -18,6 +18,7 @@ const inputs = {
   mark: path.join(project, 'assets/source-art/branding/catanova-mark-v2.png'),
   logo: path.join(project, 'assets/source-art/branding/catanova-logo-v2.png'),
   scenery: path.join(project, 'assets/source-art/title-landscape.png'),
+  social: path.join(project, 'assets/source-art/branding/social-card-v2.png'),
 };
 const cream = '#f5ebd0';
 const transparent = { r: 0, g: 0, b: 0, alpha: 0 };
@@ -29,6 +30,33 @@ const sourceHashes = await Promise.all(
   ),
 );
 await mkdir(destination, { recursive: true });
+
+async function exportSocialPreview() {
+  const file = path.join(destination, 'social-card-v2.jpg');
+  await sharp(inputs.social)
+    .rotate()
+    .resize(1200, 630, { fit: 'cover', position: 'centre' })
+    .flatten({ background: cream })
+    .removeAlpha()
+    .jpeg({ quality: 85, mozjpeg: true, chromaSubsampling: '4:2:0' })
+    .toFile(file);
+  const metadata = await sharp(file).metadata();
+  const bytes = (await stat(file)).size;
+  if (metadata.width !== 1200 || metadata.height !== 630 || metadata.hasAlpha)
+    throw new Error('Unexpected social-card-v2 geometry or alpha');
+  if (bytes > 220_000) throw new Error('Social preview exceeds its 220 KB transfer budget');
+  const sourceHash = createHash('sha256')
+    .update(await readFile(inputs.social))
+    .digest('hex');
+  if (sourceHash !== sourceHashes[3]) throw new Error('Social preview master changed');
+  console.log(`social-card-v2.jpg: 1200×630, ${bytes} bytes, opaque`);
+}
+
+// Update the versioned link preview without needlessly rewriting the existing icon exports.
+if (process.argv.includes('--social-only')) {
+  await exportSocialPreview();
+  process.exit(0);
+}
 
 async function icon(size, opaque = false) {
   // These approved display bounds trim unused source margins, without cutting the mark or spark.
@@ -137,3 +165,4 @@ console.log(
   `social-card.jpg: 1200×630, ${(await stat(path.join(destination, 'social-card.jpg'))).size} bytes, opaque`,
 );
 console.log(`favicon.ico: 16/32/48 PNG frames, ${offset} bytes`);
+await exportSocialPreview();

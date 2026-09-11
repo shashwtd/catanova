@@ -1,0 +1,41 @@
+{
+  "created": "2026-09-11",
+  "project": "Catanova",
+  "generator": "Built-in image_gen tool",
+  "mode": "Reference-guided composition; no CLI/API fallback",
+  "authorship": "AI-generated promotional illustration. Hand-painted describes its visual style, not human authorship. This is not a gameplay screenshot.",
+  "references": [
+    {
+      "file": "assets/source-art/branding/catanova-logo-v2.png",
+      "role": "Approved wordmark, mark, colors and identity reference",
+      "sha256": "6dbcb01c27f7940249326666eda05f498acac5601b61734c02e422cf7e10b301"
+    },
+    {
+      "file": "assets/source-art/title-landscape.png",
+      "role": "Approved coastal scenery, palette and illustration reference",
+      "sha256": "bde5b239acc08862f627cc08a07ab5c9a10d349de1e5974fc273254329aecabc"
+    }
+  ],
+  "prompt": "Use case: compositing / ads-marketing.\nCreate one finished, beautiful social link-preview banner for the Catanova browser game. Wide landscape 1200:630 aspect ratio. This is promotional illustration, not a gameplay screenshot. It should look polished and friendly at 600x315 pixels.\n\nInput 1: approved Catanova wordmark and mark. Preserve the recognizable exact word \"Catanova\" (C-a-t-a-n-o-v-a), its cheerful golden hand-painted lettering edged in deep teal, its house within a broken hexagon mark and small star. Integrate this logo faithfully as the primary visual, without a rectangular pasted-on panel.\nInput 2: approved game landing scenery. Use it as supporting style and setting reference, with sunlit teal sea, warm golden fields and tiny red-roof harbor houses. Recompose into a hand-painted coastal panorama adapted to this wide banner.\n\nComposition: a confident, large full wordmark centered in the upper half against a naturally pale buttery sky with restrained painterly texture. The logo must be the most prominent element and occupy about 80% of the width. Underneath it a clear brief line of dark teal text: \"Build. Trade. Play with friends.\" Keep this line crisp and comfortably separated from the logo. Below, a sunny coastal island landscape with a gentle curve of sea, green hills, fields and a tiny harbor fills the lower 40% of the banner and blends naturally into the pale sky. Add small, simple, readable \"catanova.io\" near the bottom in a quiet clear area of the landscape. Generous safe margins: keep all lettering and the mark within the central 90% of the canvas.\n\nLighting/mood: bright, welcoming, optimistic, warm morning sunlight. Hand-painted fantasy game art with confident brush strokes and charming shapes, carefully balanced detail, soft distance, crisp foreground. The art must feel warm and natural rather than plastic or glossy 3D. Teal water, leafy green, butter yellow, warm cream and subtle terracotta.\n\nConstraints: no competitor brands, no \"#1\", no claims about player counts or rankings, no extra slogans, no people or new mascots, no game UI, no cards or dice, no photorealism, no decorative rope border, no watermarks. Exactly three text elements: \"Catanova\", \"Build. Trade. Play with friends.\", \"catanova.io\". Keep the approved identity and cheerful colors.",
+  "master": {
+    "file": "assets/source-art/branding/social-card-v2.png",
+    "generatedFilename": "exec-29353c44-8258-4093-b526-e82aec362d97.png",
+    "sha256": "52b5cb207ebf27a75b47693fe86d8ecec71de44c053d058368982f60caf7c281",
+    "width": 1731,
+    "height": 908,
+    "bytes": 2577786,
+    "postProcessing": "None. Selected generator output copied unchanged. Kept outside public assets and excluded from the Docker build context."
+  },
+  "runtime": {
+    "file": "apps/client/public/branding/social-card-v2.jpg",
+    "url": "/branding/social-card-v2.jpg",
+    "sha256": "e31448333c1a050377178b0f02ed414efd5b42572e4796ac33761005ae692e61",
+    "width": 1200,
+    "height": 630,
+    "bytes": 195696,
+    "encoding": "JPEG, MozJPEG quality 85, 4:2:0 chroma, no alpha, metadata stripped",
+    "export": "scripts/export-branding.mjs --social-only",
+    "postProcessing": "Sharp proportionally resizes from the untouched master with a minimal centered crop to the standard 1200×630 preview ratio; encodes the delivery JPEG. No extra illustration or text is drawn during export."
+  },
+  "validation": "Inspected generator output and final 1200×630 JPEG: correct Catanova, tagline and domain spelling, clear brand at preview size, no clipping, no misleading gameplay or ranking claims. Geometry, alpha, source integrity and a 220,000-byte delivery budget are checked by the export script. Existing logo and icon files are unchanged; the old social preview remains available for existing cached URLs."
+}

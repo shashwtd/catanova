@@ -118,11 +118,21 @@ export function EntryScreen({
         </div>
       </header>
       <div className="landing-welcome">
-        <div className="landing-brand">
+        <div
+          className="landing-brand"
+          itemScope={homeMenu || undefined}
+          itemType={homeMenu ? 'https://schema.org/WebSite' : undefined}
+        >
+          {homeMenu && (
+            <>
+              <meta itemProp="name" content="Catanova" />
+              <link itemProp="url" href="https://catanova.io/" />
+            </>
+          )}
           <h1>
             <BrandLogo />
           </h1>
-          {homeMenu && <p>A Catan-style game for 2–4 friends.</p>}
+          {homeMenu && <p>A Catan alternative for 2–4 friends.</p>}
         </div>
         <section
           className={`title-panel landing-panel ${homeMenu ? 'home-menu' : ''} ${auth.needsOnboarding ? 'onboarding-panel' : ''}`}

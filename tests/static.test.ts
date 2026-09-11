@@ -60,6 +60,15 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.ok(response.headers.get('content-security-policy')!.includes(auth.url));
   assert.match(response.headers.get('content-security-policy')!, /img-src 'self' data:;/);
   assert.ok(!response.headers.get('content-security-policy')!.includes('googleusercontent.com'));
+  // Search and assistant crawlers receive the same public page as players; private entries stay noindex.
+  for (const agent of ['Googlebot', 'bingbot', 'OAI-SearchBot', 'ChatGPT-User']) {
+    const page = await fetch(origin, { headers: { 'User-Agent': agent } });
+    assert.equal(page.status, 200);
+    assert.equal(page.headers.get('x-robots-tag'), null);
+    assert.equal(await page.text(), '<!doctype html><title>Catanova</title>');
+    const privatePage = await fetch(origin + '/room/AB2C', { headers: { 'User-Agent': agent } });
+    assert.equal(privatePage.headers.get('x-robots-tag'), 'noindex, nofollow');
+  }
   const config = await fetch(origin + '/api/config');
   assert.equal(config.headers.get('x-robots-tag'), 'noindex, nofollow');
   assert.deepEqual(await config.json(), { auth, mode: 'authenticated' });

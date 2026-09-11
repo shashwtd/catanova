@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
+import { HOME_TITLE } from '../apps/client/src/game-attention.js';
 
 test('the production entry is readable before JavaScript and only public pages enter discovery files', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'catanova-public-'));
@@ -15,9 +16,15 @@ test('the production entry is readable before JavaScript and only public pages e
   const guide = await readFile(join(directory, 'guide', 'index.html'), 'utf8');
   const shell = await readFile(join(directory, 'app.html'), 'utf8');
   assert.equal((home.match(/<title>/g) ?? []).length, 1);
-  assert.ok(home.includes('<title>Catanova — Catan Alternative for Friends</title>'));
-  assert.ok(home.includes('property="og:title" content="Catanova — Catan Alternative for Friends"'));
-  assert.ok(home.includes('name="twitter:title" content="Catanova — Catan Alternative for Friends"'));
+  assert.ok(home.includes('<title>Catanova — Play with Friends</title>'));
+  assert.ok(home.includes(`<title>${HOME_TITLE}</title>`), 'hydration must retain the public brand title');
+  assert.ok(home.includes('property="og:title" content="Catanova — Play with Friends"'));
+  assert.ok(home.includes('name="twitter:title" content="Catanova — Play with Friends"'));
+  assert.match(home, /itemscope="" itemType="https:\/\/schema.org\/WebSite"/i);
+  assert.ok(home.includes('itemProp="name" content="Catanova"'));
+  assert.ok(home.includes('itemProp="url" href="https://catanova.io/"'));
+  assert.ok(home.includes('A Catan alternative for 2–4 friends.'));
+  assert.doesNotMatch(home, /(?:#1|Number One)\s+(?:Catan|alternative)/i);
   assert.ok(home.includes('Create room') && home.includes('Join room'));
   assert.ok(home.includes('<a href="/guide/">How to play</a>'));
   assert.ok(home.includes('Open on GitHub') && home.includes('<noscript>'));
@@ -31,10 +38,15 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.ok(guide.includes('How to Play Catanova') && guide.includes('City upgrade'));
   assert.ok(guide.includes('3 Rock') && guide.includes('2 Hay'));
   assert.ok(guide.includes('cannot add friends while still guests'));
+  assert.ok(guide.includes('Disconnected players &amp; auto-resign') && guide.includes('three minutes'));
+  assert.ok(guide.includes('last remaining player wins by resignation'));
+  assert.ok(guide.includes('id="questions"') && guide.includes('Can phones and computers play together?'));
+  assert.ok(guide.includes('not an official CATAN game'));
+  assert.ok(guide.includes('There are no solo bots or public matchmaking.'));
   assert.ok(!guide.includes('<script') && !guide.includes('/src/main.tsx'));
   for (const html of [home, guide]) {
     assert.equal((html.match(/name="description"/g) ?? []).length, 1);
-    assert.ok(html.includes('property="og:image" content="https://catanova.io/branding/social-card.jpg"'));
+    assert.ok(html.includes('property="og:image" content="https://catanova.io/branding/social-card-v2.jpg"'));
     assert.ok(html.includes('name="twitter:card" content="summary_large_image"'));
     assert.ok(html.includes('sizes="48x48"') && html.includes('rel="apple-touch-icon"'));
     assert.ok(!html.includes('sb_publishable_') && !html.includes('supabase.co'));
@@ -75,7 +87,7 @@ test('discovery assets are real files with declared icon and social dimensions',
   const ico = await readFile(join(root, 'branding/favicon.ico'));
   assert.equal(ico.readUInt16LE(2), 1);
   assert.ok(ico.readUInt16LE(4) >= 1);
-  const jpeg = await readFile(join(root, 'branding/social-card.jpg'));
+  const jpeg = await readFile(join(root, 'branding/social-card-v2.jpg'));
   assert.equal(jpeg.readUInt16BE(0), 0xffd8);
   let offset = 2,
     dimensions: number[] | undefined;
