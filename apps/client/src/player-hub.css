@@ -17,8 +17,8 @@
   --hub-ink: #244539;
   position: relative;
   z-index: 1;
-  width: min(1440px, 100%);
-  min-height: 100dvh;
+  width: min(1080px, 100%);
+  min-height: 0;
   margin: auto;
   padding: max(22px, env(safe-area-inset-top)) clamp(20px, 4vw, 60px) max(24px, env(safe-area-inset-bottom));
   padding-left: max(clamp(20px, 4vw, 60px), env(safe-area-inset-left));

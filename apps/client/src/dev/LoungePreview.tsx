@@ -113,7 +113,7 @@ function PreviewDialog({
 }
 export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
-  const [panel, setPanel] = useState<'profile' | 'settings' | 'friends' | null>(null);
+  const [panel, setPanel] = useState<'profile' | 'editProfile' | 'settings' | 'friends' | null>(null);
   const [profile, setProfile] = useState<Profile>(seats[0]!.profile);
   const [settings, setSettings] = useState(room.settings);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
@@ -192,6 +192,7 @@ export function LoungePreview() {
           onJoin={async () => setScreen('lobby')}
           onResume={() => setScreen('game')}
           onProfile={() => setPanel('profile')}
+          onEditProfile={() => setPanel('editProfile')}
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
           onSignOut={() => {
@@ -278,9 +279,11 @@ export function LoungePreview() {
           onClose={() => setPanel(null)}
         />
       )}
-      {panel === 'profile' && (
+      {(panel === 'profile' || panel === 'editProfile') && (
         <PreviewDialog title="Your profile" onClose={() => setPanel(null)}>
           <PlayerProfile
+            key={panel}
+            initialEditing={panel === 'editProfile'}
             auth={auth}
             profile={profile}
             games={record}

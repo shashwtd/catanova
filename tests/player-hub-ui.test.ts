@@ -210,3 +210,23 @@ test('the hub presents the player identity once rather than repeating it in the 
   assert.ok(!header.includes('avatar-medallion'));
   assert.ok(html.includes('hub-character-portrait') && html.includes('View FernCaptain'));
 });
+
+test('the player card owns help and editing, and Edit opens the editor directly', () => {
+  const html = renderHub();
+  assert.ok(!html.includes('<footer'));
+  const player = html.match(/<section class="hub-character"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.ok(player.includes('Edit profile') && player.includes('How to play') && player.includes('Sign out'));
+  const editor = renderToStaticMarkup(
+    createElement(PlayerProfile, {
+      auth,
+      profile,
+      games: state,
+      busy: false,
+      initialEditing: true,
+      onSave: async () => {},
+      onResume: noop,
+    }),
+  );
+  assert.ok(editor.includes('profile-editor') && editor.includes('<input'));
+  assert.ok(!editor.includes('Recent games'));
+});

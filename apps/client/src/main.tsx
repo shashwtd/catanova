@@ -232,6 +232,7 @@ function App() {
       | 'journal'
       | 'leave'
       | 'profile'
+      | 'editProfile'
       | 'network'
       | 'invite'
       | 'friends'
@@ -919,6 +920,7 @@ function App() {
           onJoin={(value) => enterRoom('join', value)}
           onResume={resumeGame}
           onProfile={() => setPanel('profile')}
+          onEditProfile={() => setPanel('editProfile')}
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
           onSignOut={() => void signOut()}
@@ -1247,7 +1249,7 @@ function App() {
           <Invite code={room.roomCode ?? room.roomId} roomId={room.roomId} />
         </Dialog>
       )}
-      {panel === 'profile' && (
+      {(panel === 'profile' || panel === 'editProfile') && (
         <Dialog title="Your profile" onClose={() => setPanel(null)}>
           {g ? (
             <>
@@ -1259,7 +1261,8 @@ function App() {
             </>
           ) : (
             <PlayerProfile
-              key={auth.account?.id ?? 'local'}
+              key={`${auth.account?.id ?? 'local'}:${panel}`}
+              initialEditing={panel === 'editProfile'}
               auth={auth}
               profile={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
               games={playerGames}

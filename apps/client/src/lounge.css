@@ -42,17 +42,30 @@
   pointer-events: none;
 }
 .hub-header {
-  padding: 12px 18px;
+  padding: 4px 12px;
+  gap: 16px;
   border: 1px solid var(--game-trim);
   border-radius: var(--game-radius);
   background: var(--game-panel-fill);
-  box-shadow: var(--game-panel-shadow);
+  box-shadow:
+    inset 0 1px #e5cd9620,
+    0 3px 8px #11241e40;
+}
+.hub-header .hub-social-button {
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 15px;
+}
+.hub-header .hub-header-tools {
+  gap: 6px;
 }
 .hub-navigation {
   gap: 8px;
 }
 .hub-navigation button {
-  padding-inline: 18px;
+  min-height: 44px;
+  font-size: 16px;
+  padding: 6px 12px;
   border-radius: 6px;
 }
 .hub-navigation button[aria-current] {
@@ -75,16 +88,18 @@
   border-radius: 8px;
 }
 .hub-lobby-content {
-  grid-template-columns: minmax(260px, 0.9fr) minmax(340px, 1fr);
-  gap: clamp(28px, 6vw, 90px);
-  padding-block: 12px 28px;
+  flex: none;
+  align-items: start;
+  grid-template-columns: minmax(290px, 0.85fr) minmax(340px, 1.3fr);
+  gap: 20px;
+  padding-block: 0;
 }
 .hub-character {
-  width: min(430px, 100%);
+  width: 100%;
   display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  column-gap: 22px;
-  justify-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  justify-items: center;
   justify-self: center;
   padding: 26px;
   border: 1px solid var(--game-trim);
@@ -93,8 +108,8 @@
   box-shadow: var(--game-panel-shadow);
 }
 .hub-brand .landing-logo {
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   margin: 0;
   filter: none;
 }
@@ -106,7 +121,7 @@
   display: none;
 }
 .hub-character-portrait .avatar-medallion {
-  width: 84px;
+  width: 128px;
   height: auto;
   aspect-ratio: 1;
   border-width: 2px;
@@ -120,8 +135,8 @@
   padding: 0;
   min-width: 0;
   width: 100%;
-  text-align: left;
-  font-size: 25px;
+  text-align: center;
+  font-size: 27px;
   clip-path: none;
   border: 0;
   background: none;
@@ -170,7 +185,7 @@
 .hub-character .player-record {
   grid-column: 1 / -1;
   justify-self: center;
-  margin: 14px 0 0;
+  margin: 0;
   gap: 0;
   text-shadow: none;
 }
@@ -467,13 +482,24 @@
 }
 @media (max-width: 850px) {
   .hub-header {
-    padding: 12px;
+    padding: 4px 6px;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .hub-navigation {
+    order: 0;
+    width: auto;
+    border: 0;
+    padding: 0;
+    margin: 0 auto;
+    gap: 2px;
   }
   .hub-lobby-content {
     grid-template-columns: minmax(0, 1fr);
     gap: 22px;
   }
   .hub-character {
+    width: min(550px, 100%);
     padding: 26px;
   }
   .hub-room-actions {
@@ -561,12 +587,18 @@
     flex-wrap: wrap;
     width: auto;
   }
-  .hub-navigation {
-    padding-top: 6px;
-    gap: 14px;
+  .hub-brand {
+    display: none;
   }
   .hub-navigation button {
-    padding-inline: 15px;
+    padding-inline: 8px;
+    font-size: 15px;
+  }
+  .hub-header .hub-header-tools {
+    gap: 2px;
+  }
+  .hub-header .hub-social-button > span {
+    display: none;
   }
   .room-lobby .lobby-heading {
     padding: 8px;
@@ -609,7 +641,7 @@
 .player-hub > .invitation-notice {
   position: fixed;
   z-index: 45;
-  top: max(100px, calc(env(safe-area-inset-top) + 84px));
+  top: max(84px, calc(env(safe-area-inset-top) + 68px));
   right: max(24px, env(safe-area-inset-right));
   width: min(420px, calc(100vw - 32px));
   max-height: calc(100dvh - 180px);
@@ -636,7 +668,62 @@
     justify-self: center;
   }
   .player-hub > .invitation-notice {
-    top: max(168px, calc(env(safe-area-inset-top) + 152px));
+    top: max(84px, calc(env(safe-area-inset-top) + 68px));
     right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+.hub-player-tools {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+  padding-top: 14px;
+  border-top: 1px solid var(--game-trim);
+}
+.hub-edit-profile,
+.hub-player-tools a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--game-cream);
+  font:
+    600 13px Barlow,
+    sans-serif;
+  white-space: nowrap;
+}
+.hub-edit-profile {
+  border: 1px solid var(--game-trim);
+  border-radius: 7px;
+  background: #47604b;
+  padding: 7px 10px;
+}
+.hub-player-tools a {
+  text-decoration: none;
+}
+.hub-player-tools a:hover {
+  text-decoration: underline;
+  color: var(--game-gold);
+}
+.hub-player-tools .hub-tool {
+  padding: 6px;
+  margin-left: auto;
+}
+@media (max-width: 650px) {
+  .hub-character {
+    row-gap: 8px;
+  }
+  .hub-player-tools {
+    gap: 8px;
+    padding-top: 10px;
+    margin-top: 8px;
+  }
+  .hub-edit-profile {
+    padding-inline: 8px;
   }
 }

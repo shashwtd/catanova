@@ -6,18 +6,7 @@ import { Avatar, ProfileEditor } from './Profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { GameLoader } from './GameLoader.js';
 import { GoogleMark } from './ProviderMarks.js';
-import {
-  ArrowLeft,
-  ArrowRight,
-  CircleHelp,
-  History,
-  LogOut,
-  Pencil,
-  Plus,
-  Settings2,
-  Users,
-  X,
-} from './GameIcons.js';
+import { ArrowLeft, ArrowRight, History, LogOut, Pencil, Plus, Settings2, Users, X } from './GameIcons.js';
 import { MatchHistory, PlayerStats } from './MatchHistory.js';
 import type { PlayerGameState } from './MatchHistory.js';
 import { normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
@@ -30,6 +19,7 @@ export function PlayerProfile({
   games,
   busy,
   resumeDisabled = false,
+  initialEditing = false,
   onSave,
   onResume,
 }: {
@@ -38,10 +28,11 @@ export function PlayerProfile({
   games: PlayerGameState;
   busy: boolean;
   resumeDisabled?: boolean;
+  initialEditing?: boolean;
   onSave: (profile: Profile) => Promise<void>;
   onResume: (roomId: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEditing);
   if (editing)
     return (
       <div className="player-profile-editor">
@@ -97,6 +88,7 @@ export function PlayerHub({
   onJoin,
   onResume,
   onProfile,
+  onEditProfile,
   onFriends,
   onSettings,
   onSignOut,
@@ -111,6 +103,7 @@ export function PlayerHub({
   onJoin: (code: string) => Promise<void>;
   onResume: (roomId: string) => void;
   onProfile: () => void;
+  onEditProfile?: () => void;
   onFriends: () => void;
   onSettings: () => void;
   onSignOut: () => void;
@@ -135,8 +128,12 @@ export function PlayerHub({
           <button aria-current={tab === 'lobby' ? 'page' : undefined} onClick={() => setTab('lobby')}>
             Lobby
           </button>
-          <button aria-current={tab === 'history' ? 'page' : undefined} onClick={() => setTab('history')}>
-            Game history
+          <button
+            aria-label="Game history"
+            aria-current={tab === 'history' ? 'page' : undefined}
+            onClick={() => setTab('history')}
+          >
+            History
           </button>
         </nav>
         <div className="hub-header-tools">
@@ -176,6 +173,17 @@ export function PlayerHub({
               {auth.account?.isGuest && <small className="hub-guest-label">Guest</small>}
             </div>
             <PlayerStats stats={games.data?.stats} />
+            <nav className="hub-player-tools" aria-label="Profile and help">
+              <button className="hub-edit-profile" onClick={onEditProfile ?? onProfile}>
+                <Pencil size={16} /> Edit profile
+              </button>
+              <a href="/guide/" target="_blank" rel="noopener noreferrer">
+                How to play
+              </a>
+              <button className="hub-tool" onClick={onSignOut} aria-label="Sign out" title="Sign out">
+                <LogOut size={18} />
+              </button>
+            </nav>
           </section>
           <div className="hub-sidebar">
             <section className="hub-room-actions" aria-label="Play">
@@ -285,17 +293,6 @@ export function PlayerHub({
           <MatchHistory state={games} busy={busy} onResume={onResume} />
         </div>
       )}
-      <footer className="hub-footer">
-        <div className="hub-footer-meta">
-          <BrandLogo mark />
-          <a href="/guide/" target="_blank" rel="noopener noreferrer">
-            <CircleHelp size={19} /> How to play
-          </a>
-          <button className="hub-tool" onClick={onSignOut} aria-label="Sign out">
-            <LogOut size={21} />
-          </button>
-        </div>
-      </footer>
     </section>
   );
 }
