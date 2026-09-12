@@ -257,15 +257,15 @@ test('the port inventory, coastal spacing and both ownership endpoints preserve 
 
 test('lobby dice settings validate and game settings show only audio after start, with rules in Game info', () => {
   assert.deepEqual(parseRoomSettings({ turnTimerSeconds: null }), { turnTimerSeconds: null });
-  assert.equal(parseRoomSettings({ turnTimerSeconds: 90, diceMode: 'flat' }).diceMode, 'flat');
-  for (const diceMode of ['adaptive', null, 5])
-    assert.throws(() => parseRoomSettings({ turnTimerSeconds: null, diceMode }), /Classic/);
+  assert.equal(parseRoomSettings({ turnTimerSeconds: 90, diceMode: 'balanced' }).diceMode, 'balanced');
+  for (const diceMode of ['flat', 'adaptive', null, 5])
+    assert.throws(() => parseRoomSettings({ turnTimerSeconds: null, diceMode }), /Natural/);
   const room: RoomState = {
     roomId: 'test-room',
     revision: 0,
     counter: 0,
     players: seats.map((p) => ({ ...p, connected: true })),
-    settings: { turnTimerSeconds: 90, diceMode: 'flat' },
+    settings: { turnTimerSeconds: 90, diceMode: 'balanced' },
   };
   const settings = () =>
     renderToStaticMarkup(
@@ -279,19 +279,19 @@ test('lobby dice settings validate and game settings show only audio after start
         previewSound: () => {},
       }),
     );
-  assert.match(settings(), /Flat totals/);
+  assert.match(settings(), /Balanced/);
   assert.match(settings(), /Turn duration/);
   room.game = gameView(
-    createGame(seats, 82, () => 0.34, { diceMode: 'flat' }),
+    createGame(seats, 82, () => 0.34, { diceMode: 'balanced' }),
     'p0',
   );
   assert.ok(!settings().includes('Turn duration'));
-  assert.ok(!settings().includes('Flat totals'));
+  assert.ok(!settings().includes('Balanced'));
   assert.match(settings(), /Effects volume/);
   assert.match(settings(), /Music volume/);
   const info = renderToStaticMarkup(createElement(GameInfo, { room }));
-  assert.match(info, /1 in 11/);
-  assert.match(info, /house rule/);
+  assert.match(info, /36 dice pairs/);
+  assert.match(info, /No player-based adjustments/);
   assert.match(info, /90 seconds/);
   assert.ok(!/<input|<button/.test(info));
 });

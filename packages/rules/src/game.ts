@@ -4,7 +4,7 @@ import type { Resource } from './index.js';
 import { generateBoard, shuffle } from './board.js';
 import type { Board } from './board.js';
 import { rollDice } from './dice.js';
-import type { DiceMode } from './dice.js';
+import type { DiceMode, BalancedDiceState } from './dice.js';
 
 export type Hand = Record<Resource, number>;
 export type CardKind = keyof typeof DEVELOPMENT_DECK;
@@ -23,7 +23,7 @@ export type Game = {
   discards: Record<string, number>; trade: Trade | null; nextTrade: number;
   longestRoad: string | null; largestArmy: string | null; winner: string | null;
   finishReason?: 'resignation' | 'abandoned';
-  diceMode?: DiceMode; victoryPoints?: number; tradeOffersThisTurn?: number;
+  diceMode?: DiceMode | 'flat'; balancedDice?: BalancedDiceState; victoryPoints?: number; tradeOffersThisTurn?: number;
   log: { id: number; text: string }[]; nextLog: number;
 };
 export type GameAction =
@@ -389,7 +389,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   }
   if (a.kind === 'roll') {
     requireRule(g.phase === 'roll', 'You have already rolled or must finish the current action');
-    g.dice = rollDice(g.diceMode ?? 'classic', random);
+    if (g.diceMode === 'balanced') g.balancedDice ??= { remaining: [] };
+    g.dice = rollDice(g.diceMode ?? 'classic', random, g.balancedDice);
     const sum = g.dice[0] + g.dice[1]; log(g, `${p.name} rolled ${g.dice[0]} + ${g.dice[1]} = ${sum}.`);
     if (sum === 7) {
       g.discards = Object.fromEntries(g.players.filter(other => !other.resigned && total(other.hand) > 7).map(other => [other.id, Math.floor(total(other.hand) / 2)]));
@@ -438,12 +439,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
 
 export const CARD_NAMES: Record<CardKind, string> = { knight: 'Knight', roadBuilding: 'Road Building', yearOfPlenty: 'Year of Plenty', monopoly: 'Monopoly', victoryPoint: 'Victory Point' };
 export type PlayerView = { id: string; name: string; resigned?: boolean; resourceCount: number; cardCount: number; knights: number; points: number; roadLength: number; pieces: ReturnType<typeof pieces>; hand?: Hand; cards?: Card[] };
-export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 'nextTrade'> & {
+export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 'nextTrade' | 'balancedDice'> & {
   deckCount: number; players: PlayerView[];
   legal: { roads: number[]; settlements: number[]; cities: number[]; playableCards: string[]; canBuyCard: boolean; rates: Hand };
 };
 export function gameView(g: Game, viewer: string): GameView {
-  const { deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
+  const { balancedDice: _balancedDice, deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
   const me = players.find(p => p.id === viewer)!; const active = !me.resigned && activePlayer(g).id === viewer; const owned = pieces(g, viewer);
   const build = active && g.phase === 'actions', setup = active && g.phase === 'setupSettlement';
   return {

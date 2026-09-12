@@ -248,7 +248,7 @@ export function GameSettings({
             <legend>
               <Dices /> Dice
             </legend>
-            {(['classic', 'flat'] as const).map((mode) => (
+            {(['classic', 'balanced'] as const).map((mode) => (
               <label
                 key={mode}
                 className="settings-dice-option"
@@ -262,11 +262,11 @@ export function GameSettings({
                   onChange={() => setDraft({ ...draft, diceMode: mode })}
                 />
                 <span>
-                  <strong>{mode === 'classic' ? 'Classic' : 'Flat totals'}</strong>
+                  <strong>{mode === 'classic' ? 'Natural' : 'Balanced'}</strong>
                   <small>
                     {mode === 'classic'
                       ? 'Two normal dice. 7 is most common.'
-                      : 'Each total 2–12 has the same chance. House rule.'}
+                      : 'A dice deck smooths extremes and reduces repeats.'}
                   </small>
                 </span>
               </label>
@@ -307,6 +307,7 @@ export function GameSettings({
 /** Frozen match rules live here; the in-game settings menu remains audio-only. */
 export function GameInfo({ room }: { room: RoomState }) {
   const settings = room.settings ?? DEFAULT_ROOM_SETTINGS;
+  const balanced = (room.game?.diceMode ?? settings.diceMode) === 'balanced';
   const flat = (room.game?.diceMode ?? settings.diceMode ?? 'classic') === 'flat';
   return (
     <div className="game-info-content">
@@ -330,11 +331,13 @@ export function GameInfo({ room }: { room: RoomState }) {
             <Dices /> Dice
           </dt>
           <dd>
-            {flat ? 'Flat totals' : 'Classic'}
+            {flat ? 'Legacy flat totals' : balanced ? 'Balanced' : 'Natural'}
             <small>
               {flat
                 ? 'Every total from 2 to 12 has a 1 in 11 chance. This house rule changes production and robber odds.'
-                : 'Two independent six-sided dice. 7 is most likely; 2 and 12 are rarest.'}
+                : balanced
+                  ? 'Draws from 36 dice pairs, refreshes with 12 left, and reduces the previous total’s weight by 30%. No player-based adjustments.'
+                  : 'Two independent six-sided dice. 7 is most likely; 2 and 12 are rarest.'}
             </small>
           </dd>
         </div>

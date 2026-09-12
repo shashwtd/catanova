@@ -115,6 +115,7 @@ export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
   const [panel, setPanel] = useState<'profile' | 'editProfile' | 'settings' | 'friends' | null>(null);
   const [profile, setProfile] = useState<Profile>(seats[0]!.profile);
+  const [removedPlayers, setRemovedPlayers] = useState<string[]>([]);
   const [settings, setSettings] = useState(room.settings);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [showInvite, setShowInvite] = useState(false);
@@ -175,7 +176,10 @@ export function LoungePreview() {
   const currentRoom = {
     ...room,
     settings,
-    players: [{ ...seats[0]!, name: profile.name, profile }, ...seats.slice(1)],
+    players: [
+      { ...seats[0]!, name: profile.name, profile },
+      ...seats.slice(1).filter((p) => !removedPlayers.includes(p.id)),
+    ],
   };
   return (
     <main
@@ -207,11 +211,12 @@ export function LoungePreview() {
           busy={false}
           connected
           onReady={noop}
+          onKick={async (id) => setRemovedPlayers((current) => [...current, id])}
           onStart={() => setScreen('game')}
           onInvite={() => setPanel('friends')}
           onFriends={() => setPanel('friends')}
           onLeave={() => setScreen('hub')}
-          onEdit={() => setPanel('profile')}
+          onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
         />
       )}

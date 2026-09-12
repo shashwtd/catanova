@@ -134,6 +134,7 @@ export function Lobby({
   onEdit,
   onSettings,
   onFriends,
+  onKick,
 }: {
   room: RoomState;
   me?: string;
@@ -146,7 +147,11 @@ export function Lobby({
   onEdit: () => void;
   onSettings: () => void;
   onFriends?: () => void;
+  onKick?: (playerId: string) => Promise<void>;
 }) {
+  const [confirmKick, setConfirmKick] = useState<string | null>(null);
+  const [kickError, setKickError] = useState('');
+  const [kicking, setKicking] = useState(false);
   const self = room.players.find((p) => p.id === me),
     host = room.players[0]?.id === me;
   const canStart =
@@ -154,35 +159,22 @@ export function Lobby({
   return (
     <section className="lobby-screen room-lobby" aria-label="Room lobby">
       <header className="lobby-heading">
-        {self && (
-          <button type="button" className="lobby-self" onClick={onEdit} aria-label="Your profile">
-            <Avatar profile={self.profile ?? defaultProfile(self.name)} />
-            <strong title={self.name}>{self.name}</strong>
-          </button>
-        )}
+        <button
+          type="button"
+          className="lobby-back"
+          onClick={onLeave}
+          disabled={busy}
+          aria-label="Leave lobby"
+        >
+          <DoorOpen size={20} />
+          <span>Leave lobby</span>
+        </button>
         <div className="lobby-tools">
           {onFriends && (
             <button className="icon-button" title="Friends" aria-label="Friends" onClick={onFriends}>
               <Users />
             </button>
           )}
-          <button
-            className="icon-button"
-            title="Game settings"
-            aria-label="Game settings"
-            onClick={onSettings}
-          >
-            <Settings2 />
-          </button>
-          <button
-            className="icon-button"
-            title="Leave lobby"
-            aria-label="Leave lobby"
-            onClick={onLeave}
-            disabled={busy}
-          >
-            <DoorOpen />
-          </button>
         </div>
       </header>
       <div className="lobby-center">
@@ -234,9 +226,73 @@ export function Lobby({
                 className={`lobby-seat ${p.id === me ? 'self' : ''} ${!p.connected ? 'seat-offline' : ''}`}
                 key={p.id}
               >
+                {p.id === me && (
+                  <button
+                    type="button"
+                    className="lobby-seat-edit"
+                    onClick={onEdit}
+                    aria-label="Your profile"
+                    title="Edit profile"
+                  >
+                    Edit
+                  </button>
+                )}
+                {host && p.id !== me && onKick && (
+                  <details
+                    className="lobby-player-info"
+                    onToggle={() => {
+                      setConfirmKick(null);
+                      setKickError('');
+                    }}
+                  >
+                    <summary aria-label={`Player info for ${p.name}`} title="Player info">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+                        <path d="M12 11v6" stroke="currentColor" strokeWidth="2" />
+                        <circle cx="12" cy="7.5" r="1" fill="currentColor" />
+                      </svg>
+                    </summary>
+                    <div className="lobby-player-menu">
+                      <strong>{p.name}</strong>
+                      <span>{p.connected ? 'In this lobby' : 'Disconnected'}</span>
+                      {confirmKick === p.id ? (
+                        <>
+                          <p>Remove {p.name} from the lobby?</p>
+                          <button
+                            disabled={busy || kicking || !connected}
+                            onClick={async () => {
+                              setKicking(true);
+                              setKickError('');
+                              try {
+                                await onKick(p.id);
+                                setConfirmKick(null);
+                              } catch (error) {
+                                setKickError(
+                                  error instanceof Error ? error.message : 'Could not remove player',
+                                );
+                              } finally {
+                                setKicking(false);
+                              }
+                            }}
+                          >
+                            {kicking ? 'Removing…' : 'Confirm removal'}
+                          </button>
+                          <button disabled={kicking} onClick={() => setConfirmKick(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button disabled={busy || !connected} onClick={() => setConfirmKick(p.id)}>
+                          Remove player
+                        </button>
+                      )}
+                      {kickError && <p role="alert">{kickError}</p>}
+                    </div>
+                  </details>
+                )}
                 <div className="lobby-avatar">
                   <Avatar profile={p.profile ?? defaultProfile(p.name)} />
-                  {i === 0 && <Crown className="host-mark" size={23} />}
+                  {i === 0 && <Crown className="host-mark" size={34} />}
                   {!p.connected && (
                     <span className="offline-mark" title="Disconnected">
                       <WifiOff size={30} />
@@ -288,22 +344,33 @@ export function Lobby({
                     : 'Waiting for host'
                   : 'Waiting for players'}
           </span>
-          {host ? (
-            <button className="gold-button" disabled={busy || !connected || !canStart} onClick={onStart}>
-              Start game
-              <Sailboat size={21} />
-            </button>
-          ) : (
+          <div className="lobby-start-controls">
             <button
-              className={self?.ready ? 'dark-button' : 'gold-button'}
-              aria-pressed={!!self?.ready}
-              disabled={busy || !connected}
-              onClick={() => onReady(!self?.ready)}
+              className="lobby-configure"
+              onClick={onSettings}
+              disabled={busy}
+              aria-label="Game settings"
             >
-              <Check size={21} />
-              {self?.ready ? 'Not ready' : 'Ready'}
+              <Settings2 size={22} />
+              <span>Settings</span>
             </button>
-          )}
+            {host ? (
+              <button className="gold-button" disabled={busy || !connected || !canStart} onClick={onStart}>
+                Start game
+                <Sailboat size={21} />
+              </button>
+            ) : (
+              <button
+                className={self?.ready ? 'dark-button' : 'gold-button'}
+                aria-pressed={!!self?.ready}
+                disabled={busy || !connected}
+                onClick={() => onReady(!self?.ready)}
+              >
+                <Check size={21} />
+                {self?.ready ? 'Not ready' : 'Ready'}
+              </button>
+            )}
+          </div>
         </div>
       </footer>
     </section>

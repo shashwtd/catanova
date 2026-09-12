@@ -33,7 +33,7 @@ export function parseRoomSettings(input: unknown): RoomSettings {
   if (seconds !== null && !TURN_TIMER_STEPS.includes(seconds as TurnTimerSeconds))
     throw new Error('Turn timer must be off, 40, 65, 90, 115, or 140 seconds');
   if (diceMode !== undefined && !DICE_MODES.includes(diceMode as DiceMode))
-    throw new Error('Choose Classic dice or Flat totals');
+    throw new Error('Choose Natural or Balanced dice');
   return {
     ...(victoryPoints === undefined ? {} : { victoryPoints }),
     turnTimerSeconds: seconds as TurnTimerSeconds | null,

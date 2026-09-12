@@ -442,6 +442,11 @@ function App() {
         return;
       }
       if (message.type === 'error') {
+        if (message.code === 'LOBBY_REMOVED') {
+          home(true);
+          setToast(message.message);
+          return;
+        }
         if (
           message.code === 'SEAT_LEFT' &&
           readJSON<PendingCommand>(sessionStorage, OUTBOX_KEY)?.type === 'leave'
@@ -968,11 +973,21 @@ function App() {
           busy={busy || !!room.launch}
           connected={connected}
           onReady={(v) => void ready(v)}
+          onKick={async (playerId) => {
+            const c = connection.current;
+            if (!c || disabled) throw new Error('Reconnect before removing a player');
+            setBusy(true);
+            try {
+              await c.kick(playerId);
+            } finally {
+              if (connection.current === c) setBusy(c.awaitingConfirmation);
+            }
+          }}
           onStart={() => void act({ kind: 'start' })}
           onInvite={() => setPanel('friends')}
           onFriends={auth.config?.mode === 'authenticated' ? () => setPanel('friends') : undefined}
           onLeave={() => void leave()}
-          onEdit={() => setPanel('profile')}
+          onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
         />
       )}
