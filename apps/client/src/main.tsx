@@ -1,3 +1,4 @@
+import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
@@ -45,7 +46,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  History,
   GameIcon,
   Settings2,
   ArrowRight,
@@ -55,10 +55,7 @@ import {
   DoorOpen,
   Dices,
   House,
-  Maximize,
-  Minimize,
   Route,
-  Wifi,
   WifiOff,
   X,
   ArrowLeftRight,
@@ -106,6 +103,8 @@ import './room-lobby.css';
 import './history-mobile.css';
 import './resource-counters.css';
 import './lounge.css';
+import './room-refinement.css';
+import './play-refinement.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -805,53 +804,15 @@ function App() {
       )}
       {!g && !room && !playerHome && <div className="title-scenery" aria-hidden="true" />}
       {g && (
-        <nav className="side-controls game-controls" aria-label="Current game tools">
-          <IconButton
-            label="Move history"
-            active={panel === 'journal'}
-            onClick={() => setPanel(panel === 'journal' ? null : 'journal')}
-          >
-            <History />
-          </IconButton>
-          <IconButton
-            label="Connection and ping"
-            active={panel === 'network'}
-            className={connected ? 'connected' : 'disconnected'}
-            onClick={() => setPanel(panel === 'network' ? null : 'network')}
-          >
-            {networkBusy ? <GameLoader compact label="Reconnecting…" /> : connected ? <Wifi /> : <WifiOff />}
-          </IconButton>
-          <IconButton
-            label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            onClick={() => void fullscreen()}
-          >
-            {isFullscreen ? <Minimize /> : <Maximize />}
-          </IconButton>
-        </nav>
-      )}
-      {g && (
-        <nav className="side-controls room-controls" aria-label="Room tools">
-          <IconButton
-            label="Rules"
-            active={panel === 'rules'}
-            onClick={() => setPanel(panel === 'rules' ? null : 'rules')}
-          >
-            <CircleHelp />
-          </IconButton>
-          <IconButton label="Game info" active={panel === 'info'} onClick={() => setPanel('info')}>
-            <GameIcon name="info" />
-          </IconButton>
-          <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
-            <Settings2 />
-          </IconButton>
-          <IconButton
-            label="Leave room"
-            disabled={busy}
-            onClick={() => (g.phase !== 'finished' ? setPanel('leave') : void leave())}
-          >
-            <DoorOpen />
-          </IconButton>
-        </nav>
+        <GameTools
+          panel={panel}
+          onPanel={(next) => setPanel(panel === next ? null : next)}
+          connected={connected}
+          fullscreen={isFullscreen}
+          onFullscreen={() => void fullscreen()}
+          busy={busy}
+          onLeave={() => (g.phase !== 'finished' ? setPanel('leave') : void leave())}
+        />
       )}
       {g && room && (
         <PlayerRail

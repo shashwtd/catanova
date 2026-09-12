@@ -1,0 +1,344 @@
+/* Smaller hand shelf: each resource remains one visually paired icon and count. */
+@media (min-width: 1001px) {
+  .playing .card-table {
+    gap: 20px;
+    right: 20px;
+    padding-inline: 15px;
+  }
+  .playing .hand-zone {
+    gap: 18px;
+  }
+  .playing .resource-hand.resource-counters {
+    width: 305px;
+    gap: 8px;
+    translate: none;
+    padding-bottom: 4px;
+  }
+  .playing .card-table::before {
+    height: 70px;
+  }
+}
+.playing .resource-counter {
+  gap: 1px;
+}
+.playing .resource-counter-value {
+  width: auto;
+  min-width: 1ch;
+  justify-content: flex-start;
+  text-align: left;
+}
+.playing .resource-counter-art,
+.playing .resource-counter-art .sprite {
+  width: 30px;
+}
+.playing .table-actions,
+.playing .utility-actions {
+  align-items: flex-end;
+}
+.playing .table-actions {
+  padding-bottom: 0;
+}
+.playing .purchase-control {
+  align-self: flex-end;
+}
+.playing .table-actions :is(.trade-action, .turn-action, .development-buy) {
+  margin-bottom: 0;
+}
+.playing .construction-tools.build-shelf {
+  gap: 6px;
+  padding: 10px 8px 12px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(#304c40, #1d342c);
+  border-color: #b89d6580;
+}
+.playing .build-shelf .build-control,
+.playing .build-shelf .build-control.build-city,
+.playing .build-shelf .build-control.build-settlement {
+  position: relative;
+  width: 64px;
+  height: 62px;
+  border: 0;
+  border-radius: 10px;
+  background: #102a2270;
+  box-shadow:
+    inset 0 2px 4px #081d1a70,
+    inset 0 -1px #e0d1a52b;
+  padding: 6px;
+  gap: 4px;
+}
+.playing .build-shelf .build-control + .build-control {
+  border-left: 0;
+}
+.playing .build-shelf .build-control.is-selected {
+  background: #c3ad6b33;
+  box-shadow: inset 0 -3px #e0c378;
+}
+.playing .build-shelf .build-control:not(:disabled):hover {
+  background: #e4d5a51c;
+}
+.playing .build-shelf .build-control-label {
+  font:
+    600 11px/1 Barlow,
+    sans-serif;
+  color: #f4e5bc;
+}
+/* Score leads. The two inventory counts are secondary, grouped on a quiet inset. */
+.player-profile .profile-stats {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: 0;
+  align-items: center;
+  margin-top: 5px;
+}
+.player-profile .profile-stats > span {
+  min-width: 0;
+  padding: 4px 5px;
+  gap: 3px;
+}
+.player-profile .profile-stats .profile-score {
+  padding-left: 0;
+  padding-right: 9px;
+  border-right: 1px solid #d6c59a44;
+  margin-right: 4px;
+}
+.player-profile .profile-stats .profile-score b {
+  color: #ffe9a5;
+  font-size: 24px;
+}
+.player-profile .profile-stats .profile-resource-count,
+.player-profile .profile-stats .profile-development-count {
+  color: #e6e3cf;
+  background: #142c2340;
+}
+.player-profile .profile-stats .profile-resource-count {
+  border-radius: 6px 0 0 6px;
+}
+.player-profile .profile-stats .profile-development-count {
+  border-radius: 0 6px 6px 0;
+}
+.player-profile .profile-stats .profile-resource-count b,
+.player-profile .profile-stats .profile-development-count b {
+  font-size: 16px;
+}
+.player-profile .profile-stats .game-icon {
+  width: 20px;
+  height: 20px;
+}
+.player-profile .profile-stats .profile-score .game-icon {
+  width: 25px;
+  height: 25px;
+}
+.player-profile .profile-achievements {
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.player-profile .profile-achievement:not(.held) {
+  padding: 0 3px;
+  min-height: 18px;
+  opacity: 0.8;
+}
+.player-profile .profile-achievement.held {
+  position: relative;
+  min-height: 28px;
+  padding: 3px 9px;
+  gap: 5px;
+  border: 1px solid #d4b971;
+  border-radius: 5px 5px 10px 10px;
+  background: linear-gradient(135deg, #977336, #554521);
+  box-shadow:
+    inset 0 0 0 2px #e1c07a22,
+    0 3px 5px #0e1c1a66;
+}
+.player-profile .profile-achievement.held::before {
+  content: '';
+  position: absolute;
+  inset: -3px 7px auto;
+  height: 3px;
+  background: #ead69a;
+  border-radius: 2px;
+  box-shadow: 0 1px 2px #14291f;
+}
+.player-profile .profile-achievement.held.army-award {
+  border-color: #b2ced0;
+  background: linear-gradient(135deg, #56838a, #294b59);
+}
+.player-profile .profile-achievement.held.army-award::before {
+  background: #c7e5de;
+}
+.player-profile .profile-achievement.held .game-icon {
+  width: 22px;
+  height: 22px;
+}
+.player-profile .profile-achievement.held small {
+  border: 0;
+  padding: 0;
+  font-size: 11px;
+  color: #fff0c2;
+}
+.game-tools-menu {
+  position: relative;
+}
+.game-tools-menu summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 49px;
+  min-height: 53px;
+  padding: 4px;
+  border: 1px solid #a894655e;
+  border-radius: 12px;
+  background: linear-gradient(#3c5446, #263b31);
+  color: #eee2bc;
+  cursor: pointer;
+  list-style: none;
+}
+.game-tools-menu summary::-webkit-details-marker {
+  display: none;
+}
+.game-tools-menu summary span {
+  font:
+    600 10px/1 Barlow,
+    sans-serif;
+}
+.game-tools-menu summary:focus-visible {
+  outline: 2px solid #f2d798;
+  outline-offset: 3px;
+}
+.game-tools-popover {
+  position: absolute;
+  bottom: 0;
+  left: calc(100% + 10px);
+  width: 195px;
+  padding: 8px;
+  border: 1px solid #b79d68;
+  border-radius: 14px;
+  background: #213c30;
+  box-shadow: 0 10px 25px #101e1cc0;
+  display: grid;
+  gap: 2px;
+}
+.game-tools-popover button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 44px;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #f1e5c9;
+  font:
+    500 15px/1.2 Barlow,
+    sans-serif;
+  box-shadow: none;
+}
+.game-tools-popover button:hover {
+  background: #496148;
+}
+.game-tools-popover button .game-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+@media (max-width: 700px) {
+  .playing .build-shelf .build-control {
+    width: 44px;
+    height: 47px;
+    padding: 3px;
+    gap: 3px;
+  }
+  .playing .build-shelf .build-control-label {
+    font-size: 9px;
+  }
+  .player-profile .profile-stats {
+    display: flex;
+    justify-content: center;
+    gap: 1px;
+  }
+  .player-profile .profile-stats > span {
+    padding: 2px;
+    gap: 1px;
+  }
+  .player-profile .profile-stats .profile-score {
+    padding-right: 3px;
+    margin-right: 0;
+  }
+  .player-profile .profile-stats .profile-score b {
+    font-size: 18px;
+  }
+  .player-profile .profile-stats .profile-resource-count b,
+  .player-profile .profile-stats .profile-development-count b {
+    font-size: 13px;
+  }
+  .player-profile .profile-stats .game-icon,
+  .player-profile .profile-stats .profile-score .game-icon {
+    width: 15px;
+    height: 15px;
+  }
+  .player-profile .profile-achievements {
+    gap: 3px;
+    justify-content: center;
+  }
+  .player-profile .profile-achievement.held {
+    padding: 2px 4px;
+    min-height: 22px;
+    gap: 2px;
+  }
+  .player-profile .profile-achievement.held .game-icon {
+    width: 15px;
+    height: 15px;
+  }
+  .player-profile .profile-achievement.held small {
+    font-size: 9px;
+  }
+  .game-tools-menu summary {
+    width: 42px;
+    min-height: 44px;
+  }
+  .game-tools-popover {
+    bottom: 0;
+  }
+}
+.profile-award-emblem {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+.held .profile-award-emblem {
+  width: 32px;
+  height: 32px;
+}
+.profile-award-emblem .award-laurel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: #f0d99d;
+}
+.army-award .profile-award-emblem .award-laurel {
+  color: #ceeae2;
+}
+.player-profile .profile-achievement.held .profile-award-emblem .game-icon {
+  width: 19px;
+  height: 19px;
+}
+@media (max-width: 700px) {
+  .held .profile-award-emblem {
+    width: 24px;
+    height: 24px;
+  }
+  .player-profile .profile-achievement.held .profile-award-emblem .game-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.playing .purchase-control {
+  display: flex;
+  align-items: flex-end;
+  min-height: 0;
+}

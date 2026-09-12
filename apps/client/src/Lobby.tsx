@@ -2,6 +2,7 @@ import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
 import {
   Check,
   Clock3,
+  Dices,
   Copy,
   Crown,
   DoorOpen,
@@ -14,8 +15,8 @@ import {
   Trophy,
   WifiOff,
 } from './GameIcons.js';
-import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, useId } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
@@ -122,6 +123,40 @@ export function Invite({ code, roomId = code ?? '' }: { code?: string; roomId?: 
     </div>
   );
 }
+function RoomSheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const id = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="game-dialog lobby-sheet"
+      aria-labelledby={id}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="dialog-surface">
+        <h2 id={id}>{title}</h2>
+        {children}
+      </div>
+    </dialog>
+  );
+}
+
 export function Lobby({
   room,
   me,
@@ -149,6 +184,9 @@ export function Lobby({
   onFriends?: () => void;
   onKick?: (playerId: string) => Promise<void>;
 }) {
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [infoPlayer, setInfoPlayer] = useState<string | null>(null);
+  const selectedPlayer = room.players.find((p) => p.id === infoPlayer);
   const [confirmKick, setConfirmKick] = useState<string | null>(null);
   const [kickError, setKickError] = useState('');
   const [kicking, setKicking] = useState(false);
@@ -162,7 +200,7 @@ export function Lobby({
         <button
           type="button"
           className="lobby-back"
-          onClick={onLeave}
+          onClick={() => setConfirmLeave(true)}
           disabled={busy}
           aria-label="Leave lobby"
         >
@@ -171,8 +209,9 @@ export function Lobby({
         </button>
         <div className="lobby-tools">
           {onFriends && (
-            <button className="icon-button" title="Friends" aria-label="Friends" onClick={onFriends}>
+            <button className="lobby-friends" title="Friends" aria-label="Friends" onClick={onFriends}>
               <Users />
+              <span>Friends</span>
             </button>
           )}
         </div>
@@ -200,6 +239,10 @@ export function Lobby({
                 Turn timer{' '}
                 <b>{room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'Off'}</b>
               </span>
+            </button>
+            <button className="lobby-dice-rule" onClick={onSettings} aria-label="Dice mode. Game settings">
+              <Dices size={18} />
+              <span>{room.settings?.diceMode === 'balanced' ? 'Balanced' : 'Natural'} dice</span>
             </button>
           </div>
         </div>
@@ -237,58 +280,23 @@ export function Lobby({
                     Edit
                   </button>
                 )}
-                {host && p.id !== me && onKick && (
-                  <details
+                {p.id !== me && (
+                  <button
+                    type="button"
                     className="lobby-player-info"
-                    onToggle={() => {
+                    aria-label={`Player info for ${p.name}`}
+                    onClick={() => {
+                      setInfoPlayer(p.id);
                       setConfirmKick(null);
                       setKickError('');
                     }}
                   >
-                    <summary aria-label={`Player info for ${p.name}`} title="Player info">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
-                        <path d="M12 11v6" stroke="currentColor" strokeWidth="2" />
-                        <circle cx="12" cy="7.5" r="1" fill="currentColor" />
-                      </svg>
-                    </summary>
-                    <div className="lobby-player-menu">
-                      <strong>{p.name}</strong>
-                      <span>{p.connected ? 'In this lobby' : 'Disconnected'}</span>
-                      {confirmKick === p.id ? (
-                        <>
-                          <p>Remove {p.name} from the lobby?</p>
-                          <button
-                            disabled={busy || kicking || !connected}
-                            onClick={async () => {
-                              setKicking(true);
-                              setKickError('');
-                              try {
-                                await onKick(p.id);
-                                setConfirmKick(null);
-                              } catch (error) {
-                                setKickError(
-                                  error instanceof Error ? error.message : 'Could not remove player',
-                                );
-                              } finally {
-                                setKicking(false);
-                              }
-                            }}
-                          >
-                            {kicking ? 'Removing…' : 'Confirm removal'}
-                          </button>
-                          <button disabled={kicking} onClick={() => setConfirmKick(null)}>
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button disabled={busy || !connected} onClick={() => setConfirmKick(p.id)}>
-                          Remove player
-                        </button>
-                      )}
-                      {kickError && <p role="alert">{kickError}</p>}
-                    </div>
-                  </details>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <circle cx="5" cy="12" r="2" />
+                      <circle cx="12" cy="12" r="2" />
+                      <circle cx="19" cy="12" r="2" />
+                    </svg>
+                  </button>
                 )}
                 <div className="lobby-avatar">
                   <Avatar profile={p.profile ?? defaultProfile(p.name)} />
@@ -346,7 +354,7 @@ export function Lobby({
           </span>
           <div className="lobby-start-controls">
             <button
-              className="lobby-configure"
+              className="lobby-configure hub-room-button"
               onClick={onSettings}
               disabled={busy}
               aria-label="Game settings"
@@ -355,13 +363,17 @@ export function Lobby({
               <span>Settings</span>
             </button>
             {host ? (
-              <button className="gold-button" disabled={busy || !connected || !canStart} onClick={onStart}>
+              <button
+                className="gold-button hub-room-button hub-create-button"
+                disabled={busy || !connected || !canStart}
+                onClick={onStart}
+              >
                 Start game
                 <Sailboat size={21} />
               </button>
             ) : (
               <button
-                className={self?.ready ? 'dark-button' : 'gold-button'}
+                className={`hub-room-button ${self?.ready ? 'dark-button' : 'gold-button hub-create-button'}`}
                 aria-pressed={!!self?.ready}
                 disabled={busy || !connected}
                 onClick={() => onReady(!self?.ready)}
@@ -373,6 +385,90 @@ export function Lobby({
           </div>
         </div>
       </footer>
+      {confirmLeave && (
+        <RoomSheet title="Leave this lobby?" onClose={() => setConfirmLeave(false)}>
+          <p>Your seat will be released.</p>
+          <div className="room-sheet-actions">
+            <button autoFocus className="hub-room-button" onClick={() => setConfirmLeave(false)}>
+              Stay
+            </button>
+            <button
+              className="lobby-back"
+              disabled={busy}
+              onClick={() => {
+                setConfirmLeave(false);
+                onLeave();
+              }}
+            >
+              Leave lobby
+            </button>
+          </div>
+        </RoomSheet>
+      )}
+      {selectedPlayer && (
+        <RoomSheet
+          title="Player info"
+          onClose={() => {
+            if (!kicking) setInfoPlayer(null);
+          }}
+        >
+          <div className="room-sheet-player">
+            <Avatar profile={selectedPlayer.profile ?? defaultProfile(selectedPlayer.name)} />
+            <div>
+              <strong>{selectedPlayer.name}</strong>
+              <span>
+                {!selectedPlayer.connected
+                  ? 'Disconnected'
+                  : selectedPlayer.id === room.players[0]?.id
+                    ? 'Host'
+                    : selectedPlayer.ready
+                      ? 'Ready'
+                      : 'Not ready'}
+              </span>
+            </div>
+          </div>
+          {confirmKick === selectedPlayer.id && <p>Remove {selectedPlayer.name} from this lobby?</p>}
+          <div className="room-sheet-actions">
+            <button
+              autoFocus
+              className="hub-room-button"
+              disabled={kicking}
+              onClick={() => setInfoPlayer(null)}
+            >
+              Close
+            </button>
+            {host && onKick && (
+              <button
+                className="lobby-back"
+                disabled={busy || kicking || !connected}
+                onClick={async () => {
+                  if (confirmKick !== selectedPlayer.id) {
+                    setConfirmKick(selectedPlayer.id);
+                    return;
+                  }
+                  setKicking(true);
+                  setKickError('');
+                  try {
+                    await onKick(selectedPlayer.id);
+                    setInfoPlayer(null);
+                  } catch (error) {
+                    setKickError(error instanceof Error ? error.message : 'Could not remove player');
+                  } finally {
+                    setKicking(false);
+                  }
+                }}
+              >
+                {kicking
+                  ? 'Removing…'
+                  : confirmKick === selectedPlayer.id
+                    ? 'Confirm removal'
+                    : 'Remove player'}
+              </button>
+            )}
+          </div>
+          {kickError && <p role="alert">{kickError}</p>}
+        </RoomSheet>
+      )}
     </section>
   );
 }

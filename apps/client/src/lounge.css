@@ -835,63 +835,6 @@
 .room-lobby .lobby-start-controls > .gold-button {
   min-width: 195px;
 }
-.room-lobby .lobby-player-info {
-  position: absolute;
-  top: 4px;
-  right: 5px;
-  z-index: 3;
-}
-.room-lobby .lobby-player-info[open] {
-  z-index: 5;
-}
-.room-lobby .lobby-player-info summary {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  color: #e0c891;
-  cursor: pointer;
-  list-style: none;
-}
-.room-lobby .lobby-player-info summary::-webkit-details-marker {
-  display: none;
-}
-.room-lobby .lobby-player-info summary:focus-visible {
-  outline: 2px solid #f9dea0;
-  border-radius: 8px;
-}
-.lobby-player-menu {
-  position: absolute;
-  top: 44px;
-  right: 0;
-  width: 200px;
-  max-width: calc(100vw - 48px);
-  display: grid;
-  gap: 9px;
-  padding: 16px;
-  text-align: left;
-  border: 1px solid #c6ac70;
-  border-radius: 10px;
-  background: #203c31;
-  color: #fff0cf;
-  box-shadow: 0 12px 32px #0b201a99;
-}
-.lobby-player-menu > span {
-  color: #c8d1bb;
-  font-size: 13px;
-}
-.lobby-player-menu > p {
-  margin: 0;
-  font-size: 14px;
-}
-.lobby-player-menu > button {
-  min-height: 44px;
-  padding: 8px;
-  border: 1px solid #c5aa7280;
-  background: #694235;
-  color: #fff0cf;
-  border-radius: 6px;
-}
 @media (max-width: 650px) {
   .room-lobby .lobby-avatar .avatar-medallion {
     width: clamp(58px, 16vw, 88px);
@@ -922,14 +865,6 @@
   }
   .room-lobby .lobby-configure {
     padding-inline: 12px;
-  }
-  .room-lobby .lobby-player-menu {
-    position: fixed;
-    top: max(80px, env(safe-area-inset-top));
-    right: 16px;
-    left: 16px;
-    width: auto;
-    max-width: none;
   }
 }
 @media (max-height: 550px) and (orientation: landscape) {

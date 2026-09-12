@@ -151,69 +151,71 @@ export function GameSettings({
       </section>
       {room && !room.game && (
         <section className="settings-room" aria-labelledby="timer-label">
-          <div className="settings-row-heading">
-            <label id="timer-label" htmlFor="turn-timer-enabled">
-              <Clock3 />
-              Turn timer
-            </label>
-            <label className="settings-switch">
-              <span aria-hidden="true">{timerEnabled ? 'On' : 'Off'}</span>
-              <input
-                id="turn-timer-enabled"
-                type="checkbox"
-                role="switch"
-                aria-labelledby="timer-label"
-                disabled={timerLocked}
-                checked={timerEnabled}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    turnTimerSeconds: e.target.checked ? DEFAULT_TURN_TIMER_SECONDS : null,
-                  })
-                }
-              />
-            </label>
-          </div>
-          {timerEnabled && (
-            <div className="settings-duration">
-              <output htmlFor="turn-duration">
-                <strong>{seconds}</strong> seconds
-              </output>
-              <input
-                id="turn-duration"
-                className="settings-range"
-                type="range"
-                min="0"
-                max="4"
-                step="1"
-                aria-label="Turn duration"
-                aria-valuetext={`${seconds} seconds`}
-                disabled={timerLocked}
-                style={{ '--range-fill': `${TURN_TIMER_STEPS.indexOf(seconds) * 25}%` } as CSSProperties}
-                value={TURN_TIMER_STEPS.indexOf(seconds)}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    turnTimerSeconds: TURN_TIMER_STEPS[Number(e.target.value)] as TurnTimerSeconds,
-                  })
-                }
-              />
-              <div className="settings-timer-stops" aria-hidden="true">
-                {TURN_TIMER_STEPS.map((n) => (
-                  <span key={n} data-selected={n === seconds}>
-                    {n}
-                  </span>
-                ))}
-              </div>
+          <div className="settings-timer-block">
+            <div className="settings-row-heading">
+              <label id="timer-label" htmlFor="turn-timer-enabled">
+                <Clock3 />
+                Turn timer
+              </label>
+              <label className="settings-switch">
+                <span aria-hidden="true">{timerEnabled ? 'On' : 'Off'}</span>
+                <input
+                  id="turn-timer-enabled"
+                  type="checkbox"
+                  role="switch"
+                  aria-labelledby="timer-label"
+                  disabled={timerLocked}
+                  checked={timerEnabled}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      turnTimerSeconds: e.target.checked ? DEFAULT_TURN_TIMER_SECONDS : null,
+                    })
+                  }
+                />
+              </label>
             </div>
-          )}
-          <p className="settings-caption">
-            {editable
-              ? timerEnabled
-                ? 'Your turn ends when time runs out.'
-                : 'Play at your own pace.'
-              : 'Chosen by the host.'}
-          </p>
+            {timerEnabled && (
+              <div className="settings-duration">
+                <output htmlFor="turn-duration">
+                  <strong>{seconds}</strong> seconds
+                </output>
+                <input
+                  id="turn-duration"
+                  className="settings-range"
+                  type="range"
+                  min="0"
+                  max="4"
+                  step="1"
+                  aria-label="Turn duration"
+                  aria-valuetext={`${seconds} seconds`}
+                  disabled={timerLocked}
+                  style={{ '--range-fill': `${TURN_TIMER_STEPS.indexOf(seconds) * 25}%` } as CSSProperties}
+                  value={TURN_TIMER_STEPS.indexOf(seconds)}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      turnTimerSeconds: TURN_TIMER_STEPS[Number(e.target.value)] as TurnTimerSeconds,
+                    })
+                  }
+                />
+                <div className="settings-timer-stops" aria-hidden="true">
+                  {TURN_TIMER_STEPS.map((n) => (
+                    <span key={n} data-selected={n === seconds}>
+                      {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="settings-caption">
+              {editable
+                ? timerEnabled
+                  ? 'Your turn ends when time runs out.'
+                  : 'Play at your own pace.'
+                : 'Chosen by the host.'}
+            </p>
+          </div>
           <section className="settings-goal" aria-labelledby="victory-target-label">
             <div className="settings-row-heading">
               <label id="victory-target-label" htmlFor="victory-target">

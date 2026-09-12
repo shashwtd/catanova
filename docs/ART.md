@@ -43,7 +43,7 @@ Terrain redraws on load, resize, board changes and context recovery, with no idl
 
 [BoardViewport.tsx](../apps/client/src/BoardViewport.tsx) moves the flat island and walnut table texture together. Scroll, pinch and keyboard controls zoom between 85% and 220%; dragging pans within bounds and suppresses accidental placement clicks. Wheel and keyboard zoom have a short glide that ends at its target. With the board focused, `0` restores the initial view. The interface has no Fit button or tilt settings. Reduced motion removes the camera glide. [Board and dice presentation](3D_NOTES.md).
 
-Each harbor has two procedural planked bridges anchored to its eligible coastal corners and converging toward the boat. The original painted sailboat sprite is displayed horizontally at every port, using an 80-pixel square crop with a roughly 76-pixel visible hull. Both bridges meet a shared point on its shore-facing side. Small resource-colored badges sit above or beside each ship and show its resource and ratio; general ports use a question mark. The nine harbors retain four general and five specific trades. Procedural bridge geometry keeps the piers aligned with the actual rules-engine vertices.
+Each harbor has two procedural planked bridges anchored to its eligible coastal corners. The 80-pixel sailboat sprite rotates with the coastal edge so its exposed side faces land. Each bridge reaches a separate boarding point; the resource-and-ratio badge sits beyond the seaward side of the hull. All rotated ship and badge bounds stay inside the board view. General ports use a question mark; the nine harbors retain four general and five resource-specific trades. Port ownership remains tied to the same two rules-engine vertices.
 
 ## Cards and visual feedback
 
@@ -60,3 +60,5 @@ Font notices ship with the browser distribution: [Cinzel](../apps/client/public/
 Google sign-in uses Google's official unmodified mark and locally served Google Sans. The external repository link uses GitHub's official Invertocat. These are third-party provider assets, excluded from claims about original MIT-licensed Catanova artwork. Their sources, usage terms and the Google Sans OFL notice are recorded in [provider marks](PROVIDER_MARKS.md).
 
 Original repository contributions are distributed under MIT to the extent rights apply. This provenance record asserts no third-party trademark rights or exclusive ownership of generated imagery.
+
+Simpler terrain and water concepts are available only in the development lounge preview. See [concept art and prompts](art/terrain-concept.md); production atlases remain unchanged.

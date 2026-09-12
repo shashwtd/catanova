@@ -1,3 +1,13 @@
+import { GameTools, type GameToolPanel } from '../GameTools.js';
+import { QuickRules } from '../QuickRules.js';
+import { MoveHistory } from '../MoveHistory.js';
+import { ConnectionPanel } from '../ConnectionPanel.js';
+import { initialMetrics } from '../connection.js';
+const conceptArt = {
+  terrain: new URL('./assets/terrain-concept.webp', import.meta.url).href,
+  environment: new URL('./assets/environment-concept.webp', import.meta.url).href,
+  concept: true,
+};
 /** Vite-only design preview. Uses real components with local sample data, never account APIs. */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -7,7 +17,7 @@ import { Lobby } from '../Lobby.js';
 import { FriendsDrawer } from '../FriendsDrawer.js';
 import { RoomInviteNotice } from '../RoomInvitePanel.js';
 import type { RoomInvitesController } from '../useRoomInvites.js';
-import { GameSettings } from '../GameSettings.js';
+import { GameSettings, GameInfo } from '../GameSettings.js';
 import { DEFAULT_PREFERENCES } from '../preferences.js';
 import { Board } from '../Board.js';
 import { BoardViewport } from '../BoardViewport.js';
@@ -113,7 +123,16 @@ function PreviewDialog({
 }
 export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
-  const [panel, setPanel] = useState<'profile' | 'editProfile' | 'settings' | 'friends' | null>(null);
+  const [panel, setPanel] = useState<'profile' | 'editProfile' | 'friends' | GameToolPanel | null>(null);
+  const [concept, setConcept] = useState(false);
+  const [showAwards, setShowAwards] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const update = () => setIsFullscreen(!!document.fullscreenElement);
+    update();
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
+  }, []);
   const [profile, setProfile] = useState<Profile>(seats[0]!.profile);
   const [removedPlayers, setRemovedPlayers] = useState<string[]>([]);
   const [settings, setSettings] = useState(room.settings);
@@ -173,6 +192,24 @@ export function LoungePreview() {
       onShowAll={() => setPanel('friends')}
     />
   );
+  const previewGame = {
+    ...game,
+    diceMode: settings?.diceMode ?? 'classic',
+    victoryPoints: settings?.victoryPoints ?? 10,
+  };
+  const displayedGame = showAwards
+    ? {
+        ...previewGame,
+        longestRoad: seats[0]!.id,
+        largestArmy: seats[1]!.id,
+        players: game.players.map((p, i) => ({
+          ...p,
+          roadLength: i === 0 ? 7 : p.roadLength,
+          knights: i === 1 ? 3 : p.knights,
+          points: p.points + (i < 2 ? 2 : 0),
+        })),
+      }
+    : previewGame;
   const currentRoom = {
     ...room,
     settings,
@@ -226,6 +263,7 @@ export function LoungePreview() {
             <BoardViewport seed={game.board.seed}>
               <Board
                 board={game.board}
+                art={concept ? conceptArt : undefined}
                 game={game}
                 me={me}
                 disabled
@@ -235,12 +273,21 @@ export function LoungePreview() {
               />
             </BoardViewport>
           </div>
-          <PlayerRail room={currentRoom} game={game} me={me} />
-          <nav className="side-controls game-controls">
-            <button className="icon-button" aria-label="Settings" onClick={() => setPanel('settings')}>
-              <Settings2 />
-            </button>
-          </nav>
+          <PlayerRail room={currentRoom} game={displayedGame} me={me} />
+          <GameTools
+            panel={panel}
+            onPanel={setPanel}
+            connected
+            fullscreen={isFullscreen}
+            onFullscreen={() => {
+              void (
+                document.fullscreenElement
+                  ? document.exitFullscreen()
+                  : document.documentElement.requestFullscreen()
+              ).catch(() => {});
+            }}
+            onLeave={() => setPanel('leave')}
+          />
           <div className="construction-tools build-shelf">
             {[Route, House, Castle].map((Icon, i) => (
               <button key={i} className="build-control">
@@ -314,29 +361,113 @@ export function LoungePreview() {
           />
         </PreviewDialog>
       )}
-      <nav className="preview-switcher" aria-label="Local design preview">
-        <span>Sample data</span>
-        {(['hub', 'lobby', 'game'] as const).map((value) => (
+      {panel === 'rules' && (
+        <PreviewDialog title="How to play" onClose={() => setPanel(null)}>
+          <QuickRules victoryPoints={settings?.victoryPoints} />
+        </PreviewDialog>
+      )}
+      {panel === 'info' && (
+        <PreviewDialog title="Game rules" onClose={() => setPanel(null)}>
+          <GameInfo room={{ ...currentRoom, game: displayedGame }} />
+        </PreviewDialog>
+      )}
+      {panel === 'journal' && (
+        <PreviewDialog title="Move history" onClose={() => setPanel(null)}>
+          <MoveHistory
+            game={game}
+            hasMore={false}
+            onEarlier={noop}
+            entries={game.log.map((entry, index) => ({
+              revision: index,
+              actor: null,
+              kind: 'action',
+              turn: Math.floor(index / 2),
+              at: new Date(0).toISOString(),
+              lines: [entry.text],
+            }))}
+          />
+        </PreviewDialog>
+      )}
+      {panel === 'network' && (
+        <PreviewDialog title="Connection · sample data" onClose={() => setPanel(null)}>
+          <ConnectionPanel
+            metrics={{ ...initialMetrics(), samples: [35, 42, 31, 38, 34].map((rtt, i) => ({ at: i, rtt })) }}
+            status="connected"
+            revision={0}
+            pending={false}
+            onSync={noop}
+          />
+        </PreviewDialog>
+      )}
+      {panel === 'leave' && (
+        <PreviewDialog title="Leave this game?" onClose={() => setPanel(null)}>
+          <p>This is a local preview.</p>
+          <div className="room-sheet-actions">
+            <button className="hub-room-button" onClick={() => setPanel(null)}>
+              Stay
+            </button>
+            <button
+              className="hub-room-button"
+              onClick={() => {
+                setPanel(null);
+                setScreen('hub');
+              }}
+            >
+              Leave
+            </button>
+          </div>
+        </PreviewDialog>
+      )}
+      <details className="preview-switcher">
+        <summary>Preview</summary>
+        <nav aria-label="Local design preview">
+          <span>Sample data</span>
+          {(['hub', 'lobby', 'game'] as const).map((value) => (
+            <button
+              key={value}
+              aria-pressed={screen === value}
+              onClick={() => {
+                setScreen(value);
+                setPanel(null);
+              }}
+            >
+              {value}
+            </button>
+          ))}
           <button
-            key={value}
-            aria-pressed={screen === value}
             onClick={() => {
-              setScreen(value);
-              setPanel(null);
+              setScreen('hub');
+              setShowInvite(true);
             }}
           >
-            {value}
+            Test invite
           </button>
-        ))}
-        <button
-          onClick={() => {
-            setScreen('hub');
-            setShowInvite(true);
-          }}
-        >
-          Test invite
-        </button>
-      </nav>
+          <label>
+            <input
+              type="checkbox"
+              checked={concept}
+              onChange={(e) => {
+                setConcept(e.target.checked);
+                setScreen('game');
+                setPanel(null);
+              }}
+            />{' '}
+            Concept terrain &amp; ocean
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={showAwards}
+              onChange={(e) => {
+                setShowAwards(e.target.checked);
+                setScreen('game');
+                setPanel(null);
+              }}
+            />{' '}
+            Show sample awards
+          </label>
+        </nav>
+      </details>
     </main>
   );
 }
