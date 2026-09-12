@@ -101,7 +101,7 @@ export function useRoomInvites(
       if (document.visibilityState === 'visible') void refresh();
     };
     update();
-    const interval = setInterval(update, 15_000);
+    const interval = setInterval(update, 5_000);
     window.addEventListener('focus', update);
     window.addEventListener('online', update);
     document.addEventListener('visibilitychange', update);

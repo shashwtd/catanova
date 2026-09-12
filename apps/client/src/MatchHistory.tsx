@@ -28,13 +28,13 @@ export function PlayerStats({ stats }: { stats?: PlayerGames['stats'] }) {
     <dl className="player-record" aria-label="Your game record">
       <div>
         <dt>
-          <Trophy size={22} /> Wins
+          <Trophy size={22} /> <span>Wins</span>
         </dt>
         <dd>{stats ? stats.wins : '—'}</dd>
       </div>
       <div>
         <dt>
-          <History size={22} /> Games played
+          <History size={22} /> <span>Games played</span>
         </dt>
         <dd>{stats ? stats.played : '—'}</dd>
       </div>

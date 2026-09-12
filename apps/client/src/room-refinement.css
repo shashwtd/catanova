@@ -1,0 +1,416 @@
+/* Pregame controls share the hub's readable, rounded carved-button treatment. */
+.hub-room-button,
+.hub-resume-button,
+.room-lobby .lobby-start-controls > .hub-room-button {
+  clip-path: none;
+  border: 1px solid #bda16b;
+  border-radius: 14px;
+  font:
+    600 18px/1.2 Barlow,
+    sans-serif;
+  box-shadow:
+    inset 0 1px #fff0c940,
+    inset 0 -3px #193c2a,
+    0 3px 5px #08191155;
+}
+.hub-room-button.hub-create-button,
+.room-lobby .lobby-start-controls > .hub-create-button {
+  background: linear-gradient(#f5d58a, #dbad55);
+  border-color: #ead094;
+  color: #3f3020;
+  box-shadow:
+    inset 0 1px #fff0c980,
+    inset 0 -3px #b98239,
+    0 3px 5px #08191155;
+}
+.room-lobby .lobby-friends {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 8px 15px;
+  border: 1px solid #c8b18380;
+  border-radius: 12px;
+  background: linear-gradient(#48624deb, #294536f5);
+  color: #fff0cd;
+  font:
+    600 15px/1 Barlow,
+    sans-serif;
+  box-shadow:
+    inset 0 1px #e4cd9d33,
+    0 3px 6px #15332455;
+}
+.room-lobby .lobby-room-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  justify-content: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.room-lobby .lobby-room-options > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 13px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: #ffefd0;
+  font:
+    500 14px/1.2 Barlow,
+    sans-serif;
+  text-shadow: 0 1px 4px #142c25;
+}
+.room-lobby .lobby-room-options > button + button {
+  border-left: 1px solid #e5d6b84d;
+}
+.room-lobby .lobby-room-options > button:hover {
+  background: #162e2533;
+  border-radius: 6px;
+}
+.room-lobby .lobby-room-options b {
+  margin-left: 3px;
+  font-weight: 600;
+}
+.room-lobby .lobby-seat,
+.room-lobby .lobby-seat.self {
+  min-height: 274px;
+  padding: 40px 14px 25px;
+  gap: 11px;
+  border: 1px solid #c5b0868c;
+  border-radius: 20px 20px 16px 16px;
+  background: linear-gradient(155deg, #455c47f0, #233f32f7 75%);
+  box-shadow:
+    inset 0 1px #f5dfaa40,
+    0 8px 20px #11291f50;
+}
+.room-lobby .lobby-seat.self {
+  border-color: #ebcf83;
+}
+.room-lobby .lobby-seat::before {
+  inset: 7px;
+  border: 1px solid #d7bd7729;
+  border-radius: 14px;
+}
+.room-lobby .lobby-seat::after {
+  content: '';
+  position: absolute;
+  width: 48px;
+  height: 17px;
+  top: 11px;
+  left: 12px;
+  background: url('/art/ui/lobby-crest.svg') center/contain no-repeat;
+  opacity: 0.65;
+  pointer-events: none;
+}
+.room-lobby .lobby-avatar {
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  box-shadow: none;
+}
+.room-lobby .lobby-avatar .avatar-medallion {
+  width: clamp(112px, 10.7vw, 142px);
+  border-radius: 16px;
+  border: 2px solid #d3ba7b;
+  box-shadow:
+    0 0 0 4px #1e362b,
+    0 7px 14px #122a2455;
+}
+.room-lobby .lobby-avatar svg {
+  border-radius: 14px;
+}
+.room-lobby .lobby-seat > strong {
+  font:
+    600 20px/1.2 Barlow,
+    sans-serif;
+  margin-top: 6px;
+}
+.room-lobby .ready-status {
+  padding: 3px 10px;
+  border-radius: 20px;
+  color: #d7dfc8;
+  font-size: 13px;
+}
+.room-lobby .ready-status.ready {
+  background: #92b87e25;
+  color: #e3f0c8;
+}
+.room-lobby .lobby-player-info {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  box-shadow: none;
+  color: #e1cfa8;
+}
+.room-lobby .lobby-player-info:hover,
+.room-lobby .lobby-seat-edit:hover {
+  background: #eddfb514;
+}
+.game-dialog.lobby-sheet {
+  width: 390px;
+  max-width: calc(100vw - 28px);
+  border-radius: 18px;
+  background: #f0e5ca;
+  border: 1px solid #b29762;
+}
+.lobby-sheet .dialog-surface {
+  padding: 24px;
+  background: none;
+  color: #314d3e;
+}
+.lobby-sheet h2 {
+  margin: 0 0 16px;
+  font:
+    600 23px/1.2 Barlow,
+    sans-serif;
+  color: #314d3e;
+}
+.lobby-sheet p {
+  margin: 12px 0 20px;
+  color: #5b6551;
+}
+.room-sheet-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+.room-sheet-actions > button {
+  flex: 1;
+  min-height: 46px;
+  min-width: 0;
+  border-radius: 12px;
+  font:
+    600 16px/1.2 Barlow,
+    sans-serif;
+}
+.room-sheet-player {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.room-sheet-player .avatar-medallion {
+  width: 84px;
+  height: 84px;
+  border-radius: 14px;
+}
+.room-sheet-player > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.room-sheet-player strong {
+  font-size: 21px;
+  overflow-wrap: anywhere;
+}
+.room-sheet-player span {
+  color: #64735b;
+  font-size: 14px;
+}
+/* One compact rules area and two audio sliders, with full-size touch targets. */
+.game-dialog:has(.settings-menu) {
+  width: 640px;
+  max-width: calc(100vw - 28px);
+  border-radius: 18px;
+}
+.game-dialog:has(.settings-menu) .dialog-surface {
+  padding: 20px 24px;
+}
+.game-dialog:has(.settings-menu) .panel-heading {
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+.game-dialog:has(.settings-menu) .panel-heading h2 {
+  font:
+    600 22px/1.2 Barlow,
+    sans-serif;
+}
+.settings-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+}
+.settings-menu .settings-music {
+  margin-top: 0;
+}
+.settings-menu .settings-row-heading {
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  min-height: 28px;
+  gap: 8px;
+}
+.settings-menu .settings-row-heading output {
+  font-size: 16px;
+  min-width: 36px;
+}
+.settings-menu .settings-row-heading svg {
+  width: 21px;
+  height: 21px;
+}
+.settings-menu .settings-volume-control {
+  gap: 10px;
+  margin-top: 3px;
+}
+.settings-menu .settings-mute {
+  width: 40px;
+  height: 44px;
+  padding: 6px;
+  border-radius: 10px;
+}
+.settings-menu .settings-room {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.settings-menu .settings-duration {
+  padding: 0;
+  margin-top: 0;
+  border: 0;
+  background: none;
+}
+.settings-menu .settings-duration output {
+  text-align: left;
+  margin: 0;
+}
+.settings-menu .settings-duration output strong {
+  font-size: 18px;
+}
+.settings-menu .settings-caption {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.settings-menu .settings-goal {
+  margin: 0;
+  padding: 8px 0 0;
+  border: 0;
+  background: none;
+}
+.settings-menu .settings-goal > .settings-range {
+  margin-top: 12px;
+}
+.settings-menu .settings-dice {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 0;
+}
+.settings-menu .settings-dice legend {
+  font-size: 15px;
+  margin-bottom: 7px;
+}
+.settings-menu .settings-dice-option {
+  min-height: 62px;
+  padding: 9px 12px;
+  gap: 9px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.settings-menu .settings-dice-option[data-selected='true'] {
+  background: #dce5ce;
+  border: 2px solid #587759;
+  padding: 8px 11px;
+}
+.settings-menu .settings-dice-option input {
+  appearance: auto;
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+.settings-menu .settings-dice-option strong {
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+}
+.settings-menu .settings-dice-option small {
+  font:
+    400 12px/1.3 Barlow,
+    sans-serif;
+  margin-top: 3px;
+}
+.settings-menu .settings-save,
+.settings-menu .entry-error {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+@media (max-width: 650px) {
+  .room-lobby .lobby-seat,
+  .room-lobby .lobby-seat.self {
+    min-height: 195px;
+    padding: 39px 8px 18px;
+    gap: 9px;
+  }
+  .room-lobby .lobby-avatar .avatar-medallion {
+    width: clamp(58px, 16vw, 88px);
+    border-radius: 12px;
+  }
+  .room-lobby .lobby-seat > strong {
+    font-size: 17px;
+  }
+  .room-lobby .lobby-room-options > button {
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+  .room-lobby .lobby-start-controls > .hub-room-button {
+    font-size: 16px;
+  }
+}
+@media (max-width: 480px) {
+  .game-dialog:has(.settings-menu) .dialog-surface {
+    padding: 16px;
+  }
+  .settings-menu {
+    gap: 0 12px;
+  }
+  .settings-menu .settings-room {
+    gap: 14px 12px;
+  }
+  .settings-menu .settings-dice-option {
+    align-items: flex-start;
+    padding: 10px;
+  }
+  .settings-menu .settings-dice-option[data-selected='true'] {
+    padding: 9px;
+  }
+  .settings-menu .settings-row-heading {
+    font-size: 14px;
+  }
+}
+@media (max-width: 360px) {
+  .settings-menu .settings-room {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-height: 550px) and (orientation: landscape) {
+  .room-lobby .lobby-seat,
+  .room-lobby .lobby-seat.self {
+    min-height: 175px;
+    padding-block: 35px 14px;
+  }
+  .room-lobby .lobby-avatar .avatar-medallion {
+    width: 65px;
+  }
+}

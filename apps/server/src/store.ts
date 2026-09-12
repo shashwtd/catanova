@@ -589,9 +589,18 @@ export class Store {
       hasMore: rows.length > 40,
     };
   }
-  lobby(seat: Seat, commandId: string, expectedRevision: number, ready: boolean, input?: Profile) {
+  lobby(
+    seat: Seat,
+    commandId: string,
+    expectedRevision: number,
+    ready: boolean,
+    input?: Profile,
+    kickPlayerId?: string,
+  ) {
     const profile = input ? parseProfile(input) : undefined;
-    const payloadHash = hash(JSON.stringify({ expectedRevision, ready, profile }));
+    const payloadHash = hash(
+      JSON.stringify({ expectedRevision, ready, profile, ...(kickPlayerId ? { kickPlayerId } : {}) }),
+    );
     return this.transaction(() => {
       this.rejectSettingsReceipt(seat, commandId);
       for (const table of ['receipts', 'game_receipts', 'leave_receipts'])
@@ -624,6 +633,17 @@ export class Store {
       if (this.loadGame(seat.room_id)) throw new ProtocolError('GAME_STARTED', 'The game has started');
       if (!room.players.some((p) => p.id === seat.id))
         throw new ProtocolError('SEAT_LEFT', 'You left this lobby');
+      if (kickPlayerId) {
+        if (room.players[0]?.id !== seat.id)
+          throw new ProtocolError('NOT_HOST', 'Only the host can remove players');
+        if (expectedRevision !== room.revision)
+          throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
+        if (input || kickPlayerId === seat.id || !room.players.some((p) => p.id === kickPlayerId))
+          throw new ProtocolError('INVALID_PLAYER', 'Choose another player in this lobby');
+        this.db
+          .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE id = ? AND room_id = ?')
+          .run(kickPlayerId, seat.room_id);
+      }
       if (profile) {
         this.db
           .prepare('UPDATE seats SET name = ?, profile = ? WHERE id = ?')
@@ -631,7 +651,8 @@ export class Store {
         const account = this.db.prepare('SELECT user_id FROM seats WHERE id = ?').get(seat.id)!;
         if (typeof account.user_id === 'string') this.saveProfile(account.user_id, profile);
       }
-      this.db.prepare('UPDATE seats SET ready = ? WHERE id = ?').run(Number(ready), seat.id);
+      if (!kickPlayerId)
+        this.db.prepare('UPDATE seats SET ready = ? WHERE id = ?').run(Number(ready), seat.id);
       const revision = room.revision + 1;
       this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
       this.db
@@ -644,7 +665,10 @@ export class Store {
   settings(roomId: string): RoomSettings {
     const row = this.db.prepare('SELECT settings FROM room_settings WHERE room_id = ?').get(roomId) as
       { settings: string } | undefined;
-    return row ? parseRoomSettings(JSON.parse(row.settings)) : { ...DEFAULT_ROOM_SETTINGS };
+    if (!row) return { ...DEFAULT_ROOM_SETTINGS };
+    const saved = JSON.parse(row.settings);
+    if (saved.diceMode === 'flat') saved.diceMode = 'classic';
+    return parseRoomSettings(saved);
   }
   private rejectSettingsReceipt(seat: Seat, commandId: string) {
     if (
@@ -1075,7 +1099,7 @@ export class Store {
           ),
           room.board.seed,
           this.random,
-          { diceMode: this.settings(seat.room_id).diceMode ?? 'classic' },
+          this.settings(seat.room_id),
         );
       } else {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');

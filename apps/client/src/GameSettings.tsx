@@ -1,3 +1,8 @@
+import {
+  DEFAULT_VICTORY_POINTS,
+  MIN_VICTORY_POINTS,
+  MAX_VICTORY_POINTS,
+} from '../../../packages/rules/src/victory.js';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { ArrowLeftRight, Check, Clock3, Dices, Trophy, Volume2, VolumeX } from './GameIcons.js';
@@ -40,7 +45,9 @@ export function GameSettings({
     timerLocked = !editable || busy || saving,
     changed =
       draft.turnTimerSeconds !== (room?.settings ?? DEFAULT_ROOM_SETTINGS).turnTimerSeconds ||
-      (draft.diceMode ?? 'classic') !== (room?.settings?.diceMode ?? 'classic');
+      (draft.diceMode ?? 'classic') !== (room?.settings?.diceMode ?? 'classic') ||
+      (draft.victoryPoints ?? DEFAULT_VICTORY_POINTS) !==
+        (room?.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS);
   const lastVolume = useRef(preferences.volume || DEFAULT_PREFERENCES.volume);
   const lastMusicVolume = useRef(preferences.musicVolume || DEFAULT_PREFERENCES.musicVolume);
   const musicMuted = !preferences.music || preferences.musicVolume === 0;
@@ -53,7 +60,7 @@ export function GameSettings({
   }, [preferences.musicVolume]);
   useEffect(
     () => setDraft(room?.settings ?? DEFAULT_ROOM_SETTINGS),
-    [room?.roomId, room?.settings?.turnTimerSeconds, room?.settings?.diceMode],
+    [room?.roomId, room?.settings?.turnTimerSeconds, room?.settings?.diceMode, room?.settings?.victoryPoints],
   );
   return (
     <div className="settings-content settings-menu">
@@ -144,74 +151,106 @@ export function GameSettings({
       </section>
       {room && !room.game && (
         <section className="settings-room" aria-labelledby="timer-label">
-          <div className="settings-row-heading">
-            <label id="timer-label" htmlFor="turn-timer-enabled">
-              <Clock3 />
-              Turn timer
-            </label>
-            <label className="settings-switch">
-              <span aria-hidden="true">{timerEnabled ? 'On' : 'Off'}</span>
-              <input
-                id="turn-timer-enabled"
-                type="checkbox"
-                role="switch"
-                aria-labelledby="timer-label"
-                disabled={timerLocked}
-                checked={timerEnabled}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    turnTimerSeconds: e.target.checked ? DEFAULT_TURN_TIMER_SECONDS : null,
-                  })
-                }
-              />
-            </label>
-          </div>
-          {timerEnabled && (
-            <div className="settings-duration">
-              <output htmlFor="turn-duration">
-                <strong>{seconds}</strong> seconds
-              </output>
-              <input
-                id="turn-duration"
-                className="settings-range"
-                type="range"
-                min="0"
-                max="4"
-                step="1"
-                aria-label="Turn duration"
-                aria-valuetext={`${seconds} seconds`}
-                disabled={timerLocked}
-                style={{ '--range-fill': `${TURN_TIMER_STEPS.indexOf(seconds) * 25}%` } as CSSProperties}
-                value={TURN_TIMER_STEPS.indexOf(seconds)}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    turnTimerSeconds: TURN_TIMER_STEPS[Number(e.target.value)] as TurnTimerSeconds,
-                  })
-                }
-              />
-              <div className="settings-timer-stops" aria-hidden="true">
-                {TURN_TIMER_STEPS.map((n) => (
-                  <span key={n} data-selected={n === seconds}>
-                    {n}
-                  </span>
-                ))}
-              </div>
+          <div className="settings-timer-block">
+            <div className="settings-row-heading">
+              <label id="timer-label" htmlFor="turn-timer-enabled">
+                <Clock3 />
+                Turn timer
+              </label>
+              <label className="settings-switch">
+                <span aria-hidden="true">{timerEnabled ? 'On' : 'Off'}</span>
+                <input
+                  id="turn-timer-enabled"
+                  type="checkbox"
+                  role="switch"
+                  aria-labelledby="timer-label"
+                  disabled={timerLocked}
+                  checked={timerEnabled}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      turnTimerSeconds: e.target.checked ? DEFAULT_TURN_TIMER_SECONDS : null,
+                    })
+                  }
+                />
+              </label>
             </div>
-          )}
-          <p className="settings-caption">
-            {editable
-              ? timerEnabled
-                ? 'Your turn ends when time runs out.'
-                : 'Play at your own pace.'
-              : 'Chosen by the host.'}
-          </p>
+            {timerEnabled && (
+              <div className="settings-duration">
+                <output htmlFor="turn-duration">
+                  <strong>{seconds}</strong> seconds
+                </output>
+                <input
+                  id="turn-duration"
+                  className="settings-range"
+                  type="range"
+                  min="0"
+                  max="4"
+                  step="1"
+                  aria-label="Turn duration"
+                  aria-valuetext={`${seconds} seconds`}
+                  disabled={timerLocked}
+                  style={{ '--range-fill': `${TURN_TIMER_STEPS.indexOf(seconds) * 25}%` } as CSSProperties}
+                  value={TURN_TIMER_STEPS.indexOf(seconds)}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      turnTimerSeconds: TURN_TIMER_STEPS[Number(e.target.value)] as TurnTimerSeconds,
+                    })
+                  }
+                />
+                <div className="settings-timer-stops" aria-hidden="true">
+                  {TURN_TIMER_STEPS.map((n) => (
+                    <span key={n} data-selected={n === seconds}>
+                      {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="settings-caption">
+              {editable
+                ? timerEnabled
+                  ? 'Your turn ends when time runs out.'
+                  : 'Play at your own pace.'
+                : 'Chosen by the host.'}
+            </p>
+          </div>
+          <section className="settings-goal" aria-labelledby="victory-target-label">
+            <div className="settings-row-heading">
+              <label id="victory-target-label" htmlFor="victory-target">
+                <Trophy /> Points to win
+              </label>
+              <output htmlFor="victory-target">{draft.victoryPoints ?? DEFAULT_VICTORY_POINTS}</output>
+            </div>
+            <input
+              id="victory-target"
+              type="range"
+              className="settings-range"
+              min={MIN_VICTORY_POINTS}
+              max={MAX_VICTORY_POINTS}
+              step={1}
+              value={draft.victoryPoints ?? DEFAULT_VICTORY_POINTS}
+              disabled={timerLocked}
+              aria-valuetext={`${draft.victoryPoints ?? DEFAULT_VICTORY_POINTS} victory points`}
+              style={
+                {
+                  '--range-fill': `${(((draft.victoryPoints ?? DEFAULT_VICTORY_POINTS) - MIN_VICTORY_POINTS) / (MAX_VICTORY_POINTS - MIN_VICTORY_POINTS)) * 100}%`,
+                } as CSSProperties
+              }
+              onChange={(event) => setDraft({ ...draft, victoryPoints: Number(event.target.value) })}
+            />
+            <div className="settings-timer-stops">
+              <span>{MIN_VICTORY_POINTS}</span>
+              <span>10 · Standard</span>
+              <span>{MAX_VICTORY_POINTS}</span>
+            </div>
+          </section>
           <fieldset className="settings-dice" disabled={timerLocked}>
             <legend>
               <Dices /> Dice
             </legend>
-            {(['classic', 'flat'] as const).map((mode) => (
+            {(['classic', 'balanced'] as const).map((mode) => (
               <label
                 key={mode}
                 className="settings-dice-option"
@@ -225,11 +264,11 @@ export function GameSettings({
                   onChange={() => setDraft({ ...draft, diceMode: mode })}
                 />
                 <span>
-                  <strong>{mode === 'classic' ? 'Classic' : 'Flat totals'}</strong>
+                  <strong>{mode === 'classic' ? 'Natural' : 'Balanced'}</strong>
                   <small>
                     {mode === 'classic'
                       ? 'Two normal dice. 7 is most common.'
-                      : 'Each total 2–12 has the same chance. House rule.'}
+                      : 'A dice deck smooths extremes and reduces repeats.'}
                   </small>
                 </span>
               </label>
@@ -270,6 +309,7 @@ export function GameSettings({
 /** Frozen match rules live here; the in-game settings menu remains audio-only. */
 export function GameInfo({ room }: { room: RoomState }) {
   const settings = room.settings ?? DEFAULT_ROOM_SETTINGS;
+  const balanced = (room.game?.diceMode ?? settings.diceMode) === 'balanced';
   const flat = (room.game?.diceMode ?? settings.diceMode ?? 'classic') === 'flat';
   return (
     <div className="game-info-content">
@@ -278,7 +318,9 @@ export function GameInfo({ room }: { room: RoomState }) {
           <dt>
             <Trophy /> Goal
           </dt>
-          <dd>10 points on your turn</dd>
+          <dd>
+            {room.game?.victoryPoints ?? settings.victoryPoints ?? DEFAULT_VICTORY_POINTS} points on your turn
+          </dd>
         </div>
         <div>
           <dt>
@@ -291,11 +333,13 @@ export function GameInfo({ room }: { room: RoomState }) {
             <Dices /> Dice
           </dt>
           <dd>
-            {flat ? 'Flat totals' : 'Classic'}
+            {flat ? 'Legacy flat totals' : balanced ? 'Balanced' : 'Natural'}
             <small>
               {flat
                 ? 'Every total from 2 to 12 has a 1 in 11 chance. This house rule changes production and robber odds.'
-                : 'Two independent six-sided dice. 7 is most likely; 2 and 12 are rarest.'}
+                : balanced
+                  ? 'Draws from 36 dice pairs, refreshes with 12 left, and reduces the previous total’s weight by 30%. No player-based adjustments.'
+                  : 'Two independent six-sided dice. 7 is most likely; 2 and 12 are rarest.'}
             </small>
           </dd>
         </div>

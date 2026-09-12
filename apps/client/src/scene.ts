@@ -4,11 +4,10 @@ export const HEX_SIZE = 64;
 export const WORLD = { x: -392, y: -368, width: 784, height: 736 };
 export const WATER_BAND = 90;
 export const WATER_FEATHER = 48;
-/** The original square sprite turns sideways; its painted hull is roughly 76px wide. */
+/** The square sprite rotates so its long axis follows its coastal edge. */
 export const SHIP_SIZE = 80;
 export const SHIP_BOUNDS = { x: -SHIP_SIZE / 2, y: -SHIP_SIZE / 2, width: SHIP_SIZE, height: SHIP_SIZE };
 export const PORT_BADGE_BOUNDS = { x: -24, y: -11, width: 48, height: 22 };
-export const SHIP_BOARDING_RADII = { x: 31, y: 16 };
 export const WATER_EDGE_WAVES = [
   { frequency: 5, phase: 0.35, amplitude: 1.7 },
   { frequency: 9, phase: 1.7, amplitude: 0.65 },
@@ -127,27 +126,31 @@ export function portPlacement(board: Board, edgeId: number) {
     length = Math.hypot(dx, dy);
   const nx = dx / length,
     ny = dy / length;
-  const boatX = x + nx * 54,
-    boatY = y + ny * 54;
-  // Boats stay horizontal. Meet the shore-facing side of their painted hull,
-  // rather than using the old boarding point for a boat that rotated with the coast.
-  const boardingDistance = 1 / Math.hypot(nx / SHIP_BOARDING_RADII.x, ny / SHIP_BOARDING_RADII.y);
-  const boarding = { x: boatX - nx * boardingDistance, y: boatY - ny * boardingDistance };
-  // Lower ports board from above, so their label sits beside the ship instead.
-  const badgeBeside = ny > 0.5;
+  const boatX = x + nx * 38,
+    boatY = y + ny * 38;
+  // The sprite's long axis is vertical: rotate it tangent to this coast edge.
+  // Its exposed left gunwale faces shore; the sail and cargo badge face open water.
+  const angle = (Math.atan2(ny, nx) * 180) / Math.PI;
+  const tx = -ny,
+    ty = nx;
+  const badgeDistance = 24 * Math.abs(nx) + 11 * Math.abs(ny) + 24;
+
   return {
     x,
     y,
     nx,
     ny,
-    angle: 90,
+    angle,
     bridges: [a, b].map((v) => ({
       from: { x: v.x * HEX_SIZE, y: v.y * HEX_SIZE },
-      to: boarding,
+      to: {
+        x: boatX - nx * 14 + tx * (Math.sign((v.x * HEX_SIZE - x) * tx + (v.y * HEX_SIZE - y) * ty) * 13),
+        y: boatY - ny * 14 + ty * (Math.sign((v.x * HEX_SIZE - x) * tx + (v.y * HEX_SIZE - y) * ty) * 13),
+      },
     })),
     boatX,
     boatY,
-    markerX: boatX + (badgeBeside ? (nx < 0 ? -61 : 61) : 0),
-    markerY: boatY + (badgeBeside ? 0 : -32),
+    markerX: boatX + nx * badgeDistance,
+    markerY: boatY + ny * badgeDistance,
   };
 }

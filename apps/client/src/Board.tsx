@@ -4,7 +4,7 @@ import type { Board as Island } from '../../../packages/rules/src/board.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
-import { Terrain } from './Terrain.js';
+import { Terrain, type TerrainArt } from './Terrain.js';
 import { DICE_READABLE_MS } from './DiceThrow.js';
 import type { BuildAction } from './placement.js';
 import {
@@ -23,7 +23,7 @@ import {
   WORLD,
 } from './scene.js';
 
-export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#e2bd4c'] as const;
+export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#f2ce56'] as const;
 // Visible immediately, underneath the artwork, even when a texture is still downloading.
 const TERRAIN_BASE = {
   wood: '#57815a',
@@ -129,6 +129,7 @@ export function Board({
   effectId,
   pendingBuild = null,
   selectedRobberHex = null,
+  art,
 }: {
   board: Island;
   game?: GameView;
@@ -141,6 +142,7 @@ export function Board({
   effectId?: string;
   pendingBuild?: BuildAction | null;
   selectedRobberHex?: number | null;
+  art?: TerrainArt;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
   const coast = useMemo(() => coastline(board), [board.seed]);
@@ -195,7 +197,7 @@ export function Board({
       className={`island-stage ${gpuReady ? 'gpu-ready' : ''}`}
       style={{ aspectRatio: `${WORLD.width}/${WORLD.height}` }}
     >
-      <Terrain board={board} onReady={setGpuReady} />
+      <Terrain board={board} onReady={setGpuReady} art={art} />
       <svg
         className="island"
         viewBox={`${WORLD.x} ${WORLD.y} ${WORLD.width} ${WORLD.height}`}
@@ -255,7 +257,7 @@ export function Board({
                     viewBox={`${MATERIAL_GUTTER} ${row * 512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
                   >
                     <image
-                      href="/art/optimized/environment-painted.00c506c983c0.webp"
+                      href={art?.environment ?? '/art/optimized/environment-painted.00c506c983c0.webp'}
                       width="1024"
                       height="1024"
                     />
@@ -336,7 +338,11 @@ export function Board({
                   height={SIZE * 2}
                   viewBox={`${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
                 >
-                  <image href="/art/optimized/terrain-fantasy.777e0ac07117.webp" width="1536" height="1024" />
+                  <image
+                    href={art?.terrain ?? '/art/optimized/terrain-fantasy.777e0ac07117.webp'}
+                    width="1536"
+                    height="1024"
+                  />
                 </svg>
               </g>
             );

@@ -13,7 +13,6 @@ import {
   MATERIAL_GUTTER,
   MATERIAL_QUADRANTS,
   SHIP_BOUNDS,
-  SHIP_BOARDING_RADII,
   PORT_BADGE_BOUNDS,
   WATER_FEATHER,
 } from '../apps/client/src/scene.js';
@@ -49,7 +48,7 @@ test('the calm continuous water band follows the coast and leaves room for its s
   assert.ok(coast.every((point) => coastDistance(outline, point.x, point.y) < 0));
 });
 
-test('horizontal painted ships and compact badges fit every coast, with both bridges meeting the hull', () => {
+test('coast-aligned ships and outer trade badges fit every coast, with separate boarding points', () => {
   for (const seed of [1, 42, 2026, 98765]) {
     const board = generateBoard(seed);
     const coast = coastline(board)
@@ -71,19 +70,24 @@ test('horizontal painted ships and compact badges fit every coast, with both bri
       assert.ok(Math.abs(pose.x - ((a.x + b.x) * HEX_SIZE) / 2) < 1e-8);
       assert.ok(Math.abs(pose.y - ((a.y + b.y) * HEX_SIZE) / 2) < 1e-8);
       const angle = (pose.angle * Math.PI) / 180;
-      assert.equal(pose.angle, 90, 'all source sprites turn into the same horizontal orientation');
+      assert.ok(
+        Math.abs(Math.cos(angle) * pose.nx + Math.sin(angle) * pose.ny - 1) < 1e-8,
+        'the ship side faces the coast and its length follows the edge',
+      );
       assert.equal(pose.bridges.length, 2);
       assert.deepEqual(
         pose.bridges.map((bridge) => bridge.from),
         [a, b].map((vertex) => ({ x: vertex.x * HEX_SIZE, y: vertex.y * HEX_SIZE })),
       );
-      assert.deepEqual(pose.bridges[0]!.to, pose.bridges[1]!.to);
+      assert.notDeepEqual(pose.bridges[0]!.to, pose.bridges[1]!.to, 'each bridge has its own boarding point');
       for (const bridge of pose.bridges) {
         const localX = bridge.to.x - pose.boatX,
           localY = bridge.to.y - pose.boatY;
+        const hullX = localX * Math.cos(angle) + localY * Math.sin(angle);
+        const hullY = -localX * Math.sin(angle) + localY * Math.cos(angle);
         assert.ok(
-          Math.abs((localX / SHIP_BOARDING_RADII.x) ** 2 + (localY / SHIP_BOARDING_RADII.y) ** 2 - 1) < 1e-8,
-          'both bridges end at the horizontal hull boundary',
+          hullX < 0 && Math.abs(hullX) < SHIP_BOUNDS.width / 2 && Math.abs(hullY) < SHIP_BOUNDS.width / 2,
+          'boarding is on the exposed shore-facing side of the sprite',
         );
         assert.ok(localX * pose.nx + localY * pose.ny < 0, 'boarding meets the shore-facing hull');
         assert.ok(
@@ -91,9 +95,10 @@ test('horizontal painted ships and compact badges fit every coast, with both bri
           'bridges extend outward from the actual eligible vertices',
         );
       }
+      const badgeOutward = (pose.markerX - pose.boatX) * pose.nx + (pose.markerY - pose.boatY) * pose.ny;
       assert.ok(
-        Math.abs(pose.markerY - pose.boatY) >= 32 - 1e-8 || Math.abs(pose.markerX - pose.boatX) >= 61 - 1e-8,
-        'compact resource badges sit above or beside the boat',
+        badgeOutward - (24 * Math.abs(pose.nx) + 11 * Math.abs(pose.ny)) > 16,
+        'the entire trade badge is beyond the seaward side of the hull',
       );
       const shipCorners = [SHIP_BOUNDS.x, SHIP_BOUNDS.x + SHIP_BOUNDS.width].flatMap((x) =>
         [SHIP_BOUNDS.y, SHIP_BOUNDS.y + SHIP_BOUNDS.height].map((y) => ({

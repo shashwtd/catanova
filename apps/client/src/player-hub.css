@@ -3,42 +3,29 @@
   height: auto;
   min-height: 100dvh;
   overflow: auto;
-  background-color: #153344;
-  background-image:
-    url('/art/ui/surface-grain.svg'), url('/art/ui/hub-atlas.svg'),
-    radial-gradient(ellipse at 35% 10%, #376176a1, transparent 66%),
-    linear-gradient(165deg, #1b4051, #142d3a 72%, #163b42);
-  background-size:
-    128px 128px,
-    max(1280px, 100vw) auto,
-    cover,
-    cover;
-  background-position:
-    center,
-    center top,
-    center,
-    center;
-  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background: var(--lounge-backdrop);
+  background-size: cover;
+  background-position: center;
 }
 .player-home .title-scenery {
   display: none;
 }
 
 .player-hub {
-  --hub-cream: #fff1cf;
-  --hub-gold: #f5ce70;
+  --hub-cream: var(--game-cream);
+  --hub-gold: var(--game-gold);
   --hub-ink: #244539;
   position: relative;
   z-index: 1;
-  width: min(1440px, 100%);
-  min-height: 100dvh;
+  width: min(1080px, 100%);
+  min-height: 0;
   margin: auto;
   padding: max(22px, env(safe-area-inset-top)) clamp(20px, 4vw, 60px) max(24px, env(safe-area-inset-bottom));
   padding-left: max(clamp(20px, 4vw, 60px), env(safe-area-inset-left));
   padding-right: max(clamp(20px, 4vw, 60px), env(safe-area-inset-right));
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
   color: var(--hub-cream);
   font-family: Barlow, sans-serif;
 }
@@ -81,7 +68,7 @@
 }
 .player-hub .avatar-medallion,
 .player-overview .avatar-medallion {
-  border-radius: 14px 4px 14px 4px;
+  border-radius: 12px;
   border: 2px solid #d6ba70;
   background: #eadfbd;
   box-shadow:
@@ -209,7 +196,7 @@
   width: clamp(160px, 22vw, 270px);
   height: clamp(160px, 22vw, 270px);
   border: 4px solid #f4dba0;
-  border-radius: 38px 10px 38px 10px;
+  border-radius: 24px;
   box-shadow:
     0 0 0 5px #284d3c,
     0 0 0 7px #c7a458;
@@ -270,10 +257,10 @@
   justify-self: end;
 }
 .match-history {
-  color: #29473d;
-  background: linear-gradient(135deg, #fbf0d8, #e5d7b9);
-  border: 1px solid #fcebc1;
-  border-radius: 3px 14px 3px 14px;
+  color: var(--game-cream);
+  background: var(--game-panel-fill);
+  border: 1px solid var(--game-trim);
+  border-radius: var(--game-radius);
   box-shadow:
     0 5px 0 #203c32b3,
     0 15px 36px #102f3038;
@@ -308,12 +295,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
-  min-height: 210px;
+  padding: 26px 20px;
+  min-height: 170px;
   text-align: center;
 }
 .hub-history-empty > svg {
-  color: #82916e;
+  color: #bca975;
 }
 .hub-history-empty h3 {
   font:
@@ -323,7 +310,7 @@
 }
 .hub-history-empty p {
   margin: 0;
-  color: #5d6757;
+  color: var(--game-muted);
   font-size: 15px;
 }
 .hub-history-error {
@@ -345,28 +332,28 @@
   display: flex;
   align-items: center;
   gap: 13px;
-  padding: 17px 21px;
+  padding: 13px 19px;
   cursor: pointer;
 }
 .match-row summary::-webkit-details-marker {
   display: none;
 }
 .match-row summary:hover {
-  background: #fff6dc80;
+  background: #f4dca80b;
 }
 .match-outcome-mark {
   display: grid;
   place-items: center;
   width: 38px;
   height: 38px;
-  color: #738274;
+  color: #aaa98b;
   flex: none;
 }
 .outcome-won .match-outcome-mark {
-  color: #ab7225;
+  color: #ebc777;
 }
 .outcome-playing .match-outcome-mark {
-  color: #3d817b;
+  color: #b5d2ae;
 }
 .match-summary-text {
   min-width: 0;
@@ -379,7 +366,7 @@
 }
 .match-summary-text small {
   font-size: 12px;
-  color: #697461;
+  color: var(--game-muted);
 }
 .match-score {
   display: grid;
@@ -395,25 +382,25 @@
 }
 .match-score small {
   font-size: 11px;
-  color: #697461;
+  color: var(--game-muted);
 }
 .match-row time {
   font-size: 12px;
   text-align: right;
   width: 62px;
   flex: none;
-  color: #67705e;
+  color: var(--game-muted);
 }
 .match-expand {
   flex: none;
-  color: #71816a;
+  color: #c7bd9f;
 }
 .match-row[open] .match-expand {
   transform: rotate(180deg);
 }
 .match-detail {
   padding: 0 22px 17px;
-  background: #fffae53d;
+  background: #101f192b;
 }
 .match-scoreboard {
   margin: 0;
@@ -478,7 +465,7 @@
   min-height: 44px;
 }
 .record-caption {
-  color: #67705e;
+  color: var(--game-muted);
   margin: 15px 22px;
   font-size: 12px;
   text-align: center;
@@ -549,37 +536,41 @@
   justify-content: flex-end;
   gap: 16px;
 }
-.hub-join-button,
+.hub-room-button,
 .hub-resume-button {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 14px;
-  min-height: 54px;
-  font-size: 17px;
-  font-weight: 600;
-  color: #fff0c8;
-  background: #193e35e6;
-  border: 1px solid #a2b48780;
-  border-bottom: 3px solid #0b2c26;
-  border-radius: 8px 3px 8px 3px;
-  padding: 12px 22px;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 60px;
+  padding: 12px 18px;
+  font:
+    600 19px/1.2 Barlow,
+    sans-serif;
+  border: 1px solid #bda16b;
+  border-bottom: 4px solid #12251f;
+  border-radius: 9px;
+  background: linear-gradient(#4e715c, #305340);
+  box-shadow:
+    inset 0 1px #fff0c940,
+    0 3px 5px #08191155;
+  color: #fff0cd;
   white-space: nowrap;
 }
-.hub-play-controls .hub-create-button {
-  min-height: 64px;
-  padding: 14px 28px;
-  font:
-    700 20px Barlow,
-    sans-serif;
-  color: #48351d;
-  background: linear-gradient(#ffe7a2, #f2bd55);
-  border: 1px solid #ffedae;
-  border-bottom: 5px solid #a16528;
-  border-radius: 10px 4px 10px 4px;
-  box-shadow:
-    0 3px 0 #172f27,
-    inset 0 1px 0 #fff6d8;
-  white-space: nowrap;
+.hub-room-button.hub-create-button {
+  background: linear-gradient(#f5d58a, #dbad55);
+  border-color: #ead094;
+  border-bottom-color: #885c2f;
+  color: #3f3020;
+}
+.hub-room-button:hover:not(:disabled),
+.hub-resume-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.hub-room-button:active:not(:disabled),
+.hub-resume-button:active:not(:disabled) {
+  translate: 0 2px;
 }
 .hub-join-form {
   position: relative;
@@ -862,7 +853,7 @@
     width: 155px;
     height: 155px;
     border-width: 3px;
-    border-radius: 24px 7px 24px 7px;
+    border-radius: 18px;
   }
   .hub-character-name {
     font-size: 23px;
@@ -903,19 +894,13 @@
     flex: 1;
     justify-content: center;
   }
-  .hub-play-controls .hub-create-button {
-    min-height: 57px;
-    padding: 11px 18px;
-    font-size: 19px;
-  }
   .hub-play-controls .hub-resume-button {
     order: -1;
     flex-basis: 100%;
     min-height: 44px;
   }
   .hub-join-button {
-    min-height: 57px;
-    padding-inline: 16px;
+    padding-inline: 12px;
   }
   .hub-join-form {
     width: 100%;

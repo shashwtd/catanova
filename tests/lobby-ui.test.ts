@@ -90,7 +90,7 @@ test('room gathering shows actual players with small invitations instead of four
       buttons(html).filter((button) => button.includes('aria-label="Invite player"')).length,
       Math.min(2, 4 - count),
     );
-    assert.ok(html.includes('2–4 players'));
+    assert.ok(html.includes('10 points'));
     assert.ok(!html.includes('Your crew') && !html.includes('open-seat'));
     assert.ok(!html.includes(`${count}/4`));
     const start = buttons(html).find((button) => text(button) === 'Start game')!;

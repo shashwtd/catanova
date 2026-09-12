@@ -1,9 +1,10 @@
+import { DEFAULT_VICTORY_POINTS, validVictoryPoints } from './victory.js';
 import { COSTS, DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES, SUPPLY, RULESET } from './index.js';
 import type { Resource } from './index.js';
 import { generateBoard, shuffle } from './board.js';
 import type { Board } from './board.js';
 import { rollDice } from './dice.js';
-import type { DiceMode } from './dice.js';
+import type { DiceMode, BalancedDiceState } from './dice.js';
 
 export type Hand = Record<Resource, number>;
 export type CardKind = keyof typeof DEVELOPMENT_DECK;
@@ -22,7 +23,7 @@ export type Game = {
   discards: Record<string, number>; trade: Trade | null; nextTrade: number;
   longestRoad: string | null; largestArmy: string | null; winner: string | null;
   finishReason?: 'resignation' | 'abandoned';
-  diceMode?: DiceMode; tradeOffersThisTurn?: number;
+  diceMode?: DiceMode | 'flat'; balancedDice?: BalancedDiceState; victoryPoints?: number; tradeOffersThisTurn?: number;
   log: { id: number; text: string }[]; nextLog: number;
 };
 export type GameAction =
@@ -80,7 +81,8 @@ export function parseGameAction(input: unknown): GameAction {
   }
 }
 
-export function createGame(seats: { id: string; name: string }[], seed: number, random: () => number, options: { diceMode?: DiceMode } = {}): Game {
+export function createGame(seats: { id: string; name: string }[], seed: number, random: () => number, options: { diceMode?: DiceMode; victoryPoints?: number } = {}): Game {
+  requireRule(options.victoryPoints === undefined || validVictoryPoints(options.victoryPoints), 'Choose a victory target from 8 to 15 points');
   requireRule(seats.length >= 2 && seats.length <= 4, 'Start with two to four players');
   requireRule(new Set(seats.map(p => p.id)).size === seats.length, 'Seats must be unique');
   const board = generateBoard(seed);
@@ -90,7 +92,7 @@ export function createGame(seats: { id: string; name: string }[], seed: number, 
     phase: 'setupSettlement', active: 0, setupIndex: 0, setupVertex: null, turn: 0, dice: null,
     deck: shuffle(Object.entries(DEVELOPMENT_DECK).flatMap(([k, n]) => Array<CardKind>(n).fill(k as CardKind)), random), nextCard: 0,
     playedCard: false, returnPhase: 'actions', freeRoads: 0, discards: {}, trade: null, nextTrade: 0,
-    longestRoad: null, largestArmy: null, winner: null, log: [], nextLog: 0, diceMode: options.diceMode ?? 'classic', tradeOffersThisTurn: 0,
+    longestRoad: null, largestArmy: null, winner: null, log: [], nextLog: 0, diceMode: options.diceMode ?? 'classic', victoryPoints: options.victoryPoints ?? DEFAULT_VICTORY_POINTS, tradeOffersThisTurn: 0,
   };
   log(g, 'The island is ready. Place two settlements and roads in snake order.');
   return g;
@@ -147,7 +149,7 @@ function updateAwards(g: Game) {
   }
 }
 function checkWin(g: Game) {
-  if (g.turn && !activePlayer(g).resigned && score(g, activePlayer(g)) >= 10) { g.winner = activePlayer(g).id; g.phase = 'finished'; g.trade = null; log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`); }
+  if (g.turn && !activePlayer(g).resigned && score(g, activePlayer(g)) >= (g.victoryPoints ?? DEFAULT_VICTORY_POINTS)) { g.winner = activePlayer(g).id; g.phase = 'finished'; g.trade = null; log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`); }
 }
 export function robberVictims(g: BoardState & { players?: { id: string; resigned?: boolean }[] }, player: string, hex: number): string[] {
   return [...new Set(g.board.hexes[hex]!.vertices.map(v => g.buildings[v]?.player).filter((p): p is string => !!p && p !== player && !g.players?.find(other => other.id === p)?.resigned))];
@@ -387,7 +389,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   }
   if (a.kind === 'roll') {
     requireRule(g.phase === 'roll', 'You have already rolled or must finish the current action');
-    g.dice = rollDice(g.diceMode ?? 'classic', random);
+    if (g.diceMode === 'balanced') g.balancedDice ??= { remaining: [] };
+    g.dice = rollDice(g.diceMode ?? 'classic', random, g.balancedDice);
     const sum = g.dice[0] + g.dice[1]; log(g, `${p.name} rolled ${g.dice[0]} + ${g.dice[1]} = ${sum}.`);
     if (sum === 7) {
       g.discards = Object.fromEntries(g.players.filter(other => !other.resigned && total(other.hand) > 7).map(other => [other.id, Math.floor(total(other.hand) / 2)]));
@@ -436,12 +439,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
 
 export const CARD_NAMES: Record<CardKind, string> = { knight: 'Knight', roadBuilding: 'Road Building', yearOfPlenty: 'Year of Plenty', monopoly: 'Monopoly', victoryPoint: 'Victory Point' };
 export type PlayerView = { id: string; name: string; resigned?: boolean; resourceCount: number; cardCount: number; knights: number; points: number; roadLength: number; pieces: ReturnType<typeof pieces>; hand?: Hand; cards?: Card[] };
-export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 'nextTrade'> & {
+export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 'nextTrade' | 'balancedDice'> & {
   deckCount: number; players: PlayerView[];
   legal: { roads: number[]; settlements: number[]; cities: number[]; playableCards: string[]; canBuyCard: boolean; rates: Hand };
 };
 export function gameView(g: Game, viewer: string): GameView {
-  const { deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
+  const { balancedDice: _balancedDice, deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
   const me = players.find(p => p.id === viewer)!; const active = !me.resigned && activePlayer(g).id === viewer; const owned = pieces(g, viewer);
   const build = active && g.phase === 'actions', setup = active && g.phase === 'setupSettlement';
   return {

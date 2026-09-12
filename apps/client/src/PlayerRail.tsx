@@ -8,6 +8,25 @@ import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
+function AwardEmblem({ kind, held }: { kind: 'road' | 'army'; held: boolean }) {
+  const Icon = kind === 'road' ? Route : Shield;
+  return (
+    <span className="profile-award-emblem" aria-hidden="true">
+      {held && (
+        <svg className="award-laurel" viewBox="0 0 36 36" fill="none">
+          <path
+            d="M15 31C3 27 3 12 11 6M21 31C33 27 33 12 25 6M8 11l-4-2m3 8-4-2m5 9-4-1m9 6-4 2M28 11l4-2m-3 8 4-2m-5 9 4-1m-9 6 4 2"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path d="m18 2 2 3-2 3-2-3Z" fill="currentColor" />
+        </svg>
+      )}
+      <Icon size={held ? 20 : 15} />
+    </span>
+  );
+}
 export function PlayerRail({
   room,
   game,
@@ -110,7 +129,7 @@ export function PlayerRail({
                   aria-label={`${road ? 'Longest Road, plus 2 victory points' : 'Longest route'}, ${p.roadLength} connected roads`}
                   title={`Longest Road · ${p.roadLength} connected roads · ${road ? '+2 points' : 'At least 5 to claim'}`}
                 >
-                  <Route size={15} />
+                  <AwardEmblem kind="road" held={road} />
                   <b>{p.roadLength}</b>
                   {road && <small>+2</small>}
                 </span>
@@ -119,7 +138,7 @@ export function PlayerRail({
                   aria-label={`${army ? 'Largest Army, plus 2 victory points' : 'Knights played'}, ${p.knights} Knights played`}
                   title={`Largest Army · ${p.knights} Knights played · ${army ? '+2 points' : 'At least 3 to claim'}`}
                 >
-                  <Shield size={15} />
+                  <AwardEmblem kind="army" held={army} />
                   <b>{p.knights}</b>
                   {army && <small>+2</small>}
                 </span>
