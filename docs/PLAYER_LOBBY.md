@@ -29,4 +29,10 @@ Layouts include narrow phone and short landscape breakpoints, flexible username 
 
 ## Release
 
-This feature is reviewed on `feature/player-lobby/2026-09-11`. It does not configure automatic deployment. Merge into `main`, then deploy the reviewed commit using the [operator runbook](../deploy/single-vm/OPERATIONS.md#deploy-a-reviewed-update). The additive record indexes do not replace canonical game saves; a UI rollback need not remove them.
+This feature is reviewed on `feature/player-lounge/2026-09-11`. It does not configure automatic deployment. Merge into `main`, then deploy the reviewed commit using the [operator runbook](../deploy/single-vm/OPERATIONS.md#deploy-a-reviewed-update). The additive record indexes do not replace canonical game saves; a UI rollback need not remove them.
+
+## Tabletop visual treatment
+
+The hub and room lobby use the same cropped, mirrored walnut texture as the playing surface. Warm wood panels, a parchment match record and brass details replace the green scenery treatment. The game’s existing compressed texture is reused, with no new image download or animated background. Gold creates/starts a room; slate blue joins or resumes one. Ready remains a semantic green indicator.
+
+This visual change is isolated in `LoungeBackdrop.tsx`, `lounge-tabletop.css` and their entry points, in a separate commit from trade/audio/award behavior. Reverting that commit restores the prior pregame look without undoing gameplay changes. Layouts and mobile seat grids stay intact.

@@ -1,3 +1,4 @@
+import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
@@ -112,6 +113,7 @@ import './tool-motion.css';
 import './lounge-controls.css';
 import './game-dialogs.css';
 import './game-feedback-polish.css';
+import './lounge-tabletop.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -807,6 +809,7 @@ function App() {
         if (button && !button.disabled) feedback.sound.play('ui');
       }}
     >
+      {!g && (room || playerHome) && <LoungeBackdrop />}
       {g && (
         <div className="board-anchor">
           <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
