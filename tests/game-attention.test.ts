@@ -111,7 +111,7 @@ test('everyone can identify who is discarding; only obligated players have card 
   assert.match(watching, /Bob/);
   assert.match(watching, /Cara/);
   assert.match(watching, /Disconnected/);
-  assert.match(watching, /Then you move the robber/);
+  assert.match(watching, /Next: you move the robber/);
   assert.ok(!watching.includes('discard-add'));
   assert.match(render(g, 'b'), /Discard 4 cards/);
   assert.equal([...render(g, 'b').matchAll(/class="discard-add"/g)].length, 5);

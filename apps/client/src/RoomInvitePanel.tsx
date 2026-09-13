@@ -62,7 +62,7 @@ export function RoomInviteInbox({
               title={blockedReason}
               onClick={() => onOpen(invite.roomId)}
             >
-              View room
+              Accept invite
             </button>
             <button
               type="button"
@@ -121,7 +121,7 @@ export function RoomInviteNotice({
               <span>{blockedReason}</span>
             ) : (
               <button className="hub-return" disabled={busy} onClick={() => onOpen(invite.roomId)}>
-                View room
+                Accept invite
               </button>
             )}
             {invitations.length > 1 && (

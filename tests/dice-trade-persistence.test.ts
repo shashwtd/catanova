@@ -49,7 +49,12 @@ test('dice settings survive restart and server results and uncapped trade receip
         legal = gameView(game, player.id).legal;
       const action: GameAction =
         game.phase === 'setupSettlement'
-          ? { kind: 'settlement', vertex: legal.settlements[0]! }
+          ? {
+              kind: 'settlement',
+              vertex: legal.settlements.find((v) =>
+                game.board.vertices[v]!.hexes.some((h) => game.board.hexes[h]!.terrain !== 'desert'),
+              )!,
+            }
           : { kind: 'road', edge: legal.roads[0]! };
       store.action(
         { ...player, room_id: roomId },

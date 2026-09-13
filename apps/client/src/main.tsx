@@ -1,3 +1,6 @@
+import { GameHandDock } from './GameHandDock.js';
+import { GameOver } from './GameOver.js';
+import { GameStatistics } from './GameStatistics.js';
 import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
@@ -45,7 +48,7 @@ import { PlayerRail } from './PlayerRail.js';
 import { BoardViewport } from './BoardViewport.js';
 import { initialMetrics } from './connection.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
-import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
+import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -53,13 +56,10 @@ import {
   GameIcon,
   Settings2,
   NextTurn,
-  Castle,
   Check,
   CircleHelp,
   DoorOpen,
   Dices,
-  House,
-  Route,
   WifiOff,
   X,
   ArrowLeftRight,
@@ -74,7 +74,6 @@ import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
 import { emptyHand } from '../../../packages/rules/src/game.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
-import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
 import { invitationCode, roomPath, shouldResume, validRoomCode } from './navigation.js';
@@ -114,6 +113,7 @@ import './lounge-controls.css';
 import './game-dialogs.css';
 import './game-feedback-polish.css';
 import './lounge-tabletop.css';
+import './match-followups.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -252,6 +252,7 @@ function App() {
       | 'trade'
       | 'rules'
       | 'journal'
+      | 'statistics'
       | 'leave'
       | 'profile'
       | 'editProfile'
@@ -259,6 +260,7 @@ function App() {
       | 'friends'
       | null
     >(null);
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [robberHex, setRobberHex] = useState<number | null>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
   const [isFullscreen, setFullscreen] = useState(!!document.fullscreenElement);
@@ -373,6 +375,7 @@ function App() {
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(OUTBOX_KEY);
     feedback.reset();
+    setStatistics(null);
     setTransitionId(null);
     setRoom(null);
     setHistoryEntries([]);
@@ -399,6 +402,7 @@ function App() {
     old?.stop();
     setError('');
     feedback.reset();
+    setStatistics(null);
     setTransitionId(null);
     setRoom(null);
     setBusy(!!pending);
@@ -434,6 +438,13 @@ function App() {
       if (message.type === 'welcome' || message.type === 'state') {
         const next = c.state;
         if (next && c.playerId) {
+          if (previousSnapshot && (next.round ?? 0) !== (previousSnapshot.round ?? 0)) {
+            feedback.reset();
+            setHistoryEntries([]);
+            historyLoaded.current = false;
+            setStatistics(null);
+            setPanel(null);
+          }
           feedback.accept(previousSnapshot, next, c.playerId, message.type === 'welcome');
           if (message.type === 'state' && previousSnapshot && !previousSnapshot.game && next.game) {
             setTransitionId(previousSnapshot.launch?.id ?? `${next.roomId}:${next.revision}`);
@@ -452,6 +463,8 @@ function App() {
         if (message.type === 'welcome' && next)
           history.replaceState(roomNavigationState(next), '', browserRoomPath(next));
       }
+      if (message.type === 'statistics' && message.statistics.round === (c.state?.round ?? 0))
+        setStatistics(message.statistics);
       if (message.type === 'history') {
         if (message.before !== undefined || !historyLoaded.current) setHistoryHasMore(message.hasMore);
         historyLoaded.current = true;
@@ -564,6 +577,11 @@ function App() {
     home(false);
     initialInvite.current = reference;
     setInvite(reference);
+    if (auth.canPlay) {
+      setPanel(null);
+      void enterRoom('join', reference);
+      return;
+    }
     setEntry('invite');
     setPreviewRoom(null);
     history.pushState(null, '', roomPath(reference));
@@ -582,6 +600,9 @@ function App() {
   useEffect(() => {
     if (panel === 'journal' && connected && room?.game) connection.current?.history();
   }, [panel, connected, room?.historyRevision]);
+  useEffect(() => {
+    if (connected && (panel === 'statistics' || g?.phase === 'finished')) connection.current?.statistics();
+  }, [panel, connected, g?.phase, room?.historyRevision, room?.round]);
   useEffect(() => {
     if (!invite || room) return;
     setPreviewRoom(null);
@@ -612,7 +633,10 @@ function App() {
         return response.json() as Promise<RoomPreview>;
       })
       .then((preview) => {
-        if (!controller.signal.aborted) setPreviewRoom(preview);
+        if (!controller.signal.aborted) {
+          setPreviewRoom(preview);
+          history.replaceState(roomNavigationState(preview), '', browserRoomPath(preview));
+        }
       })
       .catch((e) => {
         if (!controller.signal.aborted) setPreviewError(e instanceof Error ? e.message : 'Room unavailable');
@@ -1011,97 +1035,70 @@ function App() {
               )}
             </div>
           )}
-          {g && (
-            <div className="construction-tools build-shelf" aria-label="Build">
-              {(['road', 'settlement', 'city'] as const).map((kind, i) => {
-                const Icon = [Route, House, Castle][i]!,
-                  sites =
-                    kind === 'road' ? g.legal.roads : kind === 'city' ? g.legal.cities : g.legal.settlements;
-                return (
-                  <IconButton
-                    key={kind}
-                    className={`build-control build-${kind} ${!disabled && actionPhase && sites.length ? 'is-available' : ''}`}
-                    label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
-                      .map((r) => `${COSTS[kind][r]} ${RESOURCE_NAMES[r]}`)
-                      .join(', ')}`}
-                    active={mode === kind}
-                    disabled={disabled || !actionPhase || !sites.length}
+          <GameHandDock
+            resources={
+              <ResourceHand
+                hand={feedback.hand ?? hand}
+                pulse={feedback.pulse}
+                reducedMotion={reducedMotion}
+              />
+            }
+            development={
+              me &&
+              !!player?.cards?.length && (
+                <DevelopmentCards
+                  game={g}
+                  me={me}
+                  disabled={disabled}
+                  reducedMotion={reducedMotion}
+                  onAction={(a) => void act(a)}
+                  onHover={() => feedback.sound.play('hover')}
+                  obscured={panel !== null || placementReady}
+                  onSelect={() => {
+                    setPanel(null);
+                    setPlacement(null);
+                  }}
+                />
+              )
+            }
+            purchase={
+              <DevelopmentPurchase
+                disabled={disabled || !g.legal.canBuyCard}
+                onBuy={() => void act({ kind: 'buyCard' })}
+              />
+            }
+            actions={
+              <div className="table-actions">
+                <div className="dice-dock" data-dice-dock />
+                <div className="utility-actions">
+                  <button
+                    className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
+                    aria-label="Trade"
+                    title="Trade"
+                    disabled={disabled || !actionPhase}
                     onClick={() => {
-                      setPlacement(null);
-                      setMode(mode === kind ? null : kind);
-                      setPanel(null);
+                      setPanel(panel === 'trade' ? null : 'trade');
+                      setMode(null);
                     }}
                   >
-                    <Icon />
-                    <span className="build-control-label">
-                      {kind === 'settlement' ? 'House' : kind === 'city' ? 'City' : 'Road'}
-                    </span>
-                  </IconButton>
-                );
-              })}
-            </div>
-          )}
-          <div className="hand-dock">
-            <div className="card-table">
-              <div className="hand-zone">
-                <ResourceHand
-                  hand={feedback.hand ?? hand}
-                  pulse={feedback.pulse}
-                  reducedMotion={reducedMotion}
-                />
-                {me && !!player?.cards?.length && (
-                  <DevelopmentCards
-                    game={g}
-                    me={me}
-                    disabled={disabled}
-                    reducedMotion={reducedMotion}
-                    onAction={(a) => void act(a)}
-                    onHover={() => feedback.sound.play('hover')}
-                    obscured={panel !== null || placementReady}
-                    onSelect={() => {
-                      setPanel(null);
-                      setPlacement(null);
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-            <div className="table-actions">
-              <div className="dice-dock" data-dice-dock />
-              <div className="utility-actions">
-                <div className="development-hand-inline purchase-control">
-                  <DevelopmentPurchase
-                    disabled={disabled || !g.legal.canBuyCard}
-                    onBuy={() => void act({ kind: 'buyCard' })}
-                  />
+                    <ArrowLeftRight size={33} />
+                    <span>Trade</span>
+                  </button>
                 </div>
                 <button
-                  className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
-                  aria-label="Trade"
-                  title="Trade"
-                  disabled={disabled || !actionPhase}
-                  onClick={() => {
-                    setPanel(panel === 'trade' ? null : 'trade');
-                    setMode(null);
-                  }}
+                  className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
+                  aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
+                  title={actionPhase ? 'Next turn' : 'Roll dice'}
+                  disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
+                  onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
                 >
-                  <ArrowLeftRight size={33} />
-                  <span>Trade</span>
+                  <TurnButtonAttention />
+                  {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
+                  {actionPhase && <span>Next</span>}
                 </button>
               </div>
-              <button
-                className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
-                aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
-                title={actionPhase ? 'Next turn' : 'Roll dice'}
-                disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
-                onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
-              >
-                <TurnButtonAttention />
-                {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
-                {actionPhase && <span>Next</span>}
-              </button>
-            </div>
-          </div>
+            }
+          />
           {me && (
             <IncomingTrade
               roomPlayers={room!.players}
@@ -1120,6 +1117,11 @@ function App() {
               onAction={(a) => act(a, true)}
               onClose={() => setPanel(null)}
             />
+          )}
+          {panel === 'statistics' && (
+            <UtilityPanel title="Statistics" onClose={() => setPanel(null)}>
+              <GameStatistics game={g} statistics={statistics} />
+            </UtilityPanel>
           )}
           {panel === 'journal' && (
             <UtilityPanel title="Move history" onClose={() => setPanel(null)}>
@@ -1158,6 +1160,21 @@ function App() {
             />
           )}
         </>
+      )}
+      {g?.phase === 'finished' && room && (
+        <GameOver
+          room={room}
+          statistics={statistics}
+          busy={busy || !connected || feedback.presentationBusy}
+          canReturn={!player?.resigned}
+          error={error}
+          onReturn={() => void act({ kind: 'returnToLobby' })}
+          onQuit={() => {
+            void leave().then(() => {
+              if (!connection.current) location.assign('/');
+            });
+          }}
+        />
       )}
       {g && (
         <GameEffects

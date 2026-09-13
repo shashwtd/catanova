@@ -547,6 +547,10 @@ export async function startServer(
             send(ws, { type: 'state', state: snapshot(seat.room_id, seat.id) });
             return;
           }
+          if (message.type === 'statistics') {
+            send(ws, { type: 'statistics', statistics: store.statistics(seat.room_id) });
+            return;
+          }
           if (message.type === 'history') {
             send(ws, {
               type: 'history',
@@ -683,6 +687,22 @@ export async function startServer(
             message.type === 'action'
               ? store.action(seat, message.commandId, message.expectedRevision, message.action)
               : store.increment(seat, message.commandId, message.expectedRevision);
+          if (message.type === 'action' && message.action.kind === 'returnToLobby') {
+            launches.cancel(seat.room_id);
+            const members = new Set(store.snapshot(seat.room_id).players.map((p) => p.id));
+            for (const [client, member] of sessions) {
+              if (member.room_id !== seat.room_id || members.has(member.id)) continue;
+              sessions.delete(client);
+              activeSeats.delete(member.id);
+              store.setConnected(member, false);
+              send(client, {
+                type: 'error',
+                code: 'LOBBY_REMOVED',
+                message: 'Your seat resigned. The remaining players have returned to the lobby.',
+              });
+              client.close(4002, 'Match ended');
+            }
+          }
           recordGuestActivity();
           // The database transaction has committed before any success reaches a client.
           send(ws, { type: 'ack', commandId: message.commandId, ...receipt });

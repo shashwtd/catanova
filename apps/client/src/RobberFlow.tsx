@@ -8,7 +8,7 @@ import type { Resource } from '../../../packages/rules/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { ResourceIcon, PLAYER_COLORS } from './Board.js';
-import { Check, GameIcon, Plus, WifiOff } from './GameIcons.js';
+import { Check, GameIcon, WifiOff } from './GameIcons.js';
 import { TurnTimer } from './TurnTimer.js';
 
 /** A changing hand or deadline cannot leave an invalid selection enabled. */
@@ -48,15 +48,27 @@ function DiscardCards({
       <div className="discard-selection-heading">
         <span>Return to the bank</span>
         <strong aria-live="polite">
-          {chosen} / {required}
+          {chosen}
+          <small> / {required}</small>
         </strong>
       </div>
-      <div className="discard-cards" role="group" aria-label="Choose cards to discard">
+      <div
+        className="discard-progress"
+        role="progressbar"
+        aria-label="Resources selected"
+        aria-valuemin={0}
+        aria-valuemax={required}
+        aria-valuenow={chosen}
+      >
+        <span style={{ width: `${(chosen / required) * 100}%` }} />
+      </div>
+      <div className="discard-cards" role="group" aria-label="Choose resources to discard">
         {RESOURCES.map((resource) => (
           <div
+            key={resource}
             className={`discard-card resource-${resource}`}
             data-selected={selected[resource] > 0}
-            key={resource}
+            data-empty={!hand[resource]}
           >
             <button
               type="button"
@@ -66,18 +78,28 @@ function DiscardCards({
               onClick={() => setSelected((current) => discardChoice(current, hand, required, resource, 1))}
             >
               <ResourceIcon resource={resource} />
-              <b>{selected[resource] || <Plus size={16} />}</b>
+              <span>{RESOURCE_NAMES[resource]}</span>
             </button>
+            <div className="discard-stepper">
+              <button
+                type="button"
+                disabled={disabled || !selected[resource]}
+                aria-label={`Keep one ${RESOURCE_NAMES[resource]}`}
+                onClick={() => setSelected((current) => discardChoice(current, hand, required, resource, -1))}
+              >
+                −
+              </button>
+              <b>{selected[resource]}</b>
+              <button
+                type="button"
+                disabled={disabled || chosen >= required || selected[resource] >= hand[resource]}
+                aria-label={`Add ${RESOURCE_NAMES[resource]} to discard`}
+                onClick={() => setSelected((current) => discardChoice(current, hand, required, resource, 1))}
+              >
+                +
+              </button>
+            </div>
             <small>{hand[resource] - selected[resource]} kept</small>
-            <button
-              type="button"
-              className="discard-remove"
-              disabled={disabled || !selected[resource]}
-              aria-label={`Keep one ${RESOURCE_NAMES[resource]}`}
-              onClick={() => setSelected((current) => discardChoice(current, hand, required, resource, -1))}
-            >
-              <span aria-hidden="true">−</span>
-            </button>
           </div>
         ))}
       </div>
@@ -88,7 +110,7 @@ function DiscardCards({
         onClick={() => onDiscard(selected)}
       >
         <Check size={18} />
-        {chosen === required ? `Discard ${required} cards` : `Choose ${required - chosen} more`}
+        {chosen === required ? `Discard ${required} resources` : `Choose ${required - chosen} more`}
       </button>
     </div>
   );
@@ -168,7 +190,9 @@ export function RobberFlow({
       {game.phase === 'discard' ? (
         <>
           <p className="robber-explanation">
-            A seven was rolled. Players with more than 7 cards return half, rounded down.
+            {required
+              ? 'Choose what to give back. Everything else stays with you.'
+              : 'Waiting for these players to return their resources.'}
           </p>
           <div className="discard-waiting-list" aria-label="Players still discarding">
             {waiting.map((p) => {
@@ -203,9 +227,7 @@ export function RobberFlow({
               onDiscard={(resources) => onAction({ kind: 'discard', resources })}
             />
           )}
-          <p className="robber-next">
-            Then {mine ? 'you' : active.name} move{mine ? '' : 's'} the robber. Play resumes after the steal.
-          </p>
+          <p className="robber-next">Next: {mine ? 'you move' : `${active.name} moves`} the robber.</p>
         </>
       ) : mine ? (
         choosingVictim ? (

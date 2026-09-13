@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { CircleHelp, DoorOpen, GameIcon, History, Maximize, Minimize, Settings2, X } from './GameIcons.js';
-export type GameToolPanel = 'journal' | 'rules' | 'settings' | 'leave';
+export type GameToolPanel = 'statistics' | 'journal' | 'rules' | 'settings' | 'leave';
 export function GameTools({
   panel,
   onPanel,
@@ -41,6 +41,12 @@ export function GameTools({
     else onPanel(next);
   };
   const entries = [
+    {
+      key: 'statistics',
+      label: 'Statistics',
+      icon: <GameIcon name="statistics" />,
+      action: () => togglePanel('statistics'),
+    },
     { key: 'rules', label: 'How to play', icon: <CircleHelp />, action: () => togglePanel('rules') },
     { key: 'settings', label: 'Settings', icon: <Settings2 />, action: () => togglePanel('settings') },
     { key: 'leave', label: 'Leave game', icon: <DoorOpen />, action: onLeave },

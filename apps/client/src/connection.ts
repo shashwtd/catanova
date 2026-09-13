@@ -119,6 +119,9 @@ export class Connection {
     this.lastSync = performance.now();
     this.send({ type: 'sync' });
   }
+  statistics() {
+    this.send({ type: 'statistics' });
+  }
   history(before?: number) {
     this.send({ type: 'history', ...(before === undefined ? {} : { before }) });
   }

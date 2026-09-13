@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -88,7 +88,7 @@ function Pips({ value }: { value: number }) {
   );
 }
 
-function Die({
+const Die = memo(function Die({
   id,
   value,
   index,
@@ -146,7 +146,7 @@ function Die({
       )}
     </span>
   );
-}
+});
 
 /** The lasting result is ordinary 2D HUD content, with no animated board overlay. */
 export function DiceResult({ id, dice }: { id: string; dice: readonly [number, number] }) {
@@ -246,11 +246,14 @@ export function DiceThrow({
       const center = box
         ? { x: box.left + box.width / 2, y: box.top + box.height / 2 }
         : { x: innerWidth - 130, y: innerHeight - 70 };
-      setDock({
+      const next = {
         x: center.x - innerWidth / 2,
         y: center.y - innerHeight / 2,
         ...diceDockSize(tray.current?.querySelector<HTMLElement>('.dice-flight')?.offsetWidth || 40),
-      });
+      };
+      setDock((current) =>
+        current.x === next.x && current.y === next.y && current.scale === next.scale ? current : next,
+      );
     };
     place();
     window.addEventListener('resize', place);
@@ -261,7 +264,7 @@ export function DiceThrow({
       window.removeEventListener('resize', place);
       observer?.disconnect();
     };
-  }, [id, stage]);
+  }, [id, stage === 'docked']);
   // Remove the perspective/animation tree altogether. Keeping a scaled, fixed
   // 3D overlay here left stale dice on the island when the hand moved or resized.
   if (stage === 'docked')
