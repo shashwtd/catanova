@@ -70,3 +70,5 @@ This command is never part of a normal build. It crops selected sounds, mixes to
 ## Auditioning effects
 
 The local `/dev/lounge` preview now uses the same `SoundEngine` and committed-snapshot presentation path as play. Its previous placeholder callbacks produced no audio. Open **Preview → Events & sounds** to audition effects or trigger game events; Settings retains the normal mute/volume controls. Audio still unlocks on user interaction and respects muted settings. Button/hover layers are slightly more audible, with the effects master at `volume × 0.75`; the optional music mix is unchanged. No new audio downloads or dependencies were added for this adjustment.
+
+Preview event resets now clear only transient sound effects. They preserve the current music source, playback offset and running audio context; a scenario switch no longer stops and restarts the loop. Normal leave/visibility teardown still silences audio. An audio-engine regression test checks that resetting a scenario neither suspends the clock nor recreates the music source.

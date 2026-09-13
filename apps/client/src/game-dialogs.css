@@ -1,0 +1,552 @@
+/* Shared warm wood / parchment palette for modal and floating game surfaces. */
+:root {
+  --dialog-fill: linear-gradient(145deg, #69503a, #4c3628 62%, #3c2b21);
+  --dialog-ink: #faecd3;
+  --dialog-muted: #d7c2a2;
+  --dialog-edge: #bd996653;
+  --dialog-shadow: inset 0 1px #f2d6a02e, 0 10px 28px #140d096b;
+  --turn-border-duration: 5s;
+  --site-marker-duration: 6s;
+}
+.game-world .game-dialog,
+.game-world .game-dialog:has(.settings-menu, .rules-book, .profile-editor, .player-overview),
+.playing .game-panel.game-side-panel,
+.playing .game-panel.trade-panel,
+.playing .incoming-trade,
+.playing .floating-panel.development-detail,
+.playing .robber-flow {
+  color: var(--dialog-ink);
+  background: var(--dialog-fill);
+  border: 1px solid var(--dialog-edge);
+  border-radius: 12px;
+  box-shadow: var(--dialog-shadow);
+  backdrop-filter: none;
+}
+.game-world .game-dialog .dialog-surface {
+  background: transparent;
+}
+.game-world .game-dialog::backdrop {
+  background: #1d180f85;
+  backdrop-filter: blur(3px);
+}
+.game-world .game-dialog .panel-heading,
+.playing .game-side-panel .panel-heading {
+  border-bottom: 1px solid #c4a67840;
+}
+.game-world .game-dialog .panel-heading h2,
+.playing .game-side-panel .panel-heading h2 {
+  color: #ffedca;
+  font:
+    600 19px/1.25 Cinzel,
+    serif;
+}
+.game-world .game-dialog :is(.quiet-note, .muted, .field, .field label),
+.playing .game-panel :is(.quiet-note, .muted),
+.playing .development-detail p {
+  color: var(--dialog-muted);
+}
+.playing .development-detail :is(h3, .field-caption) {
+  color: #ffdfa1;
+}
+.playing .development-detail :is(.development-resources button, .plenty-picked button) {
+  color: #faecd3;
+  background: #2d1e1652;
+  border-color: #c6a36f66;
+}
+.playing .development-detail .development-resources button[aria-pressed='true'] {
+  color: #fff0ce;
+  background: #b88d423d;
+  border-color: #e7c178;
+}
+.playing .development-detail .card-unavailable {
+  color: #d7c2a2;
+}
+.game-world .game-dialog :is(input[type='text'], input:not([type]), input[type='search']) {
+  background: #261a1252;
+  border-color: #c6a36f66;
+  color: #fff0d2;
+}
+.game-world .game-dialog :is(input[type='text'], input:not([type]), input[type='search'])::placeholder {
+  color: #c5af8d;
+}
+.game-world .game-dialog .panel-heading .icon-button,
+.playing .game-side-panel .panel-heading .icon-button,
+.playing .trade-panel .trade-close,
+.playing .development-detail .development-close {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 6px;
+  flex: none;
+  background: #24170e35;
+  border: 1px solid #c49f6352;
+  color: #f7e6c6;
+  box-shadow: none;
+  border-radius: 7px;
+}
+.game-world .game-dialog .panel-heading .icon-button .game-icon,
+.playing .game-side-panel .panel-heading .icon-button .game-icon,
+.playing .trade-panel .trade-close .game-icon {
+  width: 100%;
+  height: 100%;
+}
+.game-world :is(.game-dialog, .game-panel, .incoming-trade, .development-detail) .gold-button {
+  color: #322314;
+  background: linear-gradient(#edcc89, #c99d58);
+  border: 1px solid #f2d398;
+  border-radius: 7px;
+  box-shadow:
+    inset 0 1px #fff1be80,
+    0 2px #2b1d1444;
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  padding: 9px 12px;
+}
+.game-world
+  :is(.game-dialog, .game-panel, .incoming-trade, .development-detail)
+  .gold-button:hover:not(:disabled) {
+  background: linear-gradient(#f6dba0, #d9b16c);
+  color: #322314;
+}
+.game-world
+  :is(.game-dialog, .game-panel, .incoming-trade, .development-detail)
+  :is(.text-button, .dark-button) {
+  color: #eedab8;
+  background: #25180f38;
+  border: 1px solid #c3a27145;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.game-world
+  :is(.game-dialog, .game-panel, .incoming-trade, .development-detail)
+  :is(.text-button, .dark-button):hover:not(:disabled) {
+  background: #c39b5726;
+  color: #fff0cc;
+}
+.game-world :is(.game-dialog, .game-panel, .incoming-trade) button:focus-visible {
+  outline: 2px solid #f6d088;
+  outline-offset: 3px;
+}
+/* Trading gets one header and one central workspace, with no competing outer panel title. */
+.playing .game-panel.trade-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: min(402px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 15px;
+  overflow: auto;
+  z-index: 45;
+}
+.playing .trade-panel .trade-header {
+  margin: 0 0 12px;
+}
+.playing .trade-panel .trade-header .trade-close {
+  margin: 0;
+}
+.playing .trade-panel .live-offer {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.playing .incoming-trade.trade-notice {
+  width: min(330px, calc(100vw - 24px));
+  padding: 14px;
+  max-height: calc(100dvh - 30px);
+  overflow: auto;
+}
+.playing .trade-notice .trade-side-get,
+.playing .trade-panel .trade-side-get {
+  background: #b89c6a16;
+}
+.playing .trade-notice .trade-side-give,
+.playing .trade-panel .trade-side-give {
+  background: transparent;
+}
+.playing :is(.trade-notice, .trade-panel) .trade-side > strong {
+  color: #f7e5c3;
+}
+.playing :is(.trade-notice, .trade-panel) .trade-waiting {
+  color: #f0d49f;
+}
+/* Compact, readable controls and guide pages in the same material. */
+.playing .game-side-panel:has(.settings-menu) {
+  width: min(310px, calc(100vw - 70px));
+}
+.game-world .settings-audio-group {
+  width: min(100%, 310px);
+  align-self: center;
+}
+.game-world .settings-menu :is(.settings-row-heading label, .settings-theme legend, .settings-dice legend) {
+  color: #f6e2bd;
+}
+.game-world .settings-menu .settings-dice-option strong {
+  color: #f6e2bd;
+}
+.game-world
+  .settings-menu
+  :is(.settings-row-heading output, .settings-duration output, .settings-audio-icon) {
+  color: #f2d18d;
+}
+.game-world .settings-menu .settings-duration output strong {
+  color: #f2d18d;
+}
+.game-world .settings-menu :is(.settings-caption, .settings-timer-stops, .settings-dice-option small) {
+  color: #cdb796;
+}
+.game-world .settings-menu .settings-timer-stops [data-selected='true'] {
+  color: #ffe7b3;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option) {
+  color: #e9d4b3;
+  background: transparent;
+  border-color: #c6a77633;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option):hover {
+  color: #fff1d8;
+  background: #d0ac7220;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option)[data-selected='true'] {
+  color: #fff0d0;
+  background: #c49c4e24;
+}
+.game-world .settings-menu input[type='radio'] {
+  accent-color: #e7c178;
+}
+.game-world .settings-menu .settings-range {
+  --range-track: linear-gradient(to right, #dabb79 0 var(--range-fill), #2e2017 var(--range-fill) 100%);
+  accent-color: #e9c47c;
+}
+.game-world .settings-menu .settings-room {
+  border-color: #b598663d;
+}
+.game-world .rules-book {
+  color: #eedcc0;
+}
+.game-world
+  .rules-book
+  :is(
+    .rules-victory strong,
+    .rules-scores dd,
+    .rules-awards strong,
+    .rules-awards b,
+    .rules-build h3,
+    .rules-costs dt,
+    .rules-notes b
+  ) {
+  color: #ffdfa1;
+}
+.game-world
+  .rules-book
+  :is(
+    .rules-victory p,
+    .rules-scores dt,
+    .rules-awards p,
+    .rules-rhythm,
+    .rules-costs dd,
+    .rules-notes p,
+    .recipe-pay
+  ) {
+  color: #e6d1b1;
+}
+.game-world .rules-book .rules-awards p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.game-world .rules-book .rules-notes p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.game-world .rules-book .rules-scores {
+  border-color: #bda16c3d;
+}
+.game-world .rules-book .rules-costs > .build-recipe {
+  background: #271b1240;
+  border-color: #d1af7640;
+}
+.game-world .rules-book .rules-costs .resource-summary b {
+  color: #ffebc5;
+}
+.game-world .rules-book .rulebook-link {
+  color: #f5dba9;
+}
+.game-world .game-info-rules dt {
+  color: #f4d49a;
+}
+.game-world .game-info-rules dd {
+  color: #f6e6c9;
+}
+.game-world .game-info-rules dd small {
+  color: #d8c1a0;
+}
+.game-world .game-info-rules > div {
+  border-color: #bda16c33;
+  background: transparent;
+}
+/* History has useful inline symbols; ordinary log lines need no repeated clock icon. */
+.playing .game-side-panel:has(.turn-journal) {
+  width: min(316px, calc(100vw - 72px));
+}
+.playing .game-side-panel .turn-journal,
+.playing .game-side-panel .journal-move {
+  color: #ecdbbf;
+}
+.playing .game-side-panel .journal-turn h3 {
+  background: #c0995830;
+  color: #efd2a0;
+  border-color: #b9996336;
+}
+.playing .game-side-panel .journal-person {
+  color: #fff0d5;
+}
+.playing .game-side-panel .journal-resource {
+  color: #ffedc4;
+  background: #d0ab6d20;
+  box-shadow: none;
+}
+.playing .game-side-panel .journal-resource b {
+  color: #ffedc4;
+}
+.playing .game-side-panel :is(.journal-item, .journal-action, .journal-empty) {
+  color: #d9c3a2;
+}
+.playing .game-side-panel .automatic-mark {
+  color: #f3d49a;
+  background: #443022;
+}
+.playing .journal-move.journal-note {
+  display: block;
+}
+/* Site guidance stays legible without concealing the settlement being upgraded. */
+.road-site-guide {
+  stroke: #f3d397;
+  stroke-width: 4;
+  stroke-dasharray: 9 4;
+  stroke-linecap: butt;
+}
+.road-site-guide.site-guide-back {
+  stroke: #644629;
+  stroke-width: 6.5;
+  stroke-dasharray: none;
+}
+.vertex-site-guide {
+  fill: #ad814929;
+  stroke: #ffdd93;
+  stroke-width: 2.5;
+  stroke-dasharray: 22 11;
+  filter: drop-shadow(0 1px 1px #37220ae6);
+}
+[data-build-site='city'] .vertex-site-guide {
+  fill: none;
+}
+.city-upgrade-mark circle {
+  fill: #65482c;
+  stroke: #ffe4a2;
+  stroke-width: 1.5;
+}
+.city-upgrade-mark path {
+  fill: none;
+  stroke: #ffe9b3;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+[data-build-site]:is([data-guided='true'], :hover, :focus-visible) .vertex-site-guide {
+  animation: site-marker-orbit var(--site-marker-duration) linear infinite;
+}
+[data-build-site='city'] .build-site-preview {
+  display: none;
+}
+[data-build-site='city'][data-pending='true'] .site-guide {
+  opacity: 1;
+}
+.build-ghost[data-pending-build='city'] {
+  display: none;
+}
+@keyframes site-marker-orbit {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+/* Fixed-size, local confirmation keeps the selected spot in view on phones too. */
+.placement-confirmation {
+  position: fixed;
+  z-index: 48;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100vw - 16px);
+  padding: 5px 6px 5px 11px;
+  border: 1px solid #d2ac6a99;
+  border-radius: 8px;
+  color: #fbe6bf;
+  background: var(--dialog-fill);
+  box-shadow: var(--dialog-shadow);
+}
+.placement-confirmation strong {
+  font:
+    600 13px Barlow,
+    sans-serif;
+  white-space: nowrap;
+}
+.placement-confirmation button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid #c19b6347;
+  color: #edd4b0;
+  background: #23190f2b;
+}
+.placement-confirmation .placement-confirm {
+  background: #cfad6840;
+  color: #ffe6a4;
+  border-color: #e8c47b9c;
+}
+.placement-confirmation button:focus-visible {
+  outline: 2px solid #f6d088;
+  outline-offset: 2px;
+}
+/* Follow the outline, rather than putting a shine over the face of the dice. */
+.playing .hand-dock .table-actions {
+  height: 74px;
+}
+.playing .hand-dock .table-actions .turn-action {
+  width: 80px;
+  height: 74px;
+  position: relative;
+}
+.playing .hand-dock .turn-action > .turn-button-attention {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: none;
+  color: #fff0b3;
+}
+.turn-button-attention rect {
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-dasharray: 8 5;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px #ffe38c);
+}
+.turn-action:not(:disabled) .turn-button-attention rect {
+  animation: turn-border-orbit var(--turn-border-duration) linear infinite;
+}
+.turn-action:disabled .turn-button-attention {
+  display: none;
+}
+.playing .hand-dock .turn-action.end-turn:not(:disabled) {
+  background: radial-gradient(ellipse at 50% 42%, #69836b, #3d5744 74%);
+  box-shadow:
+    inset 0 1px #c6d1a342,
+    0 3px #26352c,
+    0 0 11px #d4b76d30;
+}
+.playing .hand-dock .turn-action.roll-turn > .game-icon {
+  width: 106%;
+  height: 106%;
+}
+@keyframes turn-border-orbit {
+  to {
+    stroke-dashoffset: -104;
+  }
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .hand-dock .table-actions {
+    height: 64px;
+  }
+  .playing .hand-dock .table-actions .turn-action {
+    width: 66px;
+    height: 64px;
+  }
+  .playing .game-panel.trade-panel {
+    top: 50%;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    width: min(380px, calc(100vw - 20px));
+    padding: 12px;
+    max-height: calc(100dvh - 20px);
+  }
+  .playing .incoming-trade.trade-notice {
+    left: 50%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(330px, calc(100vw - 20px));
+    max-height: calc(100dvh - 20px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-build-site] .vertex-site-guide,
+  .turn-action:not(:disabled) .turn-button-attention rect {
+    animation: none;
+  }
+}
+
+[data-motion='reduced'] [data-build-site] .vertex-site-guide,
+[data-motion='reduced'] .turn-action:not(:disabled) .turn-button-attention rect {
+  animation: none;
+}
+
+/* The robber's required-action surface uses the same materials as the other dialogs. */
+.playing .robber-flow :is(.robber-explanation, .robber-next, .robber-steps li, .discard-card small) {
+  color: var(--dialog-muted);
+}
+.playing .robber-flow :is(.robber-flow-heading h2, .discard-selection-heading, .discard-player strong) {
+  color: var(--dialog-ink);
+}
+.playing .robber-flow .robber-steps [data-current='true'] {
+  color: #ffe1a3;
+}
+.playing .robber-flow .robber-steps [data-current='true'] > span {
+  background: #a982493b;
+  border-color: #e4bd77;
+  color: #ffebbd;
+}
+.playing .robber-flow .robber-steps [data-complete='true'] > span {
+  background: #96784833;
+  border-color: #c5a669;
+}
+.playing .robber-flow :is(.discard-player, .robber-victim) {
+  background: #24180f40;
+  color: #f3dfbb;
+}
+.playing .robber-flow .discard-selection-heading strong {
+  background: #261a1252;
+  color: #ffe1a3;
+}
+.playing .robber-flow .discard-add {
+  background: linear-gradient(#b49a7138, #77603e1a);
+  color: #fff0cc;
+  border-color: #c3a16a88;
+}
+.playing .robber-flow .discard-card[data-selected='true'] .discard-add {
+  border-color: #f3cb83;
+  background: #bd985b40;
+}
+.playing .robber-flow :is(.discard-remove, .robber-back) {
+  background: #24180f38;
+  color: #f4d9a9;
+  border-color: #c3a16a66;
+}
+.game-world .settings-menu .settings-range::-webkit-slider-thumb {
+  border-color: #8c693c;
+}
+.game-world .settings-menu .settings-range::-moz-range-thumb {
+  border-color: #8c693c;
+}
+[data-build-site]:is([data-guided='true'], :hover, :focus-visible):not([data-pending='true']) .site-guide {
+  opacity: 1;
+}

@@ -5,7 +5,7 @@ import {
 } from '../../../packages/rules/src/victory.js';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowLeftRight, Check, Clock3, Dices, Trophy, Volume2, Music } from './GameIcons.js';
+import { Check, Clock3, Dices, Trophy, Volume2, Music } from './GameIcons.js';
 import type { Preferences } from './preferences.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import {
@@ -14,7 +14,6 @@ import {
   TURN_TIMER_STEPS,
 } from '../../../packages/protocol/src/settings.js';
 import type { RoomSettings, TurnTimerSeconds } from '../../../packages/protocol/src/settings.js';
-import { TRADE_OFFER_LIMIT } from '../../../packages/rules/src/game.js';
 export function GameSettings({
   preferences,
   update,
@@ -326,17 +325,6 @@ export function GameInfo({ room }: { room: RoomState }) {
                 : balanced
                   ? 'Draws from 36 dice pairs, refreshes with 12 left, and reduces the previous total’s weight by 30%. No player-based adjustments.'
                   : 'Two independent six-sided dice. 7 is most likely; 2 and 12 are rarest.'}
-            </small>
-          </dd>
-        </div>
-        <div>
-          <dt>
-            <ArrowLeftRight /> Trade offers
-          </dt>
-          <dd>
-            {TRADE_OFFER_LIMIT} per turn
-            <small>
-              Catanova house rule. Each new or updated offer counts. Replies and bank or port trades do not.
             </small>
           </dd>
         </div>

@@ -1,3 +1,5 @@
+import { PlacementConfirmation } from './PlacementConfirmation.js';
+import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
 import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
@@ -39,7 +41,6 @@ import {
   previewJoinReference,
 } from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
-import { ConnectionPanel } from './ConnectionPanel.js';
 import { BoardViewport } from './BoardViewport.js';
 import { initialMetrics } from './connection.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
@@ -109,6 +110,7 @@ import './room-refinement.css';
 import './play-refinement.css';
 import './tool-motion.css';
 import './lounge-controls.css';
+import './game-dialogs.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -251,7 +253,6 @@ function App() {
       | 'leave'
       | 'profile'
       | 'editProfile'
-      | 'network'
       | 'invite'
       | 'friends'
       | null
@@ -348,6 +349,10 @@ function App() {
       setupIndex: g.setupIndex,
     };
     if (placementValid(draft, g, room.roomId, me)) {
+      if (mode === action.kind) {
+        void act(action);
+        return;
+      }
       setPlacement(draft);
       setPanel(null);
     }
@@ -828,7 +833,6 @@ function App() {
           panel={panel}
           onPanel={setPanel}
           onClosePanel={() => setPanel(null)}
-          connected={connected}
           fullscreen={isFullscreen}
           onFullscreen={() => void fullscreen()}
           busy={busy}
@@ -1090,6 +1094,7 @@ function App() {
                 disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
                 onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
               >
+                <TurnButtonAttention />
                 {actionPhase ? <ArrowRight size={36} /> : <Dices size={38} />}
                 {actionPhase && <span>End</span>}
               </button>
@@ -1097,15 +1102,13 @@ function App() {
           </div>
           {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />}
           {panel === 'trade' && me && (
-            <aside className="game-panel floating-panel trade-panel" aria-label="Trade">
-              <div className="panel-heading">
-                <h2>Trade</h2>
-                <IconButton label="Close panel" onClick={() => setPanel(null)}>
-                  <X />
-                </IconButton>
-              </div>
-              <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />
-            </aside>
+            <TradePanel
+              game={g}
+              me={me}
+              disabled={disabled}
+              onAction={(a) => act(a, true)}
+              onClose={() => setPanel(null)}
+            />
           )}
           {panel === 'journal' && (
             <UtilityPanel title="Move history" onClose={() => setPanel(null)}>
@@ -1118,49 +1121,17 @@ function App() {
             </UtilityPanel>
           )}
           {placementReady && placement && (
-            <aside className="build-confirmation" aria-label="Confirm placement">
-              <div className="build-confirmation-title">
-                {placement.action.kind === 'road' ? (
-                  <Route />
-                ) : placement.action.kind === 'city' ? (
-                  <Castle />
-                ) : (
-                  <House />
-                )}
-                <strong>
-                  {placement.action.kind === 'city' ? 'Upgrade to city' : `Place ${placement.action.kind}`}
-                </strong>
-              </div>
-              {g.phase === 'actions' ? (
-                <ResourceSummary hand={COSTS[placement.action.kind]} />
-              ) : (
-                <span className="free-placement">
-                  {g.phase === 'freeRoads' ? 'Free road' : 'Starting piece'}
-                </span>
-              )}
-              <div className="build-confirmation-actions">
-                <button
-                  className="text-button"
-                  aria-label="Cancel placement"
-                  onClick={() => setPlacement(null)}
-                >
-                  <X />
-                </button>
-                <button
-                  className="gold-button"
-                  disabled={disabled || !placementReady}
-                  onClick={() => {
-                    if (!placementValid(placement, g, room?.roomId, me)) return;
-                    const action = placement.action;
-                    setPlacement(null);
-                    void act(action);
-                  }}
-                >
-                  <Check />
-                  Build
-                </button>
-              </div>
-            </aside>
+            <PlacementConfirmation
+              action={placement.action}
+              disabled={disabled || !placementReady}
+              onCancel={() => setPlacement(null)}
+              onConfirm={() => {
+                if (!placementValid(placement, g, room?.roomId, me)) return;
+                const action = placement.action;
+                setPlacement(null);
+                void act(action);
+              }}
+            />
           )}
           {room && (
             <RobberFlow
@@ -1221,17 +1192,6 @@ function App() {
             previewSound={() => feedback.sound.play('settlement')}
           />
         </Dialog>
-      )}
-      {panel === 'network' && room && (
-        <UtilityPanel title="Connection" onClose={() => setPanel(null)}>
-          <ConnectionPanel
-            metrics={metrics}
-            status={status}
-            revision={room.revision}
-            pending={busy}
-            onSync={() => connection.current?.sync()}
-          />
-        </UtilityPanel>
       )}
       {panel === 'invite' && room && (
         <Dialog title="Room invitation" compact onClose={() => setPanel(null)}>

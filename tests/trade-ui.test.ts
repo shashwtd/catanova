@@ -115,11 +115,11 @@ test('trade creation locks while another player is active or the game is waiting
     view.phase = phase;
     const html = panel(view, viewer, disabled);
     assert.ok(button(html, 'Offer trade').includes('disabled=""'));
-    assert.ok(button(html, '?Open to offers').includes('disabled=""'));
+    assert.ok(button(html, 'Open to offers').includes('disabled=""'));
     assert.equal([...html.matchAll(/<fieldset[^>]*disabled=""/g)].length, 2);
   }
   const own = panel(gameView(game, 'p0'), 'p0');
-  assert.ok(!button(own, '?Open to offers').includes('disabled=""'));
+  assert.ok(!button(own, 'Open to offers').includes('disabled=""'));
   assert.ok(button(own, 'Offer trade').includes('disabled=""'), 'an empty draft cannot be submitted');
 });
 
@@ -166,21 +166,18 @@ test('specific incoming offers require the local payment and disappear when the 
   );
 });
 
-test('unknown offers invite proposals instead of gifting cards and show only the local public proposal when restored', () => {
+test('open offers show a payment picker until commitment, then only the accepted price', () => {
   let game = move(setup(), { kind: 'openTrade', give: hand({ wood: 2 }) });
   const tradeId = game.trade!.id;
-  assert.ok(!incoming(gameView(game, 'p1'), 'p1').includes('Yes, trade'));
-  assert.ok(!button(incoming(gameView(game, 'p1'), 'p1'), 'Make an offer').includes('disabled=""'));
-  assert.ok(button(incoming(gameView(game, 'p1'), 'p1', true), 'Make an offer').includes('disabled=""'));
+  const draft = incoming(gameView(game, 'p1'), 'p1');
+  assert.ok(!draft.includes('Yes, trade'));
+  assert.ok(button(draft, 'Send offer').includes('disabled=""'), 'empty responses cannot be sent');
+  assert.match(draft, /aria-label="Add Sheep to You give/);
   game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
-  game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ wheat: 1 }) }, 'p2');
   const html = incoming(gameView(game, 'p1'), 'p1');
-  assert.ok(button(html, 'Change offer'));
-  assert.ok(button(html, 'Withdraw'));
+  assert.match(html, /Waiting for Alice to choose/);
   assert.match(html, /aria-label="1 Sheep"/);
-  assert.ok(!html.includes('aria-label="7 Rock"') && !html.includes('aria-label="1 Hay"'));
-  const withdrawn = move(game, { kind: 'withdrawProposal', tradeId }, 'p1');
-  assert.ok(button(incoming(gameView(withdrawn, 'p1'), 'p1'), 'Make an offer'));
+  assert.doesNotMatch(html, /<button|<fieldset|Withdraw|Change offer|aria-label="7 Rock"/);
 });
 
 const entry = (revision: number, turn: number, kind: string, lines: string[]): HistoryEntry => ({
@@ -219,7 +216,7 @@ test('history groups committed moves by turn, deduplicates pages and hides techn
     }),
   );
   assert.equal([...html.matchAll(/class="journal-turn"/g)].length, 3);
-  assert.equal([...html.matchAll(/class="journal-move"/g)].length, 4);
+  assert.equal([...html.matchAll(/class="journal-move(?: [^"]*)?"/g)].length, 4);
   assert.match(html, /<h3>Turn 2<\/h3>/);
   assert.match(html, /<h3>Turn 1<\/h3>/);
   assert.match(html, /<h3>Island setup<\/h3>/);
@@ -301,22 +298,21 @@ test('exact and open trade summaries consistently use the viewer’s give/get pe
   assert.match(side(responder, 'You get')[0]!, /aria-label="2 Timber"/);
   assert.ok(button(responder, 'No thanks'));
   assert.ok(button(incoming(gameView(game, 'p1'), 'p1', true), 'No thanks').includes('disabled=""'));
-  game = move(game, { kind: 'openTrade', give: hand({ wood: 2 }) });
+  game = move(move(game, { kind: 'cancelTrade' }), { kind: 'openTrade', give: hand({ wood: 2 }) });
   const tradeId = game.trade!.id;
   game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
   const reply = incoming(gameView(game, 'p1'), 'p1');
   assert.match(side(reply, 'You give')[0]!, /aria-label="1 Sheep"/);
   assert.match(side(reply, 'You get')[0]!, /aria-label="2 Timber"/);
   const offers = panel(gameView(game, 'p0'), 'p0');
-  assert.match(side(offers, 'You give')[1]!, /aria-label="2 Timber"/);
-  assert.match(side(offers, 'You get')[1]!, /aria-label="1 Sheep"/);
-  game = move(game, { kind: 'declineTrade', tradeId }, 'p1');
-  assert.equal(incoming(gameView(game, 'p1'), 'p1'), '', 'declined offer must stay hidden from that player');
-  assert.match(panel(gameView(game, 'p0'), 'p0'), /Bob declined/);
-  assert.ok(
-    button(incoming(gameView(game, 'p2'), 'p2'), 'Make an offer'),
-    'another player can still respond',
-  );
+  assert.match(side(offers, 'You give')[0]!, /aria-label="2 Timber"/);
+  assert.equal(side(offers, 'You give').length, 1, 'the price is not repeated for every partner');
+  assert.match(offers, /aria-label="1 Sheep"/);
+  assert.doesNotMatch(offers, /<fieldset|Offer trade/, 'a live offer replaces the editor');
+  const declined = move(game, { kind: 'declineTrade', tradeId }, 'p2');
+  assert.equal(incoming(gameView(declined, 'p2'), 'p2'), '');
+  assert.match(panel(gameView(declined, 'p0'), 'p0'), /data-response="declined"/);
+  assert.ok(button(offers, 'Confirm trade').includes('disabled=""'), 'select a partner before confirming');
 });
 
 test('bank trade clearly previews the local payment and return, with no number spinners or off-turn selection', () => {
@@ -325,8 +321,11 @@ test('bank trade clearly previews the local payment and return, with no number s
   const render = (game: GameView, disabled = false) =>
     renderToStaticMarkup(createElement(BankTrade, { game, me: 'p0', disabled, onAction: () => {} }));
   const html = render(view);
-  assert.match(side(html, 'You give')[0]!, new RegExp(`aria-label="${view.legal.rates.wood} Timber"`));
-  assert.match(side(html, 'You get')[0]!, /aria-label="1 Clay"/);
+  assert.match(
+    side(html, 'You give')[0]!,
+    new RegExp(`aria-label="You give ${view.legal.rates.wood} Timber"`),
+  );
+  assert.match(side(html, 'You get')[0]!, /aria-label="You get 1 Clay"/);
   assert.ok(!/<input\b|<select\b|type="number"/.test(html));
   for (const markup of [render(view, true), render({ ...view, active: 1 })]) {
     assert.ok(
@@ -342,10 +341,9 @@ test('exact offers show willing partners to the maker and a clear waiting state 
   game = move(game, { kind: 'acceptTrade', tradeId: id }, 'p1');
   const maker = panel(gameView(game, 'p0'), 'p0');
   assert.ok(button(maker, 'Trade with Bob'));
-  assert.match(maker, /Bob.*is ready/);
+  assert.match(button(maker, 'Trade with Bob'), /data-response="ready"/);
   const recipient = incoming(gameView(game, 'p1'), 'p1');
   assert.match(recipient, /Waiting for Alice to choose/);
-  assert.ok(button(recipient, 'Withdraw acceptance'));
-  assert.ok(button(recipient, 'No thanks'));
+  assert.doesNotMatch(recipient, /<button|Withdraw acceptance|No thanks/);
   assert.ok(!recipient.includes('Yes, trade'));
 });

@@ -185,7 +185,7 @@ export function GameEffects({
       gainTimers.forEach((timer) => clearTimeout(timer));
     };
   }, [event?.id, reducedMotion]);
-  const notice = event?.notices.find((s) => /played |wins |claimed /.test(s)) ?? event?.notices[0];
+  const notice = event?.notices.find((s) => /played |wins /.test(s));
   return (
     <>
       {awards[0] && (

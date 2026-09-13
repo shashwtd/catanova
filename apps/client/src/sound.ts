@@ -528,6 +528,10 @@ export class SoundEngine {
       this.release(source);
     }
   }
+  /** Reset transient cues without interrupting the music or suspending its audio clock. */
+  resetEffects() {
+    this.stopEffects();
+  }
   silence() {
     this.stopEffects();
     this.stopMusic();

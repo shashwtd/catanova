@@ -4,19 +4,7 @@ import type { GameView } from '../../../packages/rules/src/game.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { ResourceIcon } from './Board.js';
-import {
-  ArrowLeftRight,
-  ArrowRight,
-  Castle,
-  Clock3,
-  Dices,
-  History,
-  House,
-  Layers,
-  Route,
-  ScrollText,
-  Shield,
-} from './GameIcons.js';
+import { ArrowRight, Castle, Clock3, Dices, House, Layers, Route, ScrollText, Shield } from './GameIcons.js';
 
 export function historyTurns(entries: readonly HistoryEntry[]) {
   const groups = new Map<number, HistoryEntry[]>();
@@ -142,26 +130,28 @@ function Move({ entry, names }: { entry: HistoryEntry; names: string[] }) {
               : entry.kind === 'endTurn'
                 ? ArrowRight
                 : /trade|proposal/i.test(entry.kind)
-                  ? ArrowLeftRight
+                  ? null
                   : entry.kind === 'discard'
                     ? Layers
-                    : History;
+                    : null;
   return (
-    <li className="journal-move">
-      <span className="journal-action">
-        <Icon />
-        {entry.automatic && (
-          <span
-            className="automatic-mark"
-            role="img"
-            aria-label={
-              entry.kind === 'resign' ? 'Automatic resignation after disconnect' : 'Automatic timer move'
-            }
-          >
-            <Clock3 />
-          </span>
-        )}
-      </span>
+    <li className={`journal-move ${!Icon && !entry.automatic ? 'journal-note' : ''}`}>
+      {(Icon || entry.automatic) && (
+        <span className="journal-action">
+          {Icon && <Icon />}
+          {entry.automatic && (
+            <span
+              className="automatic-mark"
+              role="img"
+              aria-label={
+                entry.kind === 'resign' ? 'Automatic resignation after disconnect' : 'Automatic timer move'
+              }
+            >
+              <Clock3 />
+            </span>
+          )}
+        </span>
+      )}
       <div className="journal-lines">
         {entry.lines.map((line, i) => (
           <p key={i}>{historyTokens(line, names)}</p>
@@ -206,10 +196,7 @@ export function MoveHistory({
               .slice()
               .reverse()
               .map((e) => (
-                <li className="journal-move" key={e.id}>
-                  <span className="journal-action">
-                    <History />
-                  </span>
+                <li className="journal-move journal-note" key={e.id}>
                   <p>{historyTokens(e.text, names)}</p>
                 </li>
               ))}

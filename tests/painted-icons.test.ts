@@ -27,7 +27,6 @@ test('all painted icons share a versioned atlas below 100 KB and have distinct i
 test('closed tools are inert and linked to an accessible trigger, with fullscreen outside the menu', () => {
   const html = renderToStaticMarkup(
     createElement(GameTools, {
-      connected: true,
       fullscreen: false,
       onPanel() {},
       onFullscreen() {},
@@ -35,6 +34,7 @@ test('closed tools are inert and linked to an accessible trigger, with fullscree
     }),
   );
   assert.match(html, /aria-expanded="false"/);
+  assert.ok(!html.includes('aria-label="Connection"'));
   assert.match(html, /inert=""/);
   assert.match(html, /aria-controls="([^"]+)"/);
   const fullscreen = html.indexOf('fullscreen-control');

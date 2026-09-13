@@ -1079,10 +1079,11 @@ export class Store {
       // Two people can express interest in the same immutable offer concurrently.
       // This records consent only; the maker's final exchange still needs the current revision.
       const sameOfferReply =
-        action.kind === 'acceptTrade' &&
+        (action.kind === 'acceptTrade' || action.kind === 'proposeTrade') &&
         expectedRevision < room.revision &&
         current?.trade?.id === action.tradeId &&
-        !current.trade.open &&
+        (action.kind === 'acceptTrade' ? !current.trade.open : current.trade.open) &&
+        !current.trade.proposals?.some((proposal) => proposal.player === seat.id) &&
         !current.trade.declinedBy?.includes(seat.id);
       if (room.revision !== expectedRevision && !sameOfferReply)
         throw new ProtocolError('STALE_STATE', 'State changed; review the latest snapshot and try again');

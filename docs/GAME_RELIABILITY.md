@@ -30,13 +30,13 @@ Probability dots describe the standard two-dice distribution: 2/12 have one comb
 
 The host opens a player's info menu and confirms removal. The server verifies the host, exact room revision, target membership, and that the game has not started. Removal and its intent-bound receipt commit atomically; a retry cannot remove a second player. The departing seat becomes unusable, its socket receives a terminal notice, and remaining players receive the updated roster. This removes a seat, not a permanent account ban.
 
-## Five trade offers per turn
+## Player trades
 
-Catanova limits the active player to **five new player-trade offers per turn**. This is a house rule, not a base CATAN limit. New offers, replacement prices and open requests all count. Cancelling does not restore an offer. Invalid actions and repeated delivery of the same accepted command do not consume another offer.
+There is no per-turn offer limit. The active player can keep trading, with one live offer at a time. Cancel an offer before sending a different one; a repeated submit cannot silently replace it. The client locks pending submissions immediately, and the server validates the current offer and deduplicates command receipts.
 
-Replies, declines, accepting an offer or proposal, withdrawing a proposal, and bank or harbor trades do not consume this allowance. The fifth offer can still finish normally. The allowance resets when the next player begins their turn. The client locks pending submissions immediately, but the authoritative limit and receipt handling are on the server.
+Opponents can decline before accepting. Exact acceptances and open-return proposals stay committed until the offer ends; they cannot be withdrawn, declined or repriced. Multiple willing players are shown in one row. The active player selects a partner and confirms the visible exchange. Both hands are rechecked and both transfers commit atomically. Ending the turn, cancelling the offer or taking another active-player game action expires old replies. Resigning removes that player's response.
 
-The [official CATAN rulebook](https://www.catan.com/sites/default/files/2021-06/catan_base_rules_2020_200707.pdf), pages 4 and 14, permits repeated trading during the active player's trading phase while the player has resources; it does not impose a five-offer cap.
+Concurrent first responses to the same immutable offer may use the same revision. Financial confirmation always requires the latest revision. No private unoffered cards are exposed.
 
 ## Harbor audit
 

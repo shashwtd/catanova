@@ -108,14 +108,18 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     buffer.current.reset();
     setPresentationBusy(false);
   }, []);
-  const reset = useCallback(() => {
-    clear();
-    clearAwards();
-    setHand(null);
-    last.current = '';
-    rolls.current.reset();
-    sound.silence();
-  }, [clear, clearAwards, sound]);
+  const reset = useCallback(
+    (keepMusic = false) => {
+      clear();
+      clearAwards();
+      setHand(null);
+      last.current = '';
+      rolls.current.reset();
+      if (keepMusic) sound.resetEffects();
+      else sound.silence();
+    },
+    [clear, clearAwards, sound],
+  );
   useEffect(() => {
     sound.refresh();
     if (reducedMotion) {
@@ -225,7 +229,7 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
         // Hiding already silenced ambience. Later background snapshots must not cut
         // short the separate, deduplicated turn/required-action attention cue.
         if (baseline) {
-          sound.silence();
+          sound.resetEffects();
           if (!document.hidden) sound.refresh();
         }
         setHand(currentHand ? { ...currentHand } : null);

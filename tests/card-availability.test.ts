@@ -143,7 +143,7 @@ test('development spread displays local card art, playable/held status and reada
   assert.ok(html.includes('You can play this on your next turn.'));
   assert.ok(html.includes('Already counts toward your victory points.'));
   assert.ok(html.includes('+1 point'));
-  assert.match(html, /Knight\. Play card/);
+  assert.match(html, /Knight\. Review card/);
   assert.match(html, /aria-disabled="true"/);
   assert.ok(!html.includes('development-detail'));
   assert.ok(html.includes('/art/optimized/development-cards.e40eabee1fa7.webp'));
@@ -201,8 +201,8 @@ test('development purchase is a separate buy slot with a visible three-resource 
     'the purchase slot cannot masquerade as a held illustrated card',
   );
   assert.ok(!enabled.includes('class="development-card '));
-  assert.ok(!/<button class="development-buy"[^>]*disabled/.test(enabled));
-  assert.match(render(false), /<button class="development-buy"[^>]*disabled/);
+  assert.ok(!/<button[^>]*class="development-buy"[^>]*disabled/.test(enabled));
+  assert.match(render(false), /<button[^>]*class="development-buy"[^>]*disabled/);
 });
 
 test('identical cards share a stack that chooses an eligible old copy before a fresh copy', () => {

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
@@ -24,12 +25,14 @@ export function ResourcePicker({
   max,
   label,
   disabled = false,
+  extra,
 }: {
   value: Hand;
   onChange: (hand: Hand) => void;
   max?: Hand;
   label: string;
   disabled?: boolean;
+  extra?: ReactNode;
 }) {
   return (
     <fieldset className="card-picker" disabled={disabled}>
@@ -61,6 +64,7 @@ export function ResourcePicker({
             </div>
           );
         })}
+        {extra}
       </div>
     </fieldset>
   );

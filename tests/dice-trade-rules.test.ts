@@ -10,7 +10,6 @@ import {
   gameView,
   resignPlayers,
   tradeRate,
-  tradeOffersRemaining,
 } from '../packages/rules/src/game.js';
 import type { Game, GameAction, Hand } from '../packages/rules/src/game.js';
 import { generateBoard } from '../packages/rules/src/board.js';
@@ -84,59 +83,44 @@ test('dice reject the tiny incomplete random bucket and invalid sources; old sav
   assert.deepEqual(move({ ...game, diceMode: 'flat' }, { kind: 'roll' }).dice, [2, 3]);
 });
 
-test('five offers are counted across open, replacement and cancelled offers, and reset only for the next turn', () => {
+test('offers have no turn cap, while one live offer prevents duplicate or replacement submissions', () => {
   let game = prepared();
-  assert.throws(
-    () => move(game, { kind: 'offerTrade', give: hand({ wood: 4 }), want: hand({ ore: 1 }) }),
-    /offered cards/,
-  );
-  assert.equal(tradeOffersRemaining(game), 5);
-  const offers: GameAction[] = [
-    { kind: 'offerTrade', give: hand({ wood: 1 }), want: hand({ sheep: 1 }) },
-    { kind: 'openTrade', give: hand({ wood: 2 }) },
-    { kind: 'offerTrade', give: hand({ wood: 1 }), want: hand({ ore: 1 }) },
-    { kind: 'openTrade', give: hand({ wood: 1 }) },
-    { kind: 'offerTrade', give: hand({ wood: 1 }), want: hand({ wheat: 1 }) },
-  ];
-  for (const [index, offer] of offers.entries()) {
+  const savedHands = structuredClone(game.players.map((p) => p.hand));
+  for (let index = 0; index < 12; index++) {
+    const offer: GameAction =
+      index % 2
+        ? { kind: 'openTrade', give: hand({ wood: 1 }) }
+        : { kind: 'offerTrade', give: hand({ wood: 1 }), want: hand({ sheep: 1 }) };
     game = move(game, offer);
-    assert.equal(tradeOffersRemaining(game), 4 - index);
-    if (index === 2) game = move(game, { kind: 'cancelTrade' });
+    const before = structuredClone(game);
+    assert.throws(() => move(game, offer), /Cancel your current/);
+    assert.deepEqual(game, before);
+    game = move(game, { kind: 'cancelTrade' });
   }
-  const before = structuredClone(game);
-  for (const offer of offers) assert.throws(() => move(game, offer), /all five/);
-  assert.deepEqual(game, before, 'failed sixth offers cannot change the live fifth trade');
-  game = move(game, { kind: 'acceptTrade', tradeId: game.trade!.id }, 'p1');
-  game = move(game, { kind: 'acceptProposal', tradeId: game.trade!.id, player: 'p1' });
-  assert.equal(tradeOffersRemaining(game), 0, 'finishing a trade is still allowed at the cap');
-  const port = game.board.ports.find((p) => p.resource === 'any')!,
-    edge = game.board.edges[port.edge]!;
-  game.buildings[edge.a] = { player: 'p0', kind: 'settlement' };
-  game = move(game, { kind: 'bankTrade', give: 'ore', receive: 'brick' });
-  assert.equal(tradeOffersRemaining(game), 0, 'bank and port trades do not spend offers');
-  game = move(game, { kind: 'endTurn' });
-  assert.equal(tradeOffersRemaining(game), 5);
+  assert.deepEqual(
+    game.players.map((p) => p.hand),
+    savedHands,
+  );
+  assert.equal(game.nextTrade, 12);
   conserved(game);
 });
 
-test('responses to the final open offer remain available and do not consume another player’s turn allowance', () => {
+test('legacy offer counts no longer limit trades and accepted replies stay committed', () => {
   let game = prepared();
-  game.tradeOffersThisTurn = 4;
+  game.tradeOffersThisTurn = 5;
   game = move(game, { kind: 'openTrade', give: hand({ wood: 1 }) });
   const id = game.trade!.id;
   game = move(game, { kind: 'proposeTrade', tradeId: id, give: hand({ sheep: 1 }) }, 'p1');
-  game = move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1');
-  game = move(game, { kind: 'proposeTrade', tradeId: id, give: hand({ ore: 1 }) }, 'p1');
+  assert.throws(() => move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1'), /committed/);
+  assert.throws(() => move(game, { kind: 'declineTrade', tradeId: id }, 'p1'), /committed/);
   game = move(game, { kind: 'declineTrade', tradeId: id }, 'p2');
-  game = move(game, { kind: 'acceptProposal', tradeId: id, player: 'p1', expectedGive: hand({ ore: 1 }) });
+  game = move(game, { kind: 'acceptProposal', tradeId: id, player: 'p1', expectedGive: hand({ sheep: 1 }) });
   assert.equal(game.trade, null);
-  assert.equal(tradeOffersRemaining(game), 0);
   conserved(game);
   const html = renderToStaticMarkup(
     createElement(TradePanel, { game: gameView(game, 'p0'), me: 'p0', disabled: false, onAction: () => {} }),
   );
-  assert.match(html, /All 5 offers used/);
-  assert.match(html, /<button[^>]*class="gold-button trade-submit"[^>]*disabled=""/);
+  assert.doesNotMatch(html, /offers left|All 5|per turn/);
 });
 
 test('trade submission locks before React can render and releases on acknowledgement or failure', async () => {

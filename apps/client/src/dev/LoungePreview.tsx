@@ -1,3 +1,6 @@
+import { isBuildAction, placementValid, type PlacementDraft } from '../placement.js';
+import { PlacementConfirmation } from '../PlacementConfirmation.js';
+import { TurnButtonAttention } from '../TurnButtonAttention.js';
 import { useFeedback } from '../useFeedback.js';
 import { GameEffects } from '../GameEffects.js';
 import { RobberFlow } from '../RobberFlow.js';
@@ -15,8 +18,6 @@ import { UtilityPanel } from '../UtilityPanel.js';
 import { GameTools, type GameToolPanel } from '../GameTools.js';
 import { QuickRules } from '../QuickRules.js';
 import { MoveHistory } from '../MoveHistory.js';
-import { ConnectionPanel } from '../ConnectionPanel.js';
-import { initialMetrics } from '../connection.js';
 import { BOARD_THEMES } from '../board-theme.js';
 /** Vite-only design preview. Uses real components with local sample data, never account APIs. */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -34,7 +35,7 @@ import { BoardViewport } from '../BoardViewport.js';
 import { ResourceHand } from '../ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from '../DevelopmentCards.js';
 import { PlayerRail } from '../PlayerRail.js';
-import { Dices, ArrowLeftRight, X, Settings2, House, Route, Castle } from '../GameIcons.js';
+import { Dices, ArrowLeftRight, ArrowRight, X, Settings2, House, Route, Castle } from '../GameIcons.js';
 import {
   createGame,
   gameView,
@@ -168,6 +169,7 @@ export function LoungePreview() {
   const [showAwards, setShowAwards] = useState(false);
   const [availableBuilds, setAvailableBuilds] = useState(true);
   const [selectedBuild, setSelectedBuild] = useState<BuildMode>(null);
+  const [placement, setPlacement] = useState<PlacementDraft | null>(null);
   const [previewLeader, setPreviewLeader] = useState(-1);
   const [simulation, setSimulation] = useState<Game | null>(null);
   const [robberPreview, setRobberPreview] = useState<RobberPreview>('off');
@@ -257,7 +259,7 @@ export function LoungePreview() {
     }
     return state;
   }, [simulation, availableBuilds, previewLeader, profile.name]);
-  const game = gameView(previewState, me);
+  const game = useMemo(() => gameView(previewState, me), [previewState]);
   const previewGame = {
     ...game,
     diceMode: settings?.diceMode ?? 'classic',
@@ -289,9 +291,10 @@ export function LoungePreview() {
     return { ...currentRoom, revision: rev, game: gameView(state, me) };
   }
   function showScenario(before: Game, after?: Game) {
-    feedback.reset();
+    feedback.reset(true);
     setPreviewError('');
     setSelectedBuild(null);
+    setPlacement(null);
     setRobberHex(null);
     setPanel(null);
     setScreen('game');
@@ -299,6 +302,25 @@ export function LoungePreview() {
     feedback.accept(null, first, me, true);
     setSimulation(after ?? before);
     if (after) feedback.accept(first, snapshot(after, ++revision.current), me);
+  }
+  const placementReady = placementValid(placement, game, room.roomId, me);
+  useEffect(() => {
+    if (panel || !placementReady) setPlacement(null);
+  }, [panel, placementReady]);
+  function previewPlacement(action: GameAction) {
+    if (!isBuildAction(action) || selectedBuild === action.kind) {
+      playAction(action);
+      return;
+    }
+    setPanel(null);
+    setPlacement({
+      action,
+      roomId: room.roomId,
+      player: me,
+      turn: game.turn,
+      phase: game.phase,
+      setupIndex: game.setupIndex,
+    });
   }
   function namedSample() {
     const base = structuredClone(sample);
@@ -329,12 +351,13 @@ export function LoungePreview() {
     }
   }
   function resetPreview() {
-    feedback.reset();
+    feedback.reset(true);
     setSimulation(null);
     setRobberPreview('off');
     setRobberHex(null);
     setPreviewError('');
     setSelectedBuild(null);
+    setPlacement(null);
     setPanel(null);
   }
   return (
@@ -343,6 +366,7 @@ export function LoungePreview() {
         const button = (e.target as HTMLElement).closest('button');
         if (button && !button.disabled) feedback.sound.play('ui');
       }}
+      data-motion={reducedMotion ? 'reduced' : 'full'}
       className={`game-world ${screen === 'hub' ? 'player-home' : screen === 'lobby' ? 'lobby' : 'playing'} design-preview`}
     >
       {screen === 'hub' && (
@@ -383,28 +407,40 @@ export function LoungePreview() {
       {screen === 'game' && (
         <>
           <div className="board-anchor">
-            <BoardViewport seed={game.board.seed}>
+            <BoardViewport seed={game.board.seed} reducedMotion={reducedMotion}>
               <Board
                 board={game.board}
                 art={BOARD_THEMES[preferences.boardTheme]}
                 game={game}
                 me={me}
-                disabled={false}
+                disabled={feedback.presentationBusy}
                 mode={selectedBuild}
                 glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}
                 effectId={feedback.event?.id}
                 selectedRobberHex={robberHex}
-                onAction={playAction}
+                pendingBuild={placementReady ? placement?.action : null}
+                onAction={previewPlacement}
                 onRobber={setRobberHex}
               />
             </BoardViewport>
           </div>
+          {placementReady && placement && (
+            <PlacementConfirmation
+              action={placement.action}
+              disabled={false}
+              onCancel={() => setPlacement(null)}
+              onConfirm={() => {
+                if (!placementValid(placement, game, room.roomId, me)) return;
+                playAction(placement.action);
+                setPlacement(null);
+              }}
+            />
+          )}
           <PlayerRail room={currentRoom} game={displayedGame} me={me} />
           <GameTools
             onClosePanel={() => setPanel(null)}
             panel={panel}
             onPanel={setPanel}
-            connected
             fullscreen={isFullscreen}
             onFullscreen={() => {
               void (
@@ -433,6 +469,7 @@ export function LoungePreview() {
                   aria-pressed={selectedBuild === kind}
                   aria-label={`Build ${kind}`}
                   onClick={() => {
+                    setPlacement(null);
                     setSelectedBuild(selectedBuild === kind ? null : kind);
                     setPanel(null);
                   }}
@@ -454,8 +491,14 @@ export function LoungePreview() {
                 <DevelopmentCards
                   game={game}
                   me={me}
-                  disabled={false}
+                  disabled={feedback.presentationBusy}
                   reducedMotion={reducedMotion}
+                  obscured={panel !== null || placementReady}
+                  onSelect={() => {
+                    setPanel(null);
+                    setPlacement(null);
+                    setSelectedBuild(null);
+                  }}
                   onAction={playAction}
                   onHover={() => feedback.sound.play('hover')}
                 />
@@ -466,7 +509,7 @@ export function LoungePreview() {
               <div className="utility-actions">
                 <div className="development-hand-inline purchase-control">
                   <DevelopmentPurchase
-                    disabled={!game.legal.canBuyCard}
+                    disabled={feedback.presentationBusy || !game.legal.canBuyCard}
                     onBuy={() => {
                       runEvent('buy');
                     }}
@@ -482,11 +525,24 @@ export function LoungePreview() {
                 </button>
               </div>
               <button
-                className="turn-action roll-turn"
-                aria-label="Roll dice"
-                onClick={() => runEvent('dice')}
+                className={`turn-action ${simulation && game.phase === 'actions' ? 'end-turn' : 'roll-turn'}`}
+                aria-label={simulation && game.phase === 'actions' ? 'End turn' : 'Roll dice'}
+                disabled={
+                  feedback.presentationBusy || game.active !== 0 || !['actions', 'roll'].includes(game.phase)
+                }
+                onClick={() =>
+                  simulation && game.phase === 'actions' ? playAction({ kind: 'endTurn' }) : runEvent('dice')
+                }
               >
-                <Dices />
+                <TurnButtonAttention />
+                {simulation && game.phase === 'actions' ? (
+                  <>
+                    <ArrowRight size={36} />
+                    <span>End</span>
+                  </>
+                ) : (
+                  <Dices />
+                )}
               </button>
             </div>
           </div>
@@ -513,9 +569,13 @@ export function LoungePreview() {
         </>
       )}
       {panel === 'trade' && (
-        <PreviewDialog side title="Trade" onClose={() => setPanel(null)}>
-          <TradePanel game={game} me={me} disabled={false} onAction={playAction} />
-        </PreviewDialog>
+        <TradePanel
+          game={game}
+          me={me}
+          disabled={false}
+          onAction={playAction}
+          onClose={() => setPanel(null)}
+        />
       )}
       {panel === 'friends' && (
         <FriendsDrawer
@@ -591,24 +651,6 @@ export function LoungePreview() {
           />
         </PreviewDialog>
       )}
-      {panel === 'network' && (
-        <PreviewDialog
-          side={screen === 'game'}
-          title="Connection · sample data"
-          onClose={() => setPanel(null)}
-        >
-          <ConnectionPanel
-            metrics={{
-              ...initialMetrics(),
-              samples: [35, 42, 31, 38, 34].map((rtt, i) => ({ at: i, rtt })),
-            }}
-            status="connected"
-            revision={0}
-            pending={false}
-            onSync={noop}
-          />
-        </PreviewDialog>
-      )}
       {panel === 'leave' && (
         <PreviewDialog title="Leave this game?" onClose={() => setPanel(null)}>
           <p>This is a local preview.</p>
@@ -661,6 +703,7 @@ export function LoungePreview() {
                 resetPreview();
                 setAvailableBuilds(e.target.checked);
                 setSelectedBuild(null);
+                setPlacement(null);
                 setScreen('game');
                 setPanel(null);
               }}

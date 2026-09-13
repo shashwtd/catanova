@@ -338,60 +338,70 @@ test('two connected players synchronize the last decline and a reconnected playe
   );
 });
 
-test('two concurrent exact acceptances wait for the maker; one confirmed partner is paid once', (t) => {
-  const store = new Store(':memory:');
-  t.after(() => store.close());
-  const s = newSession('Alice'),
-    host = store.enter('create', s.token, s.name);
-  for (const name of ['Bob', 'Cara']) {
-    const s = newSession(name);
-    store.enter('join', s.token, name, host.room_id);
-  }
-  const game = fixture(store, host.room_id);
-  // Both responders can supply the same return, with no private hand information broadcast.
-  game.bank.sheep -= 1;
-  game.players[2]!.hand.sheep = 1;
-  store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(game), host.room_id);
-  const bob = { ...game.players[1]!, room_id: host.room_id },
-    cara = { ...game.players[2]!, room_id: host.room_id };
-  const initial = game.players.map((p) => ({ ...p.hand }));
-  const offered = store.action(host, 'choose-partner-offer', store.snapshot(host.room_id).revision, {
-    kind: 'offerTrade',
-    give: hand({ wood: 1 }),
-    want: hand({ sheep: 1 }),
-  }).revision;
-  const tradeId = store.loadGame(host.room_id)!.trade!.id;
-  const accept = { kind: 'acceptTrade' as const, tradeId };
-  store.action(bob, 'bob-willing', offered, accept);
-  const last = store.action(cara, 'cara-willing', offered, accept).revision;
-  assert.deepEqual(
-    store.loadGame(host.room_id)!.players.map((p) => p.hand),
-    initial,
-  );
-  assert.equal(store.loadGame(host.room_id)!.trade!.proposals!.length, 2);
-  assert.equal(store.action(bob, 'bob-willing', offered, accept).duplicate, true);
-  assert.throws(() => store.action(bob, 'bob-twice', last, accept), /already accepted/);
-  assert.throws(
-    () => store.action(bob, 'bob-chooses', last, { kind: 'acceptProposal', tradeId, player: cara.id }),
-    /no longer available/,
-  );
-  const selection = {
-    kind: 'acceptProposal' as const,
-    tradeId,
-    player: cara.id,
-    expectedGive: hand({ sheep: 1 }),
-  };
-  assert.throws(() => store.action(host, 'old-selection', offered, selection), /State changed/);
-  const completed = store.action(host, 'choose-cara', last, selection);
-  const after = store.loadGame(host.room_id)!;
-  assert.equal(after.trade, null);
-  assert.deepEqual(after.players[1]!.hand, initial[1]);
-  assert.equal(after.players[0]!.hand.sheep, initial[0]!.sheep + 1);
-  assert.equal(after.players[2]!.hand.wood, initial[2]!.wood + 1);
-  assert.equal(store.action(host, 'choose-cara', last, selection).duplicate, true);
-  assert.throws(
-    () => store.action(host, 'choose-again', completed.revision, { ...selection, player: bob.id }),
-    /no longer available/,
-  );
-  conserved(after);
-});
+for (const openOffer of [false, true])
+  test(`concurrent ${openOffer ? 'open' : 'exact'} responses wait for the maker; one partner is paid once`, (t) => {
+    const store = new Store(':memory:');
+    t.after(() => store.close());
+    const s = newSession('Alice'),
+      host = store.enter('create', s.token, s.name);
+    for (const name of ['Bob', 'Cara']) {
+      const s = newSession(name);
+      store.enter('join', s.token, name, host.room_id);
+    }
+    const game = fixture(store, host.room_id);
+    // Both responders can supply the same return, with no private hand information broadcast.
+    game.bank.sheep -= 1;
+    game.players[2]!.hand.sheep = 1;
+    store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(game), host.room_id);
+    const bob = { ...game.players[1]!, room_id: host.room_id },
+      cara = { ...game.players[2]!, room_id: host.room_id };
+    const initial = game.players.map((p) => ({ ...p.hand }));
+    const offered = store.action(
+      host,
+      'choose-partner-offer',
+      store.snapshot(host.room_id).revision,
+      openOffer
+        ? { kind: 'openTrade', give: hand({ wood: 1 }) }
+        : {
+            kind: 'offerTrade',
+            give: hand({ wood: 1 }),
+            want: hand({ sheep: 1 }),
+          },
+    ).revision;
+    const tradeId = store.loadGame(host.room_id)!.trade!.id;
+    const accept = openOffer
+      ? { kind: 'proposeTrade' as const, tradeId, give: hand({ sheep: 1 }) }
+      : { kind: 'acceptTrade' as const, tradeId };
+    store.action(bob, 'bob-willing', offered, accept);
+    const last = store.action(cara, 'cara-willing', offered, accept).revision;
+    assert.deepEqual(
+      store.loadGame(host.room_id)!.players.map((p) => p.hand),
+      initial,
+    );
+    assert.equal(store.loadGame(host.room_id)!.trade!.proposals!.length, 2);
+    assert.equal(store.action(bob, 'bob-willing', offered, accept).duplicate, true);
+    assert.throws(() => store.action(bob, 'bob-twice', last, accept), /already accepted|committed/);
+    assert.throws(
+      () => store.action(bob, 'bob-chooses', last, { kind: 'acceptProposal', tradeId, player: cara.id }),
+      /no longer available/,
+    );
+    const selection = {
+      kind: 'acceptProposal' as const,
+      tradeId,
+      player: cara.id,
+      expectedGive: hand({ sheep: 1 }),
+    };
+    assert.throws(() => store.action(host, 'old-selection', offered, selection), /State changed/);
+    const completed = store.action(host, 'choose-cara', last, selection);
+    const after = store.loadGame(host.room_id)!;
+    assert.equal(after.trade, null);
+    assert.deepEqual(after.players[1]!.hand, initial[1]);
+    assert.equal(after.players[0]!.hand.sheep, initial[0]!.sheep + 1);
+    assert.equal(after.players[2]!.hand.wood, initial[2]!.wood + 1);
+    assert.equal(store.action(host, 'choose-cara', last, selection).duplicate, true);
+    assert.throws(
+      () => store.action(host, 'choose-again', completed.revision, { ...selection, player: bob.id }),
+      /no longer available/,
+    );
+    conserved(after);
+  });

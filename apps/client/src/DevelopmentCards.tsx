@@ -83,11 +83,6 @@ export function DevelopmentCards({
   function choose(c: Card) {
     if (disabled || cardLockReason(c, game, me)) return;
     onSelect?.();
-    if (c.kind === 'knight' || c.kind === 'roadBuilding') {
-      setSelected(null);
-      onAction({ kind: 'playCard', cardId: c.id });
-      return;
-    }
     setSelected((current) => (current === c.id ? null : c.id));
     setTake(emptyHand());
   }
@@ -156,10 +151,8 @@ export function DevelopmentCards({
                   >
                     <button
                       className={`development-card card-finish ${lock ? 'resting-card' : 'playable-card'} ${c.kind === 'victoryPoint' ? 'victory-card' : ''}`}
-                      aria-pressed={
-                        c.kind === 'monopoly' || c.kind === 'yearOfPlenty' ? selected === c.id : undefined
-                      }
-                      aria-label={`${CARD_NAMES[c.kind]}${stack.count > 1 ? ` × ${stack.count}` : ''}. ${lock ?? (c.kind === 'knight' || c.kind === 'roadBuilding' ? 'Play card' : 'Choose resources')}`}
+                      aria-pressed={selected === c.id}
+                      aria-label={`${CARD_NAMES[c.kind]}${stack.count > 1 ? ` × ${stack.count}` : ''}. ${lock ?? 'Review card'}`}
                       aria-disabled={disabled || !!lock}
                       onClick={() => choose(c)}
                     >
@@ -180,7 +173,7 @@ export function DevelopmentCards({
                         ) : (
                           <>
                             <Play size={11} />
-                            {c.kind === 'knight' || c.kind === 'roadBuilding' ? 'Play' : 'Choose'}
+                            Review
                           </>
                         )}
                       </span>
@@ -209,11 +202,7 @@ export function DevelopmentCards({
               </button>
               <div className="development-explanation">
                 <h3>{CARD_NAMES[card.kind]}</h3>
-                <p>
-                  {card.kind === 'monopoly'
-                    ? 'Take this resource from every opponent.'
-                    : 'Take two resources from the bank.'}
-                </p>
+                <p>{CARD_LORE[card.kind].effect}</p>
                 {reason && (
                   <div className="card-unavailable">
                     <LockKeyhole size={14} />

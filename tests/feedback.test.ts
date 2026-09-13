@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -8,7 +10,7 @@ import {
   RollPresentationTracker,
 } from '../apps/client/src/feedback.js';
 import { PresentationBuffer, presentationHold } from '../apps/client/src/useFeedback.js';
-import { nextDicePresentation } from '../apps/client/src/GameEffects.js';
+import { GameEffects, nextDicePresentation } from '../apps/client/src/GameEffects.js';
 import { DEFAULT_PREFERENCES, parsePreferences } from '../apps/client/src/preferences.js';
 import { SoundEngine, soundScore } from '../apps/client/src/sound.js';
 import type { SoundCue } from '../apps/client/src/sound.js';
@@ -633,4 +635,20 @@ test('coalesced construction and card purchases send only the card price to the 
       .sort(),
     ['brick', 'wood'],
   );
+});
+
+test('resource gains use their animations without a misleading one-player announcement', () => {
+  const base = setup();
+  base.phase = 'roll';
+  const { event } = move(base, { kind: 'roll' });
+  const render = (notices: string[]) =>
+    renderToStaticMarkup(
+      createElement(GameEffects, {
+        event: { ...event, dice: undefined, notices },
+        reducedMotion: false,
+        activity: true,
+      }),
+    );
+  assert.doesNotMatch(render(['Bob received 1 Sheep.', 'Cara received 1 Sheep.']), /move-announcement/);
+  assert.match(render(['Bob played Knight.']), /Bob played Knight/);
 });

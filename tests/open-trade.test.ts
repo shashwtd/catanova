@@ -83,7 +83,7 @@ test('open trades require active-player consent and cannot be accepted as gifts 
   }
 });
 
-test('opponents publish bounded, affordable, disjoint proposals and can replace or withdraw only their own', () => {
+test('opponents publish bounded, affordable, disjoint proposals and stay committed until the offer ends', () => {
   let game = open();
   const id = game.trade!.id;
   for (const give of [emptyHand(), hand({ sheep: 5 }), hand({ wood: 1, sheep: 1 })])
@@ -96,21 +96,20 @@ test('opponents publish bounded, affordable, disjoint proposals and can replace 
   game = move(game, { kind: 'proposeTrade', tradeId: id, give: hand({ sheep: 1 }) }, 'p1');
   game = move(game, { kind: 'proposeTrade', tradeId: id, give: hand({ wheat: 1 }) }, 'p2');
   game = move(game, { kind: 'proposeTrade', tradeId: id, give: hand({ ore: 1 }) }, 'p3');
-  game = move(game, { kind: 'proposeTrade', tradeId: id, give: hand({ sheep: 2, ore: 1 }) }, 'p1');
+  assert.throws(
+    () => move(game, { kind: 'proposeTrade', tradeId: id, give: hand({ sheep: 2, ore: 1 }) }, 'p1'),
+    /committed/,
+  );
   assert.equal(game.trade!.proposals!.length, 3);
   assert.equal(new Set(game.trade!.proposals!.map((proposal) => proposal.player)).size, 3);
   assert.deepEqual(
     game.trade!.proposals!.find((proposal) => proposal.player === 'p1')!.give,
-    hand({ sheep: 2, ore: 1 }),
+    hand({ sheep: 1 }),
   );
   assert.deepEqual(game.players, original, 'proposing reserves or transfers no cards');
-  game = move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1');
-  assert.deepEqual(
-    game.trade!.proposals!.map((proposal) => proposal.player),
-    ['p2', 'p3'],
-  );
-  assert.throws(() => move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1'), /no proposal/);
-  assert.throws(() => move(game, { kind: 'withdrawProposal', tradeId: id }), /trade/);
+  for (const kind of ['withdrawProposal', 'declineTrade'] as const)
+    assert.throws(() => move(game, { kind, tradeId: id }, 'p1'), /committed/);
+  assert.equal(game.trade!.proposals!.length, 3);
   conserved(game);
 });
 
@@ -174,7 +173,7 @@ test('another accepted active move expires every proposal; failures retain the u
       /no longer available/,
     );
   }
-  const changed = move(game, { kind: 'openTrade', give: hand({ wood: 1 }) });
+  const changed = move(move(game, { kind: 'cancelTrade' }), { kind: 'openTrade', give: hand({ wood: 1 }) });
   assert.ok(changed.trade!.id > id);
   assert.deepEqual(changed.trade!.proposals, []);
   assert.throws(() => move(game, { kind: 'road', edge: -1 }));
@@ -262,7 +261,11 @@ test('declines are scoped to one offer, cannot exchange cards, and close only af
     base.players.map((p) => p.hand),
   );
   for (const viewer of seats) assert.deepEqual(gameView(game, viewer.id).trade!.declinedBy, ['p1']);
-  const renewed = move(game, { kind: 'offerTrade', give: hand({ wood: 1 }), want: hand({ sheep: 1 }) });
+  const renewed = move(move(game, { kind: 'cancelTrade' }), {
+    kind: 'offerTrade',
+    give: hand({ wood: 1 }),
+    want: hand({ sheep: 1 }),
+  });
   assert.equal(renewed.trade!.declinedBy, undefined);
   assert.notEqual(renewed.trade!.id, tradeId);
   assert.throws(() => move(renewed, { kind: 'declineTrade', tradeId }, 'p1'), /no longer available/);
@@ -285,18 +288,16 @@ test('declines are scoped to one offer, cannot exchange cards, and close only af
   conserved(game);
 });
 
-test('declining an open offer withdraws only that player’s proposal and prevents future responses to that offer', () => {
+test('accepted open proposals cannot be withdrawn or declined; other players can still decline', () => {
   let game = open();
   const tradeId = game.trade!.id;
   game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
   game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ wheat: 1 }) }, 'p2');
-  game = move(game, { kind: 'declineTrade', tradeId }, 'p1');
-  assert.deepEqual(game.trade!.proposals, [{ player: 'p2', give: hand({ wheat: 1 }) }]);
-  assert.throws(
-    () => move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1'),
-    /already declined/,
-  );
-  assert.throws(() => move(game, { kind: 'acceptProposal', tradeId, player: 'p1' }), /no longer available/);
+  const before = structuredClone(game);
+  assert.throws(() => move(game, { kind: 'declineTrade', tradeId }, 'p1'), /committed/);
+  assert.deepEqual(game, before);
+  game = move(game, { kind: 'declineTrade', tradeId }, 'p3');
+  assert.equal(game.trade!.proposals!.length, 2);
   game = move(game, { kind: 'acceptProposal', tradeId, player: 'p2', expectedGive: hand({ wheat: 1 }) });
   assert.equal(game.trade, null);
   assert.equal(game.players[2]!.hand.wood, 2);
@@ -313,7 +314,8 @@ test('accepting a reviewed counteroffer cannot silently accept replacement cards
     player: 'p1',
     expectedGive: hand({ sheep: 1 }),
   };
-  game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ ore: 2 }) }, 'p1');
+  // A legacy persisted proposal may predate the commitment rule. The reviewed price still guards it.
+  game.trade!.proposals![0]!.give = hand({ ore: 2 });
   const saved = structuredClone(game);
   assert.throws(() => move(game, reviewed), /proposal changed/);
   assert.deepEqual(game, saved);
@@ -335,7 +337,7 @@ test('accepting a reviewed counteroffer cannot silently accept replacement cards
   assert.throws(() => parseGameAction({ ...reviewed, expectedGive: { ...emptyHand(), ore: -1 } }));
 });
 
-test('exact acceptance can be withdrawn and final selection checks the current cards', () => {
+test('exact acceptance stays committed and final selection checks the current cards', () => {
   let game = move(setup(), { kind: 'offerTrade', give: hand({ wood: 2 }), want: hand({ sheep: 1 }) });
   const id = game.trade!.id;
   const before = structuredClone(game);
@@ -347,17 +349,13 @@ test('exact acceptance can be withdrawn and final selection checks the current c
   const depleted = structuredClone(game);
   depleted.players[1]!.hand.sheep = 0;
   assert.throws(() => move(depleted, { kind: 'acceptProposal', tradeId: id, player: 'p1' }), /no longer has/);
-  game = move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1');
-  assert.deepEqual(game.trade!.proposals, []);
-  assert.throws(
-    () => move(game, { kind: 'acceptProposal', tradeId: id, player: 'p1' }),
-    /no longer available/,
-  );
-  game = move(game, { kind: 'acceptTrade', tradeId: id }, 'p1');
-  game = move(game, { kind: 'declineTrade', tradeId: id }, 'p1');
-  assert.deepEqual(game.trade!.proposals, []);
+  assert.throws(() => move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1'), /committed/);
+  assert.throws(() => move(game, { kind: 'declineTrade', tradeId: id }, 'p1'), /committed/);
   assert.deepEqual(
     game.players.map((p) => p.hand),
     before.players.map((p) => p.hand),
   );
+  game = move(game, { kind: 'acceptProposal', tradeId: id, player: 'p1', expectedGive: hand({ sheep: 1 }) });
+  assert.equal(game.trade, null);
+  conserved(game);
 });

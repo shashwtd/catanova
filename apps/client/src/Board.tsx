@@ -549,6 +549,7 @@ export function Board({
               aria-label={`Build road on edge ${id + 1}`}
               className="legal-road"
               data-build-site="road"
+              data-site-id={id}
               data-guided={setupRoad || game?.phase === 'freeRoads' || mode === 'road'}
               data-pending={pending?.kind === 'road' && pending.edge === id}
               transform={transform}
@@ -589,6 +590,7 @@ export function Board({
               aria-label={`Build ${kind} at corner ${id + 1}`}
               className="legal-vertex"
               data-build-site={kind}
+              data-site-id={id}
               data-guided={setupSettlement || mode === kind}
               data-pending={pending?.kind === kind && pending.vertex === id}
               onClick={() => onAction({ kind, vertex: id })}
@@ -597,9 +599,16 @@ export function Board({
               <circle className="vertex-hit" r="21" />
               <circle
                 className="site-guide vertex-site-guide"
-                r={kind === 'city' ? 18 : 10}
+                r={kind === 'city' ? 25 : 12}
+                pathLength={100}
                 aria-hidden="true"
               />
+              {kind === 'city' && (
+                <g className="site-guide city-upgrade-mark" aria-hidden="true">
+                  <circle cx="20" cy="-20" r="7" />
+                  <path d="M20-24v8 M16-20h8" />
+                </g>
+              )}
               <g className="build-site-preview" aria-hidden="true">
                 <BuildingShape city={kind === 'city'} color={color(me!)} />
               </g>

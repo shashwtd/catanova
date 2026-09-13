@@ -505,3 +505,31 @@ test('late sample and music downloads cannot recreate sources after disposal', a
   assert.equal(context.state, 'closed');
   assert.equal(context.sources.length, 0);
 });
+
+test('preview resets clear effects without stopping music or suspending its clock', async (t) => {
+  environment(t);
+  const urls = sampleFetch(t);
+  const engine = new SoundEngine(() => ({ ...DEFAULT_PREFERENCES, music: true }));
+  t.after(() => engine.dispose());
+  engine.setScene('game');
+  await engine.unlock();
+  for (let i = 0; i < 8; i++) await flush();
+  const context = AudioContextDouble.instances[0]!,
+    music = context.sources.find((source) => source.loop)!;
+  assert.ok(music);
+  const suspends = context.suspendCalls;
+  engine.play('road');
+  await flush();
+  const effects = context.sources.filter((source) => !source.loop);
+  assert.ok(effects.length);
+  engine.resetEffects();
+  engine.refresh();
+  engine.play('dice');
+  await flush();
+  assert.equal(music.stopCalls, 0);
+  assert.equal(music.disconnected, false);
+  assert.ok(effects.every((source) => source.disconnected));
+  assert.equal(context.suspendCalls, suspends);
+  assert.equal(context.sources.filter((source) => source.loop).length, 1);
+  assert.equal(urls.filter((url) => url === MUSIC_URL).length, 1);
+});

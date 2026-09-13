@@ -1,23 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import {
-  CircleHelp,
-  DoorOpen,
-  GameIcon,
-  History,
-  Maximize,
-  Minimize,
-  Settings2,
-  Wifi,
-  WifiOff,
-  X,
-} from './GameIcons.js';
-export type GameToolPanel = 'journal' | 'network' | 'rules' | 'info' | 'settings' | 'leave';
+import { CircleHelp, DoorOpen, GameIcon, History, Maximize, Minimize, Settings2, X } from './GameIcons.js';
+export type GameToolPanel = 'journal' | 'rules' | 'info' | 'settings' | 'leave';
 export function GameTools({
   panel,
   onPanel,
   onClosePanel,
-  connected,
   fullscreen,
   onFullscreen,
   onLeave,
@@ -26,7 +14,6 @@ export function GameTools({
   panel?: string | null;
   onPanel: (panel: GameToolPanel) => void;
   onClosePanel?: () => void;
-  connected: boolean;
   fullscreen: boolean;
   onFullscreen: () => void;
   onLeave: () => void;
@@ -57,12 +44,6 @@ export function GameTools({
     { key: 'rules', label: 'How to play', icon: <CircleHelp />, action: () => togglePanel('rules') },
     { key: 'info', label: 'Game rules', icon: <GameIcon name="info" />, action: () => togglePanel('info') },
     { key: 'settings', label: 'Settings', icon: <Settings2 />, action: () => togglePanel('settings') },
-    {
-      key: 'network',
-      label: 'Connection',
-      icon: connected ? <Wifi /> : <WifiOff />,
-      action: () => togglePanel('network'),
-    },
     { key: 'leave', label: 'Leave game', icon: <DoorOpen />, action: onLeave },
   ];
   return (
