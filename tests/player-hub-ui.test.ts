@@ -92,8 +92,8 @@ test('player lobby exposes history, profile and social controls without opening 
   assert.ok(!html.includes('<form'));
   assert.ok(!html.includes('Continue with Google'));
   assert.ok(!html.includes('guest login'));
-  assert.match(html, /<dd>4<\/dd>/);
-  assert.match(html, /<dd>12<\/dd>/);
+  assert.match(html, /<b>4<\/b><\/dd>/);
+  assert.match(html, /<b>12<\/b><\/dd>/);
 });
 
 test('join intent reveals a labelled explicit form and busy connections disable every room-entry action', () => {
@@ -127,7 +127,7 @@ test('history distinguishes unfinished games, excludes invented dates, and only 
 
 test('unknown stats remain unknown and errors never masquerade as an empty match history', () => {
   const unknown = renderToStaticMarkup(createElement(PlayerStats, {}));
-  assert.equal((unknown.match(/<dd>—<\/dd>/g) ?? []).length, 2);
+  assert.equal((unknown.match(/<b>—<\/b><\/dd>/g) ?? []).length, 2);
   const html = renderToStaticMarkup(
     createElement(MatchHistory, {
       state: { ...state, data: null, error: 'Could not reach your account.' },

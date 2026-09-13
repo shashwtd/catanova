@@ -108,6 +108,7 @@ import './lounge.css';
 import './room-refinement.css';
 import './play-refinement.css';
 import './tool-motion.css';
+import './lounge-controls.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -1088,7 +1089,7 @@ function App() {
                 onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
               >
                 {actionPhase ? <ArrowRight size={36} /> : <Dices size={38} />}
-                <span>{actionPhase ? 'End' : 'Roll'}</span>
+                {actionPhase && <span>End</span>}
               </button>
             </div>
           </div>
@@ -1236,7 +1237,10 @@ function App() {
         </Dialog>
       )}
       {(panel === 'profile' || panel === 'editProfile') && (
-        <Dialog title="Your profile" onClose={() => setPanel(null)}>
+        <Dialog
+          title={panel === 'editProfile' ? 'Edit profile' : 'Your profile'}
+          onClose={() => setPanel(null)}
+        >
           {g ? (
             <>
               <div className="profile-preview">
@@ -1249,6 +1253,7 @@ function App() {
             <PlayerProfile
               key={`${auth.account?.id ?? 'local'}:${panel}`}
               initialEditing={panel === 'editProfile'}
+              onEdit={() => setPanel('editProfile')}
               auth={auth}
               profile={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
               games={playerGames}

@@ -40,6 +40,7 @@ function renderLobby(room: RoomState, me: string, busy = false, connected = true
       onLeave: () => {},
       onEdit: () => {},
       onSettings: () => {},
+      onKick: async () => {},
     }),
   );
 }
@@ -60,6 +61,7 @@ test('host Start is enabled once the other players are ready without showing a s
   assert.ok(!buttons(html).some((button) => ['Ready', 'Not ready'].includes(text(button))));
   assert.ok(html.includes('90s'));
   assert.ok(html.includes('Everyone is ready'));
+  assert.ok(!html.includes('Manage') && !html.includes('Remove player'));
 });
 
 test('nonhosts can ready or unready and cannot start the room', () => {

@@ -3,10 +3,9 @@ import {
   MIN_VICTORY_POINTS,
   MAX_VICTORY_POINTS,
 } from '../../../packages/rules/src/victory.js';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowLeftRight, Check, Clock3, Dices, Trophy, Volume2, VolumeX } from './GameIcons.js';
-import { DEFAULT_PREFERENCES } from './preferences.js';
+import { ArrowLeftRight, Check, Clock3, Dices, Trophy, Volume2, Music } from './GameIcons.js';
 import type { Preferences } from './preferences.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import {
@@ -48,111 +47,81 @@ export function GameSettings({
       (draft.diceMode ?? 'classic') !== (room?.settings?.diceMode ?? 'classic') ||
       (draft.victoryPoints ?? DEFAULT_VICTORY_POINTS) !==
         (room?.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS);
-  const lastVolume = useRef(preferences.volume || DEFAULT_PREFERENCES.volume);
-  const lastMusicVolume = useRef(preferences.musicVolume || DEFAULT_PREFERENCES.musicVolume);
   const musicMuted = !preferences.music || preferences.musicVolume === 0;
   const musicPercent = musicMuted ? 0 : Math.round(preferences.musicVolume * 100);
-  useEffect(() => {
-    if (preferences.volume > 0) lastVolume.current = preferences.volume;
-  }, [preferences.volume]);
-  useEffect(() => {
-    if (preferences.musicVolume > 0) lastMusicVolume.current = preferences.musicVolume;
-  }, [preferences.musicVolume]);
   useEffect(
     () => setDraft(room?.settings ?? DEFAULT_ROOM_SETTINGS),
     [room?.roomId, room?.settings?.turnTimerSeconds, room?.settings?.diceMode, room?.settings?.victoryPoints],
   );
   return (
     <div className="settings-content settings-menu">
-      <section className="settings-audio" aria-labelledby="volume-label">
-        <div className="settings-row-heading">
-          <label id="volume-label" htmlFor="game-volume">
-            Sound effects
-          </label>
-          <output htmlFor="game-volume">{muted ? 'Muted' : `${volumePercent}%`}</output>
-        </div>
-        <div className="settings-volume-control">
-          <button
-            type="button"
-            className="settings-mute"
-            aria-label="Mute sound"
-            aria-pressed={muted}
-            onClick={() =>
-              update(
-                muted ? { sound: true, volume: preferences.volume || lastVolume.current } : { sound: false },
-              )
-            }
-          >
-            {muted ? <VolumeX /> : <Volume2 />}
-          </button>
-          <input
-            className="settings-range"
-            id="game-volume"
-            type="range"
-            min="0"
-            max="100"
-            step="5"
-            aria-label="Effects volume"
-            aria-valuetext={muted ? 'Muted' : `${volumePercent} percent`}
-            style={{ '--range-fill': `${volumePercent}%` } as CSSProperties}
-            value={volumePercent}
-            onChange={(e) => {
-              const volume = Number(e.target.value) / 100;
-              update({ volume, sound: volume > 0 });
-            }}
-            onPointerUp={previewSound}
-            onKeyUp={(e) => {
-              if (e.key.startsWith('Arrow') || ['Home', 'End', 'PageUp', 'PageDown'].includes(e.key))
-                previewSound();
-            }}
-          />
-        </div>
-      </section>
-      <section className="settings-audio settings-music" aria-labelledby="music-label">
-        <div className="settings-row-heading">
-          <label id="music-label" htmlFor="music-volume">
-            Music
-          </label>
-          <output htmlFor="music-volume">{musicMuted ? 'Off' : `${musicPercent}%`}</output>
-        </div>
-        <div className="settings-volume-control">
-          <button
-            type="button"
-            className="settings-mute"
-            aria-label="Mute music"
-            aria-pressed={musicMuted}
-            onClick={() =>
-              update(
-                musicMuted
-                  ? { music: true, musicVolume: preferences.musicVolume || lastMusicVolume.current }
-                  : { music: false },
-              )
-            }
-          >
-            {musicMuted ? <VolumeX /> : <Volume2 />}
-          </button>
-          <input
-            className="settings-range"
-            id="music-volume"
-            type="range"
-            min="0"
-            max="100"
-            step="5"
-            aria-label="Music volume"
-            aria-valuetext={musicMuted ? 'Off' : `${musicPercent} percent`}
-            style={{ '--range-fill': `${musicPercent}%` } as CSSProperties}
-            value={musicPercent}
-            onChange={(e) => {
-              const musicVolume = Number(e.target.value) / 100;
-              update({ musicVolume, music: musicVolume > 0 });
-            }}
-          />
-        </div>
-      </section>
+      <div className="settings-audio-group" role="group" aria-label="Audio">
+        <section className="settings-audio" aria-labelledby="volume-label">
+          <div className="settings-row-heading">
+            <label id="volume-label" htmlFor="game-volume">
+              Sound effects
+            </label>
+            <output htmlFor="game-volume">{muted ? 'Muted' : `${volumePercent}%`}</output>
+          </div>
+          <div className="settings-volume-control">
+            <span className="settings-audio-icon">
+              <Volume2 />
+            </span>
+            <input
+              className="settings-range"
+              id="game-volume"
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              aria-label="Effects volume"
+              aria-valuetext={muted ? 'Muted' : `${volumePercent} percent`}
+              style={{ '--range-fill': `${volumePercent}%` } as CSSProperties}
+              value={volumePercent}
+              onChange={(e) => {
+                const volume = Number(e.target.value) / 100;
+                update({ volume, sound: volume > 0 });
+              }}
+              onPointerUp={previewSound}
+              onKeyUp={(e) => {
+                if (e.key.startsWith('Arrow') || ['Home', 'End', 'PageUp', 'PageDown'].includes(e.key))
+                  previewSound();
+              }}
+            />
+          </div>
+        </section>
+        <section className="settings-audio settings-music" aria-labelledby="music-label">
+          <div className="settings-row-heading">
+            <label id="music-label" htmlFor="music-volume">
+              Music
+            </label>
+            <output htmlFor="music-volume">{musicMuted ? 'Off' : `${musicPercent}%`}</output>
+          </div>
+          <div className="settings-volume-control">
+            <span className="settings-audio-icon">
+              <Music />
+            </span>
+            <input
+              className="settings-range"
+              id="music-volume"
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              aria-label="Music volume"
+              aria-valuetext={musicMuted ? 'Off' : `${musicPercent} percent`}
+              style={{ '--range-fill': `${musicPercent}%` } as CSSProperties}
+              value={musicPercent}
+              onChange={(e) => {
+                const musicVolume = Number(e.target.value) / 100;
+                update({ musicVolume, music: musicVolume > 0 });
+              }}
+            />
+          </div>
+        </section>
+      </div>
       <fieldset className="settings-theme">
-        <legend>
-          Board style <small>Only changes your view</small>
-        </legend>
+        <legend>Board style</legend>
         {(['storybook', 'classic'] as const).map((theme) => (
           <label key={theme} data-selected={preferences.boardTheme === theme}>
             <input

@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { GameIcon, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
+import { GameIcon, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -23,18 +23,6 @@ function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; cou
   );
 }
 
-function AwardEmblem({ kind, held }: { kind: 'road' | 'army'; held: boolean }) {
-  const Icon = kind === 'road' ? Route : Shield;
-  return (
-    <span className="profile-award-emblem" aria-hidden="true">
-      {held ? (
-        <GameIcon name={kind === 'road' ? 'road-award' : 'army-award'} size={30} />
-      ) : (
-        <Icon size={15} />
-      )}
-    </span>
-  );
-}
 export function PlayerRail({
   room,
   game,
@@ -108,9 +96,33 @@ export function PlayerRail({
               />
             </div>
             <div className="profile-caption">
-              <strong className="profile-name-banner" title={p.name}>
-                {p.name}
-              </strong>
+              <div className="profile-name-row">
+                <strong className="profile-name-banner" title={p.name}>
+                  {p.name}
+                </strong>
+                {(road || army) && (
+                  <div className="profile-held-awards" aria-label="Awards">
+                    {road && (
+                      <span
+                        className="profile-medal road-award"
+                        title={`Longest Road · ${p.roadLength} connected roads · +2 points`}
+                        aria-label={`Longest Road, plus 2 victory points, ${p.roadLength} connected roads`}
+                      >
+                        <GameIcon name="road-award" size={30} />
+                      </span>
+                    )}
+                    {army && (
+                      <span
+                        className="profile-medal army-award"
+                        title={`Largest Army · ${p.knights} Knights played · +2 points`}
+                        aria-label={`Largest Army, plus 2 victory points, ${p.knights} Knights played`}
+                      >
+                        <GameIcon name="army-award" size={30} />
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="profile-details">
                 <div className="profile-stats">
                   <span
@@ -126,26 +138,6 @@ export function PlayerRail({
                   <div className="profile-inventories">
                     <InventoryCount kind="resource" count={p.resourceCount} />
                     <InventoryCount kind="development" count={p.cardCount} />
-                  </div>
-                  <div className="profile-achievements" aria-label="Award progress">
-                    <span
-                      className={`profile-achievement ${road ? 'held road-award' : ''}`}
-                      aria-label={`${road ? 'Longest Road, plus 2 victory points' : 'Longest route'}, ${p.roadLength} connected roads`}
-                      title={`Longest Road · ${p.roadLength} connected roads · ${road ? '+2 points' : 'At least 5 to claim'}`}
-                    >
-                      <AwardEmblem kind="road" held={road} />
-                      <b>{p.roadLength}</b>
-                      {road && <small>+2</small>}
-                    </span>
-                    <span
-                      className={`profile-achievement ${army ? 'held army-award' : ''}`}
-                      aria-label={`${army ? 'Largest Army, plus 2 victory points' : 'Knights played'}, ${p.knights} Knights played`}
-                      title={`Largest Army · ${p.knights} Knights played · ${army ? '+2 points' : 'At least 3 to claim'}`}
-                    >
-                      <AwardEmblem kind="army" held={army} />
-                      <b>{p.knights}</b>
-                      {army && <small>+2</small>}
-                    </span>
                   </div>
                 </div>
               </div>

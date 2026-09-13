@@ -1,11 +1,53 @@
 import type { SVGProps } from 'react';
 import { PAINTED_ICONS, ICON_ATLAS, ICON_ATLAS_WIDTH, ICON_ATLAS_HEIGHT } from './painted-icons.js';
-export type GameIconName = keyof typeof PAINTED_ICONS;
-export const GAME_ICON_NAMES = Object.keys(PAINTED_ICONS) as GameIconName[];
+// Everyday controls use crisp, contextual ink; game pieces keep their painted artwork.
+const CONTROL_PATHS = {
+  settings:
+    'M9 2h6v3l2 1 3-1 2 4-2 2v2l2 2-2 4-3-1-2 1v3H9v-3l-2-1-3 1-2-4 2-2v-2L2 9l2-4 3 1 2-1V2 M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+  invite:
+    'M14 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M3 21v-2a7 7 0 0 1 14 0v2 M18 4a4 4 0 0 1 0 8 M19 16a5 5 0 0 1 3 5',
+  edit: 'm4 16 11-11 4 4L8 20l-5 1 1-5 M13 7l4 4 M15 5l2-2a2 2 0 0 1 3 3l-1 3',
+  plus: 'M12 5v14 M5 12h14',
+  copy: 'M9 8h11v13H9z M15 5V3H3v13h3',
+  link: 'm9 15 6-6 M10 7l2-2a5 5 0 0 1 7 7l-2 2 M14 17l-2 2a5 5 0 0 1-7-7l2-2',
+  share: 'M12 16V3 m-4 4 4-4 4 4 M5 12H3v9h18v-9h-2',
+  refresh: 'M20 9a8 8 0 0 0-14-4L3 8 M3 3v5h5 M4 15a8 8 0 0 0 14 4l3-3 M16 16h5v5',
+  history: 'M6 3h14v18H6a3 3 0 0 1 0-6h14 M6 3a3 3 0 0 0-3 3v12 M9 7h7 M9 11h5',
+  join: 'M14 3h7v18h-7 M3 12h12 m-5-5 5 5-5 5',
+  logout: 'M12 2v10 M6 5a9 9 0 1 0 12 0',
+  defeat: 'M5 3h14v8l-4 6-3-3-2 7-5-5V3 M12 3l-2 6 4 3',
+  music: 'M9 18V5l11-2v13 M9 8l11-2 M9 18a3 3 0 1 1-3-3c2 0 3 1 3 3 M20 16a3 3 0 1 1-3-3c2 0 3 1 3 3',
+  chevron: 'm9 5 7 7-7 7',
+  'light-check': 'm4 12 5 5L20 6',
+  play: 'm7 3 14 9-14 9V3',
+} as const;
+export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
+export const GAME_ICON_NAMES = [
+  ...new Set([...Object.keys(PAINTED_ICONS), ...Object.keys(CONTROL_PATHS)]),
+] as GameIconName[];
 export type IconProps = Omit<SVGProps<SVGSVGElement>, 'name'> & { size?: number | string };
-/** Every icon shares one cached, small painted atlas. The SVG only crops its cell. */
+/** Painted game symbols share one cached atlas; utility paths add no network requests. */
 export function GameIcon({ name, size = 24, className = '', ...props }: IconProps & { name: GameIconName }) {
-  const [x, y] = PAINTED_ICONS[name];
+  if (name in CONTROL_PATHS)
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        className={`game-icon control-icon ${className}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        focusable="false"
+        {...props}
+      >
+        <path d={CONTROL_PATHS[name as keyof typeof CONTROL_PATHS]} />
+      </svg>
+    );
+  const [x, y] = PAINTED_ICONS[name as keyof typeof PAINTED_ICONS];
   return (
     <svg
       width={size}
@@ -38,7 +80,7 @@ export const Dices = icon('dice'),
   Wifi = icon('connection'),
   WifiOff = icon('disconnected'),
   DoorOpen = icon('leave'),
-  LogOut = icon('leave'),
+  LogOut = icon('logout'),
   Users = icon('invite'),
   UserRound = icon('profile'),
   X = icon('close'),
@@ -65,3 +107,8 @@ export const Dices = icon('dice'),
   Activity = icon('activity'),
   Sparkles = icon('spark'),
   Sailboat = icon('boat');
+export const JoinRoom = icon('join'),
+  ChevronRight = icon('chevron'),
+  Defeat = icon('defeat'),
+  Music = icon('music'),
+  LightCheck = icon('light-check');

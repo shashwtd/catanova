@@ -316,9 +316,8 @@ export function LoungePreview() {
                   <DevelopmentPurchase disabled onBuy={noop} />
                 </div>
               </div>
-              <button className="turn-action roll-turn">
+              <button className="turn-action roll-turn" aria-label="Roll dice">
                 <Dices />
-                <span>Roll</span>
               </button>
             </div>
           </div>
@@ -338,10 +337,14 @@ export function LoungePreview() {
         />
       )}
       {(panel === 'profile' || panel === 'editProfile') && (
-        <PreviewDialog title="Your profile" onClose={() => setPanel(null)}>
+        <PreviewDialog
+          title={panel === 'editProfile' ? 'Edit profile' : 'Your profile'}
+          onClose={() => setPanel(null)}
+        >
           <PlayerProfile
             key={panel}
             initialEditing={panel === 'editProfile'}
+            onEdit={() => setPanel('editProfile')}
             auth={auth}
             profile={profile}
             games={record}

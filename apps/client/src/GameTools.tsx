@@ -72,6 +72,7 @@ export function GameTools({
           onClick={() => onPanel('journal')}
         >
           <History />
+          <span className="tool-label">Move history</span>
         </button>
         <button
           className="icon-button fullscreen-control"
@@ -80,6 +81,7 @@ export function GameTools({
           title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         >
           {fullscreen ? <Minimize /> : <Maximize />}
+          <span className="tool-label">{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
         </button>
       </nav>
       <nav className="side-controls room-controls" aria-label="Room tools">

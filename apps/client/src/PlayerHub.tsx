@@ -6,7 +6,18 @@ import { Avatar, ProfileEditor } from './Profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { GameLoader } from './GameLoader.js';
 import { GoogleMark } from './ProviderMarks.js';
-import { ArrowLeft, ArrowRight, History, LogOut, Pencil, Plus, Settings2, Users, X } from './GameIcons.js';
+import {
+  ArrowRight,
+  CircleHelp,
+  JoinRoom,
+  History,
+  LogOut,
+  Pencil,
+  Plus,
+  Settings2,
+  Users,
+  X,
+} from './GameIcons.js';
 import { MatchHistory, PlayerStats } from './MatchHistory.js';
 import type { PlayerGameState } from './MatchHistory.js';
 import { normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
@@ -22,6 +33,7 @@ export function PlayerProfile({
   initialEditing = false,
   onSave,
   onResume,
+  onEdit,
 }: {
   auth: Auth;
   profile: Profile;
@@ -31,14 +43,12 @@ export function PlayerProfile({
   initialEditing?: boolean;
   onSave: (profile: Profile) => Promise<void>;
   onResume: (roomId: string) => void;
+  onEdit?: () => void;
 }) {
   const [editing, setEditing] = useState(initialEditing);
   if (editing)
     return (
       <div className="player-profile-editor">
-        <button className="hub-text-action" onClick={() => setEditing(false)}>
-          <ArrowLeft size={18} /> Profile
-        </button>
         <ProfileEditor
           initial={profile}
           busy={busy}
@@ -54,7 +64,13 @@ export function PlayerProfile({
         <div>
           <h2>{profile.name}</h2>
           {auth.account?.isGuest && <span className="hub-guest-label">Guest</span>}
-          <button className="hub-text-action" onClick={() => setEditing(true)}>
+          <button
+            className="hub-text-action"
+            onClick={() => {
+              setEditing(true);
+              onEdit?.();
+            }}
+          >
             <Pencil size={17} /> Edit profile
           </button>
         </div>
@@ -137,11 +153,6 @@ export function PlayerHub({
           </button>
         </nav>
         <div className="hub-header-tools">
-          {tab === 'history' && (
-            <button className="hub-tool" aria-label="Your profile" onClick={onProfile}>
-              <Pencil />
-            </button>
-          )}
           <button
             className="hub-social-button"
             aria-label={requests ? `Friends, ${requests} invitations and requests` : 'Friends'}
@@ -178,7 +189,7 @@ export function PlayerHub({
                 <Pencil size={16} /> Edit profile
               </button>
               <a href="/guide/" target="_blank" rel="noopener noreferrer">
-                How to play
+                <CircleHelp size={20} /> How to play
               </a>
               <button className="hub-tool" onClick={onSignOut} aria-label="Sign out" title="Sign out">
                 <LogOut size={18} />
@@ -222,7 +233,7 @@ export function PlayerHub({
                       aria-describedby={joinError ? 'hub-join-error' : undefined}
                     />
                     <button className="hub-join-submit" disabled={busy} type="submit" aria-label="Join room">
-                      {busy ? <GameLoader compact /> : <ArrowRight size={22} />}
+                      {busy ? <GameLoader compact /> : <JoinRoom size={22} />}
                     </button>
                     <button
                       className="hub-tool"
@@ -248,7 +259,7 @@ export function PlayerHub({
                     disabled={busy}
                     onClick={() => setJoining(true)}
                   >
-                    Join room <ArrowRight size={20} />
+                    Join room <JoinRoom size={22} />
                   </button>
                 )}
                 {resumable && !joining && (

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check } from './GameIcons.js';
+import { LightCheck } from './GameIcons.js';
 import { AVATAR_COUNT, defaultProfile, validUsername } from '../../../packages/protocol/src/profile.js';
 import type { Profile, UsernameAvailability } from '../../../packages/protocol/src/profile.js';
 const AVATAR_NAMES = [
@@ -241,7 +241,7 @@ export function ProfileEditor({
       )}
       <button className="gold-button" disabled={disabled || !ready}>
         {saving ? 'Saving…' : submitLabel}
-        <Check size={17} />
+        <LightCheck size={17} />
       </button>
     </form>
   );

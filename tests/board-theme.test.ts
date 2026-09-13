@@ -38,7 +38,9 @@ test('personal appearance remains selectable without host privileges or a room',
       previewSound() {},
     }),
   );
-  assert.match(html, /Only changes your view/);
+  assert.ok(!html.includes('Only changes your view'));
+  assert.ok(!html.includes('aria-label="Mute'));
+  assert.match(html, /aria-label="Audio"/);
   const radios = html.match(/<input[^>]*name="board-theme"[^>]*>/g)!;
   assert.equal(radios.length, 2);
   assert.ok(!radios[0]!.includes('checked'));

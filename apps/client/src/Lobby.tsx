@@ -8,7 +8,7 @@ import {
   DoorOpen,
   Link,
   Plus,
-  Sailboat,
+  Play,
   Settings2,
   Share2,
   Users,
@@ -169,7 +169,6 @@ export function Lobby({
   onEdit,
   onSettings,
   onFriends,
-  onKick,
 }: {
   room: RoomState;
   me?: string;
@@ -185,9 +184,6 @@ export function Lobby({
   onKick?: (playerId: string) => Promise<void>;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [confirmKick, setConfirmKick] = useState<string | null>(null);
-  const [kickError, setKickError] = useState('');
-  const [kicking, setKicking] = useState(false);
   const self = room.players.find((p) => p.id === me),
     host = room.players[0]?.id === me;
   const canStart =
@@ -302,62 +298,6 @@ export function Lobby({
                     'Not ready'
                   )}
                 </span>
-                {host && p.id !== me && onKick && (
-                  <details
-                    className="lobby-player-manage"
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') {
-                        event.currentTarget.open = false;
-                        event.currentTarget.querySelector('summary')?.focus();
-                      }
-                    }}
-                    onToggle={(event) => {
-                      if (event.currentTarget.open) {
-                        setConfirmKick(null);
-                        setKickError('');
-                      }
-                    }}
-                  >
-                    <summary aria-label={`Manage ${p.name}`}>Manage</summary>
-                    <div className="lobby-player-popover" role="group" aria-label={`Manage ${p.name}`}>
-                      <strong>{confirmKick === p.id ? 'Remove from lobby?' : p.name}</strong>
-                      <button
-                        type="button"
-                        disabled={busy || kicking || !connected}
-                        onClick={async () => {
-                          if (confirmKick !== p.id) {
-                            setConfirmKick(p.id);
-                            return;
-                          }
-                          setKicking(true);
-                          setKickError('');
-                          try {
-                            await onKick(p.id);
-                          } catch (error) {
-                            setKickError(error instanceof Error ? error.message : 'Could not remove player');
-                          } finally {
-                            setKicking(false);
-                          }
-                        }}
-                      >
-                        {kicking ? 'Removing…' : confirmKick === p.id ? 'Confirm removal' : 'Remove player'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          const menu = event.currentTarget.closest('details');
-                          if (menu) {
-                            menu.open = false;
-                            menu.querySelector('summary')?.focus();
-                          }
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      {kickError && <p role="alert">{kickError}</p>}
-                    </div>
-                  </details>
-                )}
               </article>
             ))}
           </div>
@@ -405,7 +345,7 @@ export function Lobby({
                 onClick={onStart}
               >
                 Start game
-                <Sailboat size={21} />
+                <Play size={21} />
               </button>
             ) : (
               <button
@@ -429,7 +369,7 @@ export function Lobby({
               Stay
             </button>
             <button
-              className="lobby-back"
+              className="hub-room-button lobby-leave-confirm"
               disabled={busy}
               onClick={() => {
                 setConfirmLeave(false);

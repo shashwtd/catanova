@@ -1,6 +1,6 @@
 import type { MatchSummary, PlayerGames } from '../../../packages/protocol/src/player-hub.js';
 import { Avatar } from './Profile.js';
-import { ArrowRight, Clock3, Crown, History, RefreshCw, Trophy } from './GameIcons.js';
+import { ArrowRight, ChevronRight, Defeat, Clock3, Crown, History, RefreshCw, Trophy } from './GameIcons.js';
 import { GameLoader } from './GameLoader.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 
@@ -27,16 +27,18 @@ export function PlayerStats({ stats }: { stats?: PlayerGames['stats'] }) {
   return (
     <dl className="player-record" aria-label="Your game record">
       <div>
-        <dt>
-          <Trophy size={22} /> <span>Wins</span>
-        </dt>
-        <dd>{stats ? stats.wins : '—'}</dd>
+        <dt>Games won</dt>
+        <dd>
+          <Trophy size={28} />
+          <b>{stats ? stats.wins : '—'}</b>
+        </dd>
       </div>
       <div>
-        <dt>
-          <History size={22} /> <span>Games played</span>
-        </dt>
-        <dd>{stats ? stats.played : '—'}</dd>
+        <dt>Games played</dt>
+        <dd>
+          <History size={26} />
+          <b>{stats ? stats.played : '—'}</b>
+        </dd>
       </div>
     </dl>
   );
@@ -55,11 +57,11 @@ export function MatchRow({
       <summary>
         <span className="match-outcome-mark" aria-hidden="true">
           {game.outcome === 'won' ? (
-            <Trophy size={26} />
+            <Trophy size={38} />
           ) : game.outcome === 'playing' ? (
             <Clock3 size={25} />
           ) : (
-            <History size={25} />
+            <Defeat size={32} />
           )}
         </span>
         <span className="match-summary-text">
@@ -94,7 +96,7 @@ export function MatchRow({
               <strong>{player.name}</strong>
               {player.winner && (
                 <span title="Winner">
-                  <Crown size={18} />
+                  <Crown size={26} />
                   <span className="visually-hidden">Winner</span>
                 </span>
               )}
@@ -135,7 +137,7 @@ export function MatchHistory({
         {compact ? (
           onAll && (
             <button className="hub-text-action" onClick={onAll}>
-              View all <ArrowRight size={16} />
+              View all <ChevronRight size={16} />
             </button>
           )
         ) : (
