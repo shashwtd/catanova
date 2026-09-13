@@ -50,13 +50,12 @@ export function GameTools({
           <History />
         </button>
         <button
-          className={`icon-button ${connected ? 'connected' : 'disconnected'}`}
-          aria-label="Connection and ping"
-          title="Connection and ping"
-          aria-pressed={panel === 'network'}
-          onClick={() => onPanel('network')}
+          className="icon-button"
+          onClick={onFullscreen}
+          aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         >
-          {connected ? <Wifi /> : <WifiOff />}
+          {fullscreen ? <Minimize /> : <Maximize />}
         </button>
       </nav>
       <nav className="side-controls room-controls" aria-label="Room tools">
@@ -87,23 +86,27 @@ export function GameTools({
             <span>Menu</span>
           </summary>
           <div className="game-tools-popover">
-            <button onClick={() => choose(() => onPanel('rules'))}>
+            <button aria-label="How to play" onClick={() => choose(() => onPanel('rules'))}>
               <CircleHelp />
               <span>How to play</span>
             </button>
-            <button onClick={() => choose(() => onPanel('info'))}>
+            <button aria-label="Game rules" onClick={() => choose(() => onPanel('info'))}>
               <GameIcon name="info" />
               <span>Game rules</span>
             </button>
-            <button onClick={() => choose(() => onPanel('settings'))}>
+            <button aria-label="Settings" onClick={() => choose(() => onPanel('settings'))}>
               <Settings2 />
-              <span>Sound settings</span>
+              <span>Settings</span>
             </button>
-            <button onClick={() => choose(onFullscreen)}>
-              {fullscreen ? <Minimize /> : <Maximize />}
-              <span>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
+            <button
+              title="Connection and ping"
+              aria-label="Connection and ping"
+              onClick={() => choose(() => onPanel('network'))}
+            >
+              {connected ? <Wifi /> : <WifiOff />}
+              <span>Connection</span>
             </button>
-            <button disabled={busy} onClick={() => choose(onLeave)}>
+            <button aria-label="Leave game" disabled={busy} onClick={() => choose(onLeave)}>
               <DoorOpen />
               <span>Leave game</span>
             </button>

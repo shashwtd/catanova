@@ -590,7 +590,7 @@ test('saved preferences accept only known booleans and a finite clamped volume',
       activity: false,
       extra: true,
     }),
-    { sound: false, volume: 1, music: false, musicVolume: 0.3 },
+    { sound: false, volume: 1, music: false, musicVolume: 0.3, boardTheme: 'storybook' },
   );
   assert.equal(parsePreferences({ volume: -0.5 }).volume, 0);
   assert.equal(parsePreferences({ volume: 0.37 }).volume, 0.37);

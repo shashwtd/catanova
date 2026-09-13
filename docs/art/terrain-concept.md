@@ -1,6 +1,10 @@
 # Terrain and ocean concept — preview only
 
-Generated with the built-in image generation tool. These assets are intentionally under `apps/client/src/dev/assets`, not the public asset folder. Only the development-only lounge preview imports them; production continues to use the existing artwork. Default preview uses the existing art until the user enables **Preview → Concept terrain & ocean**. Disable it to compare the same board and pieces.
+Generated with the built-in image generation tool. Approved as the default **Storybook** board theme on 2026-09-13. Players can select Storybook or Classic in Settings; the preference is stored on their device and does not affect room rules. Both the normal game and development preview use the same preference. Only the selected atlas pair is preloaded. The old dev-only asset copies were removed.
+
+Production files:
+- `apps/client/public/art/optimized/terrain-storybook.102c1df356ce.webp`
+- `apps/client/public/art/optimized/environment-storybook.0265406d629e.webp`
 
 - `terrain-concept.webp`: 1536 × 1024, 172,232 bytes; six equal cells, three columns/two rows.
 - `environment-concept.webp`: 1024 × 1024, 39,596 bytes; two columns/two rows.

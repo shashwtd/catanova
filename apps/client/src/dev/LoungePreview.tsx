@@ -3,11 +3,7 @@ import { QuickRules } from '../QuickRules.js';
 import { MoveHistory } from '../MoveHistory.js';
 import { ConnectionPanel } from '../ConnectionPanel.js';
 import { initialMetrics } from '../connection.js';
-const conceptArt = {
-  terrain: new URL('./assets/terrain-concept.webp', import.meta.url).href,
-  environment: new URL('./assets/environment-concept.webp', import.meta.url).href,
-  concept: true,
-};
+import { BOARD_THEMES } from '../board-theme.js';
 /** Vite-only design preview. Uses real components with local sample data, never account APIs. */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -18,7 +14,7 @@ import { FriendsDrawer } from '../FriendsDrawer.js';
 import { RoomInviteNotice } from '../RoomInvitePanel.js';
 import type { RoomInvitesController } from '../useRoomInvites.js';
 import { GameSettings, GameInfo } from '../GameSettings.js';
-import { DEFAULT_PREFERENCES } from '../preferences.js';
+import { usePreferences } from '../preferences.js';
 import { Board } from '../Board.js';
 import { BoardViewport } from '../BoardViewport.js';
 import { ResourceHand } from '../ResourceHand.js';
@@ -124,7 +120,6 @@ function PreviewDialog({
 export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
   const [panel, setPanel] = useState<'profile' | 'editProfile' | 'friends' | GameToolPanel | null>(null);
-  const [concept, setConcept] = useState(false);
   const [showAwards, setShowAwards] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
@@ -136,7 +131,7 @@ export function LoungePreview() {
   const [profile, setProfile] = useState<Profile>(seats[0]!.profile);
   const [removedPlayers, setRemovedPlayers] = useState<string[]>([]);
   const [settings, setSettings] = useState(room.settings);
-  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const { preferences, update } = usePreferences();
   const [showInvite, setShowInvite] = useState(false);
   const auth = {
     profile,
@@ -263,7 +258,7 @@ export function LoungePreview() {
             <BoardViewport seed={game.board.seed}>
               <Board
                 board={game.board}
-                art={concept ? conceptArt : undefined}
+                art={BOARD_THEMES[preferences.boardTheme]}
                 game={game}
                 me={me}
                 disabled
@@ -352,7 +347,7 @@ export function LoungePreview() {
         <PreviewDialog title="Settings" onClose={() => setPanel(null)}>
           <GameSettings
             preferences={preferences}
-            update={(patch) => setPreferences({ ...preferences, ...patch })}
+            update={update}
             room={screen === 'lobby' ? currentRoom : null}
             me={me}
             busy={false}
@@ -442,18 +437,6 @@ export function LoungePreview() {
           >
             Test invite
           </button>
-          <label>
-            <input
-              type="checkbox"
-              checked={concept}
-              onChange={(e) => {
-                setConcept(e.target.checked);
-                setScreen('game');
-                setPanel(null);
-              }}
-            />{' '}
-            Concept terrain &amp; ocean
-          </label>
           <label>
             <input
               type="checkbox"

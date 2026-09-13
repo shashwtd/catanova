@@ -5,6 +5,7 @@ import { MoveHistory } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
 import { isBuildAction, placementValid } from './placement.js';
 import type { PlacementDraft } from './placement.js';
+import { BOARD_THEMES } from './board-theme.js';
 import { usePreferences } from './preferences.js';
 import { useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
@@ -477,8 +478,8 @@ function App() {
   useEffect(() => {
     if (!room || room.game) return;
     // Requests are cached and shared with the actual launch and WebGL renderer.
-    void preloadGameAssets().catch(() => {});
-  }, [room?.roomId]);
+    void preloadGameAssets(undefined, preferences.boardTheme).catch(() => {});
+  }, [room?.roomId, preferences.boardTheme]);
   useEffect(() => {
     const launchId = room?.launch?.id;
     const c = connection.current;
@@ -487,7 +488,7 @@ function App() {
     setAssetProgress(0);
     void preloadGameAssets((ready, total) => {
       if (active) setAssetProgress(ready / total);
-    }).then(
+    }, preferences.boardTheme).then(
       () => {
         if (active && connection.current === c) c.launchReady(launchId, true);
       },
@@ -498,7 +499,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [room?.launch?.id, connected]);
+  }, [room?.launch?.id, connected, preferences.boardTheme]);
   useEffect(() => {
     setLaunchVisualExpired(false);
     const launch = room?.launch;
@@ -787,6 +788,7 @@ function App() {
         <div className="board-anchor">
           <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
             <Board
+              art={BOARD_THEMES[preferences.boardTheme]}
               board={g.board}
               game={g}
               glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}

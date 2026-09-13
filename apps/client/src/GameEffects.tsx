@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Route, Shield, Sparkles } from './GameIcons.js';
 import { ResourceIcon } from './Board.js';
-import { DevelopmentArt } from './DevelopmentCards.js';
+import { HiddenResource } from './HiddenResource.js';
 import { DiceThrow } from './DiceThrow.js';
 import type { AwardCelebration, FeedbackEvent, FlightIntent } from './feedback.js';
 import { resourceFlightStart, RESOURCE_FLIGHT_MS, PROFILE_GAIN_DWELL_MS } from './useFeedback.js';
@@ -218,11 +218,7 @@ export function GameEffects({
                 key={gain.resource}
                 title={gain.resource === 'any' ? 'Resource cards' : RESOURCE_NAMES[gain.resource]}
               >
-                {gain.resource === 'any' ? (
-                  <DevelopmentArt kind="back" />
-                ) : (
-                  <ResourceIcon resource={gain.resource} />
-                )}
+                {gain.resource === 'any' ? <HiddenResource /> : <ResourceIcon resource={gain.resource} />}
                 <b>+{gain.amount}</b>
               </span>
             ))}
@@ -247,11 +243,7 @@ export function GameEffects({
               }
             >
               <div className="mini-card">
-                {f.resource === 'any' ? (
-                  <DevelopmentArt kind="back" />
-                ) : (
-                  <ResourceIcon resource={f.resource} />
-                )}
+                {f.resource === 'any' ? <HiddenResource /> : <ResourceIcon resource={f.resource} />}
                 <b>{f.amount > 1 ? f.amount : ''}</b>
               </div>
             </div>

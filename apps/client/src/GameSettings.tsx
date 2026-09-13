@@ -149,6 +149,23 @@ export function GameSettings({
           />
         </div>
       </section>
+      <fieldset className="settings-theme">
+        <legend>
+          Board style <small>Only changes your view</small>
+        </legend>
+        {(['storybook', 'classic'] as const).map((theme) => (
+          <label key={theme} data-selected={preferences.boardTheme === theme}>
+            <input
+              type="radio"
+              name="board-theme"
+              checked={preferences.boardTheme === theme}
+              onChange={() => update({ boardTheme: theme })}
+            />
+            <span className={`theme-swatch theme-${theme}`} aria-hidden="true" />
+            <span>{theme === 'storybook' ? 'Storybook' : 'Classic'}</span>
+          </label>
+        ))}
+      </fieldset>
       {room && !room.game && (
         <section className="settings-room" aria-labelledby="timer-label">
           <div className="settings-timer-block">
@@ -306,7 +323,7 @@ export function GameSettings({
   );
 }
 
-/** Frozen match rules live here; the in-game settings menu remains audio-only. */
+/** Frozen match rules live here; the in-game settings menu contains personal audio and appearance choices. */
 export function GameInfo({ room }: { room: RoomState }) {
   const settings = room.settings ?? DEFAULT_ROOM_SETTINGS;
   const balanced = (room.game?.diceMode ?? settings.diceMode) === 'balanced';

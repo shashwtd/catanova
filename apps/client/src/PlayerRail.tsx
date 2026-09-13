@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { GameIcon, Layers, ScrollText, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
+import { GameIcon, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -8,22 +8,79 @@ import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
+
+function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; count: number }) {
+  const label = `${count} ${kind === 'resource' ? 'resource' : 'development'} cards`;
+  return (
+    <span className={`profile-${kind}-count`} data-empty={count === 0} title={label} aria-label={label}>
+      <svg className="profile-inventory-art" viewBox="0 0 30 30" aria-hidden="true" fill="none">
+        {kind === 'resource' ? (
+          <>
+            <rect
+              x="3"
+              y="6"
+              width="15"
+              height="21"
+              rx="2.5"
+              transform="rotate(-12 3 6)"
+              fill="#b96b49"
+              stroke="#f0c18b"
+            />
+            <rect
+              x="10"
+              y="3"
+              width="15"
+              height="21"
+              rx="2.5"
+              transform="rotate(10 10 3)"
+              fill="#467963"
+              stroke="#b7d3a1"
+            />
+            <rect x="9" y="7" width="15" height="21" rx="2.5" fill="#dfbb71" stroke="#fff0c5" />
+            <path d="M12 10h9v15h-9z" stroke="#aa7c3d" strokeWidth=".7" />
+            <path d="m16.5 13 3.5 4.5-3.5 4.5-3.5-4.5Z" fill="#8e6335" />
+          </>
+        ) : (
+          <>
+            <rect
+              x="5"
+              y="3"
+              width="17"
+              height="23"
+              rx="2.5"
+              transform="rotate(-9 5 3)"
+              fill="#554574"
+              stroke="#a8a2c8"
+            />
+            <rect x="9" y="6" width="17" height="23" rx="2.5" fill="#716299" stroke="#d9ccec" />
+            <path d="M12 9h11v17H12z" stroke="#b8a5d4" strokeWidth=".7" />
+            <path d="m17.5 12 1.5 3.5 3.5 2-3.5 1.5-1.5 4-1.5-4-3.5-1.5 3.5-2Z" fill="#f2dcaa" />
+          </>
+        )}
+      </svg>
+      <b>{count}</b>
+    </span>
+  );
+}
+
 function AwardEmblem({ kind, held }: { kind: 'road' | 'army'; held: boolean }) {
   const Icon = kind === 'road' ? Route : Shield;
   return (
     <span className="profile-award-emblem" aria-hidden="true">
       {held && (
-        <svg className="award-laurel" viewBox="0 0 36 36" fill="none">
-          <path
-            d="M15 31C3 27 3 12 11 6M21 31C33 27 33 12 25 6M8 11l-4-2m3 8-4-2m5 9-4-1m9 6-4 2M28 11l4-2m-3 8 4-2m-5 9 4-1m-9 6 4 2"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path d="m18 2 2 3-2 3-2-3Z" fill="currentColor" />
-        </svg>
+        <img
+          src={
+            kind === 'road'
+              ? '/art/optimized/award-road.1f37c571db63.webp'
+              : '/art/optimized/award-army.a805a3c59d7f.webp'
+          }
+          width="32"
+          height="32"
+          alt=""
+        />
       )}
-      <Icon size={held ? 20 : 15} />
+
+      {!held && <Icon size={15} />}
     </span>
   );
 }
@@ -106,22 +163,8 @@ export function PlayerRail({
                   <Trophy size={23} />
                   <b>{p.points}</b>
                 </span>
-                <span
-                  className="profile-resource-count"
-                  title={`${p.resourceCount} resource cards`}
-                  aria-label={`${p.resourceCount} resource cards`}
-                >
-                  <Layers size={23} />
-                  <b>{p.resourceCount}</b>
-                </span>
-                <span
-                  className="profile-development-count"
-                  title={`${p.cardCount} development cards`}
-                  aria-label={`${p.cardCount} development cards`}
-                >
-                  <ScrollText size={23} />
-                  <b>{p.cardCount}</b>
-                </span>
+                <InventoryCount kind="resource" count={p.resourceCount} />
+                <InventoryCount kind="development" count={p.cardCount} />
               </div>
               <div className="profile-achievements" aria-label="Award progress">
                 <span
