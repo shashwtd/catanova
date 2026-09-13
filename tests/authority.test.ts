@@ -77,6 +77,10 @@ test('every accepted game action has durable history, private outcomes and a has
   assert.equal(entries.length, 151);
   assert.equal(new Set(entries.map((e) => e.revision)).size, 151);
   assert.ok(entries.every((e) => e.lines.length > 0));
+  assert.ok(
+    entries.some((e) => e.kind === 'roll' && e.lines.some((line) => line.includes(' received '))),
+    'public production receipts survive in durable history beyond the rolling log',
+  );
   assert.equal(entries.at(-1)!.kind, 'start');
   assert.ok(!JSON.stringify(entries).includes('"hand":'));
   assert.ok(!JSON.stringify(entries).includes('"deck":'));

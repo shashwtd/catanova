@@ -97,7 +97,7 @@ test('coast-aligned ships and outer trade badges fit every coast, with separate 
       }
       const badgeOutward = (pose.markerX - pose.boatX) * pose.nx + (pose.markerY - pose.boatY) * pose.ny;
       assert.ok(
-        badgeOutward - (24 * Math.abs(pose.nx) + 11 * Math.abs(pose.ny)) > 16,
+        badgeOutward - PORT_BADGE_BOUNDS.height / 2 > 16,
         'the entire trade badge is beyond the seaward side of the hull',
       );
       const shipCorners = [SHIP_BOUNDS.x, SHIP_BOUNDS.x + SHIP_BOUNDS.width].flatMap((x) =>
@@ -106,10 +106,19 @@ test('coast-aligned ships and outer trade badges fit every coast, with separate 
           y: pose.boatY + x * Math.sin(angle) + y * Math.cos(angle),
         })),
       );
+      const badgeAngle = (pose.markerAngle * Math.PI) / 180;
+      assert.ok(
+        Math.abs(Math.cos(badgeAngle) * pose.nx + Math.sin(badgeAngle) * pose.ny) < 1e-8,
+        'the trade badge follows the long axis of its ship',
+      );
+      assert.ok(
+        Math.abs((pose.boatX - pose.x) * pose.nx + (pose.boatY - pose.y) * pose.ny - 44) < 1e-8,
+        'the ship leaves room for longer bridges',
+      );
       const badgeCorners = [PORT_BADGE_BOUNDS.x, PORT_BADGE_BOUNDS.x + PORT_BADGE_BOUNDS.width].flatMap((x) =>
         [PORT_BADGE_BOUNDS.y, PORT_BADGE_BOUNDS.y + PORT_BADGE_BOUNDS.height].map((y) => ({
-          x: pose.markerX + x,
-          y: pose.markerY + y,
+          x: pose.markerX + x * Math.cos(badgeAngle) - y * Math.sin(badgeAngle),
+          y: pose.markerY + x * Math.sin(badgeAngle) + y * Math.cos(badgeAngle),
         })),
       );
       for (const { x, y } of [...shipCorners, ...badgeCorners]) {

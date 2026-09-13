@@ -837,6 +837,7 @@ function App() {
       )}
       {g && room && (
         <PlayerRail
+          reducedMotion={reducedMotion}
           clockOffset={metrics.clockOffsetMs}
           room={room}
           game={g}
@@ -1014,7 +1015,7 @@ function App() {
                 return (
                   <IconButton
                     key={kind}
-                    className={`build-control build-${kind}`}
+                    className={`build-control build-${kind} ${!disabled && actionPhase && sites.length ? 'is-available' : ''}`}
                     label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
                       .map((r) => `${COSTS[kind][r]} ${RESOURCE_NAMES[r]}`)
                       .join(', ')}`}
@@ -1035,28 +1036,30 @@ function App() {
               })}
             </div>
           )}
-          <div className="card-table">
-            <div className="hand-zone">
-              <ResourceHand
-                hand={feedback.hand ?? hand}
-                pulse={feedback.pulse}
-                reducedMotion={reducedMotion}
-              />
-              {me && !!player?.cards?.length && (
-                <DevelopmentCards
-                  game={g}
-                  me={me}
-                  disabled={disabled}
+          <div className="hand-dock">
+            <div className="card-table">
+              <div className="hand-zone">
+                <ResourceHand
+                  hand={feedback.hand ?? hand}
+                  pulse={feedback.pulse}
                   reducedMotion={reducedMotion}
-                  onAction={(a) => void act(a)}
-                  onHover={() => feedback.sound.play('hover')}
-                  obscured={panel !== null || placementReady}
-                  onSelect={() => {
-                    setPanel(null);
-                    setPlacement(null);
-                  }}
                 />
-              )}
+                {me && !!player?.cards?.length && (
+                  <DevelopmentCards
+                    game={g}
+                    me={me}
+                    disabled={disabled}
+                    reducedMotion={reducedMotion}
+                    onAction={(a) => void act(a)}
+                    onHover={() => feedback.sound.play('hover')}
+                    obscured={panel !== null || placementReady}
+                    onSelect={() => {
+                      setPanel(null);
+                      setPlacement(null);
+                    }}
+                  />
+                )}
+              </div>
             </div>
             <div className="table-actions">
               <div className="dice-dock" data-dice-dock />

@@ -475,7 +475,7 @@ export function Board({
               <g
                 className="port-cargo"
                 data-resource={port.resource}
-                transform={`translate(${p.markerX},${p.markerY})`}
+                transform={`translate(${p.markerX},${p.markerY}) rotate(${p.markerAngle})`}
               >
                 <rect className="port-badge" {...PORT_BADGE_BOUNDS} rx="6" />
                 {port.resource === 'any' ? (

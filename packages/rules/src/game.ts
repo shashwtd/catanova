@@ -159,6 +159,7 @@ function finishFreeRoads(g: Game) {
 }
 function produce(g: Game, number: number) {
   const owed = g.players.map(() => emptyHand());
+  const received = g.players.map(() => emptyHand());
   for (const h of g.board.hexes) if (h.number === number && h.id !== g.robber && h.terrain !== 'desert') {
     for (const v of h.vertices) { const b = g.buildings[v]; if (b) { const i = g.players.findIndex(p => p.id === b.player); if (!g.players[i]?.resigned) owed[i]![h.terrain] += b.kind === 'city' ? 2 : 1; } }
   }
@@ -166,8 +167,10 @@ function produce(g: Game, number: number) {
     const recipients = owed.map((h, i) => ({ n: h[r], i })).filter(x => x.n > 0);
     const needed = recipients.reduce((n, p) => n + p.n, 0);
     if (needed > g.bank[r] && recipients.length > 1) { log(g, `The bank is short of ${RESOURCE_NAMES[r]}; nobody receives that resource.`); continue; }
-    for (const { n, i } of recipients) { const amount = Math.min(n, g.bank[r]); g.players[i]!.hand[r] += amount; g.bank[r] -= amount; }
+    for (const { n, i } of recipients) { const amount = Math.min(n, g.bank[r]); g.players[i]!.hand[r] += amount; g.bank[r] -= amount; received[i]![r] += amount; }
   }
+  for (const [i, hand] of received.entries()) if (total(hand)) log(g, `${g.players[i]!.name} received ${resourceText(hand)}.`);
+  if (!received.some(hand => total(hand))) log(g, 'No resources produced.');
 }
 
 function advanceTurn(g: Game, pendingRobber = false) {
@@ -335,11 +338,14 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   if (g.phase === 'setupSettlement') {
     requireRule(a.kind === 'settlement' && settlementSites(g, p.id, true).includes(a.vertex), 'Choose an empty corner at least two edges from another settlement');
     g.buildings[a.vertex] = { player: p.id, kind: 'settlement' }; g.setupVertex = a.vertex; g.phase = 'setupRoad';
+    const startingResources = emptyHand();
     if (g.setupIndex >= g.players.length) for (const id of g.board.vertices[a.vertex]!.hexes) {
       const resource = g.board.hexes[id]!.terrain;
-      if (resource !== 'desert') { p.hand[resource]++; g.bank[resource]--; }
+      if (resource !== 'desert') { p.hand[resource]++; g.bank[resource]--; startingResources[resource]++; }
     }
-    log(g, `${p.name} placed a starting settlement at corner ${a.vertex + 1}.`); return g;
+    log(g, `${p.name} placed a starting settlement at corner ${a.vertex + 1}.`);
+    if (total(startingResources)) log(g, `${p.name} received ${resourceText(startingResources)} from the starting settlement.`);
+    return g;
   }
   if (g.phase === 'setupRoad') {
     requireRule(a.kind === 'road' && roadSites(g, p.id, g.setupVertex).includes(a.edge), 'Place a road touching your new settlement');

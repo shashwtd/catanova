@@ -9,7 +9,7 @@ export const GAME_ART = [
   '/art/optimized/environment-dark.c55c6de597e4.webp',
   '/art/optimized/sprites-fantasy.3aaf69915ec6.webp',
   '/art/optimized/avatars-fantasy.6bf04e83341a.webp',
-  '/art/optimized/development-cards.007cbcd55355.webp',
+  '/art/optimized/development-cards.e40eabee1fa7.webp',
   '/art/optimized/portrait-frame.de152d0c9426.webp',
 ] as const;
 

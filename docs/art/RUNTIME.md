@@ -38,4 +38,4 @@ These are byte-size and behavior improvements, not a claim that an actual thrott
 
 ## Current development cards
 
-The September 2026 [readability pass](development-cards-readable.md) uses a new, smaller 768px atlas (104,534 bytes). The full-resolution table above and `runtime-art.json` record the legacy art exports, which remain available for old PNG URLs.
+The September 2026 [readability pass](development-cards-readable.md) uses a new, smaller 768px atlas (96,886 bytes). The full-resolution table above and `runtime-art.json` record the legacy art exports, which remain available for old PNG URLs.

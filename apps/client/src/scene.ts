@@ -126,14 +126,17 @@ export function portPlacement(board: Board, edgeId: number) {
     length = Math.hypot(dx, dy);
   const nx = dx / length,
     ny = dy / length;
-  const boatX = x + nx * 38,
-    boatY = y + ny * 38;
+  const boatX = x + nx * 44,
+    boatY = y + ny * 44;
   // The sprite's long axis is vertical: rotate it tangent to this coast edge.
   // Its exposed left gunwale faces shore; the sail and cargo badge face open water.
   const angle = (Math.atan2(ny, nx) * 180) / Math.PI;
   const tx = -ny,
     ty = nx;
-  const badgeDistance = 24 * Math.abs(nx) + 11 * Math.abs(ny) + 24;
+  // The badge's long axis follows the boat. Its narrow side faces the sea.
+  const parallelAngle = angle + 90;
+  const markerAngle = parallelAngle > 90 ? parallelAngle - 180 : parallelAngle; // Keep ratios upright.
+  const badgeDistance = 36;
 
   return {
     x,
@@ -150,6 +153,7 @@ export function portPlacement(board: Board, edgeId: number) {
     })),
     boatX,
     boatY,
+    markerAngle,
     markerX: boatX + nx * badgeDistance,
     markerY: boatY + ny * badgeDistance,
   };

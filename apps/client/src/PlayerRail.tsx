@@ -8,6 +8,8 @@ import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
+import { rankedPlayers } from './player-ranking.js';
+import { usePlayerOrderMotion } from './usePlayerOrderMotion.js';
 
 function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; count: number }) {
   const label = `${count} ${kind === 'resource' ? 'resource' : 'development'} cards`;
@@ -29,13 +31,19 @@ export function PlayerRail({
   me,
   timer,
   clockOffset,
+  reducedMotion = false,
 }: {
   room: RoomState;
   game: GameView;
   me?: string;
   timer?: ReactNode;
   clockOffset?: number;
+  reducedMotion?: boolean;
 }) {
+  const rail = useRef<HTMLElement>(null);
+  const ranked = rankedPlayers(game);
+  usePlayerOrderMotion(rail, ranked.map((p) => p.player.id).join('|'), room.roomId, reducedMotion);
+  const tied = ranked.filter((p) => p.leading).length > 1;
   const [now, setNow] = useState(Date.now);
   const fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() });
   if (room.serverNow !== undefined && room.serverNow !== fallback.current.server)
@@ -55,8 +63,8 @@ export function PlayerRail({
     };
   }, [counting]);
   return (
-    <aside className="player-rail" aria-label="Players">
-      {game.players.map((p, i) => {
+    <aside ref={rail} className="player-rail" aria-label="Players">
+      {ranked.map(({ player: p, seatIndex: i, publicPoints, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
           activity = playerTurnActivity(game, p.id),
@@ -72,6 +80,15 @@ export function PlayerRail({
           >
             <div className="profile-portrait">
               <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
+              {leading && (
+                <span
+                  className="profile-rank"
+                  aria-label={`${tied ? 'Joint leader' : 'Leader'}, ${publicPoints} public points`}
+                  title={`${tied ? 'Joint leader' : 'Leader'} · ${publicPoints} public points`}
+                >
+                  #1
+                </span>
+              )}
               {!seat?.connected && (
                 <span className="offline-mark" role="img" title="Disconnected" aria-label="Disconnected">
                   <WifiOff size={38} />

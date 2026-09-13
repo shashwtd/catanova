@@ -587,30 +587,6 @@
     padding: 4px;
     gap: 2px;
   }
-  .playing .card-table {
-    height: 82px;
-    padding-bottom: 8px;
-    align-items: end;
-  }
-  .playing .card-table::before {
-    height: 76px;
-    bottom: 0;
-  }
-  .playing .hand-zone {
-    align-items: end;
-  }
-  .playing .resource-hand.resource-counters {
-    height: 60px;
-    align-self: end;
-    padding: 0;
-    margin: 0;
-  }
-  .playing .resource-counter {
-    min-height: 0;
-  }
-  .playing .table-actions {
-    align-items: end;
-  }
 }
 @media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
   .playing .player-profile .profile-caption {
@@ -678,21 +654,6 @@
     padding-block: 14px;
   }
 }
-@media (max-width: 700px) and (orientation: portrait) {
-  .playing .card-table {
-    height: 122px;
-    grid-template-rows: 58px 52px;
-    gap: 4px;
-    padding-bottom: 8px;
-  }
-  .playing .card-table::before {
-    height: calc(118px + var(--mobile-safe-bottom));
-  }
-  .playing .resource-hand.resource-counters {
-    height: 48px;
-    align-self: center;
-  }
-}
 @media (min-width: 1001px) {
   .room-lobby .lobby-avatar .avatar-medallion {
     width: clamp(120px, 11vw, 148px);
@@ -708,4 +669,387 @@
   .playing .construction-tools.build-shelf {
     bottom: 96px;
   }
+}
+
+/* Ranked portraits sit over a short cloth strip that continues to the screen edge. */
+.playing .player-rail {
+  --rank-move-duration: 500ms;
+  --rank-move-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.playing .player-profile,
+.playing .player-profile.active {
+  position: relative;
+  isolation: isolate;
+  background: none;
+  box-shadow: none;
+}
+.playing .player-profile::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  inset: 13px -40px 13px 66px;
+  border: 0;
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(100deg, #5b4a35d9, #493c2fdb 72%, #3e352bea);
+  box-shadow:
+    inset 0 1px #e4c69425,
+    inset 0 -1px #15110b35;
+}
+.playing .player-profile .profile-name-banner,
+.playing .player-profile.self .profile-name-banner,
+.playing .player-profile.active .profile-name-banner {
+  font-size: 18px;
+}
+.playing .profile-details {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.playing .player-profile .profile-caption .profile-stats {
+  padding-right: 10px;
+}
+.playing .profile-detail-grid {
+  padding-left: 9px;
+}
+.playing .profile-inventories {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.profile-rank {
+  position: absolute;
+  z-index: 5;
+  top: -4px;
+  left: -5px;
+  min-width: 26px;
+  padding: 3px 5px 4px;
+  border-radius: 4px 4px 7px 4px;
+  background: linear-gradient(#ffe4a0, #dca955);
+  color: #3d2c19;
+  box-shadow:
+    inset 0 1px #fff4c2,
+    0 2px 3px #1d160d70;
+  font:
+    800 14px/1 Barlow,
+    sans-serif;
+  text-align: center;
+  text-shadow: none;
+}
+
+/* Both shelves float at the same height; action buttons have their own space. */
+.playing .hand-dock {
+  position: fixed;
+  z-index: 20;
+  right: 20px;
+  bottom: 14px;
+  max-width: calc(100% - 250px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: none;
+}
+.playing .hand-dock:has(.development-detail) {
+  z-index: 50;
+}
+.playing .hand-dock > * {
+  pointer-events: auto;
+}
+.playing .hand-dock .card-table {
+  position: relative;
+  inset: auto;
+  transform: none;
+  translate: none;
+  margin: 0;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  height: 62px;
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 0;
+}
+.playing .hand-dock .card-table::before {
+  inset: 0;
+  width: auto;
+  height: auto;
+  border: 1px solid #c8a87845;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px #f3deb336,
+    inset 0 -3px #281d174d,
+    0 3px 8px #1a171440;
+}
+.playing .hand-dock .hand-zone {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  flex-direction: row;
+  justify-content: center;
+  align-items: end;
+  gap: 18px;
+  margin: 0;
+}
+.playing .hand-dock .resource-hand.resource-counters {
+  height: 46px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  align-self: center;
+}
+.playing .hand-dock .resource-counter {
+  min-height: 0;
+}
+.playing .hand-dock .hand-zone > .development-hand-inline {
+  align-self: end;
+  margin: 0;
+}
+.playing .hand-dock .table-actions {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: row;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 10px;
+  height: 62px;
+  padding: 0;
+  margin: 0;
+}
+.playing .hand-dock .utility-actions {
+  flex-direction: row;
+  align-items: end;
+  gap: 7px;
+}
+.playing .hand-dock .purchase-control {
+  margin: 0;
+}
+.playing .hand-dock .table-actions :is(.trade-action, .development-buy, .turn-action) {
+  box-sizing: border-box;
+  flex: none;
+  margin: 0;
+  width: 52px;
+  height: 52px;
+  min-height: 0;
+  border: 1px solid #becbb270;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px #ffffff4a,
+    inset 0 -3px #07191450,
+    0 3px 0 #1e211dd9,
+    0 5px 7px #14181040;
+}
+.playing .hand-dock .table-actions .development-buy {
+  border-color: #d1c1e482;
+}
+.playing .hand-dock .table-actions .turn-action {
+  width: 70px;
+  height: 62px;
+  border-color: #e1c78396;
+}
+.playing .hand-dock .turn-action.roll-turn .game-icon {
+  width: 92%;
+  height: 92%;
+}
+.playing .hand-dock .table-actions :is(.trade-action, .development-buy, .turn-action):active:not(:disabled) {
+  translate: 0 2px;
+  box-shadow:
+    inset 0 1px #ffffff24,
+    inset 0 -1px #07191450,
+    0 1px #1e211dd9;
+}
+.playing .build-shelf .build-control.is-available:not(.is-selected) {
+  background: linear-gradient(#769b604f, #4d734735);
+  box-shadow:
+    inset 0 0 0 1px #cfdf9f65,
+    inset 0 1px #e5ecc34a;
+}
+.playing .build-shelf .build-control.is-available .build-control-label {
+  color: #fff2b8;
+}
+.playing .build-shelf .build-control.is-selected {
+  background: #77975380;
+  box-shadow: inset 0 0 0 2px #f1d88e;
+}
+.side-controls .game-menu-trigger.icon-button {
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  gap: 0;
+  border-radius: 10px;
+  background: linear-gradient(150deg, #4b646b, #283d46 72%);
+  border: 1px solid #81929270;
+  box-shadow:
+    inset 0 1px #d6e3df33,
+    inset 0 -2px #142a3499,
+    0 3px 5px #16202b55;
+}
+.side-controls .game-menu-trigger .tool-label {
+  display: none;
+}
+
+/* Ink on parchment: receipts and actors stay readable in the side journal. */
+.game-side-panel .turn-journal {
+  color: #374b3d;
+}
+.game-side-panel .journal-turn h3 {
+  color: #51654d;
+  border-color: #7b876a45;
+  background: #dedcc6;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.game-side-panel .journal-move {
+  color: #435346;
+  font-size: 13px;
+  line-height: 1.5;
+  border-color: #7b876a26;
+}
+.game-side-panel .journal-person {
+  color: #2b4431;
+  font-weight: 700;
+}
+.game-side-panel .journal-action {
+  color: #577262;
+}
+.game-side-panel .journal-resource {
+  color: #344837;
+  background: #f8f2df;
+  box-shadow: inset 0 0 0 1px #b7ab8938;
+  padding-inline: 3px;
+  border-radius: 4px;
+}
+.game-side-panel .journal-resource b {
+  color: #344837;
+}
+.game-side-panel .journal-item {
+  color: #635136;
+}
+.game-side-panel .journal-empty {
+  color: #596a58;
+  font-size: 14px;
+}
+.game-side-panel .automatic-mark {
+  color: #496851;
+  background: #eee5cf;
+}
+
+@media (min-width: 701px) and (max-width: 1100px) {
+  .playing .hand-dock {
+    max-width: calc(100% - 40px);
+  }
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .player-profile::before {
+    inset: 9px -22px 9px 43px;
+  }
+  .playing .player-profile .profile-name-banner,
+  .playing .player-profile.self .profile-name-banner,
+  .playing .player-profile.active .profile-name-banner {
+    font-size: 13px;
+  }
+  .playing .player-profile .profile-caption .profile-stats {
+    padding-right: 5px;
+  }
+  .playing .profile-detail-grid {
+    padding-left: 4px;
+  }
+  .playing .profile-inventories {
+    gap: 4px;
+  }
+  .profile-rank {
+    min-width: 20px;
+    font-size: 11px;
+    padding: 3px;
+    top: -3px;
+    left: -2px;
+  }
+  .side-controls .game-menu-trigger.icon-button {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+  .playing .hand-dock .table-actions :is(.trade-action, .development-buy) {
+    width: 44px;
+    height: 52px;
+  }
+  .playing .hand-dock .table-actions .turn-action {
+    width: 60px;
+    height: 58px;
+  }
+  .playing .hand-dock .table-actions {
+    gap: 6px;
+    height: 58px;
+  }
+  .playing .hand-dock .utility-actions {
+    gap: 4px;
+  }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing .player-profile::before {
+    right: -3px;
+  }
+  .playing .hand-dock {
+    inset: auto calc(var(--mobile-safe-right) + 8px) calc(var(--mobile-safe-bottom) + 8px)
+      calc(var(--mobile-safe-left) + 8px);
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: end;
+    gap: 8px;
+  }
+  .playing .hand-dock .card-table {
+    width: 100%;
+    padding-inline: 8px;
+  }
+  .playing .hand-dock .hand-zone {
+    gap: 8px;
+  }
+  .playing .hand-dock .hand-zone > .development-hand-inline {
+    flex: 0 1 auto;
+  }
+}
+@media (max-width: 380px) and (orientation: portrait) {
+  .playing .player-profile::before {
+    inset: 8px -2px 8px 37px;
+  }
+  .playing .player-profile .profile-caption .profile-stats {
+    padding-right: 3px;
+  }
+  .playing .profile-detail-grid {
+    padding-left: 3px;
+  }
+  .playing .profile-inventories {
+    gap: 3px;
+  }
+  .playing .hand-dock .table-actions .turn-action {
+    width: 56px;
+  }
+  .playing .hand-dock .table-actions {
+    gap: 4px;
+  }
+}
+@media (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .hand-dock {
+    right: calc(var(--mobile-safe-right) + 8px);
+    bottom: calc(var(--mobile-safe-bottom) + 8px);
+    max-width: calc(100% - 174px);
+    gap: 10px;
+  }
+}
+.playing .player-rail {
+  overflow: visible;
+}
+.playing .hand-dock .table-actions {
+  width: auto;
+}
+.game-side-panel .journal-action {
+  background: #d9ddca;
+  border-color: #78856730;
+}
+.game-side-panel .journal-lines p {
+  font-size: 13px;
 }

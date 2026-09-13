@@ -6,7 +6,7 @@ import { ConnectionPanel } from '../ConnectionPanel.js';
 import { initialMetrics } from '../connection.js';
 import { BOARD_THEMES } from '../board-theme.js';
 /** Vite-only design preview. Uses real components with local sample data, never account APIs. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { PlayerHub, PlayerProfile } from '../PlayerHub.js';
 import type { useAuth } from '../auth.js';
@@ -16,13 +16,19 @@ import { RoomInviteNotice } from '../RoomInvitePanel.js';
 import type { RoomInvitesController } from '../useRoomInvites.js';
 import { GameSettings, GameInfo } from '../GameSettings.js';
 import { usePreferences } from '../preferences.js';
-import { Board } from '../Board.js';
+import { Board, type BuildMode } from '../Board.js';
 import { BoardViewport } from '../BoardViewport.js';
 import { ResourceHand } from '../ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from '../DevelopmentCards.js';
 import { PlayerRail } from '../PlayerRail.js';
 import { Dices, ArrowLeftRight, X, Settings2, House, Route, Castle } from '../GameIcons.js';
-import { createGame, gameView, applyAction } from '../../../../packages/rules/src/game.js';
+import {
+  createGame,
+  gameView,
+  applyAction,
+  roadSites,
+  settlementSites,
+} from '../../../../packages/rules/src/game.js';
 import { defaultProfile, emptyFriends } from '../../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../../packages/protocol/src/profile.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
@@ -57,12 +63,26 @@ function sampleGame() {
         : { kind: 'road' as const, edge: view.legal.roads[0]! };
     game = applyAction(game, player.id, action, () => 0.37);
   }
-  game.players[0]!.hand = { wood: 3, brick: 2, sheep: 0, wheat: 7, ore: 4 };
+  game = applyAction(game, me, { kind: 'roll' }, () => 0.34);
+  // Give this local fixture a legal extension, so all three build states are inspectable.
+  extend: for (const edge of roadSites(game, me)) {
+    const candidate = structuredClone(game);
+    candidate.roads[edge] = me;
+    for (const next of roadSites(candidate, me)) {
+      const extended = structuredClone(candidate);
+      extended.roads[next] = me;
+      if (settlementSites(extended, me).length) {
+        game = extended;
+        break extend;
+      }
+    }
+  }
+  game.players[0]!.hand = { wood: 3, brick: 2, sheep: 2, wheat: 7, ore: 4 };
   game.players[0]!.cards = [{ id: 'sample-knight', kind: 'knight', boughtTurn: 0 }];
   game.turn = 8;
-  return gameView(game, me);
+  return game;
 }
-const game = sampleGame();
+const sample = sampleGame();
 const friends = seats
   .slice(1)
   .map((seat) => ({ id: seat.id, username: seat.name, profile: seat.profile, isGuest: false, online: true }));
@@ -131,6 +151,9 @@ export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
   const [panel, setPanel] = useState<'profile' | 'editProfile' | 'friends' | GameToolPanel | null>(null);
   const [showAwards, setShowAwards] = useState(false);
+  const [availableBuilds, setAvailableBuilds] = useState(true);
+  const [selectedBuild, setSelectedBuild] = useState<BuildMode>(null);
+  const [previewLeader, setPreviewLeader] = useState(-1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     const update = () => setIsFullscreen(!!document.fullscreenElement);
@@ -141,7 +164,7 @@ export function LoungePreview() {
   const [profile, setProfile] = useState<Profile>(seats[0]!.profile);
   const [removedPlayers, setRemovedPlayers] = useState<string[]>([]);
   const [settings, setSettings] = useState(room.settings);
-  const { preferences, update } = usePreferences();
+  const { preferences, update, reducedMotion } = usePreferences();
   const [showInvite, setShowInvite] = useState(false);
   const auth = {
     profile,
@@ -197,6 +220,16 @@ export function LoungePreview() {
       onShowAll={() => setPanel('friends')}
     />
   );
+  const game = useMemo(() => {
+    const state = structuredClone(sample);
+    state.players[0]!.name = profile.name;
+    if (!availableBuilds) state.players[0]!.hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+    if (previewLeader >= 0) {
+      const building = Object.values(state.buildings).find((b) => b.player === seats[previewLeader]!.id);
+      if (building) building.kind = 'city';
+    }
+    return gameView(state, me);
+  }, [availableBuilds, previewLeader, profile.name]);
   const previewGame = {
     ...game,
     diceMode: settings?.diceMode ?? 'classic',
@@ -271,14 +304,14 @@ export function LoungePreview() {
                 art={BOARD_THEMES[preferences.boardTheme]}
                 game={game}
                 me={me}
-                disabled
-                mode={null}
+                disabled={!availableBuilds}
+                mode={selectedBuild}
                 onAction={noop}
                 onRobber={noop}
               />
             </BoardViewport>
           </div>
-          <PlayerRail room={currentRoom} game={displayedGame} me={me} />
+          <PlayerRail room={currentRoom} game={displayedGame} me={me} reducedMotion={reducedMotion} />
           <GameTools
             onClosePanel={() => setPanel(null)}
             panel={panel}
@@ -295,17 +328,39 @@ export function LoungePreview() {
             onLeave={() => setPanel('leave')}
           />
           <div className="construction-tools build-shelf">
-            {[Route, House, Castle].map((Icon, i) => (
-              <button key={i} className="build-control">
-                <Icon />
-                <span className="build-control-label">{['Road', 'House', 'City'][i]}</span>
-              </button>
-            ))}
+            {(['road', 'settlement', 'city'] as const).map((kind, i) => {
+              const Icon = [Route, House, Castle][i]!;
+              const sites =
+                kind === 'road'
+                  ? game.legal.roads
+                  : kind === 'city'
+                    ? game.legal.cities
+                    : game.legal.settlements;
+              const ready = availableBuilds && sites.length > 0;
+              return (
+                <button
+                  key={kind}
+                  className={`icon-button build-control build-${kind} ${ready ? 'is-available' : ''} ${selectedBuild === kind ? 'is-selected' : ''}`}
+                  disabled={!ready}
+                  aria-pressed={selectedBuild === kind}
+                  aria-label={`Build ${kind}`}
+                  onClick={() => {
+                    setSelectedBuild(selectedBuild === kind ? null : kind);
+                    setPanel(null);
+                  }}
+                >
+                  <Icon />
+                  <span className="build-control-label">{['Road', 'House', 'City'][i]}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="card-table">
-            <div className="hand-zone">
-              <ResourceHand hand={game.players[0]!.hand!} pulse={{}} reducedMotion />
-              <DevelopmentCards game={game} me={me} disabled reducedMotion onAction={noop} onHover={noop} />
+          <div className="hand-dock">
+            <div className="card-table">
+              <div className="hand-zone">
+                <ResourceHand hand={game.players[0]!.hand!} pulse={{}} reducedMotion />
+                <DevelopmentCards game={game} me={me} disabled reducedMotion onAction={noop} onHover={noop} />
+              </div>
             </div>
             <div className="table-actions">
               <div className="utility-actions">
@@ -313,7 +368,7 @@ export function LoungePreview() {
                   <ArrowLeftRight />
                 </button>
                 <div className="development-hand-inline purchase-control">
-                  <DevelopmentPurchase disabled onBuy={noop} />
+                  <DevelopmentPurchase disabled={!game.legal.canBuyCard} onBuy={noop} />
                 </div>
               </div>
               <button className="turn-action roll-turn" aria-label="Roll dice">
@@ -457,6 +512,28 @@ export function LoungePreview() {
             }}
           >
             Test invite
+          </button>
+          <label>
+            <input
+              type="checkbox"
+              checked={availableBuilds}
+              onChange={(e) => {
+                setAvailableBuilds(e.target.checked);
+                setSelectedBuild(null);
+                setScreen('game');
+                setPanel(null);
+              }}
+            />{' '}
+            Available builds
+          </label>
+          <button
+            onClick={() => {
+              setPreviewLeader((i) => ((i + 2) % 5) - 1);
+              setScreen('game');
+              setPanel(null);
+            }}
+          >
+            Change leader
           </button>
           <label>
             <input

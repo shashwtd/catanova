@@ -238,6 +238,10 @@ test('history keeps resource-like player names literal without matching their te
     'only the actual maker and recipient are player-name spans',
   );
   assert.match(resourceNamed, /class="journal-resource"[^>]*aria-label="2 Timber"/);
+  const received = render('2 Timber received 1 Sheep, 2 Timber.', ['2 Timber', 'Sheep']);
+  assert.match(received, /class="journal-person">2 Timber<\/strong>/);
+  assert.equal([...received.matchAll(/class="journal-person"/g)].length, 1);
+  assert.equal([...received.matchAll(/class="journal-resource"/g)].length, 2);
   const oneLetter = render('r built a road.', ['r', 'Alice']);
   assert.equal(
     [...oneLetter.matchAll(/class="journal-person"/g)].length,

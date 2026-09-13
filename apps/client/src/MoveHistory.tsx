@@ -36,7 +36,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   const actor = people.find(
     (name) =>
       line.startsWith(name) &&
-      /^(?: (?:placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|moved|discarded|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
+      /^(?: (?:placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
         line.slice(name.length),
       ),
   );
@@ -182,6 +182,9 @@ export function MoveHistory({
   const names = game.players.map((p) => p.name);
   return (
     <div className="turn-journal">
+      {!entries.length && !game.log.length && (
+        <p className="journal-empty">Moves and resource gains will appear here.</p>
+      )}
       {entries.length ? (
         historyTurns(entries).map((group) => (
           <section className="journal-turn" key={group.turn}>

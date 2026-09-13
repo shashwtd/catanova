@@ -97,7 +97,7 @@ export function GameTools({
           <button
             ref={trigger}
             type="button"
-            className="game-menu-trigger"
+            className="icon-button game-menu-trigger"
             aria-label={open ? 'Close game menu' : 'Game menu'}
             aria-expanded={open}
             aria-controls={id}
@@ -120,7 +120,7 @@ export function GameTools({
                 <X />
               </span>
             </span>
-            <span>{open ? 'Close' : 'Menu'}</span>
+            <span className="tool-label">{open ? 'Close menu' : 'Menu'}</span>
           </button>
           <div
             id={id}
