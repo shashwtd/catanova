@@ -50,6 +50,19 @@ export class PlayerRecords {
         PRIMARY KEY(room_id,player_id)
       );
       CREATE INDEX IF NOT EXISTS match_participants_account ON match_participants(user_id,room_id);
+      CREATE TABLE IF NOT EXISTS archived_matches (
+        room_id TEXT PRIMARY KEY, revision INTEGER NOT NULL,
+        started_at INTEGER, finished_at INTEGER, sort_at INTEGER NOT NULL,
+        turns INTEGER NOT NULL, winner TEXT, players TEXT NOT NULL,
+        source_room_id TEXT NOT NULL REFERENCES rooms(id)
+      );
+      CREATE TABLE IF NOT EXISTS archived_participants (
+        room_id TEXT NOT NULL REFERENCES archived_matches(room_id), player_id TEXT NOT NULL,
+        user_id TEXT NOT NULL, points INTEGER NOT NULL, outcome TEXT NOT NULL, resumable INTEGER NOT NULL,
+        PRIMARY KEY(room_id,player_id)
+      );
+      CREATE INDEX IF NOT EXISTS archived_participants_account ON archived_participants(user_id,room_id);
+      CREATE INDEX IF NOT EXISTS archived_matches_order ON archived_matches(sort_at DESC,room_id DESC);
       CREATE INDEX IF NOT EXISTS match_records_order ON match_records(sort_at DESC,room_id DESC);
     `);
   }
@@ -151,6 +164,22 @@ export class PlayerRecords {
       );
     }
   }
+  /** Called only within the room reset transaction; historical results cannot be overwritten by a rematch. */
+  archive(roomId: string, archiveId: string) {
+    this.db
+      .prepare(
+        `INSERT INTO archived_matches
+      SELECT ?,revision,started_at,finished_at,sort_at,turns,winner,players,room_id FROM match_records WHERE room_id=?`,
+      )
+      .run(archiveId, roomId);
+    this.db
+      .prepare(
+        `INSERT INTO archived_participants
+      SELECT ?,player_id,user_id,points,outcome,0 FROM match_participants WHERE room_id=?`,
+      )
+      .run(archiveId, roomId);
+    this.db.prepare('DELETE FROM match_records WHERE room_id=?').run(roomId);
+  }
   /** Older saved matches are indexed once, on demand, without touching their game state or journal. */
   backfillBatch(userId: string, loadGame: (roomId: string) => Game | undefined, afterRoomId = '') {
     const missing = this.db
@@ -177,20 +206,24 @@ export class PlayerRecords {
     };
   }
   page(userId: string, now: number, cursor?: Cursor): PlayerGames {
+    const sources = `WITH all_matches AS (
+      SELECT * FROM match_records UNION ALL
+      SELECT room_id,revision,started_at,finished_at,sort_at,turns,winner,players FROM archived_matches
+    ), all_participants AS (SELECT * FROM match_participants UNION ALL SELECT * FROM archived_participants)`;
     const stats = this.db
       .prepare(
-        `
+        `${sources}
       SELECT count(*) AS played,coalesce(sum(CASE WHEN p.outcome='won' THEN 1 ELSE 0 END),0) AS wins
-      FROM match_participants p JOIN match_records m ON m.room_id=p.room_id WHERE p.user_id=? AND m.winner IS NOT NULL
+      FROM all_participants p JOIN all_matches m ON m.room_id=p.room_id WHERE p.user_id=? AND m.winner IS NOT NULL
     `,
       )
       .get(userId) as { played: number; wins: number };
     const rows = this.db
       .prepare(
-        `
+        `${sources}
       SELECT m.*,p.player_id,p.points,p.outcome,p.resumable,
       (SELECT code FROM room_codes c WHERE c.room_id=m.room_id AND c.expires_at>?) AS room_code
-      FROM match_participants p JOIN match_records m ON m.room_id=p.room_id WHERE p.user_id=?
+      FROM all_participants p JOIN all_matches m ON m.room_id=p.room_id WHERE p.user_id=?
       ${cursor ? 'AND (m.sort_at<? OR (m.sort_at=? AND m.room_id<?))' : ''}
       ORDER BY m.sort_at DESC,m.room_id DESC LIMIT ?
     `,

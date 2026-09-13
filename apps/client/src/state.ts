@@ -6,6 +6,14 @@ export function snapshotProblem(current: RoomState | null, next: RoomState): str
   if (!current) return null;
   if (next.roomId !== current.roomId) return 'Snapshot belongs to another room';
   if (next.revision < current.revision) return 'stale';
+  if (
+    next.round !== undefined &&
+    (!Number.isSafeInteger(next.round) || next.round < 0 || next.round > next.revision)
+  )
+    return 'Invalid match boundary';
+  if ((next.round ?? 0) < (current.round ?? 0)) return 'Match moved backwards';
+  // A persisted, monotonically increasing round boundary explicitly permits a rematch.
+  if ((next.round ?? 0) > (current.round ?? 0) && next.revision > current.revision) return null;
   if (!current.game) return null;
   if (!next.game) return 'Started game missing from snapshot';
   if (next.game.board.seed !== current.game.board.seed) return 'The saved island changed';

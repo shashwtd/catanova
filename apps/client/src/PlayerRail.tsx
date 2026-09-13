@@ -183,16 +183,6 @@ export function PlayerRail({
                 )}
               </div>
             )}
-            {game.winner === p.id && (
-              <div className="profile-awards">
-                <span
-                  className="award-ribbon winner"
-                  title={game.finishReason === 'resignation' ? 'Winner by resignation' : 'Winner'}
-                >
-                  <Trophy />
-                </span>
-              </div>
-            )}
           </article>
         );
       })}

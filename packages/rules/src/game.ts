@@ -27,7 +27,7 @@ export type Game = {
   log: { id: number; text: string }[]; nextLog: number;
 };
 export type GameAction =
-  | { kind: 'start' }
+  | { kind: 'start' | 'returnToLobby' }
   | { kind: 'settlement' | 'city'; vertex: number }
   | { kind: 'road'; edge: number }
   | { kind: 'roll' | 'endTurn' | 'buyCard' | 'cancelTrade' }
@@ -65,7 +65,7 @@ export function parseGameAction(input: unknown): GameAction {
     return result;
   };
   switch (a.kind) {
-    case 'start': case 'roll': case 'endTurn': case 'buyCard': case 'cancelTrade': return { kind: a.kind };
+    case 'returnToLobby': case 'start': case 'roll': case 'endTurn': case 'buyCard': case 'cancelTrade': return { kind: a.kind };
     case 'settlement': case 'city': return { kind: a.kind, vertex: index(a.vertex, 54) };
     case 'road': return { kind: a.kind, edge: index(a.edge, 72) };
     case 'robber': return { kind: a.kind, hex: index(a.hex, 19), ...(a.victim === undefined ? {} : { victim: id(a.victim) }) };

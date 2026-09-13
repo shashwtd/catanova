@@ -137,11 +137,9 @@
 @keyframes dice-dock {
   from {
     transform: translate(0, 0) scale(1);
-    gap: 44px;
   }
   to {
     transform: translate(var(--dock-x), var(--dock-y)) scale(var(--dock-scale));
-    gap: var(--dock-gap);
   }
 }
 @keyframes dice-view-settle {
@@ -333,5 +331,33 @@
   .dice-stage-docking .dice-throw-tray {
     animation: none;
     transform: translate(var(--dock-x), var(--dock-y)) scale(var(--dock-scale));
+  }
+}
+
+/* Dock with transforms only; animating flex gap forced layout on every frame. */
+.dice-stage-docking .dice-flight-0 {
+  --dock-direction: -1;
+}
+.dice-stage-docking .dice-flight-1 {
+  --dock-direction: 1;
+}
+.dice-stage-docking .dice-flight {
+  animation: dice-dock-spacing var(--dice-dock-ms) cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes dice-dock-spacing {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc((var(--dock-gap) - 44px) * var(--dock-direction) / 2));
+  }
+}
+.dice-stage-rolling .dice-flight-path,
+.dice-stage-rolling .dice-cube {
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dice-stage-docking .dice-flight {
+    animation: none;
   }
 }

@@ -1,3 +1,4 @@
+import { GameOver } from '../apps/client/src/GameOver.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
@@ -64,7 +65,20 @@ test('profiles and turn prompts distinguish reconnecting, paused, resigned and r
   assert.match(gameStatus(view, 'b', room).prompt, /Bob wins by resignation/);
   const finished = renderToStaticMarkup(createElement(PlayerRail, { game: view, room, me: 'b' }));
   assert.match(finished, />Resigned</);
-  assert.match(finished, /Winner by resignation/);
+  assert.ok(!finished.includes('award-ribbon winner'));
+  const results = renderToStaticMarkup(
+    createElement(GameOver, {
+      room: { ...room, game: view },
+      statistics: null,
+      busy: false,
+      canReturn: true,
+      onReturn: () => {},
+      onQuit: () => {},
+    }),
+  );
+  assert.match(results, /Bob wins!/);
+  assert.match(results, /Victory by resignation/);
+  assert.match(results, /Return to lobby/);
   assert.ok(!finished.includes('Auto-resign'));
   view.winner = null;
   view.finishReason = 'abandoned';

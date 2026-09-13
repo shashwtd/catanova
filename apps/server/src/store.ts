@@ -66,6 +66,10 @@ export class Store {
   private connectedSeats = new Set<string>();
   private readonly pendingPresence = new Set<string>();
   private dueRoomCursor = '';
+  private readonly statisticsCache = new Map<
+    string,
+    { round: number; rollRevision: number; diceCounts: number[]; rolls: number }
+  >();
   constructor(
     path: string,
     options: {
@@ -145,6 +149,10 @@ export class Store {
         command_id TEXT NOT NULL, actor TEXT, action TEXT NOT NULL,
         previous_hash TEXT, state_hash TEXT NOT NULL, state TEXT NOT NULL,
         public_entry TEXT NOT NULL, PRIMARY KEY(room_id, revision)
+      );
+      CREATE INDEX IF NOT EXISTS game_events_kind ON game_events(room_id,json_extract(public_entry,'$.kind'),revision);
+      CREATE TABLE IF NOT EXISTS room_rounds (
+        room_id TEXT PRIMARY KEY REFERENCES rooms(id), revision INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS room_boards (
         room_id TEXT PRIMARY KEY REFERENCES rooms(id), board TEXT NOT NULL
@@ -362,6 +370,7 @@ export class Store {
         ...presence?.seats[p.id],
       })),
       ...(presence?.pausedAt !== undefined ? { paused: true } : {}),
+      round: this.round(roomId),
       historyRevision: this.eventHead(roomId)?.revision ?? 0,
       settings: this.settings(roomId),
       serverNow: this.now(),
@@ -578,12 +587,46 @@ export class Store {
       );
     this.records.record(roomId, revision, game, entry);
   }
+  round(roomId: string): number {
+    return (
+      (this.db.prepare('SELECT revision FROM room_rounds WHERE room_id=?').get(roomId)?.revision as number) ??
+      0
+    );
+  }
+  /** Public roll totals only. Read on demand, never scan the journal on each broadcast. */
+  statistics(roomId: string) {
+    const round = this.round(roomId);
+    const rollRevision =
+      (this.db
+        .prepare(
+          "SELECT max(revision) AS revision FROM game_events WHERE room_id=? AND revision>? AND json_extract(public_entry,'$.kind')='roll'",
+        )
+        .get(roomId, round)?.revision as number) ?? 0;
+    const revision = this.eventHead(roomId)?.revision ?? 0;
+    const cached = this.statisticsCache.get(roomId);
+    if (cached?.round === round && cached.rollRevision === rollRevision)
+      return { round, revision, diceCounts: [...cached.diceCounts], rolls: cached.rolls };
+    const diceCounts = Array<number>(11).fill(0);
+    const rows = this.db
+      .prepare(
+        `SELECT json_extract(state,'$.dice[0]') + json_extract(state,'$.dice[1]') AS total, count(*) AS n
+      FROM game_events WHERE room_id=? AND revision>? AND json_extract(public_entry,'$.kind')='roll'
+      GROUP BY total`,
+      )
+      .all(roomId, round) as { total: number; n: number }[];
+    for (const row of rows) if (row.total >= 2 && row.total <= 12) diceCounts[row.total - 2] = row.n;
+    const rolls = diceCounts.reduce((a, b) => a + b, 0);
+    if (this.statisticsCache.size >= 128)
+      this.statisticsCache.delete(this.statisticsCache.keys().next().value!);
+    this.statisticsCache.set(roomId, { round, rollRevision, diceCounts: [...diceCounts], rolls });
+    return { round, revision, diceCounts, rolls };
+  }
   history(roomId: string, before = Number.MAX_SAFE_INTEGER) {
     const rows = this.db
       .prepare(
-        'SELECT public_entry FROM game_events WHERE room_id = ? AND revision < ? ORDER BY revision DESC LIMIT 41',
+        'SELECT public_entry FROM game_events WHERE room_id = ? AND revision < ? AND revision > ? ORDER BY revision DESC LIMIT 41',
       )
-      .all(roomId, before) as { public_entry: string }[];
+      .all(roomId, before, this.round(roomId)) as { public_entry: string }[];
     return {
       entries: rows.slice(0, 40).map((r) => JSON.parse(r.public_entry) as HistoryEntry),
       hasMore: rows.length > 40,
@@ -1029,7 +1072,8 @@ export class Store {
     const row = this.db.prepare('SELECT state FROM games WHERE room_id = ?').get(roomId) as
       { state: string } | undefined;
     const head = this.eventHead(roomId);
-    if (head && (!row || hash(row.state) !== head.state_hash))
+    const activeHead = head && head.revision > this.round(roomId) ? head : undefined;
+    if ((activeHead && (!row || hash(row.state) !== activeHead.state_hash)) || (row && head && !activeHead))
       throw new ProtocolError('STATE_INTEGRITY', 'Saved game needs recovery; no moves were discarded');
     if (!row) return undefined;
     const game = JSON.parse(row.state) as Game;
@@ -1094,6 +1138,36 @@ export class Store {
         !current.players.some((p) => !p.resigned && this.connectedSeats.has(p.id))
       )
         throw new ProtocolError('GAME_PAUSED', 'The game is paused while everyone is disconnected');
+      if (action.kind === 'returnToLobby') {
+        if (current?.phase !== 'finished')
+          throw new ProtocolError('NOT_FINISHED', 'Finish this game before returning to the lobby');
+        const member = this.db
+          .prepare('SELECT departed FROM seats WHERE id=? AND room_id=?')
+          .get(seat.id, seat.room_id);
+        if (!member || member.departed || current.players.find((p) => p.id === seat.id)?.resigned)
+          throw new ProtocolError('SEAT_LEFT', 'Your seat has left this game');
+        const revision = room.revision + 1;
+        // Archive before opening the next round. The original event chain is never deleted.
+        this.records.record(seat.room_id, this.eventHead(seat.room_id)?.revision ?? room.revision, current);
+        this.records.archive(seat.room_id, randomUUID());
+        for (const p of current.players)
+          if (p.resigned) this.db.prepare('UPDATE seats SET departed=1 WHERE id=?').run(p.id);
+        this.db.prepare('UPDATE seats SET ready=0 WHERE room_id=?').run(seat.room_id);
+        for (const table of ['games', 'turn_clocks', 'room_presence', 'room_boards'])
+          this.db.prepare('DELETE FROM ' + table + ' WHERE room_id=?').run(seat.room_id);
+        this.db
+          .prepare(
+            'INSERT INTO room_rounds VALUES (?,?) ON CONFLICT(room_id) DO UPDATE SET revision=excluded.revision',
+          )
+          .run(seat.room_id, revision);
+        this.db.prepare('UPDATE rooms SET revision=? WHERE id=?').run(revision, seat.room_id);
+        this.db
+          .prepare('INSERT INTO game_receipts VALUES (?,?,?,?,?,?)')
+          .run(seat.room_id, seat.id, commandId, payloadHash, revision, room.counter);
+        this.renewRoomCode(seat.room_id);
+        this.board(seat.room_id);
+        return { revision, counter: room.counter, duplicate: false };
+      }
       let next: Game;
       if (action.kind === 'start') {
         if (current) throw new ProtocolError('GAME_STARTED', 'This game is already underway');

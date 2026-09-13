@@ -13,6 +13,7 @@ const CONTROL_PATHS = {
   share: 'M12 16V3 m-4 4 4-4 4 4 M5 12H3v9h18v-9h-2',
   refresh: 'M20 9a8 8 0 0 0-14-4L3 8 M3 3v5h5 M4 15a8 8 0 0 0 14 4l3-3 M16 16h5v5',
   bank: 'M3 9l9-6 9 6H3 M5 10v9 M10 10v9 M14 10v9 M19 10v9 M3 21h18',
+  statistics: 'M4 20h17 M7 16v-5 M12 16V4 M17 16V8',
   menu: 'M5 6h14 M5 12h14 M5 18h14',
   history: 'M4 7a9 9 0 1 1-1 9 M3 3v5h5 M12 7v5l4 2',
   join: 'M14 3h7v18h-7 M3 12h12 m-5-5 5 5-5 5',

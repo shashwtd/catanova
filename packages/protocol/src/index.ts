@@ -23,6 +23,12 @@ export type HistoryEntry = {
   lines: string[];
   automatic?: boolean;
 };
+export type GameStatistics = {
+  round: number;
+  revision: number;
+  diceCounts: number[];
+  rolls: number;
+};
 export type RoomPlayer = {
   id: string;
   name: string;
@@ -41,6 +47,7 @@ export type RoomState = {
   board?: Board;
   players: RoomPlayer[];
   historyRevision?: number;
+  round?: number;
   settings?: RoomSettings;
   turnClock?: TurnClock;
   serverNow?: number;
@@ -82,6 +89,7 @@ export type ClientMessage =
   | { type: 'launchReady'; id: string; success: boolean }
   | { type: 'sync' }
   | { type: 'history'; before?: number }
+  | { type: 'statistics' }
   | { type: 'ping'; nonce: string };
 export type ServerMessage =
   | { type: 'welcome'; playerId: string; state: RoomState; version: number }
@@ -95,6 +103,7 @@ export type ServerMessage =
       released?: boolean;
     }
   | { type: 'history'; entries: HistoryEntry[]; before?: number; hasMore: boolean }
+  | { type: 'statistics'; statistics: GameStatistics }
   | { type: 'pong'; nonce: string; revision?: number; serverNow?: number }
   | { type: 'error'; code: string; message: string; commandId?: string };
 
@@ -163,6 +172,7 @@ export function parseClientMessage(input: string): ClientMessage {
       throw new Error('Invalid loading response');
     return { type: 'launchReady', id: v.id, success: v.success };
   }
+  if (v.type === 'statistics') return { type: 'statistics' };
   if (v.type === 'sync') return { type: 'sync' };
   if (v.type === 'history') {
     if (v.before !== undefined && (!Number.isSafeInteger(v.before) || (v.before as number) < 0))

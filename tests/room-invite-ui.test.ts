@@ -108,7 +108,7 @@ test('sent invitations are scoped to the permanent room and full rooms disable f
       .every((button) => button.includes('disabled=""')),
   );
 });
-test('received invitations clearly name the friend, preview the room and support dismissal', () => {
+test('received invitations clearly name the friend, offer acceptance and support dismissal', () => {
   const invite: RoomInvite = {
     id: 'invite',
     roomId: id,
@@ -127,7 +127,7 @@ test('received invitations clearly name the friend, preview the room and support
     }),
   );
   assert.ok(html.includes('Sailor') && html.includes('Invited you to play') && html.includes('AB2C'));
-  assert.ok(buttons(html).some((button) => button.includes('View room')));
+  assert.ok(buttons(html).some((button) => button.includes('Accept invite')));
   assert.ok(html.includes('Dismiss room invitation from Sailor'));
   assert.ok(!html.includes(id));
 });
@@ -172,13 +172,13 @@ test('a received invitation has a persistent live notice with sender, room actio
   assert.ok(html.includes('role="status"') && html.includes('aria-live="polite"'));
   assert.ok(html.includes('Sailor') && html.includes('AB2C'));
   assert.ok(!html.includes('hidden=""'));
-  assert.ok(buttons(html).some((button) => button.includes('View room')));
+  assert.ok(buttons(html).some((button) => button.includes('Accept invite')));
   assert.ok(html.includes('Dismiss invitation from Sailor'));
   assert.ok(!html.includes(id), 'private room identity is not displayed');
   const busy = renderToStaticMarkup(createElement(RoomInviteNotice, { ...props, busy: true }));
   assert.ok(
     buttons(busy)
-      .filter((button) => button.includes('View room') || button.includes('Dismiss invitation'))
+      .filter((button) => button.includes('Accept invite') || button.includes('Dismiss invitation'))
       .every((button) => button.includes('disabled=""')),
   );
   const blocked = renderToStaticMarkup(
@@ -186,7 +186,7 @@ test('a received invitation has a persistent live notice with sender, room actio
   );
   assert.ok(blocked.includes('Leave your current room'));
   assert.ok(
-    !buttons(blocked).some((button) => button.includes('View room')),
+    !buttons(blocked).some((button) => button.includes('Accept invite')),
     'no invitation action that silently fails in an occupied room',
   );
   const empty = renderToStaticMarkup(createElement(RoomInviteNotice, { ...props, invitations: [] }));
@@ -219,7 +219,7 @@ test('room invitation drawer also shows incoming invitations and explains room s
   assert.ok(html.includes('Leave your current room to join another.'));
   assert.ok(
     buttons(html)
-      .find((button) => button.includes('View room'))
+      .find((button) => button.includes('Accept invite'))
       ?.includes('disabled=""'),
   );
   invites.incoming[0]!.roomId = id;
@@ -270,7 +270,7 @@ test('canonical current and preview IDs exclude invitations from notices and the
   assert.match(markup, /Sender2|FERN/);
   assert.ok(
     buttons(markup)
-      .find((button) => button.includes('View room'))
+      .find((button) => button.includes('Accept invite'))
       ?.includes('disabled=""'),
   );
 });
