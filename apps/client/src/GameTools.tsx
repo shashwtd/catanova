@@ -43,7 +43,7 @@ export function GameTools({
   const entries = [
     {
       key: 'statistics',
-      label: 'Statistics',
+      label: 'Dice statistics',
       icon: <GameIcon name="statistics" />,
       action: () => togglePanel('statistics'),
     },
@@ -63,15 +63,6 @@ export function GameTools({
         >
           <History />
           <span className="tool-label">Move history</span>
-        </button>
-        <button
-          className="icon-button fullscreen-control"
-          onClick={onFullscreen}
-          aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        >
-          {fullscreen ? <Minimize /> : <Maximize />}
-          <span className="tool-label">{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
         </button>
       </nav>
       <nav className="side-controls room-controls" aria-label="Room tools">
@@ -135,6 +126,14 @@ export function GameTools({
             ))}
           </div>
         </div>
+        <button
+          className="icon-button fullscreen-control"
+          onClick={onFullscreen}
+          aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {fullscreen ? <Minimize /> : <Maximize />}
+        </button>
       </nav>
     </>
   );

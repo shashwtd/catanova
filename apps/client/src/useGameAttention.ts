@@ -12,11 +12,13 @@ export function useGameAttention(
   const tracker = useRef(new AttentionTracker());
   const callback = useRef(notify);
   callback.current = notify;
-  const status = room?.game ? gameStatus(room.game, me, room) : null;
+  const status = room?.game && !presenting ? gameStatus(room.game, me, room) : null;
   const title =
     room && !connected
       ? 'Reconnecting — Catanova'
-      : (status?.title ?? (room ? 'Lobby — Catanova' : HOME_TITLE));
+      : presenting
+        ? 'Rolling dice — Catanova'
+        : (status?.title ?? (room ? 'Lobby — Catanova' : HOME_TITLE));
   const icon = connected ? (status?.favicon ?? null) : null;
   useEffect(() => {
     document.title = title;

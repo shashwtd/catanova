@@ -14,7 +14,7 @@ import { isBuildAction, placementValid } from './placement.js';
 import type { PlacementDraft } from './placement.js';
 import { BOARD_THEMES } from './board-theme.js';
 import { usePreferences } from './preferences.js';
-import { useFeedback } from './useFeedback.js';
+import { dicePresentationGame, useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
@@ -295,6 +295,7 @@ function App() {
       !!player?.resigned ||
       !!room?.paused,
     hand = player?.hand ?? emptyHand();
+  const presentedGame = room ? dicePresentationGame(room, feedback.beforeDice) : undefined;
   const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
     feedback.sound.playAttention(cue),
   );
@@ -601,7 +602,7 @@ function App() {
     if (panel === 'journal' && connected && room?.game) connection.current?.history();
   }, [panel, connected, room?.historyRevision]);
   useEffect(() => {
-    if (connected && (panel === 'statistics' || g?.phase === 'finished')) connection.current?.statistics();
+    if (connected && panel === 'statistics') connection.current?.statistics();
   }, [panel, connected, g?.phase, room?.historyRevision, room?.round]);
   useEffect(() => {
     if (!invite || room) return;
@@ -839,7 +840,7 @@ function App() {
             <Board
               art={BOARD_THEMES[preferences.boardTheme]}
               board={g.board}
-              game={g}
+              game={presentedGame ?? g}
               glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}
               effectId={feedback.event?.id}
               me={me}
@@ -869,7 +870,7 @@ function App() {
         <PlayerRail
           clockOffset={metrics.clockOffsetMs}
           room={room}
-          game={g}
+          game={presentedGame ?? g}
           me={me}
           timer={
             <TurnTimer
@@ -1068,7 +1069,7 @@ function App() {
               />
             }
             actions={
-              <div className="table-actions">
+              <>
                 <div className="dice-dock" data-dice-dock />
                 <div className="utility-actions">
                   <button
@@ -1096,7 +1097,7 @@ function App() {
                   {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
                   {actionPhase && <span>Next</span>}
                 </button>
-              </div>
+              </>
             }
           />
           {me && (
@@ -1119,7 +1120,7 @@ function App() {
             />
           )}
           {panel === 'statistics' && (
-            <UtilityPanel title="Statistics" onClose={() => setPanel(null)}>
+            <UtilityPanel title="Dice statistics" onClose={() => setPanel(null)}>
               <GameStatistics game={g} statistics={statistics} />
             </UtilityPanel>
           )}
@@ -1146,7 +1147,7 @@ function App() {
               }}
             />
           )}
-          {room && (
+          {room && !feedback.presentationBusy && (
             <RobberFlow
               room={room}
               me={me}
@@ -1164,7 +1165,6 @@ function App() {
       {g?.phase === 'finished' && room && (
         <GameOver
           room={room}
-          statistics={statistics}
           busy={busy || !connected || feedback.presentationBusy}
           canReturn={!player?.resigned}
           error={error}
@@ -1181,7 +1181,7 @@ function App() {
           event={feedback.event}
           lastDice={g.dice}
           reducedMotion={reducedMotion}
-          activity={true}
+          activity={!feedback.presentationBusy}
           awards={feedback.awards}
           onAwardComplete={feedback.finishAward}
           onAwardStart={feedback.announceAward}

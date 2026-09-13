@@ -314,6 +314,8 @@ export class Store {
       if (mode === 'create') {
         roomId = randomUUID();
         this.db.prepare('INSERT INTO rooms(id) VALUES (?)').run(roomId);
+        this.db.prepare('INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, 0)')
+          .run(roomId, JSON.stringify(DEFAULT_ROOM_SETTINGS));
         this.renewRoomCode(roomId, true);
         this.board(roomId);
       } else if (!this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId!)) {
@@ -708,7 +710,8 @@ export class Store {
   settings(roomId: string): RoomSettings {
     const row = this.db.prepare('SELECT settings FROM room_settings WHERE room_id = ?').get(roomId) as
       { settings: string } | undefined;
-    if (!row) return { ...DEFAULT_ROOM_SETTINGS };
+    // A room created before defaults were persisted used Natural dice.
+    if (!row) return { turnTimerSeconds: null, diceMode: 'classic' };
     const saved = JSON.parse(row.settings);
     if (saved.diceMode === 'flat') saved.diceMode = 'classic';
     return parseRoomSettings(saved);

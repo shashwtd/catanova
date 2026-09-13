@@ -10,6 +10,45 @@ import type { GameAction } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { readyLobby } from './helpers.js';
 
+test('new rooms persist Balanced by default, hosts can choose Natural, and legacy rooms keep Natural', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'catanova-default-dice-'));
+  const path = join(dir, 'game.sqlite');
+  let store = new Store(path);
+  try {
+    const session = newSession('Host');
+    const host = store.enter('create', session.token, session.name);
+    const guest = newSession('Guest');
+    store.enter('join', guest.token, guest.name, host.room_id);
+    assert.equal(store.settings(host.room_id).diceMode, 'balanced');
+    store.close();
+    store = new Store(path);
+    assert.equal(store.preview(host.room_id).settings.diceMode, 'balanced');
+    store.action(host, 'start-default-dice', readyLobby(store, host.room_id), { kind: 'start' });
+    assert.equal(store.loadGame(host.room_id)!.diceMode, 'balanced');
+
+    const naturalSession = newSession('Natural');
+    const natural = store.enter('create', naturalSession.token, naturalSession.name);
+    store.configureSettings(natural, 'choose-natural-dice', 0, {
+      turnTimerSeconds: null,
+      diceMode: 'classic',
+    });
+    store.close();
+    store = new Store(path);
+    assert.equal(store.settings(natural.room_id).diceMode, 'classic');
+    const other = newSession('Second');
+    store.enter('join', other.token, other.name, natural.room_id);
+    store.action(natural, 'start-natural-dice', readyLobby(store, natural.room_id), { kind: 'start' });
+    assert.equal(store.loadGame(natural.room_id)!.diceMode, 'classic');
+    // Older releases did not persist an untouched room's defaults.
+    store.db.prepare('DELETE FROM room_settings WHERE room_id = ?').run(natural.room_id);
+    assert.equal(store.settings(natural.room_id).diceMode, 'classic');
+    assert.equal(store.loadGame(natural.room_id)!.diceMode, 'classic');
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('dice settings survive restart and server results and uncapped trade receipts stay idempotent', () => {
   const dir = mkdtempSync(join(tmpdir(), 'catanova-dice-trades-'));
   const path = join(dir, 'game.sqlite');

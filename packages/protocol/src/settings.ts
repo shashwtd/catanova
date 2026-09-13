@@ -9,7 +9,7 @@ export type RoomSettings = {
   diceMode?: DiceMode;
   victoryPoints?: number;
 };
-export const DEFAULT_ROOM_SETTINGS: RoomSettings = { turnTimerSeconds: null };
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = { turnTimerSeconds: null, diceMode: 'balanced' };
 export const DEFAULT_TURN_TIMER_SECONDS: TurnTimerSeconds = 90;
 
 /** All timestamps use the server's epoch milliseconds. Setup has no clock. */

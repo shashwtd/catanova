@@ -14,6 +14,7 @@ import {
   MATERIAL_QUADRANTS,
   SHIP_BOUNDS,
   PORT_BADGE_BOUNDS,
+  SHIP_COAST_DISTANCE,
   WATER_FEATHER,
 } from '../apps/client/src/scene.js';
 
@@ -79,6 +80,10 @@ test('coast-aligned ships and outer trade badges fit every coast, with separate 
         pose.bridges.map((bridge) => bridge.from),
         [a, b].map((vertex) => ({ x: vertex.x * HEX_SIZE, y: vertex.y * HEX_SIZE })),
       );
+      for (const bridge of pose.bridges) {
+        const length = Math.hypot(bridge.to.x - bridge.from.x, bridge.to.y - bridge.from.y);
+        assert.ok(length > 24 && length < 34, 'piers stay short and consistent at every coast angle');
+      }
       assert.notDeepEqual(pose.bridges[0]!.to, pose.bridges[1]!.to, 'each bridge has its own boarding point');
       for (const bridge of pose.bridges) {
         const localX = bridge.to.x - pose.boatX,
@@ -97,7 +102,10 @@ test('coast-aligned ships and outer trade badges fit every coast, with separate 
       }
       const badgeOutward = (pose.markerX - pose.boatX) * pose.nx + (pose.markerY - pose.boatY) * pose.ny;
       assert.ok(
-        badgeOutward - (24 * Math.abs(pose.nx) + 11 * Math.abs(pose.ny)) > 16,
+        badgeOutward -
+          ((PORT_BADGE_BOUNDS.width / 2) * Math.abs(pose.nx) +
+            (PORT_BADGE_BOUNDS.height / 2) * Math.abs(pose.ny)) >
+          15,
         'the entire trade badge is beyond the seaward side of the hull',
       );
       const shipCorners = [SHIP_BOUNDS.x, SHIP_BOUNDS.x + SHIP_BOUNDS.width].flatMap((x) =>
@@ -107,8 +115,9 @@ test('coast-aligned ships and outer trade badges fit every coast, with separate 
         })),
       );
       assert.ok(
-        Math.abs((pose.boatX - pose.x) * pose.nx + (pose.boatY - pose.y) * pose.ny - 44) < 1e-8,
-        'the ship leaves room for longer bridges',
+        Math.abs((pose.boatX - pose.x) * pose.nx + (pose.boatY - pose.y) * pose.ny - SHIP_COAST_DISTANCE) <
+          1e-8,
+        'the ship leaves room for two short piers',
       );
       const badgeCorners = [PORT_BADGE_BOUNDS.x, PORT_BADGE_BOUNDS.x + PORT_BADGE_BOUNDS.width].flatMap((x) =>
         [PORT_BADGE_BOUNDS.y, PORT_BADGE_BOUNDS.y + PORT_BADGE_BOUNDS.height].map((y) => ({

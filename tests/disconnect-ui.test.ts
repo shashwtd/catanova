@@ -69,7 +69,6 @@ test('profiles and turn prompts distinguish reconnecting, paused, resigned and r
   const results = renderToStaticMarkup(
     createElement(GameOver, {
       room: { ...room, game: view },
-      statistics: null,
       busy: false,
       canReturn: true,
       onReturn: () => {},
@@ -77,6 +76,8 @@ test('profiles and turn prompts distinguish reconnecting, paused, resigned and r
     }),
   );
   assert.match(results, /Bob wins!/);
+  assert.match(results, /results-timber/);
+  assert.doesNotMatch(results, /Dice statistics|dice-histogram/);
   assert.match(results, /Victory by resignation/);
   assert.match(results, /Return to lobby/);
   assert.ok(!finished.includes('Auto-resign'));

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-/** Separate the development hand from the resource table without stretching the card artwork. */
+/** Keep inventory and turn actions together in the bottom-right corner. */
 export function GameHandDock({
   purchase,
   development,
@@ -13,14 +13,12 @@ export function GameHandDock({
 }) {
   return (
     <div className="hand-dock hand-dock-separated">
-      <div className="development-tray">
-        <div className="development-hand-inline purchase-control">{purchase}</div>
-        {development}
+      <div className="card-table">
+        <div className="hand-zone">{resources}</div>
+        {development && <div className="development-tray">{development}</div>}
       </div>
-      <div className="resource-table-group">
-        <div className="card-table">
-          <div className="hand-zone">{resources}</div>
-        </div>
+      <div className="table-actions">
+        <div className="development-hand-inline purchase-control">{purchase}</div>
         {actions}
       </div>
     </div>

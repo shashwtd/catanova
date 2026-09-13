@@ -80,7 +80,7 @@ test('settings are bounded, host-only, revision checked, durable and reset readi
   try {
     const { host, seats } = lobby(store),
       roomId = host.room_id;
-    assert.deepEqual(store.settings(roomId), { turnTimerSeconds: null });
+    assert.deepEqual(store.settings(roomId), { turnTimerSeconds: null, diceMode: 'balanced' });
     assert.deepEqual(TURN_TIMER_STEPS, [40, 65, 90, 115, 140]);
     for (const seconds of [39, 41, 141, 60, '40', undefined, NaN])
       assert.throws(() => parseRoomSettings({ turnTimerSeconds: seconds }));

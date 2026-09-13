@@ -446,16 +446,16 @@ export function Board({
                     data-port-entrance={i}
                     transform={`translate(${bridge.from.x},${bridge.from.y}) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI})`}
                   >
-                    <rect className="pier-shadow" x="0" y="-5" width={length} height="12" rx="2" />
-                    <rect className="pier-deck" x="0" y="-6" width={length} height="10" />
+                    <rect className="pier-shadow" x="0" y="-2.5" width={length} height="7" rx="1" />
+                    <rect className="pier-deck" x="0" y="-3" width={length} height="6" />
                     {Array.from({ length: Math.ceil(length / 5) }, (_, j) => (
-                      <path key={j} className="pier-plank" d={`M${j * 5} -5V4`} />
+                      <path key={j} className="pier-plank" d={`M${j * 5} -3V3`} />
                     ))}
-                    <path className="pier-rail" d={`M2 -7H${length}M2 5H${length}`} />
-                    {[3, length / 2, length - 3].map((j) => (
+                    <path className="pier-rail" d={`M2 -3.5H${length}M2 3.5H${length}`} />
+                    {[2, length - 2].map((j) => (
                       <g key={j}>
-                        <circle className="pier-post" cx={j} cy="-7" r="2" />
-                        <circle className="pier-post" cx={j} cy="5" r="2" />
+                        <circle className="pier-post" cx={j} cy="-3.5" r="1.3" />
+                        <circle className="pier-post" cx={j} cy="3.5" r="1.3" />
                       </g>
                     ))}
                   </g>
@@ -477,17 +477,17 @@ export function Board({
                 data-resource={port.resource}
                 transform={`translate(${p.markerX},${p.markerY})`}
               >
-                <rect className="port-badge" {...PORT_BADGE_BOUNDS} rx="6" />
+                <rect className="port-badge" {...PORT_BADGE_BOUNDS} rx="4" />
                 {port.resource === 'any' ? (
-                  <text className="port-any" textAnchor="middle" x="-13" y="5">
+                  <text className="port-any" textAnchor="middle" x="-12" y="5">
                     ?
                   </text>
                 ) : (
                   <svg
-                    x="-23"
-                    y="-10"
-                    width="20"
-                    height="20"
+                    x="-20"
+                    y="-8"
+                    width="16"
+                    height="16"
                     viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
                   >
                     <image
@@ -497,7 +497,7 @@ export function Board({
                     />
                   </svg>
                 )}
-                <text className="port-rate" textAnchor="middle" x="10" y="4">
+                <text className="port-rate" textAnchor="middle" x="8" y="4">
                   {port.resource === 'any' ? '3:1' : '2:1'}
                 </text>
               </g>

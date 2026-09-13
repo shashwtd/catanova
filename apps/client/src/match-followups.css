@@ -21,6 +21,22 @@
     display: none;
   }
 }
+.playing .side-controls.room-controls {
+  top: auto;
+  right: auto;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.playing .room-controls .game-tools-popover.t-dropdown {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  transform-origin: bottom left;
+}
 .playing .hand-dock.hand-dock-separated {
   left: max(68px, env(safe-area-inset-left));
   right: max(20px, env(safe-area-inset-right));
@@ -28,13 +44,13 @@
   width: auto;
   max-width: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 20px;
   pointer-events: none;
 }
-.development-tray,
-.resource-table-group {
+.development-tray {
   display: flex;
   align-items: flex-end;
   min-width: 0;
@@ -43,16 +59,17 @@
 .development-tray {
   gap: 18px;
 }
-.resource-table-group {
-  gap: 16px;
-}
 .playing .hand-dock-separated .card-table {
   position: relative;
   inset: auto;
   display: flex;
-  height: 70px;
+  height: 52px;
+  flex: none;
   min-height: 0;
-  padding: 8px 14px;
+  padding: 6px 12px;
+  align-items: flex-end;
+  column-gap: 16px;
+  overflow: visible;
   margin: 0;
 }
 .playing .hand-dock-separated .card-table::before {
@@ -68,11 +85,27 @@
   position: relative;
   inset: auto;
   padding: 0;
+  gap: 12px;
+  flex: none;
 }
-.playing .development-tray .development-buy {
-  width: 62px;
-  height: 64px;
+.playing .hand-dock-separated .table-actions .purchase-control {
+  padding: 0;
+  margin: 0;
+  flex: none;
+}
+.playing .hand-dock-separated .development-buy {
+  width: 52px;
+  min-width: 0;
+  height: 52px;
   min-height: 0;
+  box-sizing: border-box;
+  border: 1px solid #d1c1e482;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px #ffffff4a,
+    inset 0 -3px #07191450,
+    0 3px 0 #1e211dd9,
+    0 5px 7px #14181040;
   margin: 0;
 }
 .playing .development-tray .development-hand-inline {
@@ -95,12 +128,6 @@
   min-height: 0;
   aspect-ratio: 2 / 3;
 }
-.playing .development-tray .development-detail {
-  left: 0;
-  right: auto;
-  bottom: 108px;
-  max-width: min(380px, calc(100vw - 32px));
-}
 .playing .development-tray .development-slot .development-art {
   width: 100%;
   height: 100%;
@@ -108,14 +135,14 @@
 }
 @media (max-width: 1000px) {
   .playing .hand-dock.hand-dock-separated {
-    left: 58px;
+    left: max(64px, env(safe-area-inset-left));
     right: 12px;
     gap: 12px;
   }
   .playing .development-tray {
     gap: 10px;
   }
-  .playing .resource-table-group {
+  .playing .hand-dock-separated .table-actions {
     gap: 10px;
   }
   .playing .development-tray .development-slot,
@@ -129,32 +156,40 @@
   .playing .development-tray .development-slot + .development-slot {
     margin-left: -10px;
   }
-  .playing .development-tray .development-buy {
-    width: 48px;
-    height: 56px;
+  .playing .hand-dock-separated .development-buy {
+    width: 44px;
+    height: 52px;
   }
 }
 @media (max-width: 700px) and (orientation: portrait) {
   .playing .hand-dock.hand-dock-separated {
-    left: 10px;
+    left: max(64px, env(safe-area-inset-left));
     right: 10px;
     bottom: max(8px, env(safe-area-inset-bottom));
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     row-gap: 10px;
   }
   .playing .development-tray {
-    width: 100%;
-    gap: 14px;
-  }
-  .playing .resource-table-group {
-    width: 100%;
-    justify-content: space-between;
-    gap: 8px;
+    order: -1;
+    gap: 10px;
   }
   .playing .hand-dock-separated .card-table {
-    height: 60px;
-    flex: 1;
-    padding: 4px 8px;
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    height: auto;
+    min-height: 52px;
+    padding: 6px 8px;
+  }
+  .playing .hand-dock-separated .table-actions {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: end;
+    gap: 10px;
   }
   .playing .hand-dock-separated .resource-counters {
     width: 100%;
@@ -175,14 +210,10 @@
   .playing .development-tray .development-fan {
     gap: 7px;
   }
-  .playing .development-tray .development-detail {
-    position: fixed;
-    left: 10px;
-    right: 10px;
-    bottom: 162px;
-    width: auto;
-    max-height: calc(100dvh - 180px);
-    overflow: auto;
+}
+@media (max-width: 420px) and (orientation: portrait) {
+  .playing .development-tray .development-slot + .development-slot {
+    margin-left: -8px;
   }
 }
 /* Discarding is one deliberate choice, followed by one confirmation. */
@@ -370,24 +401,55 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: #1b1511dd;
+  background: radial-gradient(ellipse at 50% 38%, #b67d3429, #120e0ccc 80%);
   overflow: auto;
 }
 .game-over-screen {
-  width: min(660px, 100%);
-  max-height: calc(100dvh - 40px);
+  width: min(680px, 100%);
+  max-height: calc(100dvh - 32px);
   overflow: auto;
-  border: 1px solid #a38252;
-  border-radius: 18px;
-  padding: 28px;
-  color: #f7eaca;
-  background:
-    radial-gradient(ellipse at 50% 0%, #74583466, transparent 55%), linear-gradient(135deg, #3a3028, #241e1b);
-  box-shadow:
-    0 22px 80px #0008,
-    inset 0 1px #fff1bc33;
-  animation: match-results-enter var(--modal-open-dur, 250ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1))
-    both;
+  scrollbar-width: thin;
+  color: #fff0d2;
+  filter: drop-shadow(0 20px 26px #0007);
+  animation: match-results-enter var(--modal-open-dur, 250ms) var(--ease-out, ease-out) both;
+}
+.game-over-plank {
+  position: relative;
+  isolation: isolate;
+  padding: 38px 38px 32px;
+}
+.results-timber {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+}
+.results-wood {
+  stroke: #4b2e1d;
+  stroke-width: 7;
+  paint-order: stroke;
+  filter: brightness(0.62) saturate(0.8);
+}
+.results-grain-edge {
+  fill: none;
+  stroke: #e4b97970;
+  stroke-width: 2;
+}
+.results-wood-cracks {
+  fill: none;
+  stroke: #27160cab;
+  stroke-width: 2;
+}
+.results-nail circle {
+  fill: #c29a60;
+  stroke: #503b23;
+  stroke-width: 2;
+}
+.results-nail path {
+  stroke: #674823;
+  stroke-width: 1.5;
 }
 .game-over-hero {
   text-align: center;
@@ -424,46 +486,26 @@
   font:
     500 14px/1.4 Barlow,
     sans-serif;
-  color: #ccbb9f;
-}
-.game-over-tabs {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin: 22px 0 16px;
-  border-bottom: 1px solid #b69b6540;
-}
-.game-over-tabs button {
-  font:
-    600 15px/1 Barlow,
-    sans-serif;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: none;
-  color: #bbae96;
-  padding: 12px 16px;
-}
-.game-over-tabs button[aria-pressed='true'] {
-  color: #ffe3a3;
-  border-bottom-color: #dfb76e;
+  color: #e3c9a6;
 }
 .game-over-standings {
   display: grid;
-  gap: 8px;
+  gap: 0;
+  margin-top: 24px;
+  border-block: 1px solid #e3bb7b45;
 }
 .game-over-player {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid #ab8b5830;
-  border-radius: 9px;
-  background: #ffffff05;
+  padding: 12px 8px;
+  border: 0;
+  border-bottom: 1px solid #efd7ae18;
+  border-radius: 0;
+  background: transparent;
 }
 .game-over-player.is-winner {
-  background: #d7b56716;
-  border-color: #d6b27177;
+  background: linear-gradient(90deg, transparent, #ffe1a322, transparent);
 }
 .game-over-place {
   flex: none;
@@ -488,7 +530,7 @@
 .game-over-player-details > span {
   display: block;
   font-size: 12px;
-  color: #bcae96;
+  color: #e3cfb0;
   margin-top: 5px;
 }
 .game-over-score {
@@ -538,7 +580,7 @@
 }
 .game-over-highlights small {
   display: block;
-  color: #bda984;
+  color: #dfc398;
   margin-bottom: 4px;
 }
 .game-over-actions {
@@ -611,7 +653,6 @@
   bottom: 0;
   width: 100%;
   height: var(--actual);
-  min-height: 1px;
   border-radius: 3px 3px 0 0;
   background: linear-gradient(#b4c68a, #6c976e);
 }
@@ -654,8 +695,10 @@
     padding: 10px;
   }
   .game-over-screen {
-    padding: 18px 14px;
     max-height: calc(100dvh - 20px);
+  }
+  .game-over-plank {
+    padding: 30px 22px 26px;
   }
   .game-over-player {
     gap: 8px;
@@ -693,7 +736,7 @@
 }
 @media (max-width: 800px) and (orientation: landscape) {
   .playing .hand-dock.hand-dock-separated {
-    left: 54px;
+    left: max(64px, env(safe-area-inset-left));
     right: 8px;
     gap: 8px;
   }
@@ -705,15 +748,82 @@
   .playing .development-tray .development-slot + .development-slot {
     margin-left: -12px;
   }
-  .playing .development-tray .development-buy {
+  .playing .hand-dock-separated .development-buy {
     min-width: 44px;
     width: 44px;
     height: 52px;
   }
-  .playing .resource-table-group {
-    gap: 7px;
+  .playing .hand-dock-separated .table-actions {
+    gap: 10px;
   }
   .playing .hand-dock-separated .card-table {
     padding-inline: 7px;
   }
+}
+
+/* This layer is a sibling of the board/hand, so their transforms cannot clip card choices. */
+.playing .development-hand-inline.development-detail-layer {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  width: auto;
+  height: auto;
+  z-index: 80;
+  pointer-events: none;
+  transform: none;
+}
+.playing .development-hand-inline .development-detail.development-detail-portal {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  transform: none;
+  translate: none;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  max-width: calc(100vw - 24px);
+  scrollbar-width: thin;
+  animation: card-choice-enter var(--dropdown-open-dur, 250ms) var(--ease-smooth-out) both;
+}
+.development-detail-portal:focus {
+  outline: none;
+}
+@keyframes card-choice-enter {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playing .development-detail-portal {
+    animation: none !important;
+  }
+}
+[data-motion='reduced'] .development-detail-portal {
+  animation: none !important;
+}
+.statistics-method {
+  margin-top: 12px;
+  font:
+    400 13px/1.5 Barlow,
+    sans-serif;
+}
+.statistics-method summary {
+  cursor: pointer;
+  width: fit-content;
+  font-weight: 600;
+  padding-block: 5px;
+}
+.statistics-method p {
+  margin: 6px 0 0;
+  color: inherit;
+  opacity: 0.8;
 }

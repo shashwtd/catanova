@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode, PointerEvent } from 'react';
 /** Hover/focus explains a card; only its explicit button can perform a game action. */
@@ -6,11 +6,13 @@ export function CardTooltip({
   children,
   content,
   disabledMotion = false,
+  suppressed = false,
   onHover,
 }: {
   children: ReactNode;
   content: ReactNode;
   disabledMotion?: boolean;
+  suppressed?: boolean;
   onHover?: () => void;
 }) {
   const id = useId(),
@@ -18,6 +20,24 @@ export function CardTooltip({
     wrap = useRef<HTMLDivElement>(null),
     hint = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
+  const pending = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const hoverSound = useRef(onHover);
+  hoverSound.current = onHover;
+  function close() {
+    clearTimeout(pending.current);
+    pending.current = undefined;
+    setOpen(false);
+  }
+  useEffect(() => () => clearTimeout(pending.current), []);
+  useEffect(() => {
+    if (suppressed) close();
+  }, [suppressed]);
+  useEffect(() => {
+    if (!open || suppressed || disabledMotion) return;
+    // Only announce a preview that made it to the screen, never a cancelled hover.
+    const frame = requestAnimationFrame(() => hoverSound.current?.());
+    return () => cancelAnimationFrame(frame);
+  }, [open, suppressed, disabledMotion]);
   function reset() {
     const el = wrap.current?.querySelector<HTMLElement>('.t-tilt-card');
     if (!el) return;
@@ -27,6 +47,9 @@ export function CardTooltip({
     wrap.current?.classList.remove('is-hover');
   }
   function show() {
+    clearTimeout(pending.current);
+    pending.current = undefined;
+    if (suppressed) return;
     const rect = wrap.current?.getBoundingClientRect();
     if (rect) {
       setPosition({
@@ -36,7 +59,7 @@ export function CardTooltip({
       setOpen(true);
     }
   }
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const rect = wrap.current?.getBoundingClientRect(),
       height = hint.current?.offsetHeight ?? 180;
@@ -48,7 +71,6 @@ export function CardTooltip({
             ? rect.top - height - 12
             : Math.max(10, Math.min(innerHeight - height - 10, rect.bottom + 12)),
       }));
-    const close = () => setOpen(false);
     window.addEventListener('resize', close);
     window.addEventListener('scroll', close, true);
     return () => {
@@ -94,26 +116,28 @@ export function CardTooltip({
       aria-describedby={id}
       onPointerMove={track}
       onPointerEnter={(e) => {
-        if (e.pointerType === 'mouse') {
-          show();
-          if (!disabledMotion) onHover?.();
+        if (e.pointerType === 'mouse' && !suppressed) {
+          clearTimeout(pending.current);
+          const delay =
+            parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tt-delay')) || 80;
+          pending.current = setTimeout(show, delay);
         }
       }}
       onPointerLeave={() => {
         reset();
-        setOpen(false);
+        close();
       }}
       onFocus={show}
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+        if (!e.currentTarget.contains(e.relatedTarget)) close();
       }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();
-          setOpen(false);
+          close();
         } else if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
           e.preventDefault();
-          if (open) setOpen(false);
+          if (open) close();
           else show();
         }
       }}
@@ -121,13 +145,19 @@ export function CardTooltip({
         const button = (e.target as Element).closest('button');
         // Locked cards still explain themselves on touch, where there is no hover.
         if (button?.getAttribute('aria-disabled') === 'true') show();
-        else if (button) setOpen(false);
-        else if (open) setOpen(false);
+        else if (button) close();
+        else if (open) close();
         else show();
       }}
     >
       {children}
-      {open ? createPortal(tooltip, document.body) : tooltip}
+      {open && !suppressed ? (
+        createPortal(tooltip, document.body)
+      ) : (
+        <span id={id} hidden style={{ display: 'none' }}>
+          {content}
+        </span>
+      )}
     </div>
   );
 }

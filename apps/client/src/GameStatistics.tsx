@@ -6,7 +6,7 @@ export const DICE_FREQUENCIES = [1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1] as const;
 export function GameStatistics({ game, statistics }: { game: GameView; statistics: Statistics | null }) {
   const counts = statistics?.diceCounts ?? Array<number>(11).fill(0);
   const rolls = statistics?.rolls ?? 0;
-  const ceiling = Math.max(1, ...counts, rolls / 6);
+  const ceiling = Math.max(1, ...counts, rolls / 6) * 1.08;
   return (
     <section className="match-statistics" aria-label="Dice statistics">
       <div className="statistics-heading">
@@ -24,7 +24,7 @@ export function GameStatistics({ game, statistics }: { game: GameView; statistic
             role="listitem"
             aria-label={`${index + 2}: ${count} rolls; expected ${((rolls * DICE_FREQUENCIES[index]!) / 36).toFixed(1)}`}
           >
-            <b>{count}</b>
+            <b>{statistics ? count : '–'}</b>
             <div
               className="dice-histogram-track"
               style={
@@ -42,13 +42,21 @@ export function GameStatistics({ game, statistics }: { game: GameView; statistic
         ))}
       </div>
       <p className="statistics-legend">
-        <i /> Expected average for two dice
+        <i /> Expected average · not a target for each game
       </p>
       <p className="statistics-note">
         {game.diceMode === 'balanced'
-          ? 'A deck of 36 dice pairs, reshuffled after 24 rolls. Recent repeats are less likely; rare totals can still be missed.'
+          ? 'Balanced reduces streaks. 6, 7 and 8 are still the most common totals.'
           : 'Two independent dice. 7 is most common; 2 and 12 each have a 1 in 36 chance.'}
       </p>
+      <details className="statistics-method">
+        <summary>How these dice work</summary>
+        <p>
+          {game.diceMode === 'balanced'
+            ? 'We draw from the 36 possible dice pairs without replacing each pair. After 24 rolls the deck refreshes. An immediate repeat has a lower selection weight. Because 12 pairs stay undrawn, a rare total such as 2 or 12 can still be missed.'
+            : 'Each roll uses two independent random numbers from 1 to 6. There are six ways to roll 7, but only one way each to roll 2 or 12. Earlier rolls do not change the next roll.'}
+        </p>
+      </details>
     </section>
   );
 }

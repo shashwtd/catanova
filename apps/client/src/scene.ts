@@ -5,9 +5,10 @@ export const WORLD = { x: -392, y: -368, width: 784, height: 736 };
 export const WATER_BAND = 90;
 export const WATER_FEATHER = 48;
 /** The square sprite rotates so its long axis follows its coastal edge. */
-export const SHIP_SIZE = 80;
+export const SHIP_SIZE = 60;
+export const SHIP_COAST_DISTANCE = 36;
 export const SHIP_BOUNDS = { x: -SHIP_SIZE / 2, y: -SHIP_SIZE / 2, width: SHIP_SIZE, height: SHIP_SIZE };
-export const PORT_BADGE_BOUNDS = { x: -24, y: -11, width: 48, height: 22 };
+export const PORT_BADGE_BOUNDS = { x: -21, y: -10, width: 42, height: 20 };
 export const WATER_EDGE_WAVES = [
   { frequency: 5, phase: 0.35, amplitude: 1.7 },
   { frequency: 9, phase: 1.7, amplitude: 0.65 },
@@ -126,15 +127,16 @@ export function portPlacement(board: Board, edgeId: number) {
     length = Math.hypot(dx, dy);
   const nx = dx / length,
     ny = dy / length;
-  const boatX = x + nx * 44,
-    boatY = y + ny * 44;
+  const boatX = x + nx * SHIP_COAST_DISTANCE,
+    boatY = y + ny * SHIP_COAST_DISTANCE;
   // The sprite's long axis is vertical: rotate it tangent to this coast edge.
   // Its exposed left gunwale faces shore; the sail and cargo badge face open water.
   const angle = (Math.atan2(ny, nx) * 180) / Math.PI;
   const tx = -ny,
     ty = nx;
   // Keep ratios horizontal, with enough seaward clearance at every coast angle.
-  const badgeDistance = 18 + 24 * Math.abs(nx) + 11 * Math.abs(ny);
+  const badgeDistance =
+    16 + (PORT_BADGE_BOUNDS.width / 2) * Math.abs(nx) + (PORT_BADGE_BOUNDS.height / 2) * Math.abs(ny);
 
   return {
     x,
@@ -145,8 +147,8 @@ export function portPlacement(board: Board, edgeId: number) {
     bridges: [a, b].map((v) => ({
       from: { x: v.x * HEX_SIZE, y: v.y * HEX_SIZE },
       to: {
-        x: boatX - nx * 14 + tx * (Math.sign((v.x * HEX_SIZE - x) * tx + (v.y * HEX_SIZE - y) * ty) * 13),
-        y: boatY - ny * 14 + ty * (Math.sign((v.x * HEX_SIZE - x) * tx + (v.y * HEX_SIZE - y) * ty) * 13),
+        x: boatX - nx * 10 + tx * (Math.sign((v.x * HEX_SIZE - x) * tx + (v.y * HEX_SIZE - y) * ty) * 18),
+        y: boatY - ny * 10 + ty * (Math.sign((v.x * HEX_SIZE - x) * tx + (v.y * HEX_SIZE - y) * ty) * 18),
       },
     })),
     boatX,

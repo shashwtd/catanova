@@ -80,6 +80,7 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     [hand, setHand] = useState<Hand | null>(null),
     [pulse, setPulse] = useState<Partial<Record<Resource, string>>>({});
   const [presentationBusy, setPresentationBusy] = useState(false);
+  const [beforeDice, setBeforeDice] = useState<RoomState | null>(null);
   const [awards, setAwards] = useState<readonly AwardCelebration[]>([]);
   const awardQueue = useRef(new AwardPresentationQueue());
   const rolls = useRef(new RollPresentationTracker());
@@ -107,6 +108,7 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     setPulse({});
     buffer.current.reset();
     setPresentationBusy(false);
+    setBeforeDice(null);
   }, []);
   const reset = useCallback(
     (keepMusic = false) => {
@@ -167,7 +169,13 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     const hold = presentationHold(nextEvent, reduced);
     buffer.current.begin(next, performance.now() + hold);
     setPresentationBusy(!!nextEvent.dice && !reduced);
-    if (nextEvent.dice && !reduced) schedule(() => setPresentationBusy(false), DICE_READABLE_MS);
+    if (nextEvent.dice && !reduced) {
+      setBeforeDice(previous);
+      schedule(() => {
+        setPresentationBusy(false);
+        setBeforeDice(null);
+      }, DICE_READABLE_MS);
+    }
     const hasOwnTransfer = nextEvent.flights.some(
       (f) => f.from.startsWith('[data-resource-card=') || f.to.startsWith('[data-resource-card='),
     );
@@ -244,5 +252,24 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
     },
     [clear, sound],
   );
-  return { event, hand, pulse, sound, accept, reset, presentationBusy, awards, finishAward, announceAward };
+  return {
+    event,
+    hand,
+    pulse,
+    sound,
+    accept,
+    reset,
+    presentationBusy,
+    beforeDice,
+    awards,
+    finishAward,
+    announceAward,
+  };
+}
+
+/** Only the visible board is held back. Commands, persistence and deadlines use the live room. */
+export function dicePresentationGame(live: RoomState, beforeDice: RoomState | null) {
+  if (!beforeDice?.game || beforeDice.roomId !== live.roomId || (beforeDice.round ?? 0) !== (live.round ?? 0))
+    return live.game;
+  return beforeDice.game;
 }

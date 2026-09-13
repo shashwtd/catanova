@@ -1,15 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { GameStatistics as Statistics, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { GameIcon } from './GameIcons.js';
-import { GameStatistics } from './GameStatistics.js';
 import { playerStandings } from './player-ranking.js';
 
 /** Results use the final viewer-safe snapshot; scores are revealed by the server at victory. */
 export function GameOver({
   room,
-  statistics,
   busy,
   canReturn,
   error,
@@ -17,7 +15,8 @@ export function GameOver({
   onQuit,
 }: {
   room: RoomState;
-  statistics: Statistics | null;
+  /** Accepted by older local previews; dice statistics live exclusively in the game menu. */
+  statistics?: Statistics | null;
   busy: boolean;
   canReturn: boolean;
   error?: string;
@@ -25,7 +24,7 @@ export function GameOver({
   onQuit: () => void;
 }) {
   const game = room.game!;
-  const [tab, setTab] = useState<'standings' | 'dice'>('standings');
+  const grainId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const winner = game.players.find((p) => p.id === game.winner);
   const profile = (id: string, name: string) =>
@@ -61,31 +60,58 @@ export function GameOver({
           }
         }}
       >
-        <header className="game-over-hero">
-          <div className="game-over-laurel" aria-hidden="true">
-            <GameIcon name="trophy" size={76} />
-          </div>
-          {winner && <Avatar profile={profile(winner.id, winner.name)} />}
-          <p>Game over</p>
-          <h1>{winner ? `${winner.name} wins!` : 'The island rests'}</h1>
-          <span>
-            {game.finishReason === 'resignation'
-              ? 'Victory by resignation'
-              : game.finishReason === 'abandoned'
-                ? 'Everyone left the game'
-                : `${winner?.points ?? 0} victory points`}{' '}
-            · {game.turn} turns
-          </span>
-        </header>
-        <nav className="game-over-tabs" aria-label="Result views">
-          <button aria-pressed={tab === 'standings'} onClick={() => setTab('standings')}>
-            Leaderboard
-          </button>
-          <button aria-pressed={tab === 'dice'} onClick={() => setTab('dice')}>
-            Dice statistics
-          </button>
-        </nav>
-        {tab === 'standings' ? (
+        <div className="game-over-plank">
+          <svg className="results-timber" viewBox="0 0 680 720" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <pattern id={grainId} width="680" height="720" patternUnits="userSpaceOnUse">
+                <image
+                  href="/art/optimized/environment-painted.00c506c983c0.webp"
+                  x="-680"
+                  y="-720"
+                  width="1360"
+                  height="1440"
+                  preserveAspectRatio="none"
+                />
+              </pattern>
+            </defs>
+            <path
+              className="results-wood"
+              d="M16 15 L118 10 L121 14 L349 8 L352 12 L568 9 L657 17 L664 75 L659 80 L666 183 L663 362 L668 368 L662 542 L666 648 L658 701 L545 706 L538 702 L320 710 L166 703 L161 707 L20 701 L13 621 L18 617 L12 427 L16 420 L10 241 L15 236 L11 89 Z"
+              fill={`url(#${grainId})`}
+            />
+            <path
+              className="results-grain-edge"
+              d="M23 23 L117 19 M360 20 L563 18 L648 24 M21 692 L158 697 M329 699 L539 693 L650 692"
+            />
+            <path
+              className="results-wood-cracks"
+              d="M15 80 L67 83 L27 88 M666 182 L605 185 L641 187 M12 426 L62 429 M665 648 L593 652 L626 655"
+            />
+            {[34, 686].flatMap((y) =>
+              [34, 646].map((x) => (
+                <g key={`${x}-${y}`} className="results-nail">
+                  <circle cx={x} cy={y} r="5" />
+                  <path d={`M${x - 2} ${y + 2}l4 -4`} />
+                </g>
+              )),
+            )}
+          </svg>
+          <header className="game-over-hero">
+            <div className="game-over-laurel" aria-hidden="true">
+              <GameIcon name="trophy" size={76} />
+            </div>
+            {winner && <Avatar profile={profile(winner.id, winner.name)} />}
+            <p>{winner ? 'The island has a champion' : 'Game over'}</p>
+            <h1>{winner ? `${winner.name} wins!` : 'The island rests'}</h1>
+            <span>
+              {game.finishReason === 'resignation'
+                ? 'Victory by resignation'
+                : game.finishReason === 'abandoned'
+                  ? 'Everyone left the game'
+                  : `${winner?.points ?? 0} victory points`}{' '}
+              · {game.turn} turns
+            </span>
+          </header>
           <div className="game-over-standings">
             {playerStandings(game).map(({ player, points }, index) => (
               <article
@@ -145,22 +171,20 @@ export function GameOver({
               })}
             </div>
           </div>
-        ) : (
-          <GameStatistics game={game} statistics={statistics} />
-        )}
-        {error && (
-          <p className="game-over-error" role="alert">
-            {error}
-          </p>
-        )}
-        <footer className="game-over-actions">
-          <button className="dark-button" disabled={busy} onClick={onQuit}>
-            Quit Catanova
-          </button>
-          <button className="gold-button" disabled={busy || !canReturn} onClick={onReturn}>
-            Return to lobby
-          </button>
-        </footer>
+          {error && (
+            <p className="game-over-error" role="alert">
+              {error}
+            </p>
+          )}
+          <footer className="game-over-actions">
+            <button className="dark-button" disabled={busy} onClick={onQuit}>
+              Quit Catanova
+            </button>
+            <button className="gold-button" disabled={busy || !canReturn} onClick={onReturn}>
+              Return to lobby
+            </button>
+          </footer>
+        </div>
       </div>
     </div>
   );

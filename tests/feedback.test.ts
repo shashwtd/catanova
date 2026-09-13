@@ -9,7 +9,11 @@ import {
   latestRoll,
   RollPresentationTracker,
 } from '../apps/client/src/feedback.js';
-import { PresentationBuffer, presentationHold } from '../apps/client/src/useFeedback.js';
+import {
+  dicePresentationGame,
+  PresentationBuffer,
+  presentationHold,
+} from '../apps/client/src/useFeedback.js';
 import { GameEffects, nextDicePresentation } from '../apps/client/src/GameEffects.js';
 import { DEFAULT_PREFERENCES, parsePreferences } from '../apps/client/src/preferences.js';
 import { SoundEngine, soundScore } from '../apps/client/src/sound.js';
@@ -662,4 +666,39 @@ test('resource gains use their animations without a misleading one-player announ
     );
   assert.doesNotMatch(render(['Bob received 1 Sheep.', 'Cara received 1 Sheep.']), /move-announcement/);
   assert.match(render(['Bob played Knight.']), /Bob played Knight/);
+});
+
+test('a seven keeps the board at its pre-roll state until the result is readable, without delaying authoritative state', () => {
+  const g = setup();
+  const before = snapshot(g, 20);
+  const live = structuredClone(before);
+  live.revision = 21;
+  live.game!.phase = 'discard';
+  live.game!.dice = [3, 4];
+  live.game!.discards = { p0: 4 };
+  const committed = structuredClone(live);
+  assert.equal(dicePresentationGame(live, before)?.phase, 'roll');
+  assert.equal(live.game!.phase, 'discard', 'server requirements remain immediate');
+  assert.deepEqual(live, committed);
+  assert.equal(
+    dicePresentationGame(live, null),
+    live.game,
+    'finishing the read window reveals the current requirements',
+  );
+  const moved = structuredClone(live);
+  moved.game!.robber = (g.robber + 1) % 19;
+  moved.game!.phase = 'actions';
+  moved.revision++;
+  assert.equal(
+    dicePresentationGame(moved, before)?.robber,
+    g.robber,
+    'even a fast automated robber move waits for the roll',
+  );
+  assert.equal(dicePresentationGame(moved, null)?.robber, moved.game!.robber);
+  assert.equal(
+    dicePresentationGame({ ...moved, round: 100 }, before),
+    moved.game,
+    'a rematch cannot show the previous board',
+  );
+  assert.equal(dicePresentationGame({ ...moved, roomId: 'other-room' }, before), moved.game);
 });
