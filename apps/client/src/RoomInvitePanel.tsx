@@ -9,6 +9,14 @@ import { GoogleMark } from './ProviderMarks.js';
 import { Invite } from './Lobby.js';
 import { visibleRoomCode } from './navigation.js';
 
+/** Compare canonical identities once resolved; a short alias alone cannot identify a room. */
+export function visibleRoomInvitations(
+  invitations: readonly RoomInvite[],
+  excludedRoomIds: readonly (string | null | undefined)[],
+) {
+  return invitations.filter((invite) => !excludedRoomIds.includes(invite.roomId));
+}
+
 type Auth = ReturnType<typeof useAuth>;
 export function RoomInviteInbox({
   invitations,

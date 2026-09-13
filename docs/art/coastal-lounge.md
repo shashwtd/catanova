@@ -1,8 +1,8 @@
 # Quiet coastal lounge
 
-Original environment regenerated with the built-in image generation tool for the signed-in hub and waiting room. The second version keeps the coastal veranda direction but removes the town, boats, banners, furniture and dense greenery. The public landing and game board retain their artwork.
+Historical environment regenerated with the built-in image generation tool for the signed-in hub and waiting room. The current tabletop treatment replaces it; it remains available so that the separate visual commit can be reverted. The second version keeps the coastal veranda direction but removes the town, boats, banners, furniture and dense greenery. The public landing and game board retain their artwork.
 
-Runtime: `apps/client/public/art/optimized/quiet-lounge.336ba3af237d.webp`, 1600 × 900, 53,072 bytes (about 52 KiB). Sharp resized the result and encoded WebP at quality 76, effort 6. Only this optimized, content-hashed file is shipped. The original generation PNG remains outside the repository. This replaces the 91,832-byte coastal-lounge texture.
+Retained export (not the active hub/lobby background): `apps/client/public/art/optimized/quiet-lounge.336ba3af237d.webp`, 1600 × 900, 53,072 bytes (about 52 KiB). Sharp resized the result and encoded WebP at quality 76, effort 6. Only this optimized, content-hashed file is shipped. The original generation PNG remains outside the repository. This replaces the 91,832-byte coastal-lounge texture.
 
 ## Final generation prompt
 

@@ -29,7 +29,7 @@ import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
 import { preloadGameAssets } from './game-assets.js';
 import { useRoomInvites } from './useRoomInvites.js';
-import { RoomInviteNotice } from './RoomInvitePanel.js';
+import { RoomInviteNotice, visibleRoomInvitations } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
@@ -278,9 +278,8 @@ function App() {
     auth.accessToken,
     auth.canPlay && !!auth.account && !auth.account.isGuest,
   );
-  const incomingInvites = roomInvites.incoming.filter(
-    (incoming) => incoming.roomId !== room?.roomId && incoming.roomId !== invite,
-  );
+  const excludedInviteRoomIds = [room?.roomId, previewRoom?.roomId, invite];
+  const incomingInvites = visibleRoomInvitations(roomInvites.incoming, excludedInviteRoomIds);
   const roomEntryBlocked = room ? 'Leave your current room to join another.' : undefined;
   const [assetProgress, setAssetProgress] = useState(0);
   const [launchVisualExpired, setLaunchVisualExpired] = useState(false);
@@ -1240,6 +1239,7 @@ function App() {
           auth={auth}
           onClose={() => setPanel(null)}
           room={room && !g ? room : undefined}
+          excludedRoomIds={excludedInviteRoomIds}
           invites={roomInvites}
           onOpenRoom={openInvitation}
           roomEntryBlocked={roomEntryBlocked}

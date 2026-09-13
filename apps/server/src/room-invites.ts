@@ -13,6 +13,9 @@ import type {
 
 export const ROOM_INVITE_TTL_MS = 5 * 60_000;
 export const ROOM_INVITE_ACCOUNT_LIMIT = 20;
+// Five-second polling costs 12 reads/device/minute. Leave headroom for several
+// devices and focus/mutation refreshes, without loosening invitation writes.
+export const ROOM_INVITE_READ_LIMIT = 120;
 const GLOBAL_LIMIT = 10_000;
 type InviteRow = {
   id: string;
@@ -26,7 +29,7 @@ type InviteRow = {
 
 /** Small durable invitations share the game's backup, while friendships remain authoritative in Supabase. */
 export class RoomInviteService {
-  private readonly reads = new RoomAccessLimit(30);
+  private readonly reads = new RoomAccessLimit(ROOM_INVITE_READ_LIMIT);
   private readonly writes = new RoomAccessLimit(30);
   constructor(
     private readonly store: Store,
