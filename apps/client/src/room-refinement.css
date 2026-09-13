@@ -372,7 +372,7 @@
   }
 }
 
-/* Lighter cut-corner panels sit clearly against the coast. */
+/* Keep the stronger title and backed rule strip with the original muted palette. */
 .room-lobby .lobby-caption h1 {
   font:
     600 clamp(28px, 3vw, 39px)/1.15 Cinzel,
@@ -389,7 +389,7 @@
   padding: 4px 8px;
   border: 1px solid #f2e6bc65;
   border-radius: 5px;
-  background: #335344bb;
+  background: #213c30bb;
   backdrop-filter: blur(10px);
   box-shadow:
     inset 0 1px #fff5d52e,
@@ -405,49 +405,6 @@
   color: #fffbe9;
   border-radius: 3px;
   filter: none;
-}
-.room-lobby .lobby-seat,
-.room-lobby .lobby-seat.self {
-  background: linear-gradient(150deg, #6d8567f5, #46654ff5);
-  border-color: #dfce9c;
-  border-radius: 7px;
-  padding-block: 30px 18px;
-  min-height: 265px;
-  gap: 9px;
-  overflow: visible;
-}
-.room-lobby .lobby-seat.self {
-  border-color: #fff0bc;
-}
-.room-lobby .lobby-seat::before {
-  border-radius: 3px;
-  border-color: #f9e1a943;
-}
-.room-lobby .lobby-seat > strong {
-  color: #fff8de;
-}
-.room-lobby .lobby-avatar,
-.room-lobby .lobby-avatar .avatar-medallion,
-.room-lobby .lobby-avatar svg {
-  border-radius: 6px;
-}
-.room-lobby .ready-status {
-  border-radius: 3px;
-  color: #f1f1d7;
-}
-.room-lobby .lobby-friends {
-  border-radius: 6px;
-  background: linear-gradient(#698269, #4b6853);
-}
-.room-lobby .lobby-start-controls > .hub-room-button {
-  border-radius: 7px;
-}
-.room-lobby .lobby-start-controls > .hub-room-button:not(.hub-create-button) {
-  background: linear-gradient(#6a8268, #486650);
-  color: #fff2d1;
-}
-.room-lobby .lobby-start-controls > .hub-room-button:hover:not(:disabled) {
-  filter: brightness(1.08);
 }
 .lobby-player-manage {
   position: relative;
@@ -519,34 +476,6 @@
   margin: 0;
   font-size: 13px;
 }
-.game-dialog:has(.settings-menu) {
-  border-radius: 7px;
-  background: #f6efd9;
-  box-shadow: 0 16px 55px #10291d66;
-}
-.settings-menu {
-  gap: 12px 18px;
-}
-.settings-menu .settings-audio {
-  background: #e8e0c7;
-  padding: 10px 12px;
-  border-radius: 4px;
-}
-.settings-menu .settings-room {
-  margin-top: 0;
-  padding-top: 12px;
-}
-.settings-menu .settings-mute {
-  border-radius: 4px;
-  box-shadow: none;
-}
-.settings-menu .settings-dice-option {
-  border-radius: 4px;
-  background: #eee7d0;
-}
-.settings-menu .settings-dice-option[data-selected='true'] {
-  background: #dbe4c9;
-}
 .settings-theme {
   grid-column: 1 / -1;
   display: grid;
@@ -580,7 +509,7 @@
   min-height: 44px;
   padding: 4px 10px;
   border: 1px solid #c7b88e;
-  border-radius: 4px;
+  border-radius: 12px;
   cursor: pointer;
   color: #3c5543;
   font:
@@ -610,17 +539,6 @@
   background: linear-gradient(140deg, #426335 45%, #9e814e 46%, #287a8b 75%);
 }
 @media (max-width: 650px) {
-  .room-lobby .lobby-seat,
-  .room-lobby .lobby-seat.self {
-    min-height: 208px;
-    padding: 30px 8px 12px;
-  }
-  .room-lobby .lobby-caption h1 {
-    font-size: 27px;
-  }
-  .settings-menu .settings-audio {
-    padding: 7px;
-  }
   .settings-theme legend small {
     float: none;
     display: block;

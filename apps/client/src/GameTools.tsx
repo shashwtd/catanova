@@ -50,7 +50,7 @@ export function GameTools({
           <History />
         </button>
         <button
-          className="icon-button"
+          className="icon-button fullscreen-control"
           onClick={onFullscreen}
           aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
           title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}

@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { IconStudy } from './IconStudy.js';
 import type { ReactNode, SVGProps } from 'react';
 /** A small original vector vocabulary: filled silhouettes, quiet ink edges and purposeful color. */
 export const GAME_ICON_NAMES = [
@@ -374,6 +376,7 @@ const paths: Record<GameIconName, ReactNode> = {
   ),
 };
 export function GameIcon({ name, size = 24, className = '', ...props }: IconProps & { name: GameIconName }) {
+  const study = useContext(IconStudy);
   return (
     <svg
       width={size}
@@ -389,7 +392,7 @@ export function GameIcon({ name, size = 24, className = '', ...props }: IconProp
       focusable="false"
       {...props}
     >
-      {paths[name]}
+      {study[name] ? <image href={study[name]} width="32" height="32" /> : paths[name]}
     </svg>
   );
 }

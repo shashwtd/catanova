@@ -2,22 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { profileGainPosition } from '../apps/client/src/GameEffects.js';
 
-test('portrait resource gains stay under their own profile without collapsing onto the first player', () => {
+test('portrait gains stay inside the correct cell in a two-row player layout', () => {
   const viewport = { width: 320, height: 700 };
-  const badges = Array.from({ length: 4 }, (_, index) =>
-    profileGainPosition({ left: 10 + index * 76, top: 17, width: 72, height: 85 }, viewport),
-  );
-  assert.equal(new Set(badges.map((badge) => badge.left)).size, 4);
-  for (const badge of badges) {
-    assert.equal(badge.placement, 'below');
-    assert.equal(badge.top, 109);
-    assert.ok(badge.left - badge.maxWidth / 2 >= 8);
-    assert.ok(badge.left + badge.maxWidth / 2 <= viewport.width - 8);
-  }
-  for (let index = 1; index < badges.length; index++) {
-    const previous = badges[index - 1]!,
-      current = badges[index]!;
-    assert.ok(previous.left + previous.maxWidth / 2 < current.left - current.maxWidth / 2);
+  const cells = Array.from({ length: 4 }, (_, i) => ({
+    left: 10 + (i % 2) * 156,
+    top: 8 + Math.floor(i / 2) * 58,
+    width: 144,
+    height: 48,
+  }));
+  const badges = cells.map((box) => profileGainPosition(box, viewport));
+  assert.equal(new Set(badges.map((b) => `${b.left}:${b.top}`)).size, 4);
+  for (const [i, badge] of badges.entries()) {
+    const box = cells[i]!;
+    assert.equal(badge.placement, 'within');
+    assert.ok(badge.left - badge.maxWidth / 2 >= box.left + 48);
+    assert.ok(badge.left + badge.maxWidth / 2 <= box.left + box.width);
+    assert.ok(badge.top - 18 >= box.top);
+    assert.ok(badge.top + 18 <= box.top + box.height);
   }
 });
 
@@ -38,6 +39,6 @@ test('rotating to a side rail retains its established gain anchor and wide profi
   });
   assert.equal(
     profileGainPosition({ left: 10, top: 17, width: 180, height: 85 }, { width: 390, height: 844 }).maxWidth,
-    88,
+    108,
   );
 });

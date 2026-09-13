@@ -394,8 +394,8 @@
   padding: 6px;
   gap: 6px;
   border: 0;
-  border-radius: 5px 5px 0 0;
-  background: linear-gradient(#4d6852, #344e40);
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(#304c40, #1d342c);
   box-shadow: 0 -2px 8px #17332440;
 }
 .playing .build-shelf .build-control,
@@ -410,7 +410,7 @@
   padding: 6px;
   gap: 4px;
   border: 0;
-  border-radius: 3px;
+  border-radius: 10px;
   box-shadow: none;
   background: #eff1cc12;
 }
@@ -459,8 +459,8 @@
   height: 44px;
   padding: 8px;
   border: 1px solid #b6ba8b70;
-  border-radius: 5px;
-  background: linear-gradient(#566f56, #354e3e);
+  border-radius: 8px;
+  background: linear-gradient(#3c5446, #263b31);
   box-shadow: 0 2px 4px #182e2740;
 }
 .game-tools-popover button > span {
@@ -468,7 +468,7 @@
   left: calc(100% + 8px);
   padding: 6px 9px;
   background: #f5eacb;
-  border-radius: 3px;
+  border-radius: 10px;
   color: #334c38;
   white-space: nowrap;
   pointer-events: none;
@@ -478,26 +478,35 @@
   visibility: visible;
 }
 .game-tools-menu summary {
-  border-radius: 5px;
+  border-radius: 12px;
 }
 
-/* One contained identity panel: name, inventory and award progress share its interior. */
-.playing .player-profile {
+/* Portrait determines the row height; every public count lives to its right. */
+.playing .player-profile,
+.playing .player-profile.active {
+  --portrait-size: 76px;
+  display: grid;
+  grid-template-columns: var(--portrait-size) minmax(0, 1fr);
   align-items: center;
-  padding: 9px;
-  gap: 8px;
-  border: 1px solid color-mix(in srgb, var(--player-color), #bdcaa0 35%);
-  border-left-width: 3px;
-  border-radius: 5px;
-  background: linear-gradient(135deg, #50684bf2, #314b3ef5);
-  box-shadow: 0 3px 9px #16302533;
-  grid-template-columns: 54px minmax(0, 1fr);
+  min-height: 0;
+  padding: 0;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 .playing .player-profile .profile-portrait {
-  width: 54px;
+  width: var(--portrait-size);
+  height: var(--portrait-size);
 }
 .playing .player-profile .profile-caption {
+  display: grid;
+  grid-template-rows: 20px 28px 28px;
+  align-items: center;
+  height: var(--portrait-size);
   width: 100%;
+  padding: 0;
   min-width: 0;
 }
 .playing .player-profile .profile-name-banner,
@@ -507,22 +516,39 @@
   transform: none;
   margin: 0;
   padding: 0;
-  color: #fff4d4;
+  text-align: left;
+  color: #f7ebd0;
   font:
     600 16px/1.2 Barlow,
     sans-serif;
+  background: none;
+  box-shadow: none;
+}
+.playing .player-profile .profile-caption .profile-stats {
+  margin: 0;
+  gap: 4px;
+}
+.playing .player-profile .profile-stats > span {
+  padding-block: 0;
+}
+.playing .player-profile .profile-stats .profile-resource-count,
+.playing .player-profile .profile-stats .profile-development-count {
+  background: none;
+  box-shadow: none;
 }
 .playing .player-profile .profile-achievements {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
-  margin: 3px 0 0;
+  justify-content: flex-start;
+  gap: 9px;
+  margin: 0;
   padding: 0;
-  min-height: 24px;
+  min-height: 0;
 }
 .playing .player-profile .profile-achievement,
 .playing .player-profile .profile-achievement.held {
-  min-height: 24px;
+  min-height: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -551,14 +577,93 @@
   font-size: 10px;
   color: #f4dfb0;
 }
-.playing .player-profile.active {
-  background: linear-gradient(135deg, #667d53f5, #3d5b44fa);
+.playing .profile-portrait .profile-absence {
+  position: absolute;
+  z-index: 7;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 2px 4px;
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+.playing .profile-portrait .profile-absence > span {
+  display: none;
+}
+.playing .profile-portrait .profile-absence .game-icon {
+  display: none;
+}
+.development-buy-mark > img {
+  display: block;
+  object-fit: contain;
+}
+@media (max-width: 1000px) and (min-width: 701px) and (min-height: 601px) {
+  .playing .player-profile {
+    --portrait-size: 70px;
+    gap: 8px;
+  }
+  .playing .player-profile .profile-caption {
+    grid-template-rows: 18px 26px 26px;
+  }
 }
 @media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .side-controls .fullscreen-control {
+    display: none;
+  }
+  .playing .player-profile,
+  .playing .player-profile.active {
+    --portrait-size: 56px;
+    gap: 6px;
+  }
+  .playing .player-profile .profile-caption {
+    grid-template-rows: 16px 20px 20px;
+  }
+  .playing .player-profile .profile-name-banner,
+  .playing .player-profile.self .profile-name-banner,
+  .playing .player-profile.active .profile-name-banner {
+    font-size: 12px;
+  }
+  .playing .player-profile .profile-caption .profile-stats {
+    gap: 3px;
+  }
+  .playing .player-profile .profile-stats .profile-score b {
+    font-size: 16px;
+  }
+  .playing .player-profile .profile-stats .profile-resource-count b,
+  .playing .player-profile .profile-stats .profile-development-count b {
+    font-size: 13px;
+  }
+  .playing .player-profile .profile-achievements {
+    gap: 7px;
+  }
+  .playing .profile-award-emblem,
+  .playing .held .profile-award-emblem {
+    width: 20px;
+    height: 20px;
+  }
+  .playing .player-profile .profile-achievement,
+  .playing .player-profile .profile-achievement.held {
+    gap: 2px;
+  }
+  .playing .profile-achievement.held small {
+    display: none;
+  }
+  .playing .profile-portrait::before {
+    border-width: 1px;
+    box-shadow: none;
+  }
+  .playing .profile-portrait .profile-absence {
+    font-size: 9px;
+    padding: 1px 3px;
+  }
   .playing .construction-tools.build-shelf {
     padding: 4px;
     gap: 4px;
-    border-radius: 4px;
+    border-radius: 9px;
   }
   .playing .build-shelf .build-control,
   .playing .build-shelf .build-control.build-city,
@@ -578,43 +683,155 @@
   .game-tools-popover {
     gap: 5px;
   }
-  .playing .player-profile {
-    padding: 4px 2px;
-    gap: 2px;
-    border-left-width: 2px;
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing,
+  .playing:has(.profile-absence) {
+    --mobile-profile-height: 124px;
+    --hud-bottom: calc(var(--mobile-safe-bottom) + 140px);
   }
-  .playing .player-profile .profile-name-banner,
-  .playing .player-profile.self .profile-name-banner,
-  .playing .player-profile.active .profile-name-banner {
-    font-size: 12px;
+  .playing .player-rail {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 10px 12px;
+    inset: calc(var(--mobile-safe-top) + 8px) calc(var(--mobile-safe-right) + 10px) auto
+      calc(var(--mobile-safe-left) + 10px);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
-  .playing .player-profile .profile-portrait {
-    width: 36px;
+  .playing .player-rail .player-profile {
+    min-width: 0;
   }
-  .playing .player-profile .profile-achievements {
+  .playing .board-anchor {
+    inset: calc(var(--mobile-safe-top) + var(--mobile-profile-height) + 24px) var(--hud-right)
+      var(--hud-bottom) var(--hud-left);
+  }
+  .playing .card-table {
+    height: 132px;
+    grid-template-rows: 68px 52px;
     gap: 4px;
-    min-height: 20px;
-    margin-top: 1px;
+    padding: 0 0 8px;
+  }
+  .playing .card-table::before {
+    height: calc(103px + var(--mobile-safe-bottom));
+  }
+  .playing .hand-zone {
+    align-self: center;
+    gap: 8px;
+  }
+  .playing .resource-hand.resource-counters {
+    width: clamp(170px, 53vw, 205px);
+    gap: 3px;
+    translate: none;
+  }
+  .playing .resource-counter {
+    min-height: 48px;
+  }
+  .playing .resource-counter-art,
+  .playing .resource-counter-art .sprite {
+    width: 26px;
+    height: 26px;
+  }
+  .playing .resource-counter-value {
+    font-size: 21px;
+  }
+  .playing .hand-zone > .development-hand-inline {
+    flex: 1 1 0;
+  }
+  .playing .construction-tools.build-shelf {
+    padding: 0;
+    gap: 4px;
+    left: calc(var(--mobile-safe-left) + 8px);
+    bottom: calc(var(--mobile-safe-bottom) + 8px);
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+  .playing .build-shelf .build-control,
+  .playing .build-shelf .build-control.build-city,
+  .playing .build-shelf .build-control.build-settlement {
+    width: 44px;
+    height: 52px;
+    background: #22382b55;
+    border-radius: 8px;
+  }
+  .playing .table-actions {
+    gap: 8px;
+    align-items: end;
+    padding: 0;
+  }
+  .playing .utility-actions {
+    gap: 4px;
+  }
+  .playing .trade-action,
+  .playing .development-buy {
+    width: 44px;
+    height: 52px;
+  }
+  .playing .turn-action {
+    width: 52px;
+    height: 52px;
+  }
+}
+@media (max-width: 380px) and (orientation: portrait) {
+  .playing,
+  .playing:has(.profile-absence) {
+    --mobile-profile-height: 108px;
+  }
+  .playing .player-profile,
+  .playing .player-profile.active {
+    --portrait-size: 48px;
+    gap: 5px;
+  }
+  .playing .player-profile .profile-caption {
+    grid-template-rows: 14px 18px 16px;
+  }
+  .playing .player-profile .profile-caption .profile-stats {
+    gap: 2px;
+  }
+  .playing .player-profile .profile-stats .profile-score b {
+    font-size: 14px;
+  }
+  .playing .player-profile .profile-stats .profile-resource-count b,
+  .playing .player-profile .profile-stats .profile-development-count b {
+    font-size: 12px;
   }
   .playing .profile-award-emblem,
   .playing .held .profile-award-emblem {
-    width: 21px;
-    height: 21px;
-  }
-  .playing .player-profile .profile-achievement,
-  .playing .player-profile .profile-achievement.held {
-    min-height: 20px;
-    gap: 1px;
+    width: 16px;
+    height: 16px;
   }
 }
 @media (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
-  .playing .player-profile {
-    grid-template-columns: 36px minmax(0, 1fr);
+  .playing .player-rail {
+    width: 172px;
+    padding: 6px 0;
+    background: none;
+    border: 0;
   }
-}
-@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
-  .playing .profile-achievement.held small {
-    display: none;
+  .playing {
+    --hud-right: calc(var(--mobile-safe-right) + 184px);
+  }
+  .playing .player-profile,
+  .playing .player-profile.active {
+    --portrait-size: 48px;
+  }
+  .playing .player-profile .profile-caption {
+    grid-template-rows: 14px 18px 16px;
+  }
+  .playing .profile-award-emblem,
+  .playing .held .profile-award-emblem {
+    width: 16px;
+    height: 16px;
+  }
+  .playing .side-controls.room-controls {
+    top: auto;
+    bottom: calc(var(--hud-bottom) + 68px);
+    left: calc(var(--mobile-safe-left) + 6px);
   }
 }
 @media (max-height: 480px) {
@@ -625,5 +842,49 @@
   }
   .game-tools-popover button {
     width: 42px;
+  }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  .profile-gain-badge[data-placement='within'] {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: center;
+    justify-items: center;
+    gap: 2px;
+    width: 108px;
+    height: 36px;
+    box-sizing: border-box;
+    padding: 2px;
+    transform: translate(-50%, -50%);
+    border-radius: 5px;
+    animation: none;
+  }
+  .profile-gain-badge[data-placement='within']:has(> span:only-child) {
+    grid-template-columns: 1fr;
+  }
+  .profile-gain-badge[data-placement='within'] > span {
+    gap: 1px;
+  }
+  .profile-gain-badge[data-placement='within'] svg {
+    width: 12px;
+    height: 14px;
+  }
+  .profile-gain-badge[data-placement='within'] b {
+    font-size: 11px;
+  }
+}
+.playing .development-hand-inline .development-buy-mark:has(> img) {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+.playing .development-hand-inline .development-buy-mark > img {
+  width: 100%;
+  height: 100%;
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing .table-actions .development-hand-inline .development-buy {
+    width: 44px;
+    height: 52px;
   }
 }

@@ -31,18 +31,19 @@ export function nextDicePresentation(
     return restored;
   return current;
 }
-/** A phone's top profile row receives cards below each player; side rails keep their left-side badges. */
+/** A phone shows gains inside the recipient's caption so the second profile row stays clear. */
 export function profileGainPosition(
   box: { left: number; top: number; width: number; height: number },
   viewport: { width: number; height: number },
 ) {
   if (viewport.width <= 700 && viewport.width <= viewport.height) {
-    const maxWidth = Math.max(52, Math.min(88, box.width - 6));
+    const portrait = viewport.width <= 380 ? 48 : 56;
+    const maxWidth = Math.max(78, Math.min(108, box.width - portrait - 8));
     return {
-      left: Math.max(maxWidth / 2 + 8, Math.min(viewport.width - maxWidth / 2 - 8, box.left + box.width / 2)),
-      top: box.top + box.height + 7,
+      left: Math.min(viewport.width - maxWidth / 2 - 8, box.left + box.width - maxWidth / 2),
+      top: box.top + box.height - 18,
       maxWidth,
-      placement: 'below' as const,
+      placement: 'within' as const,
     };
   }
   return {

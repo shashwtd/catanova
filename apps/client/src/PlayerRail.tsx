@@ -71,8 +71,8 @@ function AwardEmblem({ kind, held }: { kind: 'road' | 'army'; held: boolean }) {
         <img
           src={
             kind === 'road'
-              ? '/art/optimized/award-road.1f37c571db63.webp'
-              : '/art/optimized/award-army.a805a3c59d7f.webp'
+              ? '/art/optimized/simple-road-award.a16c85e5b0e5.webp'
+              : '/art/optimized/simple-army-award.8e351c70c123.webp'
           }
           width="32"
           height="32"
@@ -149,6 +149,12 @@ export function PlayerRail({
                   {active && timer}
                 </span>
               )}
+              <DisconnectStatus
+                resigned={p.resigned}
+                deadline={!seat?.connected && game.phase !== 'finished' ? seat?.resignAt : undefined}
+                now={serverNow}
+                paused={room.paused}
+              />
             </div>
             <div className="profile-caption">
               <strong className="profile-name-banner" title={p.name}>
@@ -186,12 +192,6 @@ export function PlayerRail({
                   {army && <small>+2</small>}
                 </span>
               </div>
-              <DisconnectStatus
-                resigned={p.resigned}
-                deadline={!seat?.connected && game.phase !== 'finished' ? seat?.resignAt : undefined}
-                now={serverNow}
-                paused={room.paused}
-              />
             </div>
             {game.winner === p.id && (
               <div className="profile-awards">

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { IconStudy } from './IconStudy.js';
+import { useContext, useEffect, useState } from 'react';
 import { Check, Clock3, LockKeyhole, Play, Plus, ScrollText, X } from './GameIcons.js';
 import type { CSSProperties } from 'react';
 import { CARD_NAMES, canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
@@ -295,6 +296,7 @@ export function DevelopmentCards({
 }
 
 export function DevelopmentPurchase({ disabled, onBuy }: { disabled: boolean; onBuy: () => void }) {
+  const study = useContext(IconStudy);
   return (
     <button
       className="development-buy"
@@ -304,8 +306,14 @@ export function DevelopmentPurchase({ disabled, onBuy }: { disabled: boolean; on
       onClick={onBuy}
     >
       <span className="development-buy-mark" aria-hidden="true">
-        <ScrollText size={30} />
-        <Plus size={18} />
+        {study['buy-development'] ? (
+          <img src={study['buy-development']} width="34" height="34" alt="" />
+        ) : (
+          <>
+            <ScrollText size={30} />
+            <Plus size={18} />
+          </>
+        )}
       </span>
       <span className="development-buy-label">Buy</span>
       <span className="development-buy-cost" aria-hidden="true">
