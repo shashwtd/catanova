@@ -1075,9 +1075,17 @@ export class Store {
         return { revision: old.revision, counter: old.counter, duplicate: true };
       }
       const room = this.snapshot(seat.room_id);
-      if (room.revision !== expectedRevision)
-        throw new ProtocolError('STALE_STATE', 'State changed; review the latest snapshot and try again');
       const current = this.loadGame(seat.room_id);
+      // Two people can express interest in the same immutable offer concurrently.
+      // This records consent only; the maker's final exchange still needs the current revision.
+      const sameOfferReply =
+        action.kind === 'acceptTrade' &&
+        expectedRevision < room.revision &&
+        current?.trade?.id === action.tradeId &&
+        !current.trade.open &&
+        !current.trade.declinedBy?.includes(seat.id);
+      if (room.revision !== expectedRevision && !sameOfferReply)
+        throw new ProtocolError('STALE_STATE', 'State changed; review the latest snapshot and try again');
       if (
         current &&
         current.phase !== 'finished' &&

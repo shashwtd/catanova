@@ -130,8 +130,8 @@ test('the maker sees only offered proposal cards and can accept only while activ
   game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ wheat: 1 }) }, 'p2');
   const view = gameView(game, 'p0'),
     html = panel(view, 'p0');
-  assert.ok(!button(html, 'Accept Bob&#x27;s offer').includes('disabled=""'));
-  assert.ok(!button(html, 'Accept Cara&#x27;s offer').includes('disabled=""'));
+  assert.ok(!button(html, 'Trade with Bob').includes('disabled=""'));
+  assert.ok(!button(html, 'Trade with Cara').includes('disabled=""'));
   assert.match(html, /aria-label="1 Sheep"/);
   assert.match(html, /aria-label="1 Hay"/);
   assert.ok(!html.includes('aria-label="7 Rock"'));
@@ -139,22 +139,22 @@ test('the maker sees only offered proposal cards and can accept only while activ
   assert.equal(view.players[2]!.hand, undefined);
   for (const next of [view, { ...view, phase: 'roll' as const }]) {
     const markup = panel(next, 'p0', next === view);
-    assert.ok(button(markup, 'Accept Bob&#x27;s offer').includes('disabled=""'));
+    assert.ok(button(markup, 'Trade with Bob').includes('disabled=""'));
   }
   const depleted = structuredClone(view);
   depleted.players[0]!.hand!.wood = 0;
-  assert.ok(button(panel(depleted, 'p0'), 'Accept Bob&#x27;s offer').includes('disabled=""'));
+  assert.ok(button(panel(depleted, 'p0'), 'Trade with Bob').includes('disabled=""'));
   assert.ok(!panel(gameView(game, 'p1'), 'p1').includes('Accept Bob'));
 });
 
 test('specific incoming offers require the local payment and disappear when the offer or action phase ends', () => {
   const game = move(setup(), { kind: 'offerTrade', give: hand({ wood: 2 }), want: hand({ sheep: 1 }) });
   const view = gameView(game, 'p1');
-  assert.ok(!button(incoming(view, 'p1'), 'Accept trade').includes('disabled=""'));
-  assert.ok(button(incoming(view, 'p1', true), 'Accept trade').includes('disabled=""'));
+  assert.ok(!button(incoming(view, 'p1'), 'Yes, trade').includes('disabled=""'));
+  assert.ok(button(incoming(view, 'p1', true), 'Yes, trade').includes('disabled=""'));
   const depleted = structuredClone(view);
   depleted.players[1]!.hand!.sheep = 0;
-  assert.ok(button(incoming(depleted, 'p1'), 'Accept trade').includes('disabled=""'));
+  assert.ok(button(incoming(depleted, 'p1'), 'Yes, trade').includes('disabled=""'));
   assert.equal(incoming(gameView(game, 'p0'), 'p0'), '');
   assert.equal(incoming(gameView(move(game, { kind: 'endTurn' }), 'p1'), 'p1'), '');
   assert.equal(incoming({ ...view, phase: 'robber' }, 'p1'), '');
@@ -169,7 +169,7 @@ test('specific incoming offers require the local payment and disappear when the 
 test('unknown offers invite proposals instead of gifting cards and show only the local public proposal when restored', () => {
   let game = move(setup(), { kind: 'openTrade', give: hand({ wood: 2 }) });
   const tradeId = game.trade!.id;
-  assert.ok(!incoming(gameView(game, 'p1'), 'p1').includes('Accept trade'));
+  assert.ok(!incoming(gameView(game, 'p1'), 'p1').includes('Yes, trade'));
   assert.ok(!button(incoming(gameView(game, 'p1'), 'p1'), 'Make an offer').includes('disabled=""'));
   assert.ok(button(incoming(gameView(game, 'p1'), 'p1', true), 'Make an offer').includes('disabled=""'));
   game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
@@ -299,8 +299,8 @@ test('exact and open trade summaries consistently use the viewer’s give/get pe
   assert.match(side(maker, 'You get')[0]!, /aria-label="1 Sheep"/);
   assert.match(side(responder, 'You give')[0]!, /aria-label="1 Sheep"/);
   assert.match(side(responder, 'You get')[0]!, /aria-label="2 Timber"/);
-  assert.ok(button(responder, 'Decline'));
-  assert.ok(button(incoming(gameView(game, 'p1'), 'p1', true), 'Decline').includes('disabled=""'));
+  assert.ok(button(responder, 'No thanks'));
+  assert.ok(button(incoming(gameView(game, 'p1'), 'p1', true), 'No thanks').includes('disabled=""'));
   game = move(game, { kind: 'openTrade', give: hand({ wood: 2 }) });
   const tradeId = game.trade!.id;
   game = move(game, { kind: 'proposeTrade', tradeId, give: hand({ sheep: 1 }) }, 'p1');
@@ -334,4 +334,18 @@ test('bank trade clearly previews the local payment and return, with no number s
       'bank choices and commit all lock',
     );
   }
+});
+
+test('exact offers show willing partners to the maker and a clear waiting state to a recipient', () => {
+  let game = move(setup(), { kind: 'offerTrade', give: hand({ wood: 1 }), want: hand({ sheep: 1 }) });
+  const id = game.trade!.id;
+  game = move(game, { kind: 'acceptTrade', tradeId: id }, 'p1');
+  const maker = panel(gameView(game, 'p0'), 'p0');
+  assert.ok(button(maker, 'Trade with Bob'));
+  assert.match(maker, /Bob.*is ready/);
+  const recipient = incoming(gameView(game, 'p1'), 'p1');
+  assert.match(recipient, /Waiting for Alice to choose/);
+  assert.ok(button(recipient, 'Withdraw acceptance'));
+  assert.ok(button(recipient, 'No thanks'));
+  assert.ok(!recipient.includes('Yes, trade'));
 });

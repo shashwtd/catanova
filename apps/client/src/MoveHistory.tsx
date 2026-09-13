@@ -36,7 +36,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   const actor = people.find(
     (name) =>
       line.startsWith(name) &&
-      /^(?: (?:placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
+      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
         line.slice(name.length),
       ),
   );
@@ -55,6 +55,8 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
         if (index >= 0) at = actor.length + index + 5;
       } else if (body === ` moved the robber and stole a card from ${name}.`)
         at = actor.length + ' moved the robber and stole a card from '.length;
+      else if (body === ` is willing to trade with ${name}.`)
+        at = actor.length + ' is willing to trade with '.length;
       else if (body === ` moved the robber. ${name} had no resource cards.`)
         at = actor.length + ' moved the robber. '.length;
       if (at >= 0) {

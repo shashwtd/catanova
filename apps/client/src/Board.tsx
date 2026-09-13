@@ -475,7 +475,7 @@ export function Board({
               <g
                 className="port-cargo"
                 data-resource={port.resource}
-                transform={`translate(${p.markerX},${p.markerY}) rotate(${p.markerAngle})`}
+                transform={`translate(${p.markerX},${p.markerY})`}
               >
                 <rect className="port-badge" {...PORT_BADGE_BOUNDS} rx="6" />
                 {port.resource === 'any' ? (
@@ -556,6 +556,14 @@ export function Board({
               onKeyDown={(e) => keyActivate(e, () => onAction({ kind: 'road', edge: id }))}
             >
               <line className="road-hit" x1={-length / 2} y1="0" x2={length / 2} y2="0" />
+              <line
+                className="site-guide site-guide-back road-site-guide"
+                x1={-length / 2 + 4}
+                y1="0"
+                x2={length / 2 - 4}
+                y2="0"
+                aria-hidden="true"
+              />
               <line
                 className="site-guide road-site-guide"
                 x1={-length / 2 + 4}

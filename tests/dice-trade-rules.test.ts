@@ -107,6 +107,7 @@ test('five offers are counted across open, replacement and cancelled offers, and
   for (const offer of offers) assert.throws(() => move(game, offer), /all five/);
   assert.deepEqual(game, before, 'failed sixth offers cannot change the live fifth trade');
   game = move(game, { kind: 'acceptTrade', tradeId: game.trade!.id }, 'p1');
+  game = move(game, { kind: 'acceptProposal', tradeId: game.trade!.id, player: 'p1' });
   assert.equal(tradeOffersRemaining(game), 0, 'finishing a trade is still allowed at the cap');
   const port = game.board.ports.find((p) => p.resource === 'any')!,
     edge = game.board.edges[port.edge]!;

@@ -8,8 +8,8 @@ import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
-import { rankedPlayers } from './player-ranking.js';
-import { usePlayerOrderMotion } from './usePlayerOrderMotion.js';
+import { playerStandings } from './player-ranking.js';
+import { CardTooltip } from './CardTooltip.js';
 
 function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; count: number }) {
   const label = `${count} ${kind === 'resource' ? 'resource' : 'development'} cards`;
@@ -25,24 +25,46 @@ function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; cou
   );
 }
 
+export function AwardStandings({ game, kind }: { game: GameView; kind: 'longestRoad' | 'largestArmy' }) {
+  const field = kind === 'longestRoad' ? 'roadLength' : 'knights';
+  const players = game.players
+    .map((player, seat) => ({ player, seat }))
+    .sort((a, b) => b.player[field] - a.player[field] || a.seat - b.seat);
+  return (
+    <span className="award-standings">
+      <strong>{kind === 'longestRoad' ? 'Longest Road' : 'Largest Army'}</strong>
+      <small>{kind === 'longestRoad' ? 'Connected roads · minimum 5' : 'Knights played · minimum 3'}</small>
+      <span role="list" aria-label="Award standings">
+        {players.map(({ player }) => (
+          <span
+            role="listitem"
+            key={player.id}
+            data-holder={game[kind] === player.id}
+            aria-label={`${player.name}: ${player[field]}${game[kind] === player.id ? ', award holder' : ''}`}
+          >
+            <span>{player.name}</span>
+            <b>{player[field]}</b>
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 export function PlayerRail({
   room,
   game,
   me,
   timer,
   clockOffset,
-  reducedMotion = false,
 }: {
   room: RoomState;
   game: GameView;
   me?: string;
   timer?: ReactNode;
   clockOffset?: number;
-  reducedMotion?: boolean;
 }) {
-  const rail = useRef<HTMLElement>(null);
-  const ranked = rankedPlayers(game);
-  usePlayerOrderMotion(rail, ranked.map((p) => p.player.id).join('|'), room.roomId, reducedMotion);
+  const ranked = playerStandings(game);
   const tied = ranked.filter((p) => p.leading).length > 1;
   const [now, setNow] = useState(Date.now);
   const fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() });
@@ -63,7 +85,7 @@ export function PlayerRail({
     };
   }, [counting]);
   return (
-    <aside ref={rail} className="player-rail" aria-label="Players">
+    <aside className="player-rail" aria-label="Players">
       {ranked.map(({ player: p, seatIndex: i, publicPoints, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
@@ -120,22 +142,24 @@ export function PlayerRail({
                 {(road || army) && (
                   <div className="profile-held-awards" aria-label="Awards">
                     {road && (
-                      <span
-                        className="profile-medal road-award"
-                        title={`Longest Road · ${p.roadLength} connected roads · +2 points`}
-                        aria-label={`Longest Road, plus 2 victory points, ${p.roadLength} connected roads`}
-                      >
-                        <GameIcon name="road-award" size={30} />
-                      </span>
+                      <CardTooltip disabledMotion content={<AwardStandings game={game} kind="longestRoad" />}>
+                        <span
+                          className="profile-medal road-award"
+                          aria-label={`Longest Road, plus 2 victory points, ${p.roadLength} connected roads`}
+                        >
+                          <GameIcon name="road-award" size={30} />
+                        </span>
+                      </CardTooltip>
                     )}
                     {army && (
-                      <span
-                        className="profile-medal army-award"
-                        title={`Largest Army · ${p.knights} Knights played · +2 points`}
-                        aria-label={`Largest Army, plus 2 victory points, ${p.knights} Knights played`}
-                      >
-                        <GameIcon name="army-award" size={30} />
-                      </span>
+                      <CardTooltip disabledMotion content={<AwardStandings game={game} kind="largestArmy" />}>
+                        <span
+                          className="profile-medal army-award"
+                          aria-label={`Largest Army, plus 2 victory points, ${p.knights} Knights played`}
+                        >
+                          <GameIcon name="army-award" size={30} />
+                        </span>
+                      </CardTooltip>
                     )}
                   </div>
                 )}

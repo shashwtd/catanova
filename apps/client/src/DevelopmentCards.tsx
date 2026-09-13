@@ -310,6 +310,7 @@ export function DevelopmentCards({
 export function DevelopmentPurchase({ disabled, onBuy }: { disabled: boolean; onBuy: () => void }) {
   return (
     <button
+      data-development-purchase
       className="development-buy"
       disabled={disabled}
       aria-label="Buy development card · 1 Sheep, 1 Hay, 1 Rock"

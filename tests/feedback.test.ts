@@ -465,7 +465,13 @@ test('actual trades have a public sound for observers, while Monopoly and sugges
     { kind: 'offerTrade', give: { ...emptyHand(), wood: 1 }, want: { ...emptyHand(), sheep: 1 } },
     () => 0.34,
   );
-  const traded = move(offered, { kind: 'acceptTrade', tradeId: offered.trade!.id }, 'p2');
+  const accepted = applyAction(
+    offered,
+    'p2',
+    { kind: 'acceptTrade', tradeId: offered.trade!.id },
+    () => 0.34,
+  );
+  const traded = move(accepted, { kind: 'acceptProposal', tradeId: accepted.trade!.id, player: 'p2' }, 'p1');
   assert.ok(
     traded.event.sounds.includes('trade'),
     'observers hear a trade even when their own hand stays unchanged',
@@ -594,4 +600,37 @@ test('saved preferences accept only known booleans and a finite clamped volume',
   );
   assert.equal(parsePreferences({ volume: -0.5 }).volume, 0);
   assert.equal(parsePreferences({ volume: 0.37 }).volume, 0.37);
+});
+
+test('coalesced construction and card purchases send only the card price to the purchase button', () => {
+  const before = setup();
+  clearHands(before);
+  before.phase = 'actions';
+  fund(before, 'p0', { wood: 1, brick: 1, sheep: 1, wheat: 1, ore: 1 });
+  const bought = applyAction(before, 'p0', { kind: 'buyCard' }, () => 0.34);
+  const road = gameView(bought, 'p0').legal.roads[0]!;
+  const built = applyAction(bought, 'p0', { kind: 'road', edge: road }, () => 0.34);
+  const room = (g: Game, revision: number): RoomState => ({
+    roomId: 'costs',
+    roomCode: 'TEST',
+    revision,
+    counter: 0,
+    players: [],
+    game: gameView(g, 'p0'),
+  });
+  const event = deriveFeedback(room(before, 1), room(built, 3), 'p0')!;
+  assert.deepEqual(
+    event.flights
+      .filter((f) => f.to === '[data-development-purchase]')
+      .map((f) => f.resource)
+      .sort(),
+    ['ore', 'sheep', 'wheat'],
+  );
+  assert.deepEqual(
+    event.flights
+      .filter((f) => f.spending && f.to !== '[data-development-purchase]')
+      .map((f) => f.resource)
+      .sort(),
+    ['brick', 'wood'],
+  );
 });

@@ -1,5 +1,5 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
-import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
+import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { GameView, Hand } from '../../../packages/rules/src/game.js';
@@ -216,6 +216,11 @@ export function deriveFeedback(
     changed: RESOURCES.filter((r) => old[r] !== hand[r]),
     gains: [],
   };
+  const oldCards = new Set(before.players.find((p) => p.id === me)?.cards?.map((c) => c.id));
+  const purchasedCards = Math.min(
+    Math.max(0, before.deckCount - g.deckCount),
+    g.players.find((p) => p.id === me)?.cards?.filter((c) => !oldCards.has(c.id)).length ?? 0,
+  );
   const gain = emptyHand();
   for (const r of RESOURCES) gain[r] = Math.max(0, hand[r] - old[r]);
   for (const [id, building] of Object.entries(g.buildings))
@@ -273,14 +278,26 @@ export function deriveFeedback(
         from: g.robber !== before.robber ? `[data-effect-hex="${g.robber}"]` : bank,
         to: card(r),
       });
-    if (hand[r] < old[r])
-      event.flights.push({
-        resource: r,
-        amount: old[r] - hand[r],
-        from: card(r),
-        to: event.sites[0] ?? (before.robber !== g.robber ? `[data-effect-hex="${g.robber}"]` : bank),
-        spending: true,
-      });
+    if (hand[r] < old[r]) {
+      const spent = old[r] - hand[r];
+      const purchaseCost = Math.min(spent, purchasedCards * COSTS.developmentCard[r]);
+      if (purchaseCost)
+        event.flights.push({
+          resource: r,
+          amount: purchaseCost,
+          from: card(r),
+          to: '[data-development-purchase]',
+          spending: true,
+        });
+      if (spent > purchaseCost)
+        event.flights.push({
+          resource: r,
+          amount: spent - purchaseCost,
+          from: card(r),
+          to: event.sites[0] ?? (before.robber !== g.robber ? `[data-effect-hex="${g.robber}"]` : bank),
+          spending: true,
+        });
+    }
   }
   // Other hands remain private: show a card back and public count, never infer theft identities.
   for (const p of g.players)

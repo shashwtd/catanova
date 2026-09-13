@@ -672,10 +672,6 @@
 }
 
 /* Ranked portraits sit over a short cloth strip that continues to the screen edge. */
-.playing .player-rail {
-  --rank-move-duration: 500ms;
-  --rank-move-ease: cubic-bezier(0.22, 1, 0.36, 1);
-}
 .playing .player-profile,
 .playing .player-profile.active {
   position: relative;
@@ -1052,4 +1048,187 @@
 }
 .game-side-panel .journal-lines p {
   font-size: 13px;
+}
+
+/* Keep portraits in turn order; the ribbon marks the score leader independently. */
+.playing .player-profile::before {
+  background: linear-gradient(100deg, #71472fdc, #593723e3 72%, #493022eb);
+  box-shadow:
+    inset 0 1px #edc29129,
+    inset 0 -1px #2d1c1240;
+}
+.playing .profile-name-row {
+  translate: 0 4px;
+}
+.profile-held-awards .card-hint {
+  display: inline-flex;
+}
+.award-standings {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  width: 100%;
+}
+.award-standings > small {
+  font-size: 12px;
+  color: #617059;
+}
+.award-standings [role='list'] {
+  display: grid;
+  gap: 5px;
+}
+.award-standings [role='listitem'] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 7px;
+}
+.award-standings [role='listitem'] > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.award-standings [role='listitem'] b {
+  font-variant-numeric: tabular-nums;
+}
+.award-standings [data-holder='true'] {
+  background: #cfaa5430;
+  box-shadow: inset 3px 0 #b58b3c;
+  font-weight: 700;
+}
+
+/* One 52px shelf baseline. Only the primary turn button rises above it. */
+.playing .hand-dock {
+  align-items: end;
+}
+.playing .hand-dock .card-table {
+  height: 52px;
+  padding-block: 6px;
+}
+.playing .hand-dock .hand-zone,
+.playing .hand-dock .resource-hand.resource-counters {
+  height: 40px;
+}
+.playing .hand-dock .resource-counter-art,
+.playing .hand-dock .resource-counter-art .sprite {
+  width: 28px;
+  height: 28px;
+}
+.playing .hand-dock .resource-counter-value {
+  font-size: 22px;
+}
+.playing .construction-tools.build-shelf {
+  padding: 0;
+  height: 52px;
+  box-sizing: border-box;
+}
+.playing .hand-dock .table-actions {
+  height: 70px;
+}
+.playing .hand-dock .table-actions .turn-action {
+  width: 76px;
+  height: 70px;
+}
+.playing .hand-dock .turn-action.roll-turn:not(:disabled) {
+  background: radial-gradient(ellipse at 50% 44%, #ffd986 0%, #c18a3a 57%, #745025 100%);
+  box-shadow:
+    inset 0 1px #fff0b9,
+    inset 0 -3px #52391799,
+    0 3px #372915,
+    0 0 13px #f8c86150;
+}
+.playing .hand-dock .turn-action.roll-turn .game-icon {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 4px #ffedb487);
+}
+/* All tools use the same hit area; icon layers occupy the exact same center. */
+.side-controls {
+  --game-tool-edge: 42px;
+}
+.side-controls .game-menu-trigger .t-icon-swap {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+}
+.side-controls .game-menu-trigger .t-icon {
+  display: grid;
+  place-items: center;
+}
+.side-controls .game-menu-trigger .game-icon {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+}
+.playing .game-tools-popover {
+  width: var(--game-tool-edge);
+  min-width: 0;
+}
+.playing .game-tools-popover button {
+  width: var(--game-tool-edge);
+  height: var(--game-tool-edge);
+  min-height: var(--game-tool-edge);
+  padding: 0;
+  box-sizing: border-box;
+}
+.playing .game-tools-popover button > .game-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Dark outer shapes remain visible on hay/desert; warm centers survive dark forest. */
+.road-site-guide {
+  stroke: #ffeab4;
+  stroke-width: 4;
+  stroke-dasharray: 6 5;
+}
+.road-site-guide.site-guide-back {
+  stroke: #193f47;
+  stroke-width: 8;
+  stroke-dasharray: none;
+}
+.vertex-site-guide {
+  fill: #214751;
+  stroke: #fff0bc;
+  stroke-width: 3;
+}
+.exact-trade-response .gold-button {
+  width: 100%;
+}
+.trade-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #eddbac;
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .side-controls {
+    --game-tool-edge: 44px;
+  }
+  .playing .profile-name-row {
+    translate: 0 2px;
+  }
+  .playing .hand-dock .table-actions .turn-action {
+    width: 64px;
+    height: 62px;
+  }
+  .playing .hand-dock .table-actions {
+    height: 62px;
+  }
+  .playing .hand-dock .resource-counter-art,
+  .playing .hand-dock .resource-counter-art .sprite {
+    width: 22px;
+    height: 24px;
+  }
+  .playing .hand-dock .resource-counter-value {
+    font-size: 19px;
+  }
+}
+@media (max-width: 380px) and (orientation: portrait) {
+  .playing .hand-dock .table-actions .turn-action {
+    width: 58px;
+  }
 }

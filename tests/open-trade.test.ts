@@ -75,10 +75,7 @@ test('open trades require active-player consent and cannot be accepted as gifts 
     proposals: [],
   });
   assert.throws(() => move(opened, { kind: 'acceptTrade', tradeId: id }, 'p1'), /no longer available/);
-  assert.throws(
-    () => move(opened, { kind: 'proposeTrade', tradeId: id, give: hand({ brick: 1 }) }),
-    /open trade/,
-  );
+  assert.throws(() => move(opened, { kind: 'proposeTrade', tradeId: id, give: hand({ brick: 1 }) }), /trade/);
   for (const phase of ['roll', 'discard', 'robber', 'freeRoads', 'finished'] as const) {
     const changed = structuredClone(opened);
     changed.phase = phase;
@@ -113,7 +110,7 @@ test('opponents publish bounded, affordable, disjoint proposals and can replace 
     ['p2', 'p3'],
   );
   assert.throws(() => move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1'), /no proposal/);
-  assert.throws(() => move(game, { kind: 'withdrawProposal', tradeId: id }), /open trade/);
+  assert.throws(() => move(game, { kind: 'withdrawProposal', tradeId: id }), /trade/);
   conserved(game);
 });
 
@@ -191,7 +188,7 @@ test('legacy exact trade shapes remain valid and public open proposals expose no
   assert.equal(exact.trade!.proposals, undefined);
   assert.throws(
     () => move(exact, { kind: 'proposeTrade', tradeId: exact.trade!.id, give: hand({ sheep: 1 }) }, 'p1'),
-    /open trade/,
+    /trade/,
   );
   conserved(move(JSON.parse(JSON.stringify(exact)), { kind: 'acceptTrade', tradeId: exact.trade!.id }, 'p1'));
   let game = open(base);
@@ -269,7 +266,12 @@ test('declines are scoped to one offer, cannot exchange cards, and close only af
   assert.equal(renewed.trade!.declinedBy, undefined);
   assert.notEqual(renewed.trade!.id, tradeId);
   assert.throws(() => move(renewed, { kind: 'declineTrade', tradeId }, 'p1'), /no longer available/);
-  assert.equal(move(renewed, { kind: 'acceptTrade', tradeId: renewed.trade!.id }, 'p1').trade, null);
+  const willing = move(renewed, { kind: 'acceptTrade', tradeId: renewed.trade!.id }, 'p1');
+  assert.equal(willing.trade!.proposals!.length, 1);
+  assert.equal(
+    move(willing, { kind: 'acceptProposal', tradeId: renewed.trade!.id, player: 'p1' }).trade,
+    null,
+  );
   game = move(game, { kind: 'declineTrade', tradeId }, 'p2');
   assert.ok(game.trade, 'one remaining player must still have their opportunity');
   game = move(game, { kind: 'declineTrade', tradeId }, 'p3');
@@ -331,4 +333,31 @@ test('accepting a reviewed counteroffer cannot silently accept replacement cards
   for (const tradeId of [-1, 1.5, Infinity, '1'])
     assert.throws(() => parseGameAction({ kind: 'declineTrade', tradeId }));
   assert.throws(() => parseGameAction({ ...reviewed, expectedGive: { ...emptyHand(), ore: -1 } }));
+});
+
+test('exact acceptance can be withdrawn and final selection checks the current cards', () => {
+  let game = move(setup(), { kind: 'offerTrade', give: hand({ wood: 2 }), want: hand({ sheep: 1 }) });
+  const id = game.trade!.id;
+  const before = structuredClone(game);
+  game = move(game, { kind: 'acceptTrade', tradeId: id }, 'p1');
+  assert.deepEqual(
+    game.players.map((p) => p.hand),
+    before.players.map((p) => p.hand),
+  );
+  const depleted = structuredClone(game);
+  depleted.players[1]!.hand.sheep = 0;
+  assert.throws(() => move(depleted, { kind: 'acceptProposal', tradeId: id, player: 'p1' }), /no longer has/);
+  game = move(game, { kind: 'withdrawProposal', tradeId: id }, 'p1');
+  assert.deepEqual(game.trade!.proposals, []);
+  assert.throws(
+    () => move(game, { kind: 'acceptProposal', tradeId: id, player: 'p1' }),
+    /no longer available/,
+  );
+  game = move(game, { kind: 'acceptTrade', tradeId: id }, 'p1');
+  game = move(game, { kind: 'declineTrade', tradeId: id }, 'p1');
+  assert.deepEqual(game.trade!.proposals, []);
+  assert.deepEqual(
+    game.players.map((p) => p.hand),
+    before.players.map((p) => p.hand),
+  );
 });

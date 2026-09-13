@@ -300,7 +300,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     return g;
   }
   if (a.kind === 'proposeTrade' || a.kind === 'withdrawProposal') {
-    requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && g.trade.open && g.trade.player === activePlayer(g).id, 'That open trade is no longer available');
+    requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && (a.kind === 'withdrawProposal' || g.trade.open) && g.trade.player === activePlayer(g).id, 'That trade is no longer available');
     const offer = g.trade;
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
     if (a.kind === 'proposeTrade') {
@@ -316,7 +316,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     return g;
   }
   if (a.kind === 'acceptProposal') {
-    requireRule(g.phase === 'actions' && isActive && g.trade?.id === a.tradeId && g.trade.open && g.trade.player === p.id, 'That proposal is no longer available');
+    requireRule(g.phase === 'actions' && isActive && g.trade?.id === a.tradeId && g.trade.player === p.id, 'That proposal is no longer available');
     const offer = g.trade, proposal = offer.proposals?.find(proposal => proposal.player === a.player);
     const responder = g.players.find(other => other.id === a.player && other.id !== p.id && !other.resigned);
     requireRule(proposal && responder && !offer.declinedBy?.includes(a.player), 'That proposal is no longer available');
@@ -330,8 +330,9 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     const maker = activePlayer(g), offer = g.trade;
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
     requireRule(canPay(maker.hand, offer.give) && canPay(p.hand, offer.want), 'A player no longer has the offered cards');
-    transfer(maker.hand, p.hand, offer.give); transfer(p.hand, maker.hand, offer.want);
-    log(g, `${maker.name} traded ${resourceText(offer.give)} to ${p.name} for ${resourceText(offer.want)}.`); g.trade = null; return g;
+    requireRule(!offer.proposals?.some(proposal => proposal.player === p.id), 'You already accepted this offer');
+    offer.proposals = [...(offer.proposals ?? []), { player: p.id, give: { ...offer.want } }];
+    log(g, `${p.name} is willing to trade with ${maker.name}.`); return g;
   }
   requireRule(isActive, 'Wait for your turn');
   const owned = pieces(g, p.id);

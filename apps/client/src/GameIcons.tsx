@@ -12,6 +12,7 @@ const CONTROL_PATHS = {
   link: 'm9 15 6-6 M10 7l2-2a5 5 0 0 1 7 7l-2 2 M14 17l-2 2a5 5 0 0 1-7-7l2-2',
   share: 'M12 16V3 m-4 4 4-4 4 4 M5 12H3v9h18v-9h-2',
   refresh: 'M20 9a8 8 0 0 0-14-4L3 8 M3 3v5h5 M4 15a8 8 0 0 0 14 4l3-3 M16 16h5v5',
+  menu: 'M5 6h14 M5 12h14 M5 18h14',
   history: 'M4 7a9 9 0 1 1-1 9 M3 3v5h5 M12 7v5l4 2',
   join: 'M14 3h7v18h-7 M3 12h12 m-5-5 5 5-5 5',
   logout: 'M12 2v10 M6 5a9 9 0 1 0 12 0',

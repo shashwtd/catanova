@@ -66,3 +66,7 @@ python scripts/prepare-audio.py /path/to/source-archives
 ```
 
 This command is never part of a normal build. It crops selected sounds, mixes to mono, applies an antialias filter when downsampling, normalizes peaks, and adds short edge fades. It writes hashed exports, the TypeScript catalog, provenance and license copies, removing only superseded outputs recorded in the previous manifest. Source archives and temporary decoded recordings are not shipped. Encoder changes may produce new hashes; review the generated files and listen before publishing.
+
+## Auditioning effects
+
+The local `/dev/lounge` preview now uses the same `SoundEngine` and committed-snapshot presentation path as play. Its previous placeholder callbacks produced no audio. Open **Preview → Events & sounds** to audition effects or trigger game events; Settings retains the normal mute/volume controls. Audio still unlocks on user interaction and respects muted settings. Button/hover layers are slightly more audible, with the effects master at `volume × 0.75`; the optional music mix is unchanged. No new audio downloads or dependencies were added for this adjustment.

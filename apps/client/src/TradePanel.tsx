@@ -291,41 +291,44 @@ export function TradePanel({ game, me, disabled, onAction }: Props) {
                   ))}
                 </div>
               )}
-              {trade.open && (
-                <div className="counteroffers">
-                  {trade.proposals?.length ? (
-                    trade.proposals.map((proposal) => {
-                      const name = game.players.find((p) => p.id === proposal.player)?.name;
-                      return (
-                        <div className="counteroffer trade-counteroffer" key={proposal.player}>
-                          <strong>{name}'s offer</strong>
-                          <TradeExchange give={trade.give} get={proposal.give} />
-                          <ConfirmTrade
-                            action={{
-                              kind: 'acceptProposal',
-                              tradeId: trade.id,
-                              player: proposal.player,
-                              expectedGive: proposal.give,
-                            }}
-                            give={trade.give}
-                            get={proposal.give}
-                            label="Accept offer"
-                            ariaLabel={`Accept ${name}'s offer`}
-                            disabled={
-                              locked ||
-                              !canPay(hand, trade.give) ||
-                              !!trade.declinedBy?.includes(proposal.player)
-                            }
-                            onAction={command.submit}
-                          />
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="quiet-note">Waiting for offers…</p>
-                  )}
-                </div>
-              )}
+              <div className="counteroffers" aria-label="Choose a trading partner">
+                {trade.proposals?.length ? (
+                  trade.proposals.map((proposal) => {
+                    const name = game.players.find((p) => p.id === proposal.player)?.name;
+                    return (
+                      <div className="counteroffer trade-counteroffer" key={proposal.player}>
+                        <strong>
+                          {name}
+                          {trade.open ? "'s offer" : ' is ready'}
+                        </strong>
+                        {trade.open && <TradeExchange give={trade.give} get={proposal.give} />}
+                        <ConfirmTrade
+                          action={{
+                            kind: 'acceptProposal',
+                            tradeId: trade.id,
+                            player: proposal.player,
+                            expectedGive: proposal.give,
+                          }}
+                          give={trade.give}
+                          get={proposal.give}
+                          label={`Trade with ${name}`}
+                          ariaLabel={`Trade with ${name}`}
+                          disabled={
+                            locked ||
+                            !canPay(hand, trade.give) ||
+                            !!trade.declinedBy?.includes(proposal.player)
+                          }
+                          onAction={command.submit}
+                        />
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="quiet-note">
+                    {trade.open ? 'Waiting for offers…' : 'Choose a player when they accept.'}
+                  </p>
+                )}
+              </div>
             </section>
           )}
         </div>
@@ -440,14 +443,31 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
           )}
         </>
       ) : (
-        <ConfirmTrade
-          action={{ kind: 'acceptTrade', tradeId: trade.id }}
-          give={trade.want}
-          get={trade.give}
-          disabled={locked || !canPay(hand, trade.want)}
-          onAction={command.submit}
-          label="Accept trade"
-        />
+        <div className="exact-trade-response">
+          {proposal ? (
+            <>
+              <p className="trade-waiting" role="status">
+                <Check size={18} /> Waiting for {name} to choose
+              </p>
+              <button
+                className="text-button"
+                disabled={locked}
+                onClick={() => void command.submit({ kind: 'withdrawProposal', tradeId: trade.id })}
+              >
+                Withdraw acceptance
+              </button>
+            </>
+          ) : (
+            <button
+              className="gold-button"
+              disabled={locked || !canPay(hand, trade.want)}
+              onClick={() => void command.submit({ kind: 'acceptTrade', tradeId: trade.id })}
+            >
+              <Check /> Yes, trade
+            </button>
+          )}
+          {!canPay(hand, trade.want) && <p className="quiet-note">Not enough resources</p>}
+        </div>
       )}
       <button
         className="trade-decline-button"
@@ -455,7 +475,7 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
         onClick={() => void command.submit({ kind: 'declineTrade', tradeId: trade.id })}
       >
         <X size={15} />
-        Decline
+        No thanks
       </button>
       {command.error && (
         <p role="alert" className="entry-error">

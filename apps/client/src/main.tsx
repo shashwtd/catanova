@@ -826,7 +826,7 @@ function App() {
       {g && (
         <GameTools
           panel={panel}
-          onPanel={(next) => setPanel(panel === next ? null : next)}
+          onPanel={setPanel}
           onClosePanel={() => setPanel(null)}
           connected={connected}
           fullscreen={isFullscreen}
@@ -837,7 +837,6 @@ function App() {
       )}
       {g && room && (
         <PlayerRail
-          reducedMotion={reducedMotion}
           clockOffset={metrics.clockOffsetMs}
           room={room}
           game={g}
@@ -1064,6 +1063,12 @@ function App() {
             <div className="table-actions">
               <div className="dice-dock" data-dice-dock />
               <div className="utility-actions">
+                <div className="development-hand-inline purchase-control">
+                  <DevelopmentPurchase
+                    disabled={disabled || !g.legal.canBuyCard}
+                    onBuy={() => void act({ kind: 'buyCard' })}
+                  />
+                </div>
                 <button
                   className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
                   aria-label="Trade"
@@ -1077,12 +1082,6 @@ function App() {
                   <ArrowLeftRight size={33} />
                   <span>Trade</span>
                 </button>
-                <div className="development-hand-inline purchase-control">
-                  <DevelopmentPurchase
-                    disabled={disabled || !g.legal.canBuyCard}
-                    onBuy={() => void act({ kind: 'buyCard' })}
-                  />
-                </div>
               </div>
               <button
                 className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}

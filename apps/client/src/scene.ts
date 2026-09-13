@@ -133,10 +133,8 @@ export function portPlacement(board: Board, edgeId: number) {
   const angle = (Math.atan2(ny, nx) * 180) / Math.PI;
   const tx = -ny,
     ty = nx;
-  // The badge's long axis follows the boat. Its narrow side faces the sea.
-  const parallelAngle = angle + 90;
-  const markerAngle = parallelAngle > 90 ? parallelAngle - 180 : parallelAngle; // Keep ratios upright.
-  const badgeDistance = 36;
+  // Keep ratios horizontal, with enough seaward clearance at every coast angle.
+  const badgeDistance = 18 + 24 * Math.abs(nx) + 11 * Math.abs(ny);
 
   return {
     x,
@@ -153,7 +151,6 @@ export function portPlacement(board: Board, edgeId: number) {
     })),
     boatX,
     boatY,
-    markerAngle,
     markerX: boatX + nx * badgeDistance,
     markerY: boatY + ny * badgeDistance,
   };

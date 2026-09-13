@@ -49,15 +49,19 @@ export function GameTools({
     timeout.current = setTimeout(() => setClosing(false), ms);
     trigger.current?.focus({ preventScroll: true });
   }
+  const togglePanel = (next: GameToolPanel) => {
+    if (panel === next) onClosePanel?.();
+    else onPanel(next);
+  };
   const entries = [
-    { key: 'rules', label: 'How to play', icon: <CircleHelp />, action: () => onPanel('rules') },
-    { key: 'info', label: 'Game rules', icon: <GameIcon name="info" />, action: () => onPanel('info') },
-    { key: 'settings', label: 'Settings', icon: <Settings2 />, action: () => onPanel('settings') },
+    { key: 'rules', label: 'How to play', icon: <CircleHelp />, action: () => togglePanel('rules') },
+    { key: 'info', label: 'Game rules', icon: <GameIcon name="info" />, action: () => togglePanel('info') },
+    { key: 'settings', label: 'Settings', icon: <Settings2 />, action: () => togglePanel('settings') },
     {
       key: 'network',
       label: 'Connection',
       icon: connected ? <Wifi /> : <WifiOff />,
-      action: () => onPanel('network'),
+      action: () => togglePanel('network'),
     },
     { key: 'leave', label: 'Leave game', icon: <DoorOpen />, action: onLeave },
   ];
@@ -69,7 +73,7 @@ export function GameTools({
           aria-label="Move history"
           title="Move history"
           aria-pressed={panel === 'journal'}
-          onClick={() => onPanel('journal')}
+          onClick={() => togglePanel('journal')}
         >
           <History />
           <span className="tool-label">Move history</span>

@@ -133,9 +133,9 @@ export function soundLayers(cue: SoundCue): SampleLayer[] {
   });
   switch (cue) {
     case 'ui':
-      return [layer('paperPlace', 0, 0.15, 1.2, 0.13)];
+      return [layer('paperPlace', 0, 0.22, 1.2, 0.13)];
     case 'hover':
-      return [layer('paperSlide', 0, 0.18, 1.2, 0.14)];
+      return [layer('paperSlide', 0, 0.24, 1.2, 0.14)];
     case 'dice':
       return [
         layer('diceRattle', 0.025, 0.38),
@@ -280,7 +280,7 @@ export class SoundEngine {
     }
     if (this.context && this.context.state !== 'closed' && this.master)
       this.master.gain.setTargetAtTime(
-        this.enabled() ? this.preferences().volume * 0.6 : 0,
+        this.enabled() ? this.preferences().volume * 0.75 : 0,
         this.context.currentTime,
         0.025,
       );

@@ -59,3 +59,35 @@
   padding: 0;
   accent-color: #b99c5d;
 }
+.preview-switcher > nav {
+  max-height: min(70dvh, 600px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.preview-switcher select {
+  min-width: 0;
+  flex: 1;
+  height: 34px;
+  padding: 4px 6px;
+  font: inherit;
+  color: #fff1d1;
+  background: #344d3d;
+  border: 1px solid #72876a;
+  border-radius: 5px;
+}
+.preview-event-menu {
+  width: 100%;
+}
+.preview-event-menu > summary {
+  cursor: pointer;
+  padding: 9px 0;
+}
+.preview-event-menu > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-block: 5px;
+}
+.preview-event-menu p {
+  font-size: 12px;
+}
