@@ -47,13 +47,13 @@ Each harbor has two procedural planked bridges anchored to its eligible coastal 
 
 ## Cards and visual feedback
 
-[DevelopmentCards.tsx](../apps/client/src/DevelopmentCards.tsx) places a compact illustrated hand inline beside the resource cards, with counts, availability symbols and a glossy surface. Its separate purchase slot uses a plus/development icon with Sheep, Hay and Rock price sprites. Selecting a held card opens its rules and Play controls; its tooltip retains the story and availability explanation. Duplicate cards share stacks. The atlas remains unchanged, including its navy compass-and-leaf back cell; generation prompts are recorded in fantasy provenance.
+[DevelopmentCards.tsx](../apps/client/src/DevelopmentCards.tsx) places a compact illustrated hand inline beside the resource counters, with counts, availability symbols and a glossy surface. Its separate purchase slot uses a plus/development icon with Sheep, Hay and Rock price sprites. Selecting a held card opens its rules and Play controls; its tooltip retains the story and availability explanation. Duplicate cards share stacks. The optimized atlas uses simpler, character-free illustrations; each face is clipped to its own cell. Generation prompts are recorded in the art provenance.
 
-Resource hand cards combine transparent art, distinct material colors and counts within one uniform border. Their mild vertical color gradient has no diagonal sheen, bright top/left trim or offset backing layer. They omit visible names/tooltips while retaining accessible names and quantities. Positive cards keep hover sound independently of reduced motion; empty cards stay still and silent. The square development purchase tile matches Trade; the shared Roll/End control is larger. Trade stays to its left, with space between hand groups. Dice, resource trails, profile +N receipts and scene transitions are finite; reduced motion quiets spatial effects. Settings contain volume and the optional turn timer.
+Resources are bright icon-and-number counters on a compact wooden shelf, with no hover behavior. Development cards sit beside them in illustrated stacks. The square development purchase tile matches Trade; the shared Roll/Next control is larger. Dice, resource trails, profile +N receipts and scene transitions are finite; reduced motion quiets spatial effects. Player settings include separate effects/music controls and a personal board theme. Hosts configure the turn timer, victory target and dice mode before launch.
 
 ## Fonts, icons, and licenses
 
-Interface icons are original SVG shapes in [GameIcons.tsx](../apps/client/src/GameIcons.tsx), with filled silhouettes, ink edges and a shared palette. Rules uses a book; connection uses Wi-Fi arcs with a slashed offline variant; fullscreen has distinct enter and exit shapes. Turn-grouped history reuses action and resource icons. Cinzel supplies titles; Barlow supplies controls and number tokens.
+Interface icons use a small compressed painted atlas through [GameIcons.tsx](../apps/client/src/GameIcons.tsx), with lightweight vectors for controls that need precise directional or player-colored feedback. Rules uses a book; connection uses Wi-Fi arcs with a slashed offline variant; fullscreen has distinct enter and exit shapes. Turn-grouped history reuses action and resource icons. Cinzel supplies titles; Barlow supplies controls and number tokens.
 
 Font notices ship with the browser distribution: [Cinzel](../apps/client/public/licenses/cinzel.txt) and [Barlow](../apps/client/public/licenses/barlow.txt). Both fonts retain their SIL Open Font License 1.1.
 
@@ -61,4 +61,4 @@ Google sign-in uses Google's official unmodified mark and locally served Google 
 
 Original repository contributions are distributed under MIT to the extent rights apply. This provenance record asserts no third-party trademark rights or exclusive ownership of generated imagery.
 
-Simpler terrain and water concepts are available only in the development lounge preview. See [concept art and prompts](art/terrain-concept.md); production atlases remain unchanged.
+The approved Storybook terrain and water are the default personal board theme. Classic remains available in Settings and the choice is saved on each device. See [concept art and prompts](art/terrain-concept.md). Preview event controls and sample game data stay outside the production browser build.
