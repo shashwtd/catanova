@@ -8,6 +8,7 @@ import {
   RoomInviteService,
   ROOM_INVITE_TTL_MS,
   ROOM_INVITE_ACCOUNT_LIMIT,
+  ROOM_INVITE_READ_LIMIT,
 } from '../apps/server/src/room-invites.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { Account, PublicAccount } from '../packages/protocol/src/profile.js';
@@ -281,4 +282,36 @@ test('room membership is checked again after the asynchronous friendship authori
     /no longer available/,
   );
   assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM room_invites').get()!.n, 0);
+});
+
+test('three polling devices plus refreshes stay within a bounded account read budget', async (t) => {
+  const f = fixture();
+  t.after(() => f.store.close());
+  const account = f.add(1),
+    other = f.add(2);
+  let reads = 0;
+  for (let tick = 0; tick < 12; tick++) {
+    for (let device = 0; device < 3; device++) {
+      await f.service.list(account.id);
+      reads++;
+    }
+    if (tick === 6)
+      for (let refresh = 0; refresh < 6; refresh++) {
+        await f.service.list(account.id);
+        reads++;
+      }
+    if (tick < 11) f.advance(5_000);
+  }
+  assert.equal(reads, 42);
+  for (; reads < ROOM_INVITE_READ_LIMIT; reads++) await f.service.list(account.id);
+  await assert.rejects(f.service.list(account.id), { code: 'ACCOUNT_RATE_LIMIT' });
+  await f.service.list(other.id);
+  // Reads cannot consume the separate send/dismiss budget, and writes retain their cap.
+  for (let i = 0; i < 30; i++)
+    await f.service.dismiss(account.id, { id: '00000000-0000-4000-8000-999999999999' });
+  await assert.rejects(f.service.dismiss(account.id, { id: '00000000-0000-4000-8000-999999999999' }), {
+    code: 'ACCOUNT_RATE_LIMIT',
+  });
+  f.advance(5_001);
+  await f.service.list(account.id);
 });

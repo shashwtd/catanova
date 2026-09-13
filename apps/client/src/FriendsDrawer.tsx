@@ -4,7 +4,7 @@ import { Users, X } from './GameIcons.js';
 import { FriendsPanel } from './FriendsPanel.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import type { RoomInvitesController } from './useRoomInvites.js';
-import { RoomInvitePanel, RoomInviteInbox } from './RoomInvitePanel.js';
+import { RoomInvitePanel, RoomInviteInbox, visibleRoomInvitations } from './RoomInvitePanel.js';
 
 /** Native modality keeps focus and touch interactions inside the drawer. */
 export function FriendsDrawer({
@@ -14,6 +14,7 @@ export function FriendsDrawer({
   invites,
   onOpenRoom,
   roomEntryBlocked,
+  excludedRoomIds = [],
 }: {
   auth: ReturnType<typeof useAuth>;
   onClose: () => void;
@@ -21,6 +22,7 @@ export function FriendsDrawer({
   invites?: RoomInvitesController;
   onOpenRoom?: (roomId: string) => void;
   roomEntryBlocked?: string;
+  excludedRoomIds?: readonly (string | null | undefined)[];
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
     surface = useRef<HTMLDivElement>(null),
@@ -97,7 +99,7 @@ export function FriendsDrawer({
         </header>
         {invites && onOpenRoom && (
           <RoomInviteInbox
-            invitations={invites.incoming.filter((invite) => invite.roomId !== room?.roomId)}
+            invitations={visibleRoomInvitations(invites.incoming, [room?.roomId, ...excludedRoomIds])}
             busy={!!invites.busy}
             onOpen={onOpenRoom}
             onDismiss={(id) => void invites.dismiss(id)}

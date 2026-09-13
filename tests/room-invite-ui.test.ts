@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FriendsDrawer } from '../apps/client/src/FriendsDrawer.js';
-import { RoomInviteInbox } from '../apps/client/src/RoomInvitePanel.js';
+import { RoomInviteInbox, visibleRoomInvitations } from '../apps/client/src/RoomInvitePanel.js';
 import type { useAuth } from '../apps/client/src/auth.js';
 import type { RoomInvitesController } from '../apps/client/src/useRoomInvites.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
@@ -233,4 +233,44 @@ test('room invitation drawer also shows incoming invitations and explains room s
     }),
   );
   assert.ok(!current.includes('Room invitations'), 'do not offer an invitation to the room already occupied');
+});
+
+test('canonical current and preview IDs exclude invitations from notices and the in-game Friends drawer', () => {
+  const invites = controller();
+  invites.incoming = [id, 'preview-uuid', 'other-uuid'].map((roomId, index) => ({
+    id: `invite-${index}`,
+    roomId,
+    roomCode: ['AB2C', 'MOSS', 'FERN'][index]!,
+    from: account(`Sender${index}`),
+    players: 2,
+    createdAt: 1,
+    expiresAt: 300_001,
+  }));
+  const excluded = [id, 'preview-uuid', 'MOSS'];
+  const visible = visibleRoomInvitations(invites.incoming, excluded);
+  assert.deepEqual(
+    visible.map((invite) => invite.roomId),
+    ['other-uuid'],
+  );
+  assert.equal(invites.incoming.length, 3, 'display filtering must not dismiss invitations server-side');
+  assert.equal(visibleRoomInvitations(invites.incoming, [undefined, null]).length, 3);
+  const markup = renderToStaticMarkup(
+    createElement(FriendsDrawer, {
+      auth: auth(),
+      invites,
+      excludedRoomIds: excluded,
+      onClose: () => {},
+      onOpenRoom: () => {},
+      roomEntryBlocked: 'Leave your current room to join another.',
+      // In-game Friends intentionally receives no lobby room object.
+    }),
+  );
+  assert.match(markup, /<h2[^>]*>Friends<\/h2>/);
+  assert.doesNotMatch(markup, /Sender0|Sender1|AB2C|MOSS/);
+  assert.match(markup, /Sender2|FERN/);
+  assert.ok(
+    buttons(markup)
+      .find((button) => button.includes('View room'))
+      ?.includes('disabled=""'),
+  );
 });
