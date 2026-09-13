@@ -7,12 +7,10 @@ export function ResourceHand({
   hand,
   pulse,
   reducedMotion,
-  onHover,
 }: {
   hand: Hand;
   pulse: Partial<Record<Resource, string>>;
   reducedMotion: boolean;
-  onHover: () => void;
 }) {
   return (
     <div className="resource-hand resource-counters" role="group" aria-label="Your resources">
@@ -24,9 +22,6 @@ export function ResourceHand({
             data-empty={hand[resource] === 0}
             role="img"
             aria-label={`${hand[resource]} ${RESOURCE_NAMES[resource]}`}
-            onPointerEnter={(e) => {
-              if (e.pointerType === 'mouse' && hand[resource] > 0) onHover();
-            }}
           >
             <span className="resource-counter-art" aria-hidden="true">
               <ResourceIcon resource={resource} />

@@ -4,17 +4,9 @@ Generated with the built-in image generation tool on September 13, 2026. The pre
 
 The new icons use broad silhouettes and very few color planes. Each atlas cell was cropped inside the grid, transparent padding trimmed, resized to 96×96, and encoded as WebP at quality 80 / effort 6 with alpha preserved. Generated originals remain outside the repository. No bitmap was wrapped in SVG to disguise its size.
 
-## Assets
+## Shipping assets
 
-- `apps/client/public/art/optimized/simple-road.57796f6c7d77.webp` — 2,794 bytes.
-- `apps/client/public/art/optimized/simple-house.f39f2d94e881.webp` — 3,546 bytes.
-- `apps/client/public/art/optimized/simple-city.4b3917a61969.webp` — 4,218 bytes.
-- `apps/client/public/art/optimized/simple-victory.994c816b98f8.webp` — 4,834 bytes.
-- `apps/client/public/art/optimized/simple-buy-development.73b2758ddd18.webp` — 4,140 bytes.
-- `apps/client/public/art/optimized/simple-road-award.a16c85e5b0e5.webp` — 4,332 bytes.
-- `apps/client/public/art/optimized/simple-army-award.8e351c70c123.webp` — 4,780 bytes.
-
-The two award icons replace the previous icons. The five road/house/city/trophy/purchase experiments are enabled only inside the development preview via **Preview → Simple icon study**. Toggle it off to compare existing icons. Gameplay pieces on the island are unchanged. The production application does not enable this icon study.
+The individual images have been consolidated into `apps/client/public/art/optimized/painted-icons.ca739109762c.webp` with the rest of the UI vocabulary. See [Painted UI icons](painted-ui-icons.md). The experimental icon toggle is retired: the approved style is used throughout the application. Board pieces and official brand logos remain separate.
 
 ## Generation prompt
 

@@ -1,11 +1,4 @@
-import { IconStudy } from '../IconStudy.js';
-const illustratedIcons = {
-  road: '/art/optimized/simple-road.57796f6c7d77.webp',
-  settlement: '/art/optimized/simple-house.f39f2d94e881.webp',
-  city: '/art/optimized/simple-city.4b3917a61969.webp',
-  trophy: '/art/optimized/simple-victory.994c816b98f8.webp',
-  'buy-development': '/art/optimized/simple-buy-development.73b2758ddd18.webp',
-};
+import { UtilityPanel } from '../UtilityPanel.js';
 import { GameTools, type GameToolPanel } from '../GameTools.js';
 import { QuickRules } from '../QuickRules.js';
 import { MoveHistory } from '../MoveHistory.js';
@@ -98,7 +91,16 @@ const record: PlayerGameState = {
   refresh: noop,
   loadMore: noop,
 };
-function PreviewDialog({
+function PreviewDialog(props: { title: string; children: ReactNode; onClose: () => void; side?: boolean }) {
+  return props.side ? (
+    <UtilityPanel title={props.title} onClose={props.onClose}>
+      {props.children}
+    </UtilityPanel>
+  ) : (
+    <PreviewModal {...props} />
+  );
+}
+function PreviewModal({
   title,
   children,
   onClose,
@@ -129,7 +131,6 @@ export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
   const [panel, setPanel] = useState<'profile' | 'editProfile' | 'friends' | GameToolPanel | null>(null);
   const [showAwards, setShowAwards] = useState(false);
-  const [iconStudy, setIconStudy] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     const update = () => setIsFullscreen(!!document.fullscreenElement);
@@ -223,252 +224,251 @@ export function LoungePreview() {
     ],
   };
   return (
-    <IconStudy.Provider value={iconStudy ? illustratedIcons : {}}>
-      <main
-        className={`game-world ${screen === 'hub' ? 'player-home' : screen === 'lobby' ? 'lobby' : 'playing'} design-preview`}
-      >
-        {screen === 'hub' && (
-          <PlayerHub
-            auth={auth}
-            games={record}
-            busy={false}
-            notifications={notice}
-            invitationCount={invites.incoming.length}
-            onCreate={() => setScreen('lobby')}
-            onJoin={async () => setScreen('lobby')}
-            onResume={() => setScreen('game')}
-            onProfile={() => setPanel('profile')}
-            onEditProfile={() => setPanel('editProfile')}
-            onFriends={() => setPanel('friends')}
-            onSettings={() => setPanel('settings')}
-            onSignOut={() => {
-              location.href = '/';
-            }}
-          />
-        )}
-        {screen === 'lobby' && (
-          <Lobby
-            room={currentRoom}
-            me={me}
-            busy={false}
+    <main
+      className={`game-world ${screen === 'hub' ? 'player-home' : screen === 'lobby' ? 'lobby' : 'playing'} design-preview`}
+    >
+      {screen === 'hub' && (
+        <PlayerHub
+          auth={auth}
+          games={record}
+          busy={false}
+          notifications={notice}
+          invitationCount={invites.incoming.length}
+          onCreate={() => setScreen('lobby')}
+          onJoin={async () => setScreen('lobby')}
+          onResume={() => setScreen('game')}
+          onProfile={() => setPanel('profile')}
+          onEditProfile={() => setPanel('editProfile')}
+          onFriends={() => setPanel('friends')}
+          onSettings={() => setPanel('settings')}
+          onSignOut={() => {
+            location.href = '/';
+          }}
+        />
+      )}
+      {screen === 'lobby' && (
+        <Lobby
+          room={currentRoom}
+          me={me}
+          busy={false}
+          connected
+          onReady={noop}
+          onKick={async (id) => setRemovedPlayers((current) => [...current, id])}
+          onStart={() => setScreen('game')}
+          onInvite={() => setPanel('friends')}
+          onFriends={() => setPanel('friends')}
+          onLeave={() => setScreen('hub')}
+          onEdit={() => setPanel('editProfile')}
+          onSettings={() => setPanel('settings')}
+        />
+      )}
+      {screen === 'game' && (
+        <>
+          <div className="board-anchor">
+            <BoardViewport seed={game.board.seed}>
+              <Board
+                board={game.board}
+                art={BOARD_THEMES[preferences.boardTheme]}
+                game={game}
+                me={me}
+                disabled
+                mode={null}
+                onAction={noop}
+                onRobber={noop}
+              />
+            </BoardViewport>
+          </div>
+          <PlayerRail room={currentRoom} game={displayedGame} me={me} />
+          <GameTools
+            onClosePanel={() => setPanel(null)}
+            panel={panel}
+            onPanel={setPanel}
             connected
-            onReady={noop}
-            onKick={async (id) => setRemovedPlayers((current) => [...current, id])}
-            onStart={() => setScreen('game')}
-            onInvite={() => setPanel('friends')}
-            onFriends={() => setPanel('friends')}
-            onLeave={() => setScreen('hub')}
-            onEdit={() => setPanel('editProfile')}
-            onSettings={() => setPanel('settings')}
-          />
-        )}
-        {screen === 'game' && (
-          <>
-            <div className="board-anchor">
-              <BoardViewport seed={game.board.seed}>
-                <Board
-                  board={game.board}
-                  art={BOARD_THEMES[preferences.boardTheme]}
-                  game={game}
-                  me={me}
-                  disabled
-                  mode={null}
-                  onAction={noop}
-                  onRobber={noop}
-                />
-              </BoardViewport>
-            </div>
-            <PlayerRail room={currentRoom} game={displayedGame} me={me} />
-            <GameTools
-              panel={panel}
-              onPanel={setPanel}
-              connected
-              fullscreen={isFullscreen}
-              onFullscreen={() => {
-                void (
-                  document.fullscreenElement
-                    ? document.exitFullscreen()
-                    : document.documentElement.requestFullscreen()
-                ).catch(() => {});
-              }}
-              onLeave={() => setPanel('leave')}
-            />
-            <div className="construction-tools build-shelf">
-              {[Route, House, Castle].map((Icon, i) => (
-                <button key={i} className="build-control">
-                  <Icon />
-                  <span className="build-control-label">{['Road', 'House', 'City'][i]}</span>
-                </button>
-              ))}
-            </div>
-            <div className="card-table">
-              <div className="hand-zone">
-                <ResourceHand hand={game.players[0]!.hand!} pulse={{}} reducedMotion onHover={noop} />
-                <DevelopmentCards game={game} me={me} disabled reducedMotion onAction={noop} onHover={noop} />
-              </div>
-              <div className="table-actions">
-                <div className="utility-actions">
-                  <button className="trade-action" aria-label="Trade">
-                    <ArrowLeftRight />
-                  </button>
-                  <div className="development-hand-inline purchase-control">
-                    <DevelopmentPurchase disabled onBuy={noop} />
-                  </div>
-                </div>
-                <button className="turn-action roll-turn">
-                  <Dices />
-                  <span>Roll</span>
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-        {panel === 'friends' && (
-          <FriendsDrawer
-            auth={auth}
-            room={screen === 'lobby' ? currentRoom : undefined}
-            invites={invites}
-            onOpenRoom={() => {
-              setPanel(null);
-              setScreen('lobby');
-              setShowInvite(false);
+            fullscreen={isFullscreen}
+            onFullscreen={() => {
+              void (
+                document.fullscreenElement
+                  ? document.exitFullscreen()
+                  : document.documentElement.requestFullscreen()
+              ).catch(() => {});
             }}
-            onClose={() => setPanel(null)}
+            onLeave={() => setPanel('leave')}
           />
-        )}
-        {(panel === 'profile' || panel === 'editProfile') && (
-          <PreviewDialog title="Your profile" onClose={() => setPanel(null)}>
-            <PlayerProfile
-              key={panel}
-              initialEditing={panel === 'editProfile'}
-              auth={auth}
-              profile={profile}
-              games={record}
-              busy={false}
-              onSave={async (p) => {
-                setProfile(p);
-                setPanel(null);
-              }}
-              onResume={noop}
-            />
-          </PreviewDialog>
-        )}
-        {panel === 'settings' && (
-          <PreviewDialog title="Settings" onClose={() => setPanel(null)}>
-            <GameSettings
-              preferences={preferences}
-              update={update}
-              room={screen === 'lobby' ? currentRoom : null}
-              me={me}
-              busy={false}
-              save={async (next) => setSettings(next)}
-              previewSound={noop}
-            />
-          </PreviewDialog>
-        )}
-        {panel === 'rules' && (
-          <PreviewDialog title="How to play" onClose={() => setPanel(null)}>
-            <QuickRules victoryPoints={settings?.victoryPoints} />
-          </PreviewDialog>
-        )}
-        {panel === 'info' && (
-          <PreviewDialog title="Game rules" onClose={() => setPanel(null)}>
-            <GameInfo room={{ ...currentRoom, game: displayedGame }} />
-          </PreviewDialog>
-        )}
-        {panel === 'journal' && (
-          <PreviewDialog title="Move history" onClose={() => setPanel(null)}>
-            <MoveHistory
-              game={game}
-              hasMore={false}
-              onEarlier={noop}
-              entries={game.log.map((entry, index) => ({
-                revision: index,
-                actor: null,
-                kind: 'action',
-                turn: Math.floor(index / 2),
-                at: new Date(0).toISOString(),
-                lines: [entry.text],
-              }))}
-            />
-          </PreviewDialog>
-        )}
-        {panel === 'network' && (
-          <PreviewDialog title="Connection · sample data" onClose={() => setPanel(null)}>
-            <ConnectionPanel
-              metrics={{
-                ...initialMetrics(),
-                samples: [35, 42, 31, 38, 34].map((rtt, i) => ({ at: i, rtt })),
-              }}
-              status="connected"
-              revision={0}
-              pending={false}
-              onSync={noop}
-            />
-          </PreviewDialog>
-        )}
-        {panel === 'leave' && (
-          <PreviewDialog title="Leave this game?" onClose={() => setPanel(null)}>
-            <p>This is a local preview.</p>
-            <div className="room-sheet-actions">
-              <button className="hub-room-button" onClick={() => setPanel(null)}>
-                Stay
-              </button>
-              <button
-                className="hub-room-button"
-                onClick={() => {
-                  setPanel(null);
-                  setScreen('hub');
-                }}
-              >
-                Leave
-              </button>
-            </div>
-          </PreviewDialog>
-        )}
-        <details className="preview-switcher">
-          <summary>Preview</summary>
-          <nav aria-label="Local design preview">
-            <span>Sample data</span>
-            {(['hub', 'lobby', 'game'] as const).map((value) => (
-              <button
-                key={value}
-                aria-pressed={screen === value}
-                onClick={() => {
-                  setScreen(value);
-                  setPanel(null);
-                }}
-              >
-                {value}
+          <div className="construction-tools build-shelf">
+            {[Route, House, Castle].map((Icon, i) => (
+              <button key={i} className="build-control">
+                <Icon />
+                <span className="build-control-label">{['Road', 'House', 'City'][i]}</span>
               </button>
             ))}
+          </div>
+          <div className="card-table">
+            <div className="hand-zone">
+              <ResourceHand hand={game.players[0]!.hand!} pulse={{}} reducedMotion />
+              <DevelopmentCards game={game} me={me} disabled reducedMotion onAction={noop} onHover={noop} />
+            </div>
+            <div className="table-actions">
+              <div className="utility-actions">
+                <button className="trade-action" aria-label="Trade">
+                  <ArrowLeftRight />
+                </button>
+                <div className="development-hand-inline purchase-control">
+                  <DevelopmentPurchase disabled onBuy={noop} />
+                </div>
+              </div>
+              <button className="turn-action roll-turn">
+                <Dices />
+                <span>Roll</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+      {panel === 'friends' && (
+        <FriendsDrawer
+          auth={auth}
+          room={screen === 'lobby' ? currentRoom : undefined}
+          invites={invites}
+          onOpenRoom={() => {
+            setPanel(null);
+            setScreen('lobby');
+            setShowInvite(false);
+          }}
+          onClose={() => setPanel(null)}
+        />
+      )}
+      {(panel === 'profile' || panel === 'editProfile') && (
+        <PreviewDialog title="Your profile" onClose={() => setPanel(null)}>
+          <PlayerProfile
+            key={panel}
+            initialEditing={panel === 'editProfile'}
+            auth={auth}
+            profile={profile}
+            games={record}
+            busy={false}
+            onSave={async (p) => {
+              setProfile(p);
+              setPanel(null);
+            }}
+            onResume={noop}
+          />
+        </PreviewDialog>
+      )}
+      {panel === 'settings' && (
+        <PreviewDialog side={screen === 'game'} title="Settings" onClose={() => setPanel(null)}>
+          <GameSettings
+            preferences={preferences}
+            update={update}
+            room={screen === 'lobby' ? currentRoom : null}
+            me={me}
+            busy={false}
+            save={async (next) => setSettings(next)}
+            previewSound={noop}
+          />
+        </PreviewDialog>
+      )}
+      {panel === 'rules' && (
+        <PreviewDialog side={screen === 'game'} title="How to play" onClose={() => setPanel(null)}>
+          <QuickRules victoryPoints={settings?.victoryPoints} />
+        </PreviewDialog>
+      )}
+      {panel === 'info' && (
+        <PreviewDialog side={screen === 'game'} title="Game rules" onClose={() => setPanel(null)}>
+          <GameInfo room={{ ...currentRoom, game: displayedGame }} />
+        </PreviewDialog>
+      )}
+      {panel === 'journal' && (
+        <PreviewDialog side={screen === 'game'} title="Move history" onClose={() => setPanel(null)}>
+          <MoveHistory
+            game={game}
+            hasMore={false}
+            onEarlier={noop}
+            entries={game.log.map((entry, index) => ({
+              revision: index,
+              actor: null,
+              kind: 'action',
+              turn: Math.floor(index / 2),
+              at: new Date(0).toISOString(),
+              lines: [entry.text],
+            }))}
+          />
+        </PreviewDialog>
+      )}
+      {panel === 'network' && (
+        <PreviewDialog
+          side={screen === 'game'}
+          title="Connection · sample data"
+          onClose={() => setPanel(null)}
+        >
+          <ConnectionPanel
+            metrics={{
+              ...initialMetrics(),
+              samples: [35, 42, 31, 38, 34].map((rtt, i) => ({ at: i, rtt })),
+            }}
+            status="connected"
+            revision={0}
+            pending={false}
+            onSync={noop}
+          />
+        </PreviewDialog>
+      )}
+      {panel === 'leave' && (
+        <PreviewDialog title="Leave this game?" onClose={() => setPanel(null)}>
+          <p>This is a local preview.</p>
+          <div className="room-sheet-actions">
+            <button className="hub-room-button" onClick={() => setPanel(null)}>
+              Stay
+            </button>
             <button
+              className="hub-room-button"
               onClick={() => {
+                setPanel(null);
                 setScreen('hub');
-                setShowInvite(true);
               }}
             >
-              Test invite
+              Leave
             </button>
-            <label>
-              <input type="checkbox" checked={iconStudy} onChange={(e) => setIconStudy(e.target.checked)} />{' '}
-              Simple icon study
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={showAwards}
-                onChange={(e) => {
-                  setShowAwards(e.target.checked);
-                  setScreen('game');
-                  setPanel(null);
-                }}
-              />{' '}
-              Show sample awards
-            </label>
-          </nav>
-        </details>
-      </main>
-    </IconStudy.Provider>
+          </div>
+        </PreviewDialog>
+      )}
+      <details className="preview-switcher">
+        <summary>Preview</summary>
+        <nav aria-label="Local design preview">
+          <span>Sample data</span>
+          {(['hub', 'lobby', 'game'] as const).map((value) => (
+            <button
+              key={value}
+              aria-pressed={screen === value}
+              onClick={() => {
+                setScreen(value);
+                setPanel(null);
+              }}
+            >
+              {value}
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              setScreen('hub');
+              setShowInvite(true);
+            }}
+          >
+            Test invite
+          </button>
+          <label>
+            <input
+              type="checkbox"
+              checked={showAwards}
+              onChange={(e) => {
+                setShowAwards(e.target.checked);
+                setScreen('game');
+                setPanel(null);
+              }}
+            />{' '}
+            Show sample awards
+          </label>
+        </nav>
+      </details>
+    </main>
   );
 }

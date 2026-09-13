@@ -103,9 +103,7 @@ test('Road Building and Year of Plenty explain unavailable inventory instead of 
 
 test('compact resource counters keep accessible names and flight anchors without card shapes or hover popups', () => {
   const hand = { ...emptyHand(), wood: 2, wheat: 1 };
-  const html = renderToStaticMarkup(
-    createElement(ResourceHand, { hand, pulse: {}, reducedMotion: false, onHover: () => {} }),
-  );
+  const html = renderToStaticMarkup(createElement(ResourceHand, { hand, pulse: {}, reducedMotion: false }));
   assert.equal([...html.matchAll(/data-resource-card=/g)].length, 5);
   assert.equal([...html.matchAll(/data-empty="true"/g)].length, 3);
   assert.equal([...html.matchAll(/class="resource-counter"/g)].length, 5);
@@ -155,31 +153,20 @@ test('development spread displays local card art, playable/held status and reada
   }
 });
 
-test('resource hover audio works with reduced motion and stays silent for empty cards and touch', () => {
-  let sounds = 0;
+test('resource counters have no hover interaction, including when resources are available', () => {
   const hand = { ...emptyHand(), wood: 2 };
   for (const reducedMotion of [false, true]) {
-    const cards = ResourceHand({ hand, pulse: {}, reducedMotion, onHover: () => sounds++ }).props
-      .children as Array<
-      ReactElement<{ children: ReactElement<{ onPointerEnter: (event: { pointerType: string }) => void }> }>
+    const cards = ResourceHand({ hand, pulse: {}, reducedMotion }).props.children as Array<
+      ReactElement<{ children: ReactElement<{ onPointerEnter?: unknown }> }>
     >;
-    const wood = cards[0]!.props.children.props.onPointerEnter;
-    const clay = cards[1]!.props.children.props.onPointerEnter;
-    const before = sounds;
-    wood({ pointerType: 'mouse' });
-    assert.equal(sounds, before + 1, 'positive resource cards keep audio independent of motion');
-    clay({ pointerType: 'mouse' });
-    wood({ pointerType: 'touch' });
-    assert.equal(sounds, before + 1, 'empty cards and touch do not play a hover cue');
+    assert.ok(cards.every((card) => card.props.children.props.onPointerEnter === undefined));
   }
 });
 
 test('resource arrival updates pulse their number while reduced motion keeps the count static', () => {
   const hand = { ...emptyHand(), wood: 12 };
   const render = (reducedMotion: boolean) =>
-    renderToStaticMarkup(
-      createElement(ResourceHand, { hand, pulse: { wood: 'arrival-1' }, reducedMotion, onHover: () => {} }),
-    );
+    renderToStaticMarkup(createElement(ResourceHand, { hand, pulse: { wood: 'arrival-1' }, reducedMotion }));
   assert.equal([...render(false).matchAll(/\bis-animating\b/g)].length, 1);
   assert.equal([...render(true).matchAll(/\bis-animating\b/g)].length, 0);
   assert.match(render(true), /aria-label="12 Timber"/);

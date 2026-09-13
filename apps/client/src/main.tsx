@@ -1,3 +1,4 @@
+import { UtilityPanel } from './UtilityPanel.js';
 import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
@@ -106,6 +107,7 @@ import './resource-counters.css';
 import './lounge.css';
 import './room-refinement.css';
 import './play-refinement.css';
+import './tool-motion.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -155,7 +157,22 @@ function IconButton({
     </button>
   );
 }
-function Dialog({
+function Dialog(props: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  compact?: boolean;
+  side?: boolean;
+}) {
+  return props.side ? (
+    <UtilityPanel title={props.title} onClose={props.onClose}>
+      {props.children}
+    </UtilityPanel>
+  ) : (
+    <ModalDialog {...props} />
+  );
+}
+function ModalDialog({
   title,
   children,
   onClose,
@@ -809,6 +826,7 @@ function App() {
         <GameTools
           panel={panel}
           onPanel={(next) => setPanel(panel === next ? null : next)}
+          onClosePanel={() => setPanel(null)}
           connected={connected}
           fullscreen={isFullscreen}
           onFullscreen={() => void fullscreen()}
@@ -1022,7 +1040,6 @@ function App() {
                 hand={feedback.hand ?? hand}
                 pulse={feedback.pulse}
                 reducedMotion={reducedMotion}
-                onHover={() => feedback.sound.play('hover')}
               />
               {me && !!player?.cards?.length && (
                 <DevelopmentCards
@@ -1076,29 +1093,26 @@ function App() {
             </div>
           </div>
           {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />}
-          {(panel === 'trade' || panel === 'journal') && (
-            <aside
-              className={`game-panel floating-panel ${panel === 'trade' ? 'trade-panel' : 'journal-panel'}`}
-              aria-label={panel === 'trade' ? 'Trade' : 'Move history'}
-            >
+          {panel === 'trade' && me && (
+            <aside className="game-panel floating-panel trade-panel" aria-label="Trade">
               <div className="panel-heading">
-                <h2>{panel === 'trade' ? 'Trade' : 'Move history'}</h2>
+                <h2>Trade</h2>
                 <IconButton label="Close panel" onClick={() => setPanel(null)}>
                   <X />
                 </IconButton>
               </div>
-              {panel === 'trade' && me && (
-                <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />
-              )}
-              {panel === 'journal' && (
-                <MoveHistory
-                  entries={historyEntries}
-                  game={g}
-                  hasMore={historyHasMore}
-                  onEarlier={() => connection.current?.history(historyEntries.at(-1)?.revision)}
-                />
-              )}
+              <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />
             </aside>
+          )}
+          {panel === 'journal' && (
+            <UtilityPanel title="Move history" onClose={() => setPanel(null)}>
+              <MoveHistory
+                entries={historyEntries}
+                game={g}
+                hasMore={historyHasMore}
+                onEarlier={() => connection.current?.history(historyEntries.at(-1)?.revision)}
+              />
+            </UtilityPanel>
           )}
           {placementReady && placement && (
             <aside className="build-confirmation" aria-label="Confirm placement">
@@ -1188,12 +1202,12 @@ function App() {
         />
       )}
       {panel === 'info' && room && (
-        <Dialog title="Game info" onClose={() => setPanel(null)}>
+        <Dialog side={!!g} title="Game info" onClose={() => setPanel(null)}>
           <GameInfo room={room} />
         </Dialog>
       )}
       {panel === 'settings' && (
-        <Dialog title="Settings" onClose={() => setPanel(null)}>
+        <Dialog side={!!g} title="Settings" onClose={() => setPanel(null)}>
           <GameSettings
             preferences={preferences}
             update={update}
@@ -1206,13 +1220,7 @@ function App() {
         </Dialog>
       )}
       {panel === 'network' && room && (
-        <aside className="game-panel utility-panel floating-panel">
-          <div className="panel-heading">
-            <h2>Connection</h2>
-            <IconButton label="Close connection panel" onClick={() => setPanel(null)}>
-              <X />
-            </IconButton>
-          </div>
+        <UtilityPanel title="Connection" onClose={() => setPanel(null)}>
           <ConnectionPanel
             metrics={metrics}
             status={status}
@@ -1220,7 +1228,7 @@ function App() {
             pending={busy}
             onSync={() => connection.current?.sync()}
           />
-        </aside>
+        </UtilityPanel>
       )}
       {panel === 'invite' && room && (
         <Dialog title="Room invitation" compact onClose={() => setPanel(null)}>
@@ -1278,7 +1286,7 @@ function App() {
         </Dialog>
       )}
       {panel === 'rules' && (
-        <Dialog title="Rules" onClose={() => setPanel(null)}>
+        <Dialog side={!!g} title="Rules" onClose={() => setPanel(null)}>
           <QuickRules victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints} />
         </Dialog>
       )}

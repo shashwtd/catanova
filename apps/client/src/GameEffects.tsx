@@ -37,7 +37,7 @@ export function profileGainPosition(
   viewport: { width: number; height: number },
 ) {
   if (viewport.width <= 700 && viewport.width <= viewport.height) {
-    const portrait = viewport.width <= 380 ? 48 : 56;
+    const portrait = viewport.width <= 380 ? 50 : 58;
     const maxWidth = Math.max(78, Math.min(108, box.width - portrait - 8));
     return {
       left: Math.min(viewport.width - maxWidth / 2 - 8, box.left + box.width - maxWidth / 2),

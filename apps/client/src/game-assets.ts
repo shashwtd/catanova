@@ -1,9 +1,11 @@
+import { ICON_ATLAS } from './painted-icons.js';
 import { BOARD_THEMES, type BoardTheme } from './board-theme.js';
 export const TERRAIN_ART = '/art/optimized/terrain-fantasy.777e0ac07117.webp';
 export const ENVIRONMENT_ART = '/art/optimized/environment-painted.00c506c983c0.webp';
 export const GAME_ART = [
   BOARD_THEMES.storybook.terrain,
   BOARD_THEMES.storybook.environment,
+  ICON_ATLAS,
   '/art/optimized/environment-dark.c55c6de597e4.webp',
   '/art/optimized/sprites-fantasy.3aaf69915ec6.webp',
   '/art/optimized/avatars-fantasy.6bf04e83341a.webp',

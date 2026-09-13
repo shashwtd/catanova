@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   CircleHelp,
   DoorOpen,
@@ -9,12 +10,13 @@ import {
   Settings2,
   Wifi,
   WifiOff,
+  X,
 } from './GameIcons.js';
 export type GameToolPanel = 'journal' | 'network' | 'rules' | 'info' | 'settings' | 'leave';
-/** Keep frequently used tools visible; group the rest in one labelled menu. */
 export function GameTools({
   panel,
   onPanel,
+  onClosePanel,
   connected,
   fullscreen,
   onFullscreen,
@@ -23,20 +25,42 @@ export function GameTools({
 }: {
   panel?: string | null;
   onPanel: (panel: GameToolPanel) => void;
+  onClosePanel?: () => void;
   connected: boolean;
   fullscreen: boolean;
   onFullscreen: () => void;
   onLeave: () => void;
   busy?: boolean;
 }) {
-  const menu = useRef<HTMLDetailsElement>(null);
-  const choose = (action: () => void) => {
-    if (menu.current) {
-      menu.current.open = false;
-      menu.current.querySelector('summary')?.focus();
-    }
-    action();
-  };
+  const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const timeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const id = useId();
+  useEffect(() => () => clearTimeout(timeout.current), []);
+  function closeMenu() {
+    clearTimeout(timeout.current);
+    setOpen(false);
+    setClosing(true);
+    const ms = matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 0
+      : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dropdown-close-dur')) ||
+        150;
+    timeout.current = setTimeout(() => setClosing(false), ms);
+    trigger.current?.focus({ preventScroll: true });
+  }
+  const entries = [
+    { key: 'rules', label: 'How to play', icon: <CircleHelp />, action: () => onPanel('rules') },
+    { key: 'info', label: 'Game rules', icon: <GameIcon name="info" />, action: () => onPanel('info') },
+    { key: 'settings', label: 'Settings', icon: <Settings2 />, action: () => onPanel('settings') },
+    {
+      key: 'network',
+      label: 'Connection',
+      icon: connected ? <Wifi /> : <WifiOff />,
+      action: () => onPanel('network'),
+    },
+    { key: 'leave', label: 'Leave game', icon: <DoorOpen />, action: onLeave },
+  ];
   return (
     <>
       <nav className="side-controls game-controls" aria-label="Current game tools">
@@ -59,59 +83,65 @@ export function GameTools({
         </button>
       </nav>
       <nav className="side-controls room-controls" aria-label="Room tools">
-        <details
-          ref={menu}
+        <div
           className="game-tools-menu"
           onKeyDown={(e) => {
-            if (e.key === 'Escape') {
+            if (e.key === 'Escape' && open && !panel) {
               e.preventDefault();
-              menu.current!.open = false;
-              menu.current?.querySelector('summary')?.focus();
+              closeMenu();
             }
           }}
         >
-          <summary aria-label="Game menu" title="Game menu">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            <span>Menu</span>
-          </summary>
-          <div className="game-tools-popover">
-            <button aria-label="How to play" onClick={() => choose(() => onPanel('rules'))}>
-              <CircleHelp />
-              <span>How to play</span>
-            </button>
-            <button aria-label="Game rules" onClick={() => choose(() => onPanel('info'))}>
-              <GameIcon name="info" />
-              <span>Game rules</span>
-            </button>
-            <button aria-label="Settings" onClick={() => choose(() => onPanel('settings'))}>
-              <Settings2 />
-              <span>Settings</span>
-            </button>
-            <button
-              title="Connection and ping"
-              aria-label="Connection and ping"
-              onClick={() => choose(() => onPanel('network'))}
-            >
-              {connected ? <Wifi /> : <WifiOff />}
-              <span>Connection</span>
-            </button>
-            <button aria-label="Leave game" disabled={busy} onClick={() => choose(onLeave)}>
-              <DoorOpen />
-              <span>Leave game</span>
-            </button>
+          <button
+            ref={trigger}
+            type="button"
+            className="game-menu-trigger"
+            aria-label={open ? 'Close game menu' : 'Game menu'}
+            aria-expanded={open}
+            aria-controls={id}
+            onClick={() => {
+              if (open) {
+                closeMenu();
+                onClosePanel?.();
+              } else {
+                clearTimeout(timeout.current);
+                setClosing(false);
+                setOpen(true);
+              }
+            }}
+          >
+            <span className="t-icon-swap" data-state={open ? 'b' : 'a'}>
+              <span className="t-icon" data-icon="a">
+                <GameIcon name="menu" />
+              </span>
+              <span className="t-icon" data-icon="b">
+                <X />
+              </span>
+            </span>
+            <span>{open ? 'Close' : 'Menu'}</span>
+          </button>
+          <div
+            id={id}
+            className={`game-tools-popover t-dropdown ${open ? 'is-open' : closing ? 'is-closing' : ''}`}
+            data-origin="bottom-left"
+            inert={!open}
+            aria-hidden={!open}
+          >
+            {entries.map((entry, i) => (
+              <button
+                key={entry.key}
+                aria-label={entry.label}
+                aria-pressed={panel === entry.key}
+                disabled={entry.key === 'leave' && busy}
+                style={{ '--tool-order': entries.length - i - 1 } as CSSProperties}
+                onClick={entry.action}
+              >
+                {entry.icon}
+                <span>{entry.label}</span>
+              </button>
+            ))}
           </div>
-        </details>
+        </div>
       </nav>
     </>
   );
