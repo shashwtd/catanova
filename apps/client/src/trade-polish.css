@@ -1,4 +1,4 @@
-/* One receiving-above-payment layout, shared by all trade states. */
+/* Two clear sides, from the local player's perspective, throughout a trade. */
 .trade-content {
   min-width: 0;
 }
@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .trade-header > .game-icon {
   flex: none;
@@ -14,11 +14,11 @@
 .trade-header .menu-tabs {
   flex: 1;
   display: flex;
-  gap: 4px;
+  gap: 3px;
   margin: 0;
   padding: 3px;
-  background: #21190f50;
-  border: 1px solid #b5956238;
+  background: #a7834b20;
+  border: 1px solid #ab89523b;
   border-radius: 8px;
 }
 .trade-header .menu-tabs button {
@@ -28,80 +28,93 @@
   flex: 1;
   gap: 6px;
   padding: 7px 6px;
-  min-height: 36px;
+  min-height: 38px;
   white-space: nowrap;
   font:
     600 14px Barlow,
     sans-serif;
-  color: #dbccb0;
-  border: 0;
+  color: #776248;
+  border: 1px solid transparent;
   border-radius: 5px;
   background: transparent;
 }
-.trade-header .menu-tabs button[aria-selected='true'] {
-  color: #fff0cd;
-  background: #9c77494a;
-  box-shadow: inset 0 0 0 1px #c4a06c66;
-}
 .trade-header .menu-tabs button:hover {
-  color: #fff5e0;
+  color: #493c2c;
+  background: #fff2d743;
+}
+.trade-header .menu-tabs button[aria-selected='true'] {
+  color: #3f3427;
+  background: #fff1d5;
+  border-color: #bda16b85;
+  box-shadow: 0 1px 3px #72543218;
 }
 .trade-exchange {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
+  align-items: stretch;
   gap: 0;
-  margin: 0 0 14px;
-  border: 1px solid #b99a6557;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #291c1245;
+  margin: 0 0 16px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+.trade-exchange-mark {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  color: #927248;
+  padding-top: 20px;
 }
 .trade-side {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 9px;
-  padding: 12px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0;
   min-width: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
 }
-.trade-side-get {
-  background: #b89c6a16;
-}
-.trade-side-give {
-  border-top: 1px solid #d4af7440;
-}
 .trade-side > strong {
+  align-self: stretch;
+  padding-bottom: 8px;
+  text-align: center;
   font:
-    600 13px/1.2 Barlow,
+    700 15px/1.2 Barlow,
     sans-serif;
-  color: #f7e5c3;
+  color: #493a27;
+  border-bottom: 1px solid #af89563b;
 }
 .trade-side .resource-summary {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 9px;
+  padding: 8px 0;
+}
+.trade-side .resource-summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 .trade-side .resource-summary .sprite {
-  width: 32px;
-  height: 34px;
+  width: 34px;
+  height: 38px;
 }
 .trade-side .resource-summary b {
   font:
-    700 21px Barlow,
+    700 25px Barlow,
     sans-serif;
-  color: #fff0d5;
+  color: #473726;
 }
 .trade-undecided {
   display: grid;
   place-items: center;
-  width: 31px;
-  height: 34px;
-  color: #e9d7b4;
+  min-height: 58px;
+  color: #947953;
   font:
     600 28px Barlow,
     sans-serif;
@@ -122,80 +135,159 @@
   white-space: nowrap;
 }
 .trade-exchange .picker-cards {
-  display: flex;
-  justify-content: center;
-  gap: 7px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 8px;
 }
 .trade-exchange .picker-slot {
-  flex: 1;
-  max-width: 52px;
+  position: relative;
   min-width: 0;
+  max-width: none;
+  padding-bottom: 0;
+}
+.trade-exchange .resource-wood {
+  --picker-color: #a5c29b;
+  --picker-edge: #4f7455;
+}
+.trade-exchange .resource-brick {
+  --picker-color: #e6ad8c;
+  --picker-edge: #a05d3f;
+}
+.trade-exchange .resource-sheep {
+  --picker-color: #c3d5a2;
+  --picker-edge: #7a8b51;
+}
+.trade-exchange .resource-wheat {
+  --picker-color: #efd084;
+  --picker-edge: #a8893c;
+}
+.trade-exchange .resource-ore {
+  --picker-color: #b7c5d0;
+  --picker-edge: #6a8095;
 }
 .trade-exchange .picker-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
-  min-height: 66px;
-  padding: 6px 3px;
-  color: #fbe8c4;
-  border: 1px solid #d5b37270;
-  border-radius: 6px;
-  background: linear-gradient(160deg, #bba07530, #83634512);
-  box-shadow: inset 0 1px #f6e1ab26;
+  height: auto;
+  min-height: 84px;
+  padding: 7px 4px;
+  color: #423722;
+  border: 1px solid color-mix(in srgb, var(--picker-edge, #aa8955) 65%, #eee0ba);
+  border-radius: 7px;
+  background: linear-gradient(145deg, #ffffff4d, #ffffff00 55%), var(--picker-color, #e7d5b3);
+  box-shadow:
+    inset 0 1px #fff8eac7,
+    0 2px 2px #72583926;
   cursor: pointer;
+  transition:
+    translate var(--duration-quick, 150ms) var(--ease-smooth-out, ease-out),
+    filter var(--duration-quick, 150ms) ease-out;
 }
 .trade-exchange .picker-card > .sprite {
-  width: 29px;
-  height: 32px;
+  width: 32px;
+  height: 35px;
+  flex: none;
+}
+.trade-exchange .picker-card::before,
+.trade-exchange .picker-card::after {
+  display: none;
 }
 .trade-exchange .picker-quantity {
+  position: static;
+  display: grid;
+  place-items: center;
+  min-height: 23px;
+  min-width: 26px;
   font:
-    700 17px/1 Barlow,
+    700 22px/1 Barlow,
     sans-serif;
-  min-height: 17px;
+  color: #493823;
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
 }
 .trade-exchange .picker-quantity .game-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
 }
-.trade-exchange .picker-card:hover:not(:disabled),
-.trade-exchange .picker-card[aria-pressed='true'],
-.trade-exchange .has-selection .picker-card {
-  background: linear-gradient(150deg, #be9b555e, #8d672b40);
-  border-color: #f1cc81;
-  color: #fff1d0;
-  box-shadow: inset 0 0 0 1px #ffe0a526;
+.trade-exchange .picker-cards[data-has-selection='true'] .picker-slot:not(.has-selection) .picker-card,
+.trade-exchange .picker-cards[data-has-selection='true'] > .picker-card:not([aria-pressed='true']) {
+  filter: saturate(0.55);
+  background-color: #d9cdb5;
+}
+.trade-exchange .picker-cards:has(.question-card[aria-pressed='true']) .picker-card:not(.question-card) {
+  filter: saturate(0.55);
+  background-color: #d9cdb5;
+}
+.trade-exchange .picker-card:hover:not(:disabled) {
+  translate: 0 -2px;
+  filter: brightness(1.06);
+  border-color: var(--picker-edge, #9b7949);
+}
+.trade-exchange .picker-card:active:not(:disabled) {
+  translate: 0 1px;
+}
+.trade-exchange .picker-card[aria-pressed='true'] {
+  border: 2px solid var(--picker-edge, #9b7949);
+  padding: 6px 3px;
+  box-shadow:
+    inset 0 1px #fff8eac7,
+    0 2px 5px #72543226;
+}
+.trade-exchange .picker-card[aria-pressed='true'] > .sprite {
+  width: 35px;
+  height: 36px;
+}
+.trade-exchange .picker-card[aria-pressed='true'] .picker-quantity {
+  color: #302719;
+  font-size: 27px;
+  text-shadow: 0 1px #fff6dfb0;
 }
 .trade-exchange .picker-card:disabled {
-  opacity: 0.46;
   cursor: default;
+  filter: saturate(0.25);
+  opacity: 0.52;
 }
-.trade-exchange .has-selection .picker-card:disabled {
-  opacity: 0.85;
+.trade-exchange .picker-card[aria-pressed='true']:disabled {
+  opacity: 1;
+  filter: none;
 }
 .trade-exchange .picker-remove {
-  width: 100%;
-  height: 24px;
-  min-height: 24px;
-  margin-top: 3px;
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  margin: 0;
   padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: #d0a46d18;
-  color: #f5dfb8;
-  font-size: 18px;
+  border: 1px solid #b99b72;
+  border-radius: 50%;
+  color: #57412a;
+  background: #fff1d4;
+  box-shadow: 0 1px 3px #67492126;
+  font:
+    600 22px/1 Barlow,
+    sans-serif;
+}
+.trade-exchange .picker-remove:hover:not(:disabled) {
+  background: #fff8e7;
+  color: #7b3c29;
 }
 .trade-exchange .picker-remove:disabled {
-  opacity: 0.28;
+  visibility: hidden;
+  pointer-events: none;
 }
 .trade-exchange .question-card {
-  flex: 1;
-  max-width: 42px;
-  align-self: flex-start;
   font:
     600 33px/1 Cinzel,
     serif;
@@ -205,11 +297,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 9px;
+  gap: 10px;
 }
 .trade-footer-actions > button {
   flex: 1;
-  min-height: 39px;
+  min-height: 42px;
   min-width: 0;
   display: flex;
   justify-content: center;
@@ -221,7 +313,7 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  min-height: 40px;
+  min-height: 42px;
 }
 .trade-footer-actions .game-icon {
   width: 18px;
@@ -229,8 +321,8 @@
 }
 .trade-partners {
   display: flex;
-  gap: 7px;
-  margin: 11px 0 0;
+  gap: 8px;
+  margin: 10px 0 0;
   align-items: stretch;
 }
 .trade-partners .trade-partner {
@@ -240,16 +332,15 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  column-gap: 5px;
+  column-gap: 6px;
   row-gap: 3px;
-  padding: 8px 5px;
-  border: 1px solid #ae8c5e45;
-  border-bottom: 3px solid var(--partner-color);
+  padding: 10px 6px;
+  border: 1px solid #94775255;
   border-radius: 7px;
-  background: #30211844;
-  color: #e5d4b5;
+  background: #ffffff30;
+  color: #53432e;
   font:
-    600 13px/1.2 Barlow,
+    600 14px/1.2 Barlow,
     sans-serif;
 }
 .trade-partner > span:not(.resource-summary) {
@@ -258,22 +349,27 @@
   white-space: nowrap;
 }
 .trade-partner > .game-icon {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   flex: none;
 }
 .trade-partner[data-response='ready'] > .game-icon {
   color: var(--partner-color);
+  stroke-width: 3;
+  filter: drop-shadow(0 1px #61472338);
 }
 .trade-partner[data-response='waiting'],
 .trade-partner[data-response='declined'] {
-  opacity: 0.55;
+  opacity: 0.66;
+}
+.trade-partner[data-response='declined'] > .game-icon {
+  color: #985744;
 }
 .trade-partner[aria-pressed='true'] {
-  background: #ba965838;
+  background: color-mix(in srgb, var(--partner-color) 14%, #fff3d9);
   border-color: var(--partner-color);
   box-shadow: inset 0 0 0 1px var(--partner-color);
-  color: #fff1d8;
+  color: #3e3225;
 }
 .trade-partner .resource-summary {
   flex-basis: 100%;
@@ -286,58 +382,92 @@
   height: 21px;
 }
 .trade-partner .resource-summary b {
-  font-size: 14px;
+  font-size: 15px;
 }
 .trade-status {
   text-align: center;
-  color: #dec59d;
+  color: #806645;
   font:
-    500 12px/1.3 Barlow,
+    500 13px/1.3 Barlow,
     sans-serif;
   margin: 10px 0;
 }
-.trade-waiting {
+.playing .trade-notice .trade-waiting {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   margin: 8px 0 0;
-  color: #f0d49f;
+  color: #5b6941;
   font:
     600 14px/1.4 Barlow,
     sans-serif;
 }
 .trade-waiting > .game-icon {
   flex: none;
-  color: #e9c16f;
+  color: #5b6941;
 }
 .trade-notice .trade-header strong {
   font:
     600 17px/1.2 Barlow,
     sans-serif;
-  color: #fff0d6;
+  color: #4b3b26;
 }
 .trade-notice .trade-exchange {
-  margin-bottom: 12px;
-}
-.trade-notice .trade-side {
-  padding: 9px;
+  margin-bottom: 14px;
 }
 @media (max-width: 450px) {
   .trade-header {
     gap: 6px;
   }
   .trade-header > .game-icon {
-    width: 26px;
+    width: 25px;
   }
   .trade-header .menu-tabs button {
     font-size: 13px;
     gap: 4px;
   }
+  .trade-exchange {
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  }
+  .trade-exchange-mark .game-icon {
+    width: 20px;
+  }
   .trade-exchange .picker-cards {
-    gap: 5px;
+    gap: 9px 5px;
   }
-  .trade-side {
-    padding: 10px 8px;
+  .trade-exchange .picker-card {
+    min-height: 76px;
+    padding: 6px 2px;
   }
+  .trade-exchange .picker-card[aria-pressed='true'] {
+    padding: 5px 1px;
+  }
+  .trade-exchange .picker-card > .sprite {
+    width: 28px;
+    height: 30px;
+  }
+  .trade-exchange .picker-card[aria-pressed='true'] > .sprite {
+    width: 30px;
+    height: 31px;
+  }
+  .trade-exchange .picker-remove {
+    right: -3px;
+    bottom: -5px;
+    width: 26px;
+    height: 26px;
+    min-height: 26px;
+  }
+  .trade-footer-actions > button {
+    padding-inline: 6px;
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trade-exchange .picker-card {
+    transition: none;
+  }
+}
+[data-motion='reduced'] .trade-exchange .picker-card {
+  transition: none;
 }

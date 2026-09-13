@@ -4,7 +4,15 @@ import { canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
-import { ArrowLeftRight, Check, Clock3, GameIcon, Users, X } from './GameIcons.js';
+import {
+  ArrowLeftRight,
+  LightCheck as Check,
+  Clock3,
+  Exchange,
+  GameIcon,
+  Users,
+  LightClose as X,
+} from './GameIcons.js';
 import { PLAYER_COLORS } from './Board.js';
 import { ResourceChoice, ResourcePicker, ResourceSummary } from './ResourcePicker.js';
 import { TradeSubmission } from './trade-submission.js';
@@ -31,7 +39,7 @@ function useTradeAction(disabled: boolean, send: Props['onAction']) {
   return { submit, pending, error };
 }
 
-/** The same receiving-above-payment layout for drafting, reviewing and incoming offers. */
+/** Keep the player's receiving and payment sides consistent throughout the trade. */
 export function TradeExchange({
   give,
   get,
@@ -59,6 +67,9 @@ export function TradeExchange({
             </span>
           ))}
       </section>
+      <span className="trade-exchange-mark" aria-hidden="true">
+        <Exchange size={24} />
+      </span>
       <section className="trade-side trade-side-give" aria-label="You give">
         <strong>You give</strong>
         {giveControl ??
@@ -255,6 +266,7 @@ export function TradePanel({ game, me, disabled, onAction, onClose }: Props & { 
                     disabled={locked}
                     onClick={() => void command.submit({ kind: 'cancelTrade' })}
                   >
+                    <X />
                     Cancel offer
                   </button>
                   <button

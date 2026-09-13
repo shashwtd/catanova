@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { X } from './GameIcons.js';
 
@@ -20,6 +20,28 @@ export function UtilityPanel({
     close.current();
     if (opener.current?.isConnected) opener.current.focus({ preventScroll: true });
   }
+  useLayoutEffect(() => {
+    if (title !== 'Settings') return;
+    const trigger = document.querySelector('[data-game-tool="settings"]');
+    const panel = ref.current;
+    if (!trigger || !panel) return;
+    const align = () => {
+      const target = trigger.getBoundingClientRect(),
+        box = panel.getBoundingClientRect();
+      panel.style.setProperty(
+        '--panel-notch-y',
+        `${Math.max(18, Math.min(box.height - 18, target.top + target.height / 2 - box.top))}px`,
+      );
+    };
+    align();
+    const observer = new ResizeObserver(align);
+    observer.observe(panel);
+    window.addEventListener('resize', align);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', align);
+    };
+  }, [title]);
   useEffect(() => {
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });

@@ -28,14 +28,14 @@ import { Lobby } from '../Lobby.js';
 import { FriendsDrawer } from '../FriendsDrawer.js';
 import { RoomInviteNotice } from '../RoomInvitePanel.js';
 import type { RoomInvitesController } from '../useRoomInvites.js';
-import { GameSettings, GameInfo } from '../GameSettings.js';
+import { GameSettings } from '../GameSettings.js';
 import { usePreferences } from '../preferences.js';
 import { Board, type BuildMode } from '../Board.js';
 import { BoardViewport } from '../BoardViewport.js';
 import { ResourceHand } from '../ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from '../DevelopmentCards.js';
 import { PlayerRail } from '../PlayerRail.js';
-import { Dices, ArrowLeftRight, ArrowRight, X, Settings2, House, Route, Castle } from '../GameIcons.js';
+import { Dices, ArrowLeftRight, NextTurn, X, Settings2, House, Route, Castle } from '../GameIcons.js';
 import {
   createGame,
   gameView,
@@ -526,7 +526,7 @@ export function LoungePreview() {
               </div>
               <button
                 className={`turn-action ${simulation && game.phase === 'actions' ? 'end-turn' : 'roll-turn'}`}
-                aria-label={simulation && game.phase === 'actions' ? 'End turn' : 'Roll dice'}
+                aria-label={simulation && game.phase === 'actions' ? 'Next turn' : 'Roll dice'}
                 disabled={
                   feedback.presentationBusy || game.active !== 0 || !['actions', 'roll'].includes(game.phase)
                 }
@@ -537,8 +537,8 @@ export function LoungePreview() {
                 <TurnButtonAttention />
                 {simulation && game.phase === 'actions' ? (
                   <>
-                    <ArrowRight size={36} />
-                    <span>End</span>
+                    <NextTurn size={36} />
+                    <span>Next</span>
                   </>
                 ) : (
                   <Dices />
@@ -627,11 +627,6 @@ export function LoungePreview() {
       {panel === 'rules' && (
         <PreviewDialog side={screen === 'game'} title="How to play" onClose={() => setPanel(null)}>
           <QuickRules victoryPoints={settings?.victoryPoints} />
-        </PreviewDialog>
-      )}
-      {panel === 'info' && (
-        <PreviewDialog side={screen === 'game'} title="Game rules" onClose={() => setPanel(null)}>
-          <GameInfo room={{ ...currentRoom, game: displayedGame }} />
         </PreviewDialog>
       )}
       {panel === 'journal' && (

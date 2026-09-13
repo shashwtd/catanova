@@ -1058,7 +1058,7 @@
     inset 0 -1px #2d1c1240;
 }
 .playing .profile-name-row {
-  translate: 0 4px;
+  translate: 0 7px;
 }
 .profile-held-awards .card-hint {
   display: inline-flex;
@@ -1209,7 +1209,7 @@
     --game-tool-edge: 44px;
   }
   .playing .profile-name-row {
-    translate: 0 2px;
+    translate: 0 4px;
   }
   .playing .hand-dock .table-actions .turn-action {
     width: 64px;

@@ -4,11 +4,23 @@ import { createElement } from 'react';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from '../apps/client/src/cards.js';
-import { DevelopmentCards, developmentStacks } from '../apps/client/src/DevelopmentCards.js';
+import { DevelopmentArt, DevelopmentCards, developmentStacks } from '../apps/client/src/DevelopmentCards.js';
 import { ResourceHand } from '../apps/client/src/ResourceHand.js';
 import { activePlayer, applyAction, createGame, emptyHand, gameView } from '../packages/rules/src/game.js';
 import type { Card, Game, GameView } from '../packages/rules/src/game.js';
 import { DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
+
+test('development previews isolate each atlas cell instead of exposing neighboring cards in wider slots', () => {
+  for (const [kind, cell] of Object.entries(DEVELOPMENT_ART_INDEX)) {
+    const html = renderToStaticMarkup(createElement(DevelopmentArt, { kind: kind as Card['kind'] }));
+    assert.match(html, /viewBox="0 0 418 627"/);
+    assert.match(html, /preserveAspectRatio="xMidYMid meet" overflow="hidden"/);
+    const clip = html.match(/<clipPath id="([^"]+)"><rect width="418" height="627"/);
+    assert.ok(clip, 'the cell has an explicit clip, including any letterboxed area');
+    assert.ok(html.includes(`clip-path="url(#${clip[1]})"`));
+    assert.ok(html.includes(`x="${-(cell % 3) * 418}" y="${-Math.floor(cell / 3) * 627}"`));
+  }
+});
 
 function setup(): Game {
   let game = createGame(

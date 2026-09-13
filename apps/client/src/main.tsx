@@ -14,7 +14,7 @@ import { useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
-import { GameSettings, GameInfo } from './GameSettings.js';
+import { GameSettings } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -51,7 +51,7 @@ import { createRoot } from 'react-dom/client';
 import {
   GameIcon,
   Settings2,
-  ArrowRight,
+  NextTurn,
   Castle,
   Check,
   CircleHelp,
@@ -245,7 +245,6 @@ function App() {
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
-      | 'info'
       | 'settings'
       | 'trade'
       | 'rules'
@@ -1089,14 +1088,14 @@ function App() {
               </div>
               <button
                 className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
-                aria-label={actionPhase ? 'End turn' : 'Roll dice'}
-                title={actionPhase ? 'End turn' : 'Roll dice'}
+                aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
+                title={actionPhase ? 'Next turn' : 'Roll dice'}
                 disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
                 onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
               >
                 <TurnButtonAttention />
-                {actionPhase ? <ArrowRight size={36} /> : <Dices size={38} />}
-                {actionPhase && <span>End</span>}
+                {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
+                {actionPhase && <span>Next</span>}
               </button>
             </div>
           </div>
@@ -1174,11 +1173,6 @@ function App() {
           reducedMotion={reducedMotion}
           onComplete={() => setTransitionId(null)}
         />
-      )}
-      {panel === 'info' && room && (
-        <Dialog side={!!g} title="Game info" onClose={() => setPanel(null)}>
-          <GameInfo room={room} />
-        </Dialog>
       )}
       {panel === 'settings' && (
         <Dialog side={!!g} title="Settings" onClose={() => setPanel(null)}>

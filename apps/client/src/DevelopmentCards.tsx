@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { GameIcon, Check, Clock3, LockKeyhole, Play, X } from './GameIcons.js';
 import type { CSSProperties } from 'react';
 import { CARD_NAMES, canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
@@ -11,6 +11,7 @@ import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from './cards.js';
 const ART_COLUMNS = [0, 418, 836, 1254],
   ART_ROWS = [0, 627, 1254];
 export function DevelopmentArt({ kind }: { kind: CardKind | 'back' }) {
+  const clip = useId();
   const n = kind === 'back' ? 5 : DEVELOPMENT_ART_INDEX[kind],
     col = n % 3,
     row = Math.floor(n / 3),
@@ -19,10 +20,24 @@ export function DevelopmentArt({ kind }: { kind: CardKind | 'back' }) {
   return (
     <svg
       className="development-art"
-      viewBox={`${x} ${y} ${ART_COLUMNS[col + 1]! - x} ${ART_ROWS[row + 1]! - y}`}
+      viewBox="0 0 418 627"
+      preserveAspectRatio="xMidYMid meet"
+      overflow="hidden"
       aria-hidden="true"
     >
-      <image href="/art/optimized/development-cards.e40eabee1fa7.webp" width="1254" height="1254" />
+      <defs>
+        <clipPath id={clip}>
+          <rect width="418" height="627" />
+        </clipPath>
+      </defs>
+      <image
+        href="/art/optimized/development-cards.e40eabee1fa7.webp"
+        x={-x}
+        y={-y}
+        width="1254"
+        height="1254"
+        clipPath={`url(#${clip})`}
+      />
     </svg>
   );
 }

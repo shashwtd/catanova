@@ -37,7 +37,7 @@ export function ResourcePicker({
   return (
     <fieldset className="card-picker" disabled={disabled}>
       <legend>{label}</legend>
-      <div className="picker-cards">
+      <div className="picker-cards" data-has-selection={Object.values(value).some(Boolean)}>
         {RESOURCES.map((r) => {
           const limit = max?.[r] ?? 19;
           return (
@@ -45,12 +45,21 @@ export function ResourcePicker({
               <button
                 type="button"
                 className="picker-card"
+                aria-pressed={value[r] > 0}
                 disabled={value[r] >= limit}
                 aria-label={`Add ${RESOURCE_NAMES[r]} to ${label}; ${value[r]} selected`}
                 onClick={() => onChange({ ...value, [r]: value[r] + 1 })}
               >
                 <ResourceIcon resource={r} />
-                <span className="picker-quantity">{value[r] || <Plus size={16} />}</span>
+                <span className="picker-quantity" key={value[r]}>
+                  {value[r] ? (
+                    <span className="t-digit-group is-animating">
+                      <span className="t-digit">{value[r]}</span>
+                    </span>
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                </span>
               </button>
               <button
                 type="button"
@@ -86,7 +95,7 @@ export function ResourceChoice({
   return (
     <fieldset className="card-picker">
       <legend>{label}</legend>
-      <div className="picker-cards">
+      <div className="picker-cards" data-has-selection="true">
         {RESOURCES.map((r) => (
           <button
             type="button"

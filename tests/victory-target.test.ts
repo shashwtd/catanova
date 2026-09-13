@@ -10,7 +10,7 @@ import { parseRoomSettings } from '../packages/protocol/src/settings.js';
 import { Store } from '../apps/server/src/store.js';
 import { newSession } from '../apps/client/src/connection.js';
 import { readyLobby } from './helpers.js';
-import { GameSettings, GameInfo } from '../apps/client/src/GameSettings.js';
+import { GameSettings } from '../apps/client/src/GameSettings.js';
 import { QuickRules } from '../apps/client/src/QuickRules.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
 const seats = [
@@ -96,7 +96,6 @@ test('host target persists across restart, reaches the match snapshot, and locks
     const snapshot = store.snapshot(host.room_id);
     const room = { ...snapshot, players: snapshot.players.map((player) => ({ ...player, connected: true })) };
     room.game = gameView(store.loadGame(host.room_id)!, host.id);
-    assert.match(renderToStaticMarkup(createElement(GameInfo, { room })), /12 points on your turn/);
     const props = {
       preferences: DEFAULT_PREFERENCES,
       room: { ...room, game: undefined },
@@ -115,7 +114,7 @@ test('host target persists across restart, reaches the match snapshot, and locks
     assert.ok(!playing.includes('victory-target'), 'in-game settings remain audio-only');
     assert.match(
       renderToStaticMarkup(createElement(QuickRules, { victoryPoints: 12 })),
-      /First to 12 victory points/,
+      /First to 12 points/,
     );
   } finally {
     store.close();

@@ -28,22 +28,25 @@ function findButton(node: ReactNode): ReactElement<{ onClick: () => void; disabl
 test('quick rules name each scoring piece and explain both award thresholds instead of relying on symbols', () => {
   const html = renderToStaticMarkup(createElement(QuickRules)),
     visible = text(html);
-  assert.ok(visible.includes('First to 10 victory points'));
-  assert.ok(visible.includes('Win on your turn.'));
-  assert.match(visible, /Settlement 1 VP/);
-  assert.match(visible, /City 2 VP/);
-  assert.match(visible, /Longest Road \+2 VP Longest continuous route: at least 5 connected roads/);
-  assert.match(visible, /Largest Army \+2 VP Most Knights played: at least 3 Knights/);
-  assert.match(visible, /Over 7 resource cards\? Discard half, rounded down/);
-  assert.match(visible, /City upgrade Replaces your settlement/);
-  assert.match(visible, /Victory-point cards count immediately/);
+  assert.ok(visible.includes('First to 10 points'));
+  assert.ok(visible.includes('Reach the goal on your own turn to win.'));
+  assert.match(visible, /Settlement 1 point/);
+  assert.match(visible, /City 2 points total/);
+  assert.match(visible, /Longest Road · \+2 points Longest continuous route, at least 5 roads/);
+  assert.match(visible, /Largest Army · \+2 points Most Knights played, at least 3/);
+  assert.match(visible, /over 7 resources discards half, rounded down/);
+  assert.match(visible, /Upgrade your own settlement to a city/);
+  assert.match(visible, /Victory Point cards count immediately/);
+  assert.equal([...html.matchAll(/aria-expanded="true"/g)].length, 1);
+  assert.equal([...html.matchAll(/aria-expanded="false"/g)].length, 4);
+  assert.equal([...html.matchAll(/inert="" aria-hidden="true"/g)].length, 4);
 });
 
 test('build recipes identify the action and explicitly group the exact resource payment', () => {
   const html = renderToStaticMarkup(createElement(QuickRules));
-  const recipes = html.match(/<div class="build-recipe">[\s\S]*?<\/dd><\/div>/g) ?? [];
+  const recipes = html.match(/<div class="guide-recipe">[\s\S]*?<\/dd><\/div>/g) ?? [];
   assert.equal(recipes.length, 4);
-  assert.ok(text(html).includes('Build costs'));
+  assert.ok(text(html).includes('Build &amp; buy'));
   const kinds = ['road', 'settlement', 'city', 'developmentCard'] as const;
   const labels = ['Road', 'Settlement', 'City upgrade', 'Development card'];
   for (const [i, recipe] of recipes.entries()) {

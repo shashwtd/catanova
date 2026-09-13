@@ -35,6 +35,8 @@ test('closed tools are inert and linked to an accessible trigger, with fullscree
   );
   assert.match(html, /aria-expanded="false"/);
   assert.ok(!html.includes('aria-label="Connection"'));
+  assert.ok(!html.includes('aria-label="Game rules"'));
+  assert.match(html, /aria-label="How to play"/);
   assert.match(html, /inert=""/);
   assert.match(html, /aria-controls="([^"]+)"/);
   const fullscreen = html.indexOf('fullscreen-control');
@@ -68,6 +70,9 @@ test('painted game symbols stay intact while utility controls use contextual SVG
     'history',
     'defeat',
     'light-check',
+    'light-close',
+    'next-turn',
+    'exchange',
   ] as const) {
     const html = renderToStaticMarkup(createElement(GameIcon, { name }));
     assert.match(html, /stroke="currentColor"/);

@@ -15,7 +15,7 @@ import type { Game, GameAction, Hand } from '../packages/rules/src/game.js';
 import { generateBoard } from '../packages/rules/src/board.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { parseRoomSettings } from '../packages/protocol/src/settings.js';
-import { GameSettings, GameInfo } from '../apps/client/src/GameSettings.js';
+import { GameSettings } from '../apps/client/src/GameSettings.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { TradeSubmission } from '../apps/client/src/trade-submission.js';
@@ -274,9 +274,4 @@ test('lobby dice settings validate and game settings show only audio after start
   assert.ok(!settings().includes('Balanced'));
   assert.match(settings(), /Effects volume/);
   assert.match(settings(), /Music volume/);
-  const info = renderToStaticMarkup(createElement(GameInfo, { room }));
-  assert.match(info, /36 dice pairs/);
-  assert.match(info, /No player-based adjustments/);
-  assert.match(info, /90 seconds/);
-  assert.ok(!/<input|<button/.test(info));
 });

@@ -21,6 +21,9 @@ const CONTROL_PATHS = {
   music: 'M9 18V5l11-2v13 M9 8l11-2 M9 18a3 3 0 1 1-3-3c2 0 3 1 3 3 M20 16a3 3 0 1 1-3-3c2 0 3 1 3 3',
   chevron: 'm9 5 7 7-7 7',
   'light-check': 'm4 12 5 5L20 6',
+  'light-close': 'm6 6 12 12 M18 6 6 18',
+  exchange: 'M4 8h15 m-4-4 4 4-4 4 M20 16H5 m4-4-4 4 4 4',
+  'next-turn': 'M5 20v-7a5 5 0 0 1 5-5h10 m-5-5 5 5-5 5',
   play: 'm7 3 14 9-14 9V3',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
@@ -113,4 +116,7 @@ export const JoinRoom = icon('join'),
   ChevronRight = icon('chevron'),
   Defeat = icon('defeat'),
   Music = icon('music'),
+  NextTurn = icon('next-turn'),
+  Exchange = icon('exchange'),
+  LightClose = icon('light-close'),
   LightCheck = icon('light-check');

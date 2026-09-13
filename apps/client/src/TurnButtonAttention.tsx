@@ -1,4 +1,4 @@
-/** One inexpensive SVG stroke follows the button edge; it never covers the dice artwork. */
+/** A quiet rim and two small highlights frame the action without covering its artwork. */
 export function TurnButtonAttention() {
   return (
     <svg
@@ -8,7 +8,8 @@ export function TurnButtonAttention() {
       aria-hidden="true"
       focusable="false"
     >
-      <rect x="3" y="3" width="74" height="68" rx="12" pathLength="100" />
+      <rect className="turn-rim" x="2" y="2" width="76" height="70" rx="12" />
+      <path className="turn-corner" d="M3 20v-6A11 11 0 0 1 14 3h9 M57 71h9a11 11 0 0 0 11-11v-6" />
     </svg>
   );
 }
