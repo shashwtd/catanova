@@ -61,3 +61,11 @@ Every playable development card opens its explanation and a Play confirmation. B
 Production animations and profile gain badges replace redundant resource-gain text announcements. Card-play and victory messages remain. The local preview resets transient effects without stopping or suspending the music, and memoizes its legal game view across feedback updates. Network diagnostics have been removed from the game menu; connection recovery and disconnected-player status remain active.
 
 The guide opens one topic at a time while retaining build costs, scoring, awards, turn flow, robber rules and development-card timing. The separate Game rules menu entry is removed. Settings distinguish selection from hover and point back to the settings control. Roll uses amber accents; Next uses mint accents and a bent arrow, with restrained corner highlights instead of a rotating dashed border. Development artwork explicitly clips each atlas cell so neighboring illustrations cannot leak into differently sized previews.
+
+## Trade and event polish
+
+A live offer shows actual room avatars. Pending responses have a small spinner, declined responses a painted red cross, and accepted responses a player-colored check. Choosing a partner still requires a separate confirmation. Incoming offers name and show the maker; give/get summaries always use the viewer’s perspective. Muted or reduced-motion preferences stop decorative movement without hiding response status.
+
+Held medals sit on the upper-right edge of each player panel, outside the name row. Announcements use the earned medal and a fading backdrop, with the holder, count and award requirement still readable. Public development plays use their own artwork and a short effect description; buying a hidden card does not reveal its face. A queued award takes visual priority over a card announcement to avoid stacking celebrations. Mobile uses smaller medals and places celebrations below the player rail.
+
+Passing a committed local turn uses a short paper-and-wood cue. The separate “your turn” reminder uses a softer, lower pluck with a wood contact instead of the longer stinger. No extra audio files are downloaded.

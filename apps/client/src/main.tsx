@@ -111,6 +111,7 @@ import './play-refinement.css';
 import './tool-motion.css';
 import './lounge-controls.css';
 import './game-dialogs.css';
+import './game-feedback-polish.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -1099,9 +1100,18 @@ function App() {
               </button>
             </div>
           </div>
-          {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />}
+          {me && (
+            <IncomingTrade
+              roomPlayers={room!.players}
+              game={g}
+              me={me}
+              disabled={disabled}
+              onAction={(a) => act(a, true)}
+            />
+          )}
           {panel === 'trade' && me && (
             <TradePanel
+              roomPlayers={room!.players}
               game={g}
               me={me}
               disabled={disabled}

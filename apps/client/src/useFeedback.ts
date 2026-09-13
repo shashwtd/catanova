@@ -215,7 +215,7 @@ export function useFeedback(preferences: Preferences, reducedMotion: boolean) {
       const queued = buffer.current.take();
       if (queued) present.current(queued.previous, queued.next, queued.me);
     }, hold);
-    schedule(() => setEvent(null), Math.max(hold + PROFILE_GAIN_DWELL_MS, 3200));
+    schedule(() => setEvent(null), Math.max(hold + PROFILE_GAIN_DWELL_MS, nextEvent.cardPlay ? 3800 : 3200));
   };
   const accept = useCallback(
     (previous: RoomState | null, next: RoomState, me: string, welcome = false) => {

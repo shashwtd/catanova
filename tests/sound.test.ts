@@ -283,6 +283,7 @@ test('overlapping events have a fixed voice budget and release it for later cues
     'development',
     'robber',
     'turn',
+    'pass',
     'award',
     'win',
   ];
@@ -325,6 +326,12 @@ test('recorded dice contacts match the animation and construction has a three-st
   assert.ok(soundLayers('city').some(({ sample }) => sample === 'woodHeavy'));
   assert.ok(soundLayers('gain').every(({ sample }) => sample.startsWith('paper')));
   assert.notDeepEqual(soundLayers('turn'), soundLayers('join'));
+  assert.notDeepEqual(soundLayers('turn'), soundLayers('pass'));
+  assert.ok(soundLayers('pass').every(({ sample }) => sample === 'paperSlide' || sample === 'wood'));
+  assert.ok(
+    soundLayers('turn').every(({ sample }) => sample !== 'turn'),
+    'turn attention avoids the old long stinger',
+  );
 });
 
 test('samples warm only after activation, never delay a cue, and never replay it after a download', async (t) => {

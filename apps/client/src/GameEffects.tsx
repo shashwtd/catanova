@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Route, Shield, Sparkles } from './GameIcons.js';
+import { GameIcon, Sparkles } from './GameIcons.js';
+import { DevelopmentArt } from './DevelopmentCards.js';
+import { CARD_NAMES } from '../../../packages/rules/src/game.js';
 import { ResourceIcon } from './Board.js';
 import { HiddenResource } from './HiddenResource.js';
 import { DiceThrow } from './DiceThrow.js';
@@ -251,13 +253,51 @@ export function GameEffects({
           ))}
         </div>
       )}
-      {event && notice && activity && (
+      {event?.cardPlay && activity && !awards.length && (
+        <CardPlayToast key={event.id} card={event.cardPlay} reducedMotion={reducedMotion} />
+      )}
+      {event && notice && !event.cardPlay && activity && !awards.length && (
         <div key={event.id} className="move-announcement" role="status">
           <Sparkles size={16} />
           <span>{notice}</span>
         </div>
       )}
     </>
+  );
+}
+
+const CARD_PLAY_CAPTIONS = {
+  knight: 'The watch rides out. Move the robber.',
+  roadBuilding: 'Two roads, ready to build.',
+  yearOfPlenty: 'Two resources from the bank.',
+  monopoly: 'One resource, gathered from every rival.',
+};
+function CardPlayToast({
+  card,
+  reducedMotion,
+}: {
+  card: NonNullable<FeedbackEvent['cardPlay']>;
+  reducedMotion: boolean;
+}) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 3400);
+    return () => clearTimeout(timer);
+  }, []);
+  if (!visible) return null;
+  return (
+    <div className="card-play-layer" role="status" aria-live="polite">
+      <div className={`card-play-celebration ${reducedMotion ? 'celebration-static' : ''}`}>
+        <div className="card-play-art">
+          <DevelopmentArt kind={card.kind} />
+        </div>
+        <div className="card-play-copy">
+          <span>{card.playerName} played</span>
+          <strong>{CARD_NAMES[card.kind]}</strong>
+          <p>{CARD_PLAY_CAPTIONS[card.kind]}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -311,7 +351,7 @@ export function AwardToast({
         aria-atomic="true"
       >
         <div className="award-emblem" aria-hidden="true">
-          {award.kind === 'longestRoad' ? <Route size={44} /> : <Shield size={44} />}
+          <GameIcon name={award.kind === 'longestRoad' ? 'road-award' : 'army-award'} size={60} />
         </div>
         <div className="award-celebration-copy">
           <span className="award-recipient">

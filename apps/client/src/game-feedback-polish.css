@@ -1,0 +1,443 @@
+/* Read the exchange first, then choose a person. */
+.playing .trade-panel .trade-header > .game-icon {
+  width: 40px;
+  height: 40px;
+}
+.playing .trade-panel .trade-close {
+  width: 40px;
+  height: 40px;
+  padding: 4px;
+  background: transparent;
+  border: 0;
+}
+.playing :is(.trade-panel, .trade-notice) .text-button {
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.playing :is(.trade-panel, .trade-notice) .text-button:hover {
+  text-decoration: none;
+}
+.playing :is(.trade-panel, .trade-notice) .text-button .game-icon {
+  width: 25px;
+  height: 25px;
+  flex: none;
+}
+.playing .trade-exchange {
+  gap: 3px;
+}
+.playing .trade-side {
+  padding: 10px 8px 12px;
+  border-radius: 8px;
+  background: #fff8e33b;
+  gap: 10px;
+}
+.playing .trade-side > strong {
+  padding: 0;
+  border: 0;
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  color: #766041;
+}
+.playing .trade-exchange .picker-cards {
+  gap: 9px 6px;
+}
+.playing .trade-exchange .picker-card {
+  min-height: 75px;
+}
+.playing .trade-exchange .picker-card:not([aria-pressed='true']) {
+  box-shadow:
+    inset 0 1px #fff9e594,
+    0 1px 2px #80613e18;
+}
+.playing .trade-panel:has(.live-offer) .menu-tabs {
+  background: transparent;
+  border-color: transparent;
+}
+.playing .trade-panel:has(.live-offer) .trade-exchange {
+  margin-bottom: 10px;
+}
+.playing .trade-partners {
+  gap: 8px;
+}
+.playing .trade-partners .trade-partner {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 10px 6px 8px;
+  border: 1px solid transparent;
+  background: #a68b5912;
+  box-shadow: none;
+  opacity: 1;
+  color: #59482f;
+}
+.playing .trade-partner[data-response='ready']:hover {
+  background: #fff5dc94;
+  border-color: #a48b5b55;
+}
+.playing .trade-partner[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--partner-color) 12%, #fff2d5);
+  border-color: var(--partner-color);
+  box-shadow: inset 0 -2px var(--partner-color);
+}
+.playing .trade-partner > .trade-partner-portrait {
+  position: relative;
+  display: block;
+  overflow: visible;
+  width: 42px;
+  height: 42px;
+}
+.trade-partner-portrait .avatar-medallion,
+.trade-maker-portrait .avatar-medallion {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+  background: #a58b672e;
+  overflow: hidden;
+}
+.trade-partner-portrait .avatar-medallion::before,
+.trade-partner-portrait .avatar-medallion::after,
+.trade-maker-portrait .avatar-medallion::before,
+.trade-maker-portrait .avatar-medallion::after {
+  display: none;
+}
+.trade-partner-portrait .avatar-medallion > svg,
+.trade-maker-portrait .avatar-medallion > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.trade-partner-response {
+  position: absolute;
+  right: -8px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f2e4c7;
+}
+.trade-partner-response .game-icon {
+  width: 24px;
+  height: 24px;
+}
+.trade-partner-response .control-icon {
+  width: 21px;
+  height: 21px;
+  stroke-width: 3;
+  color: color-mix(in srgb, var(--partner-color) 80%, #4f3e29);
+}
+.trade-partner-name {
+  display: block;
+  max-width: 100%;
+  font:
+    600 13px/1.3 Barlow,
+    sans-serif;
+}
+.trade-waiting-ring {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  color: #9b8050;
+}
+.trade-waiting-ring circle {
+  stroke: currentColor;
+  opacity: 0.2;
+}
+.trade-waiting-ring path {
+  stroke: currentColor;
+  transform-origin: 12px 12px;
+  animation: trade-waiting-spin 1.4s linear infinite;
+}
+@keyframes trade-waiting-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.playing .trade-notice .trade-header {
+  gap: 10px;
+}
+.trade-maker-portrait {
+  flex: none;
+  width: 39px;
+  height: 39px;
+}
+.playing .trade-notice .trade-header strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.playing .trade-notice .trade-header > .game-icon {
+  width: 34px;
+  height: 34px;
+}
+.playing .trade-notice .trade-side {
+  background: #fff5db3b;
+}
+.playing .trade-notice .trade-waiting {
+  font-size: 13px;
+}
+/* Medals pin to the portrait panel, above and to the right of the name. */
+.playing .player-profile > .profile-held-awards {
+  position: absolute;
+  top: -6px;
+  right: -3px;
+  z-index: 5;
+  gap: 2px;
+}
+.playing .player-profile:has(> .profile-held-awards) .profile-name-row {
+  padding-right: 34px;
+}
+.playing .player-profile:has(> .profile-held-awards > :nth-child(2)) .profile-name-row {
+  padding-right: 65px;
+}
+/* A soft wash has no cut edge. Only the backdrop fades; the emblem and lettering stay crisp. */
+.playing .award-celebration {
+  isolation: isolate;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  padding: 19px 22px;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+}
+.playing .award-celebration::before,
+.card-play-celebration::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -17px -28px;
+  height: auto;
+  width: auto;
+  border: 0;
+  background:
+    radial-gradient(ellipse at 25% 52%, #9f763342, transparent 65%),
+    radial-gradient(ellipse at 68% 46%, #58422cec 10%, #3c302ae8 47%, #33292066 60%, transparent 73%);
+  mask-image: radial-gradient(ellipse, #000 40%, #000b 58%, transparent 73%);
+}
+.playing .award-emblem {
+  width: 72px;
+  height: 76px;
+  background: none;
+}
+.playing .award-emblem .game-icon {
+  width: 68px;
+  height: 68px;
+}
+.playing .award-celebration h2 {
+  margin-block: 4px;
+  text-shadow: 0 2px 3px #1a130b70;
+}
+.playing .award-celebration .award-recipient {
+  color: #f0ddbb;
+}
+.card-play-layer {
+  position: fixed;
+  z-index: 70;
+  top: max(82px, 11vh);
+  left: 64px;
+  right: var(--hud-right, 258px);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.card-play-celebration {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  width: min(100%, 370px);
+  padding: 15px 24px;
+  animation: card-play-arrive var(--toast-open, 350ms) var(--toast-ease, ease-out) both;
+}
+.card-play-art {
+  flex: none;
+  width: 51px;
+  aspect-ratio: 2/3;
+  rotate: -5deg;
+  filter: drop-shadow(0 3px 4px #20130988);
+}
+.card-play-art .development-art {
+  border-radius: 4px;
+}
+.card-play-copy {
+  min-width: 0;
+}
+.card-play-copy > span {
+  color: #e3cfae;
+  font:
+    500 13px/1.4 Barlow,
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+.card-play-copy > strong {
+  display: block;
+  color: #ffe2a2;
+  font:
+    700 21px/1.25 Cinzel,
+    serif;
+  margin: 3px 0 5px;
+}
+.card-play-copy p {
+  margin: 0;
+  color: #f0dfc4;
+  font:
+    400 13px/1.4 Barlow,
+    sans-serif;
+}
+@keyframes card-play-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  /* Keep attention on the island; smaller secondary ornaments and quieter inactive actions. */
+  .playing .player-profile > .profile-held-awards {
+    top: -3px;
+    right: 0;
+    gap: 1px;
+  }
+  .playing .player-profile:has(> .profile-held-awards) .profile-name-row {
+    padding-right: 21px;
+  }
+  .playing .player-profile:has(> .profile-held-awards > :nth-child(2)) .profile-name-row {
+    padding-right: 40px;
+  }
+  .playing .profile-medal::before,
+  .playing .profile-medal::after {
+    display: none;
+  }
+  .playing .profile-medal {
+    background: none;
+    box-shadow: none;
+    border: 0;
+  }
+  .playing .construction-tools .build-control:not(.is-available):not(.is-selected) {
+    box-shadow: none;
+    background: #503e2e4f;
+  }
+  .playing .hand-dock .table-actions :is(.trade-action, .development-buy) {
+    box-shadow:
+      inset 0 1px #ffffff30,
+      0 2px #1e17192e;
+  }
+  .playing .hand-dock .resource-counters {
+    gap: 4px;
+  }
+  .playing .hand-dock .card-table {
+    column-gap: 12px;
+  }
+  .playing .trade-panel .trade-header {
+    gap: 6px;
+  }
+  .playing .trade-panel .trade-header > .game-icon {
+    width: 34px;
+    height: 34px;
+  }
+  .playing .trade-panel .trade-close {
+    width: 36px;
+    height: 36px;
+    padding: 2px;
+  }
+  .playing .trade-header .menu-tabs button {
+    min-height: 40px;
+    padding: 6px 3px;
+    font-size: 12px;
+  }
+  .playing .trade-side {
+    padding: 8px 4px 9px;
+    gap: 8px;
+  }
+  .playing .trade-exchange .picker-card {
+    min-height: 72px;
+  }
+  .playing .trade-panel .trade-footer-actions > button {
+    font-size: 14px;
+  }
+  .playing .award-celebration-layer,
+  .card-play-layer {
+    top: calc(var(--mobile-safe-top, 0px) + var(--mobile-profile-height, 116px) + 10px);
+    left: 12px;
+    right: 12px;
+  }
+  .playing .award-celebration {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .playing .award-emblem,
+  .playing .award-emblem .game-icon {
+    width: 48px;
+    height: 52px;
+  }
+  .playing .award-celebration h2 {
+    font-size: 16px;
+  }
+  .playing .award-celebration small {
+    font-size: 10px;
+  }
+  .playing .award-points b {
+    font-size: 22px;
+  }
+  .card-play-celebration {
+    width: min(100%, 330px);
+    gap: 12px;
+    padding: 12px 20px;
+  }
+  .card-play-art {
+    width: 40px;
+  }
+  .card-play-copy > strong {
+    font-size: 18px;
+  }
+  .card-play-copy p {
+    font-size: 12px;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .playing .award-celebration-layer,
+  .card-play-layer {
+    top: 28px;
+  }
+  .playing .award-celebration {
+    padding: 9px 15px;
+  }
+  .playing .award-celebration small,
+  .card-play-copy p {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trade-waiting-ring path,
+  .card-play-celebration {
+    animation: none;
+  }
+}
+[data-motion='reduced'] .trade-waiting-ring path,
+[data-motion='reduced'] .card-play-celebration,
+.card-play-celebration.celebration-static {
+  animation: none;
+}

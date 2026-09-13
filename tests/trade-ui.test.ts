@@ -8,6 +8,7 @@ import { MoveHistory, historyTokens, historyTurns } from '../apps/client/src/Mov
 import { activePlayer, applyAction, createGame, emptyHand, gameView } from '../packages/rules/src/game.js';
 import type { Game, GameAction, GameView, Hand } from '../packages/rules/src/game.js';
 import { RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
+import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../packages/protocol/src/index.js';
 
 const hand = (values: Partial<Hand>): Hand => ({ ...emptyHand(), ...values });
@@ -178,6 +179,49 @@ test('open offers show a payment picker until commitment, then only the accepted
   assert.match(html, /Waiting for Alice to choose/);
   assert.match(html, /aria-label="1 Sheep"/);
   assert.doesNotMatch(html, /<button|<fieldset|Withdraw|Change offer|aria-label="7 Rock"/);
+});
+
+test('live trade responses keep real avatars visible and distinguish pending, declined and ready players', () => {
+  let game = move(setup(), { kind: 'offerTrade', give: hand({ wood: 2 }), want: hand({ sheep: 1 }) });
+  const roomPlayers = game.players.map((p, index) => ({
+    id: p.id,
+    name: p.name,
+    connected: true,
+    profile: { ...defaultProfile(`Portrait ${index}`), avatar: index + 3 },
+  }));
+  const render = () =>
+    renderToStaticMarkup(
+      createElement(TradePanel, {
+        game: gameView(game, 'p0'),
+        me: 'p0',
+        disabled: false,
+        onAction: () => {},
+        roomPlayers,
+      }),
+    );
+  assert.match(render(), /Portrait 1&#x27;s avatar/);
+  assert.match(render(), /data-response="waiting"/);
+  assert.match(render(), /trade-waiting-ring/);
+  const tradeId = game.trade!.id;
+  game = move(game, { kind: 'declineTrade', tradeId }, 'p2');
+  game = move(game, { kind: 'acceptTrade', tradeId }, 'p1');
+  const html = render();
+  assert.match(html, /data-response="declined"/);
+  assert.match(html, /data-response="ready"/);
+  assert.ok(!button(html, 'Trade with Bob').includes('disabled=""'));
+  assert.match(html, /Portrait 2&#x27;s avatar/, 'declining does not replace the avatar');
+  const offered = renderToStaticMarkup(
+    createElement(IncomingTrade, {
+      game: gameView(game, 'p1'),
+      me: 'p1',
+      disabled: false,
+      onAction: () => {},
+      roomPlayers,
+    }),
+  );
+  assert.match(offered, /Portrait 0&#x27;s avatar/);
+  assert.match(offered, /Waiting for Alice to choose/);
+  assert.doesNotMatch(offered, /<button|<fieldset|7 Rock/);
 });
 
 const entry = (revision: number, turn: number, kind: string, lines: string[]): HistoryEntry => ({

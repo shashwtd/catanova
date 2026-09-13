@@ -497,6 +497,12 @@ test('actual trades have a public sound for observers, while Monopoly and sugges
   monopoly.players[1]!.cards = [{ id: 'old-monopoly', kind: 'monopoly', boughtTurn: 0 }];
   const seized = move(monopoly, { kind: 'playCard', cardId: 'old-monopoly', resource: 'wood' }, 'p1');
   assert.ok(seized.event.sounds.includes('development'));
+  assert.deepEqual(seized.event.cardPlay, { kind: 'monopoly', playerName: 'Bob' });
+  assert.equal(
+    seized.after.game!.players[1]!.cards,
+    undefined,
+    'announcements use the public play, not a private hand',
+  );
   assert.ok(!seized.event.sounds.includes('trade'), 'Monopoly is a development action, not an agreed trade');
   const misleading = setup();
   misleading.players[0]!.name = 'Alice played Knight traded';
@@ -505,6 +511,7 @@ test('actual trades have a public sound for observers, while Monopoly and sugges
   fund(misleading, 'p0', COSTS.road);
   const built = move(misleading, { kind: 'road', edge: gameView(misleading, 'p0').legal.roads[0]! });
   assert.ok(!built.event.sounds.includes('trade') && !built.event.sounds.includes('knight'));
+  assert.equal(built.event.cardPlay, undefined);
 });
 
 test('award celebrations and win cues follow the committed state without duplicate award or turn sounds', () => {
@@ -527,6 +534,9 @@ test('award celebrations and win cues follow the committed state without duplica
   game.phase = 'actions';
   const ended = move(game, { kind: 'endTurn' });
   assert.ok(!ended.event.sounds.includes('turn'));
+  assert.ok(ended.event.sounds.includes('pass'), 'only a committed turn change gives the local pass cue');
+  const observed = move(game, { kind: 'endTurn' }, 'p0', 'p1');
+  assert.ok(!observed.event.sounds.includes('pass'), 'other players do not hear the local pass cue');
   assert.ok(ended.event.notices.some((line) => line.includes('Bob')));
 });
 
@@ -545,6 +555,7 @@ test('all original sound cues are short, finite, non-silent, and safely bounded'
     knight: true,
     robber: true,
     turn: true,
+    pass: true,
     award: true,
     win: true,
     warning: true,

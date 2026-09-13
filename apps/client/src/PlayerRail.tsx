@@ -139,30 +139,6 @@ export function PlayerRail({
                 <strong className="profile-name-banner" title={p.name}>
                   {p.name}
                 </strong>
-                {(road || army) && (
-                  <div className="profile-held-awards" aria-label="Awards">
-                    {road && (
-                      <CardTooltip disabledMotion content={<AwardStandings game={game} kind="longestRoad" />}>
-                        <span
-                          className="profile-medal road-award"
-                          aria-label={`Longest Road, plus 2 victory points, ${p.roadLength} connected roads`}
-                        >
-                          <GameIcon name="road-award" size={30} />
-                        </span>
-                      </CardTooltip>
-                    )}
-                    {army && (
-                      <CardTooltip disabledMotion content={<AwardStandings game={game} kind="largestArmy" />}>
-                        <span
-                          className="profile-medal army-award"
-                          aria-label={`Largest Army, plus 2 victory points, ${p.knights} Knights played`}
-                        >
-                          <GameIcon name="army-award" size={30} />
-                        </span>
-                      </CardTooltip>
-                    )}
-                  </div>
-                )}
               </div>
               <div className="profile-details">
                 <div className="profile-stats">
@@ -183,6 +159,30 @@ export function PlayerRail({
                 </div>
               </div>
             </div>
+            {(road || army) && (
+              <div className="profile-held-awards" aria-label="Awards">
+                {road && (
+                  <CardTooltip disabledMotion content={<AwardStandings game={game} kind="longestRoad" />}>
+                    <span
+                      className="profile-medal road-award"
+                      aria-label={`Longest Road, plus 2 victory points, ${p.roadLength} connected roads`}
+                    >
+                      <GameIcon name="road-award" size={30} />
+                    </span>
+                  </CardTooltip>
+                )}
+                {army && (
+                  <CardTooltip disabledMotion content={<AwardStandings game={game} kind="largestArmy" />}>
+                    <span
+                      className="profile-medal army-award"
+                      aria-label={`Largest Army, plus 2 victory points, ${p.knights} Knights played`}
+                    >
+                      <GameIcon name="army-award" size={30} />
+                    </span>
+                  </CardTooltip>
+                )}
+              </div>
+            )}
             {game.winner === p.id && (
               <div className="profile-awards">
                 <span

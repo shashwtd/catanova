@@ -4,21 +4,43 @@ import { canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
-import {
-  ArrowLeftRight,
-  LightCheck as Check,
-  Clock3,
-  Exchange,
-  GameIcon,
-  Users,
-  LightClose as X,
-} from './GameIcons.js';
+import { ArrowLeftRight, LightCheck as Check, Exchange, GameIcon, Users, X } from './GameIcons.js';
+import type { RoomState } from '../../../packages/protocol/src/index.js';
+import { defaultProfile } from '../../../packages/protocol/src/profile.js';
+import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
 import { ResourceChoice, ResourcePicker, ResourceSummary } from './ResourcePicker.js';
 import { TradeSubmission } from './trade-submission.js';
 import type { TradeSender } from './trade-submission.js';
 
-type Props = { game: GameView; me: string; disabled: boolean; onAction: TradeSender };
+type Props = {
+  game: GameView;
+  me: string;
+  disabled: boolean;
+  onAction: TradeSender;
+  roomPlayers?: RoomState['players'];
+};
+function TradePortrait({
+  player,
+  roomPlayers,
+}: {
+  player: { id: string; name: string };
+  roomPlayers?: RoomState['players'];
+}) {
+  return (
+    <Avatar
+      profile={roomPlayers?.find((seat) => seat.id === player.id)?.profile ?? defaultProfile(player.name)}
+    />
+  );
+}
+function TradeWaiting() {
+  return (
+    <svg className="trade-waiting-ring" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 4a8 8 0 0 1 8 8" />
+    </svg>
+  );
+}
 function useTradeAction(disabled: boolean, send: Props['onAction']) {
   const latch = useRef(new TradeSubmission()),
     [pending, setPending] = useState(false),
@@ -162,7 +184,14 @@ export function BankTrade({ game, me, disabled, onAction }: Props) {
 }
 
 /** A live offer replaces its editor. Selection never transfers cards until Confirm is pressed. */
-export function TradePanel({ game, me, disabled, onAction, onClose }: Props & { onClose?: () => void }) {
+export function TradePanel({
+  game,
+  me,
+  disabled,
+  onAction,
+  onClose,
+  roomPlayers,
+}: Props & { onClose?: () => void }) {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -199,7 +228,7 @@ export function TradePanel({ game, me, disabled, onAction, onClose }: Props & { 
   return (
     <aside className="game-panel floating-panel trade-panel" role="dialog" aria-label="Trade">
       <header className="trade-header">
-        <ArrowLeftRight size={32} />
+        <ArrowLeftRight size={40} />
         <div className="menu-tabs" role="tablist" aria-label="Trade with">
           <button role="tab" aria-selected={tab === 'players'} onClick={() => setTab('players')}>
             <Users size={18} />
@@ -246,8 +275,13 @@ export function TradePanel({ game, me, disabled, onAction, onClose }: Props & { 
                         disabled={locked || !response || !!declined || !canPay(hand, trade.give)}
                         onClick={() => response && setSelection(key(other.id, response.give))}
                       >
-                        {declined ? <X /> : response ? <Check /> : <Clock3 />}
-                        <span>{other.name}</span>
+                        <span className="trade-partner-portrait">
+                          <TradePortrait player={other} roomPlayers={roomPlayers} />
+                          <span className="trade-partner-response">
+                            {declined ? <X /> : response ? <Check /> : <TradeWaiting />}
+                          </span>
+                        </span>
+                        <span className="trade-partner-name">{other.name}</span>
                         {trade.open && response && <ResourceSummary hand={response.give} />}
                       </button>
                     );
@@ -262,7 +296,7 @@ export function TradePanel({ game, me, disabled, onAction, onClose }: Props & { 
                 </p>
                 <div className="trade-footer-actions">
                   <button
-                    className="text-button"
+                    className="text-button trade-cancel"
                     disabled={locked}
                     onClick={() => void command.submit({ kind: 'cancelTrade' })}
                   >
@@ -358,7 +392,7 @@ export function TradePanel({ game, me, disabled, onAction, onClose }: Props & { 
 }
 
 /** Accepted replies stay committed; only the maker can choose a partner or cancel the offer. */
-export function IncomingTrade({ game, me, disabled, onAction }: Props) {
+export function IncomingTrade({ game, me, disabled, onAction, roomPlayers }: Props) {
   const command = useTradeAction(disabled, onAction),
     locked = disabled || command.pending;
   const trade = game.trade,
@@ -378,14 +412,18 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
     trade.declinedBy?.includes(me)
   )
     return null;
-  const name = game.players.find((p) => p.id === trade.player)?.name,
+  const maker = game.players.find((p) => p.id === trade.player)!,
+    name = maker.name,
     proposal = trade.proposals?.find((p) => p.player === me);
   const limits = Object.fromEntries(RESOURCES.map((r) => [r, trade.give[r] ? 0 : hand[r]])) as Hand;
   return (
     <aside className="incoming-trade trade-notice floating-panel" aria-label="Incoming trade">
       <header className="trade-header">
-        <ArrowLeftRight size={28} />
+        <span className="trade-maker-portrait">
+          <TradePortrait player={maker} roomPlayers={roomPlayers} />
+        </span>
         <strong>{name} offers</strong>
+        <ArrowLeftRight size={36} />
       </header>
       <TradeExchange
         give={trade.open ? (proposal?.give ?? give) : trade.want}
@@ -398,7 +436,7 @@ export function IncomingTrade({ game, me, disabled, onAction }: Props) {
       />
       {proposal ? (
         <p className="trade-waiting" role="status">
-          <Check size={18} />
+          <TradeWaiting />
           Waiting for {name} to choose
         </p>
       ) : (
