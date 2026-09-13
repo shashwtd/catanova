@@ -58,12 +58,14 @@ test('existing saved effects settings do not opt users into music', () => {
     volume: 0.8,
     music: false,
     musicVolume: 0.3,
+    boardTheme: 'storybook',
   });
   assert.deepEqual(parsePreferences({ sound: false, volume: 0, music: true, musicVolume: 2 }), {
     sound: false,
     volume: 0,
     music: true,
     musicVolume: 1,
+    boardTheme: 'storybook',
   });
   assert.equal(parsePreferences({ musicVolume: Number.NaN }).musicVolume, 0.3);
 });

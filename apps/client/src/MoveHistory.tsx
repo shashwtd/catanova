@@ -4,19 +4,7 @@ import type { GameView } from '../../../packages/rules/src/game.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { ResourceIcon } from './Board.js';
-import {
-  ArrowLeftRight,
-  ArrowRight,
-  Castle,
-  Clock3,
-  Dices,
-  History,
-  House,
-  Layers,
-  Route,
-  ScrollText,
-  Shield,
-} from './GameIcons.js';
+import { ArrowRight, Castle, Clock3, Dices, House, Layers, Route, ScrollText, Shield } from './GameIcons.js';
 
 export function historyTurns(entries: readonly HistoryEntry[]) {
   const groups = new Map<number, HistoryEntry[]>();
@@ -36,7 +24,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   const actor = people.find(
     (name) =>
       line.startsWith(name) &&
-      /^(?: (?:placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|moved|discarded|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
+      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
         line.slice(name.length),
       ),
   );
@@ -55,6 +43,8 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
         if (index >= 0) at = actor.length + index + 5;
       } else if (body === ` moved the robber and stole a card from ${name}.`)
         at = actor.length + ' moved the robber and stole a card from '.length;
+      else if (body === ` is willing to trade with ${name}.`)
+        at = actor.length + ' is willing to trade with '.length;
       else if (body === ` moved the robber. ${name} had no resource cards.`)
         at = actor.length + ' moved the robber. '.length;
       if (at >= 0) {
@@ -140,26 +130,28 @@ function Move({ entry, names }: { entry: HistoryEntry; names: string[] }) {
               : entry.kind === 'endTurn'
                 ? ArrowRight
                 : /trade|proposal/i.test(entry.kind)
-                  ? ArrowLeftRight
+                  ? null
                   : entry.kind === 'discard'
                     ? Layers
-                    : History;
+                    : null;
   return (
-    <li className="journal-move">
-      <span className="journal-action">
-        <Icon />
-        {entry.automatic && (
-          <span
-            className="automatic-mark"
-            role="img"
-            aria-label={
-              entry.kind === 'resign' ? 'Automatic resignation after disconnect' : 'Automatic timer move'
-            }
-          >
-            <Clock3 />
-          </span>
-        )}
-      </span>
+    <li className={`journal-move ${!Icon && !entry.automatic ? 'journal-note' : ''}`}>
+      {(Icon || entry.automatic) && (
+        <span className="journal-action">
+          {Icon && <Icon />}
+          {entry.automatic && (
+            <span
+              className="automatic-mark"
+              role="img"
+              aria-label={
+                entry.kind === 'resign' ? 'Automatic resignation after disconnect' : 'Automatic timer move'
+              }
+            >
+              <Clock3 />
+            </span>
+          )}
+        </span>
+      )}
       <div className="journal-lines">
         {entry.lines.map((line, i) => (
           <p key={i}>{historyTokens(line, names)}</p>
@@ -182,6 +174,9 @@ export function MoveHistory({
   const names = game.players.map((p) => p.name);
   return (
     <div className="turn-journal">
+      {!entries.length && !game.log.length && (
+        <p className="journal-empty">Moves and resource gains will appear here.</p>
+      )}
       {entries.length ? (
         historyTurns(entries).map((group) => (
           <section className="journal-turn" key={group.turn}>
@@ -201,10 +196,7 @@ export function MoveHistory({
               .slice()
               .reverse()
               .map((e) => (
-                <li className="journal-move" key={e.id}>
-                  <span className="journal-action">
-                    <History />
-                  </span>
+                <li className="journal-move journal-note" key={e.id}>
                   <p>{historyTokens(e.text, names)}</p>
                 </li>
               ))}

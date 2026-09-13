@@ -16,6 +16,7 @@ export type SoundCue =
   | 'knight'
   | 'robber'
   | 'turn'
+  | 'pass'
   | 'award'
   | 'win'
   | 'warning'
@@ -107,7 +108,13 @@ export function soundScore(cue: SoundCue): SoundNote[] {
         tap(115, 0.21, 0.09),
       ];
     case 'turn':
-      return [tone(660, 0, 0.28, 0.08), tone(880, 0.11, 0.32, 0.055)];
+      return [
+        tap(240, 0, 0.07),
+        tone(330, 0.08, 0.2, 0.055, 'triangle'),
+        tone(440, 0.19, 0.25, 0.04, 'triangle'),
+      ];
+    case 'pass':
+      return [noise(0, 0.14, 0.04, 1200), tap(220, 0.12, 0.06)];
     case 'award':
       return [523, 659, 784, 1046].map((n, i) => tone(n, i * 0.1, 0.45, 0.08));
     case 'win':
@@ -133,9 +140,9 @@ export function soundLayers(cue: SoundCue): SampleLayer[] {
   });
   switch (cue) {
     case 'ui':
-      return [layer('paperPlace', 0, 0.15, 1.2, 0.13)];
+      return [layer('paperPlace', 0, 0.22, 1.2, 0.13)];
     case 'hover':
-      return [layer('paperSlide', 0, 0.18, 1.2, 0.14)];
+      return [layer('paperSlide', 0, 0.24, 1.2, 0.14)];
     case 'dice':
       return [
         layer('diceRattle', 0.025, 0.38),
@@ -172,7 +179,9 @@ export function soundLayers(cue: SoundCue): SampleLayer[] {
     case 'robber':
       return [layer('cloth', 0, 0.47), layer('woodHeavy', 0.2, 0.39, 0.76)];
     case 'turn':
-      return [layer('turn', 0, 0.73)];
+      return [layer('wood', 0, 0.26, 0.88, 0.15), layer('join', 0.08, 0.42, 0.88)];
+    case 'pass':
+      return [layer('paperSlide', 0, 0.35, 0.88), layer('wood', 0.14, 0.27, 0.82, 0.17)];
     case 'award':
       return [layer('award', 0, 0.77), layer('magic', 0.66, 0.37, 1.12)];
     case 'win':
@@ -280,7 +289,7 @@ export class SoundEngine {
     }
     if (this.context && this.context.state !== 'closed' && this.master)
       this.master.gain.setTargetAtTime(
-        this.enabled() ? this.preferences().volume * 0.6 : 0,
+        this.enabled() ? this.preferences().volume * 0.75 : 0,
         this.context.currentTime,
         0.025,
       );
@@ -527,6 +536,10 @@ export class SoundEngine {
       } catch {}
       this.release(source);
     }
+  }
+  /** Reset transient cues without interrupting the music or suspending its audio clock. */
+  resetEffects() {
+    this.stopEffects();
   }
   silence() {
     this.stopEffects();

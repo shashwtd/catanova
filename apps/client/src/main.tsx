@@ -1,15 +1,21 @@
+import { LoungeBackdrop } from './LoungeBackdrop.js';
+import { PlacementConfirmation } from './PlacementConfirmation.js';
+import { TurnButtonAttention } from './TurnButtonAttention.js';
+import { UtilityPanel } from './UtilityPanel.js';
+import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
 import { isBuildAction, placementValid } from './placement.js';
 import type { PlacementDraft } from './placement.js';
+import { BOARD_THEMES } from './board-theme.js';
 import { usePreferences } from './preferences.js';
 import { useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
-import { GameSettings, GameInfo } from './GameSettings.js';
+import { GameSettings } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -23,7 +29,7 @@ import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
 import { preloadGameAssets } from './game-assets.js';
 import { useRoomInvites } from './useRoomInvites.js';
-import { RoomInviteInbox } from './RoomInvitePanel.js';
+import { RoomInviteNotice } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
@@ -36,7 +42,6 @@ import {
   previewJoinReference,
 } from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
-import { ConnectionPanel } from './ConnectionPanel.js';
 import { BoardViewport } from './BoardViewport.js';
 import { initialMetrics } from './connection.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
@@ -45,20 +50,16 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  History,
   GameIcon,
   Settings2,
-  ArrowRight,
+  NextTurn,
   Castle,
   Check,
   CircleHelp,
   DoorOpen,
   Dices,
   House,
-  Maximize,
-  Minimize,
   Route,
-  Wifi,
   WifiOff,
   X,
   ArrowLeftRight,
@@ -105,10 +106,19 @@ import './friends-drawer.css';
 import './room-lobby.css';
 import './history-mobile.css';
 import './resource-counters.css';
+import './lounge.css';
+import './room-refinement.css';
+import './play-refinement.css';
+import './tool-motion.css';
+import './lounge-controls.css';
+import './game-dialogs.css';
+import './game-feedback-polish.css';
+import './lounge-tabletop.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
   LAST_SEAT_KEY = 'catanova.last-seat.v1';
+const designPreview = import.meta.env.DEV && location.pathname === '/dev/lounge';
 // Consume the OAuth choice once per page load, outside React renders (including StrictMode).
 const arrivalLocation = entryLocation();
 const arrivalInvite = navigationRoomReference(
@@ -116,7 +126,7 @@ const arrivalInvite = navigationRoomReference(
   arrivalLocation.search,
   history.state,
 );
-const arrivalIntent = takeEntryIntent(sessionStorage);
+const arrivalIntent = designPreview ? 'home' : takeEntryIntent(sessionStorage);
 function readJSON<T>(storage: Storage, key: string): T | undefined {
   try {
     const value = storage.getItem(key);
@@ -153,7 +163,22 @@ function IconButton({
     </button>
   );
 }
-function Dialog({
+function Dialog(props: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  compact?: boolean;
+  side?: boolean;
+}) {
+  return props.side ? (
+    <UtilityPanel title={props.title} onClose={props.onClose}>
+      {props.children}
+    </UtilityPanel>
+  ) : (
+    <ModalDialog {...props} />
+  );
+}
+function ModalDialog({
   title,
   children,
   onClose,
@@ -223,14 +248,13 @@ function App() {
     [code, setCode] = useState('');
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
-      | 'info'
       | 'settings'
       | 'trade'
       | 'rules'
       | 'journal'
       | 'leave'
       | 'profile'
-      | 'network'
+      | 'editProfile'
       | 'invite'
       | 'friends'
       | null
@@ -252,8 +276,12 @@ function App() {
   const roomInvites = useRoomInvites(
     auth.account?.id,
     auth.accessToken,
-    auth.canPlay && !!auth.account && !auth.account.isGuest && !g,
+    auth.canPlay && !!auth.account && !auth.account.isGuest,
   );
+  const incomingInvites = roomInvites.incoming.filter(
+    (incoming) => incoming.roomId !== room?.roomId && incoming.roomId !== invite,
+  );
+  const roomEntryBlocked = room ? 'Leave your current room to join another.' : undefined;
   const [assetProgress, setAssetProgress] = useState(0);
   const [launchVisualExpired, setLaunchVisualExpired] = useState(false);
   const connected = status === 'connected',
@@ -274,6 +302,17 @@ function App() {
   }, [!!g, feedback.sound]);
   const actionPhase = myTurn && g?.phase === 'actions';
   const networkBusy = status === 'connecting' || status === 'reconnecting';
+  const invitationNotice = (
+    <RoomInviteNotice
+      invitations={incomingInvites}
+      busy={!!roomInvites.busy || busy || networkBusy}
+      blockedReason={roomEntryBlocked}
+      error={roomInvites.error}
+      onOpen={openInvitation}
+      onDismiss={(id) => void roomInvites.dismiss(id)}
+      onShowAll={() => setPanel('friends')}
+    />
+  );
   const placementReady = placementValid(placement, g, room?.roomId, me);
   useEffect(() => {
     const change = () => setFullscreen(!!document.fullscreenElement);
@@ -312,6 +351,10 @@ function App() {
       setupIndex: g.setupIndex,
     };
     if (placementValid(draft, g, room.roomId, me)) {
+      if (mode === action.kind) {
+        void act(action);
+        return;
+      }
       setPlacement(draft);
       setPanel(null);
     }
@@ -424,6 +467,11 @@ function App() {
         return;
       }
       if (message.type === 'error') {
+        if (message.code === 'LOBBY_REMOVED') {
+          home(true);
+          setToast(message.message);
+          return;
+        }
         if (
           message.code === 'SEAT_LEFT' &&
           readJSON<PendingCommand>(sessionStorage, OUTBOX_KEY)?.type === 'leave'
@@ -455,8 +503,8 @@ function App() {
   useEffect(() => {
     if (!room || room.game) return;
     // Requests are cached and shared with the actual launch and WebGL renderer.
-    void preloadGameAssets().catch(() => {});
-  }, [room?.roomId]);
+    void preloadGameAssets(undefined, preferences.boardTheme).catch(() => {});
+  }, [room?.roomId, preferences.boardTheme]);
   useEffect(() => {
     const launchId = room?.launch?.id;
     const c = connection.current;
@@ -465,7 +513,7 @@ function App() {
     setAssetProgress(0);
     void preloadGameAssets((ready, total) => {
       if (active) setAssetProgress(ready / total);
-    }).then(
+    }, preferences.boardTheme).then(
       () => {
         if (active && connection.current === c) c.launchReady(launchId, true);
       },
@@ -476,7 +524,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [room?.launch?.id, connected]);
+  }, [room?.launch?.id, connected, preferences.boardTheme]);
   useEffect(() => {
     setLaunchVisualExpired(false);
     const launch = room?.launch;
@@ -761,10 +809,12 @@ function App() {
         if (button && !button.disabled) feedback.sound.play('ui');
       }}
     >
+      {!g && (room || playerHome) && <LoungeBackdrop />}
       {g && (
         <div className="board-anchor">
           <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
             <Board
+              art={BOARD_THEMES[preferences.boardTheme]}
               board={g.board}
               game={g}
               glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}
@@ -782,53 +832,15 @@ function App() {
       )}
       {!g && !room && !playerHome && <div className="title-scenery" aria-hidden="true" />}
       {g && (
-        <nav className="side-controls game-controls" aria-label="Current game tools">
-          <IconButton
-            label="Move history"
-            active={panel === 'journal'}
-            onClick={() => setPanel(panel === 'journal' ? null : 'journal')}
-          >
-            <History />
-          </IconButton>
-          <IconButton
-            label="Connection and ping"
-            active={panel === 'network'}
-            className={connected ? 'connected' : 'disconnected'}
-            onClick={() => setPanel(panel === 'network' ? null : 'network')}
-          >
-            {networkBusy ? <GameLoader compact label="Reconnecting…" /> : connected ? <Wifi /> : <WifiOff />}
-          </IconButton>
-          <IconButton
-            label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            onClick={() => void fullscreen()}
-          >
-            {isFullscreen ? <Minimize /> : <Maximize />}
-          </IconButton>
-        </nav>
-      )}
-      {g && (
-        <nav className="side-controls room-controls" aria-label="Room tools">
-          <IconButton
-            label="Rules"
-            active={panel === 'rules'}
-            onClick={() => setPanel(panel === 'rules' ? null : 'rules')}
-          >
-            <CircleHelp />
-          </IconButton>
-          <IconButton label="Game info" active={panel === 'info'} onClick={() => setPanel('info')}>
-            <GameIcon name="info" />
-          </IconButton>
-          <IconButton label="Settings" active={panel === 'settings'} onClick={() => setPanel('settings')}>
-            <Settings2 />
-          </IconButton>
-          <IconButton
-            label="Leave room"
-            disabled={busy}
-            onClick={() => (g.phase !== 'finished' ? setPanel('leave') : void leave())}
-          >
-            <DoorOpen />
-          </IconButton>
-        </nav>
+        <GameTools
+          panel={panel}
+          onPanel={setPanel}
+          onClosePanel={() => setPanel(null)}
+          fullscreen={isFullscreen}
+          onFullscreen={() => void fullscreen()}
+          busy={busy}
+          onLeave={() => (g.phase !== 'finished' ? setPanel('leave') : void leave())}
+        />
       )}
       {g && room && (
         <PlayerRail
@@ -896,25 +908,19 @@ function App() {
           games={playerGames}
           busy={busy || networkBusy}
           initialJoin={entry === 'join'}
+          invitationCount={incomingInvites.length}
+          notifications={panel === 'friends' ? null : invitationNotice}
           onCreate={() => void enterRoom('create')}
           onJoin={(value) => enterRoom('join', value)}
           onResume={resumeGame}
           onProfile={() => setPanel('profile')}
+          onEditProfile={() => setPanel('editProfile')}
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
           onSignOut={() => void signOut()}
         />
       )}
-      {playerHome && roomInvites.incoming.length > 0 && (
-        <div className="hub-invitations">
-          <RoomInviteInbox
-            invitations={roomInvites.incoming}
-            busy={!!roomInvites.busy}
-            onOpen={openInvitation}
-            onDismiss={(id) => void roomInvites.dismiss(id)}
-          />
-        </div>
-      )}
+      {!playerHome && panel !== 'friends' && <div className="room-notifications">{invitationNotice}</div>}
       {!room && !playerHome && (
         <EntryScreen
           auth={auth}
@@ -956,11 +962,21 @@ function App() {
           busy={busy || !!room.launch}
           connected={connected}
           onReady={(v) => void ready(v)}
+          onKick={async (playerId) => {
+            const c = connection.current;
+            if (!c || disabled) throw new Error('Reconnect before removing a player');
+            setBusy(true);
+            try {
+              await c.kick(playerId);
+            } finally {
+              if (connection.current === c) setBusy(c.awaitingConfirmation);
+            }
+          }}
           onStart={() => void act({ kind: 'start' })}
           onInvite={() => setPanel('friends')}
           onFriends={auth.config?.mode === 'authenticated' ? () => setPanel('friends') : undefined}
           onLeave={() => void leave()}
-          onEdit={() => setPanel('profile')}
+          onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
         />
       )}
@@ -1005,7 +1021,7 @@ function App() {
                 return (
                   <IconButton
                     key={kind}
-                    className={`build-control build-${kind}`}
+                    className={`build-control build-${kind} ${!disabled && actionPhase && sites.length ? 'is-available' : ''}`}
                     label={`Build ${kind} · ${RESOURCES.filter((r) => COSTS[kind][r])
                       .map((r) => `${COSTS[kind][r]} ${RESOURCE_NAMES[r]}`)
                       .join(', ')}`}
@@ -1026,33 +1042,40 @@ function App() {
               })}
             </div>
           )}
-          <div className="card-table">
-            <div className="hand-zone">
-              <ResourceHand
-                hand={feedback.hand ?? hand}
-                pulse={feedback.pulse}
-                reducedMotion={reducedMotion}
-                onHover={() => feedback.sound.play('hover')}
-              />
-              {me && !!player?.cards?.length && (
-                <DevelopmentCards
-                  game={g}
-                  me={me}
-                  disabled={disabled}
+          <div className="hand-dock">
+            <div className="card-table">
+              <div className="hand-zone">
+                <ResourceHand
+                  hand={feedback.hand ?? hand}
+                  pulse={feedback.pulse}
                   reducedMotion={reducedMotion}
-                  onAction={(a) => void act(a)}
-                  onHover={() => feedback.sound.play('hover')}
-                  obscured={panel !== null || placementReady}
-                  onSelect={() => {
-                    setPanel(null);
-                    setPlacement(null);
-                  }}
                 />
-              )}
+                {me && !!player?.cards?.length && (
+                  <DevelopmentCards
+                    game={g}
+                    me={me}
+                    disabled={disabled}
+                    reducedMotion={reducedMotion}
+                    onAction={(a) => void act(a)}
+                    onHover={() => feedback.sound.play('hover')}
+                    obscured={panel !== null || placementReady}
+                    onSelect={() => {
+                      setPanel(null);
+                      setPlacement(null);
+                    }}
+                  />
+                )}
+              </div>
             </div>
             <div className="table-actions">
               <div className="dice-dock" data-dice-dock />
               <div className="utility-actions">
+                <div className="development-hand-inline purchase-control">
+                  <DevelopmentPurchase
+                    disabled={disabled || !g.legal.canBuyCard}
+                    onBuy={() => void act({ kind: 'buyCard' })}
+                  />
+                </div>
                 <button
                   className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
                   aria-label="Trade"
@@ -1066,94 +1089,61 @@ function App() {
                   <ArrowLeftRight size={33} />
                   <span>Trade</span>
                 </button>
-                <div className="development-hand-inline purchase-control">
-                  <DevelopmentPurchase
-                    disabled={disabled || !g.legal.canBuyCard}
-                    onBuy={() => void act({ kind: 'buyCard' })}
-                  />
-                </div>
               </div>
               <button
                 className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
-                aria-label={actionPhase ? 'End turn' : 'Roll dice'}
-                title={actionPhase ? 'End turn' : 'Roll dice'}
+                aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
+                title={actionPhase ? 'Next turn' : 'Roll dice'}
                 disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
                 onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
               >
-                {actionPhase ? <ArrowRight size={36} /> : <Dices size={38} />}
-                <span>{actionPhase ? 'End' : 'Roll'}</span>
+                <TurnButtonAttention />
+                {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
+                {actionPhase && <span>Next</span>}
               </button>
             </div>
           </div>
-          {me && <IncomingTrade game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />}
-          {(panel === 'trade' || panel === 'journal') && (
-            <aside
-              className={`game-panel floating-panel ${panel === 'trade' ? 'trade-panel' : 'journal-panel'}`}
-              aria-label={panel === 'trade' ? 'Trade' : 'Move history'}
-            >
-              <div className="panel-heading">
-                <h2>{panel === 'trade' ? 'Trade' : 'Move history'}</h2>
-                <IconButton label="Close panel" onClick={() => setPanel(null)}>
-                  <X />
-                </IconButton>
-              </div>
-              {panel === 'trade' && me && (
-                <TradePanel game={g} me={me} disabled={disabled} onAction={(a) => act(a, true)} />
-              )}
-              {panel === 'journal' && (
-                <MoveHistory
-                  entries={historyEntries}
-                  game={g}
-                  hasMore={historyHasMore}
-                  onEarlier={() => connection.current?.history(historyEntries.at(-1)?.revision)}
-                />
-              )}
-            </aside>
+          {me && (
+            <IncomingTrade
+              roomPlayers={room!.players}
+              game={g}
+              me={me}
+              disabled={disabled}
+              onAction={(a) => act(a, true)}
+            />
+          )}
+          {panel === 'trade' && me && (
+            <TradePanel
+              roomPlayers={room!.players}
+              game={g}
+              me={me}
+              disabled={disabled}
+              onAction={(a) => act(a, true)}
+              onClose={() => setPanel(null)}
+            />
+          )}
+          {panel === 'journal' && (
+            <UtilityPanel title="Move history" onClose={() => setPanel(null)}>
+              <MoveHistory
+                entries={historyEntries}
+                game={g}
+                hasMore={historyHasMore}
+                onEarlier={() => connection.current?.history(historyEntries.at(-1)?.revision)}
+              />
+            </UtilityPanel>
           )}
           {placementReady && placement && (
-            <aside className="build-confirmation" aria-label="Confirm placement">
-              <div className="build-confirmation-title">
-                {placement.action.kind === 'road' ? (
-                  <Route />
-                ) : placement.action.kind === 'city' ? (
-                  <Castle />
-                ) : (
-                  <House />
-                )}
-                <strong>
-                  {placement.action.kind === 'city' ? 'Upgrade to city' : `Place ${placement.action.kind}`}
-                </strong>
-              </div>
-              {g.phase === 'actions' ? (
-                <ResourceSummary hand={COSTS[placement.action.kind]} />
-              ) : (
-                <span className="free-placement">
-                  {g.phase === 'freeRoads' ? 'Free road' : 'Starting piece'}
-                </span>
-              )}
-              <div className="build-confirmation-actions">
-                <button
-                  className="text-button"
-                  aria-label="Cancel placement"
-                  onClick={() => setPlacement(null)}
-                >
-                  <X />
-                </button>
-                <button
-                  className="gold-button"
-                  disabled={disabled || !placementReady}
-                  onClick={() => {
-                    if (!placementValid(placement, g, room?.roomId, me)) return;
-                    const action = placement.action;
-                    setPlacement(null);
-                    void act(action);
-                  }}
-                >
-                  <Check />
-                  Build
-                </button>
-              </div>
-            </aside>
+            <PlacementConfirmation
+              action={placement.action}
+              disabled={disabled || !placementReady}
+              onCancel={() => setPlacement(null)}
+              onConfirm={() => {
+                if (!placementValid(placement, g, room?.roomId, me)) return;
+                const action = placement.action;
+                setPlacement(null);
+                void act(action);
+              }}
+            />
           )}
           {room && (
             <RobberFlow
@@ -1197,13 +1187,8 @@ function App() {
           onComplete={() => setTransitionId(null)}
         />
       )}
-      {panel === 'info' && room && (
-        <Dialog title="Game info" onClose={() => setPanel(null)}>
-          <GameInfo room={room} />
-        </Dialog>
-      )}
       {panel === 'settings' && (
-        <Dialog title="Settings" onClose={() => setPanel(null)}>
+        <Dialog side={!!g} title="Settings" onClose={() => setPanel(null)}>
           <GameSettings
             preferences={preferences}
             update={update}
@@ -1215,30 +1200,16 @@ function App() {
           />
         </Dialog>
       )}
-      {panel === 'network' && room && (
-        <aside className="game-panel utility-panel floating-panel">
-          <div className="panel-heading">
-            <h2>Connection</h2>
-            <IconButton label="Close connection panel" onClick={() => setPanel(null)}>
-              <X />
-            </IconButton>
-          </div>
-          <ConnectionPanel
-            metrics={metrics}
-            status={status}
-            revision={room.revision}
-            pending={busy}
-            onSync={() => connection.current?.sync()}
-          />
-        </aside>
-      )}
       {panel === 'invite' && room && (
         <Dialog title="Room invitation" compact onClose={() => setPanel(null)}>
           <Invite code={room.roomCode ?? room.roomId} roomId={room.roomId} />
         </Dialog>
       )}
-      {panel === 'profile' && (
-        <Dialog title="Your profile" onClose={() => setPanel(null)}>
+      {(panel === 'profile' || panel === 'editProfile') && (
+        <Dialog
+          title={panel === 'editProfile' ? 'Edit profile' : 'Your profile'}
+          onClose={() => setPanel(null)}
+        >
           {g ? (
             <>
               <div className="profile-preview">
@@ -1249,7 +1220,9 @@ function App() {
             </>
           ) : (
             <PlayerProfile
-              key={auth.account?.id ?? 'local'}
+              key={`${auth.account?.id ?? 'local'}:${panel}`}
+              initialEditing={panel === 'editProfile'}
+              onEdit={() => setPanel('editProfile')}
               auth={auth}
               profile={room?.players.find((p) => p.id === me)?.profile ?? auth.profile}
               games={playerGames}
@@ -1269,6 +1242,7 @@ function App() {
           room={room && !g ? room : undefined}
           invites={roomInvites}
           onOpenRoom={openInvitation}
+          roomEntryBlocked={roomEntryBlocked}
         />
       )}
       {panel === 'leave' && (
@@ -1286,11 +1260,16 @@ function App() {
         </Dialog>
       )}
       {panel === 'rules' && (
-        <Dialog title="Rules" onClose={() => setPanel(null)}>
-          <QuickRules />
+        <Dialog side={!!g} title="Rules" onClose={() => setPanel(null)}>
+          <QuickRules victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints} />
         </Dialog>
       )}
     </main>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+const root = createRoot(document.getElementById('root')!);
+if (designPreview) {
+  void import('./dev/LoungePreview.js').then(({ LoungePreview }) => root.render(<LoungePreview />));
+} else {
+  root.render(<App />);
+}

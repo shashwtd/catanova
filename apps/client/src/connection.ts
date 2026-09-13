@@ -268,6 +268,7 @@ export class Connection {
           [
             'INVALID_SESSION',
             'SEAT_LEFT',
+            'LOBBY_REMOVED',
             'ROOM_NOT_FOUND',
             'ROOM_FULL',
             'CAPACITY',
@@ -342,6 +343,9 @@ export class Connection {
   }
   lobby(ready: boolean, profile?: Profile) {
     return this.submit({ type: 'lobby', ready, ...(profile ? { profile } : {}) });
+  }
+  kick(playerId: string) {
+    return this.submit({ type: 'lobby', ready: false, kickPlayerId: playerId });
   }
   settings(settings: RoomSettings) {
     return this.submit({ type: 'settings', settings });

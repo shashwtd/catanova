@@ -149,3 +149,88 @@ test('an unavailable short code never exposes the UUID in room details or offers
       ?.includes('disabled=""'),
   );
 });
+
+test('a received invitation has a persistent live notice with sender, room action and dismissal', async () => {
+  const { RoomInviteNotice } = await import('../apps/client/src/RoomInvitePanel.js');
+  const invite: RoomInvite = {
+    id: 'received',
+    roomId: id,
+    roomCode: 'AB2C',
+    from: account('Sailor'),
+    createdAt: 1,
+    expiresAt: 300_001,
+    players: 2,
+  };
+  const props = {
+    invitations: [invite],
+    busy: false,
+    onOpen: () => {},
+    onDismiss: () => {},
+    onShowAll: () => {},
+  };
+  const html = renderToStaticMarkup(createElement(RoomInviteNotice, props));
+  assert.ok(html.includes('role="status"') && html.includes('aria-live="polite"'));
+  assert.ok(html.includes('Sailor') && html.includes('AB2C'));
+  assert.ok(!html.includes('hidden=""'));
+  assert.ok(buttons(html).some((button) => button.includes('View room')));
+  assert.ok(html.includes('Dismiss invitation from Sailor'));
+  assert.ok(!html.includes(id), 'private room identity is not displayed');
+  const busy = renderToStaticMarkup(createElement(RoomInviteNotice, { ...props, busy: true }));
+  assert.ok(
+    buttons(busy)
+      .filter((button) => button.includes('View room') || button.includes('Dismiss invitation'))
+      .every((button) => button.includes('disabled=""')),
+  );
+  const blocked = renderToStaticMarkup(
+    createElement(RoomInviteNotice, { ...props, blockedReason: 'Leave your current room to join another.' }),
+  );
+  assert.ok(blocked.includes('Leave your current room'));
+  assert.ok(
+    !buttons(blocked).some((button) => button.includes('View room')),
+    'no invitation action that silently fails in an occupied room',
+  );
+  const empty = renderToStaticMarkup(createElement(RoomInviteNotice, { ...props, invitations: [] }));
+  assert.ok(empty.includes('hidden=""') && !empty.includes('Sailor'));
+});
+
+test('room invitation drawer also shows incoming invitations and explains room switching', () => {
+  const invites = controller();
+  invites.incoming = [
+    {
+      id: 'received',
+      roomId: 'another-room',
+      roomCode: 'FERN',
+      from: account('Mason'),
+      createdAt: 1,
+      expiresAt: 300_001,
+      players: 2,
+    },
+  ];
+  const html = renderToStaticMarkup(
+    createElement(FriendsDrawer, {
+      auth: auth(),
+      room: room(),
+      invites,
+      onClose: () => {},
+      onOpenRoom: () => {},
+    }),
+  );
+  assert.ok(html.includes('Room invitations') && html.includes('FERN'));
+  assert.ok(html.includes('Leave your current room to join another.'));
+  assert.ok(
+    buttons(html)
+      .find((button) => button.includes('View room'))
+      ?.includes('disabled=""'),
+  );
+  invites.incoming[0]!.roomId = id;
+  const current = renderToStaticMarkup(
+    createElement(FriendsDrawer, {
+      auth: auth(),
+      room: room(),
+      invites,
+      onClose: () => {},
+      onOpenRoom: () => {},
+    }),
+  );
+  assert.ok(!current.includes('Room invitations'), 'do not offer an invitation to the room already occupied');
+});

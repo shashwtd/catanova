@@ -1,9 +1,10 @@
+import { DEFAULT_VICTORY_POINTS, validVictoryPoints } from './victory.js';
 import { COSTS, DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES, SUPPLY, RULESET } from './index.js';
 import type { Resource } from './index.js';
 import { generateBoard, shuffle } from './board.js';
 import type { Board } from './board.js';
 import { rollDice } from './dice.js';
-import type { DiceMode } from './dice.js';
+import type { DiceMode, BalancedDiceState } from './dice.js';
 
 export type Hand = Record<Resource, number>;
 export type CardKind = keyof typeof DEVELOPMENT_DECK;
@@ -22,7 +23,7 @@ export type Game = {
   discards: Record<string, number>; trade: Trade | null; nextTrade: number;
   longestRoad: string | null; largestArmy: string | null; winner: string | null;
   finishReason?: 'resignation' | 'abandoned';
-  diceMode?: DiceMode; tradeOffersThisTurn?: number;
+  diceMode?: DiceMode | 'flat'; balancedDice?: BalancedDiceState; victoryPoints?: number; tradeOffersThisTurn?: number;
   log: { id: number; text: string }[]; nextLog: number;
 };
 export type GameAction =
@@ -80,7 +81,8 @@ export function parseGameAction(input: unknown): GameAction {
   }
 }
 
-export function createGame(seats: { id: string; name: string }[], seed: number, random: () => number, options: { diceMode?: DiceMode } = {}): Game {
+export function createGame(seats: { id: string; name: string }[], seed: number, random: () => number, options: { diceMode?: DiceMode; victoryPoints?: number } = {}): Game {
+  requireRule(options.victoryPoints === undefined || validVictoryPoints(options.victoryPoints), 'Choose a victory target from 8 to 15 points');
   requireRule(seats.length >= 2 && seats.length <= 4, 'Start with two to four players');
   requireRule(new Set(seats.map(p => p.id)).size === seats.length, 'Seats must be unique');
   const board = generateBoard(seed);
@@ -90,15 +92,13 @@ export function createGame(seats: { id: string; name: string }[], seed: number, 
     phase: 'setupSettlement', active: 0, setupIndex: 0, setupVertex: null, turn: 0, dice: null,
     deck: shuffle(Object.entries(DEVELOPMENT_DECK).flatMap(([k, n]) => Array<CardKind>(n).fill(k as CardKind)), random), nextCard: 0,
     playedCard: false, returnPhase: 'actions', freeRoads: 0, discards: {}, trade: null, nextTrade: 0,
-    longestRoad: null, largestArmy: null, winner: null, log: [], nextLog: 0, diceMode: options.diceMode ?? 'classic', tradeOffersThisTurn: 0,
+    longestRoad: null, largestArmy: null, winner: null, log: [], nextLog: 0, diceMode: options.diceMode ?? 'classic', victoryPoints: options.victoryPoints ?? DEFAULT_VICTORY_POINTS,
   };
   log(g, 'The island is ready. Place two settlements and roads in snake order.');
   return g;
 }
 export const activePlayer = (g: Pick<Game, 'players' | 'active'>) => g.players[g.active]!;
 /** Catanova's anti-spam house rule; responses and bank/port trades do not consume this allowance. */
-export const TRADE_OFFER_LIMIT = 5;
-export const tradeOffersRemaining = (g: Pick<Game, 'tradeOffersThisTurn'>) => Math.max(0, TRADE_OFFER_LIMIT - (g.tradeOffersThisTurn ?? 0));
 type BoardState = Pick<Game, 'board' | 'buildings' | 'roads'>;
 export function settlementSites(g: BoardState, player: string, setup = false): number[] {
   return g.board.vertices.filter(v => !g.buildings[v.id] && v.neighbors.every(n => !g.buildings[n]) && (setup || v.edges.some(e => g.roads[e] === player))).map(v => v.id);
@@ -147,7 +147,7 @@ function updateAwards(g: Game) {
   }
 }
 function checkWin(g: Game) {
-  if (g.turn && !activePlayer(g).resigned && score(g, activePlayer(g)) >= 10) { g.winner = activePlayer(g).id; g.phase = 'finished'; g.trade = null; log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`); }
+  if (g.turn && !activePlayer(g).resigned && score(g, activePlayer(g)) >= (g.victoryPoints ?? DEFAULT_VICTORY_POINTS)) { g.winner = activePlayer(g).id; g.phase = 'finished'; g.trade = null; log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`); }
 }
 export function robberVictims(g: BoardState & { players?: { id: string; resigned?: boolean }[] }, player: string, hex: number): string[] {
   return [...new Set(g.board.hexes[hex]!.vertices.map(v => g.buildings[v]?.player).filter((p): p is string => !!p && p !== player && !g.players?.find(other => other.id === p)?.resigned))];
@@ -157,6 +157,7 @@ function finishFreeRoads(g: Game) {
 }
 function produce(g: Game, number: number) {
   const owed = g.players.map(() => emptyHand());
+  const received = g.players.map(() => emptyHand());
   for (const h of g.board.hexes) if (h.number === number && h.id !== g.robber && h.terrain !== 'desert') {
     for (const v of h.vertices) { const b = g.buildings[v]; if (b) { const i = g.players.findIndex(p => p.id === b.player); if (!g.players[i]?.resigned) owed[i]![h.terrain] += b.kind === 'city' ? 2 : 1; } }
   }
@@ -164,14 +165,16 @@ function produce(g: Game, number: number) {
     const recipients = owed.map((h, i) => ({ n: h[r], i })).filter(x => x.n > 0);
     const needed = recipients.reduce((n, p) => n + p.n, 0);
     if (needed > g.bank[r] && recipients.length > 1) { log(g, `The bank is short of ${RESOURCE_NAMES[r]}; nobody receives that resource.`); continue; }
-    for (const { n, i } of recipients) { const amount = Math.min(n, g.bank[r]); g.players[i]!.hand[r] += amount; g.bank[r] -= amount; }
+    for (const { n, i } of recipients) { const amount = Math.min(n, g.bank[r]); g.players[i]!.hand[r] += amount; g.bank[r] -= amount; received[i]![r] += amount; }
   }
+  for (const [i, hand] of received.entries()) if (total(hand)) log(g, `${g.players[i]!.name} received ${resourceText(hand)}.`);
+  if (!received.some(hand => total(hand))) log(g, 'No resources produced.');
 }
 
 function advanceTurn(g: Game, pendingRobber = false) {
   do { g.active = (g.active + 1) % g.players.length; } while (activePlayer(g).resigned);
   g.turn++; g.phase = pendingRobber ? 'robber' : 'roll'; g.returnPhase = 'roll';
-  g.dice = null; g.playedCard = false; g.freeRoads = 0; g.trade = null; g.tradeOffersThisTurn = 0;
+  g.dice = null; g.playedCard = false; g.freeRoads = 0; g.trade = null;
   log(g, `${activePlayer(g).name}'s turn.${pendingRobber ? ' Move the robber, then roll.' : ''}`);
 }
 
@@ -285,6 +288,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && g.trade.player === activePlayer(g).id, 'That trade is no longer available');
     const offer = g.trade;
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
+    requireRule(!offer.proposals?.some(proposal => proposal.player === p.id), 'Your acceptance is committed until this offer ends');
     offer.declinedBy = [...(offer.declinedBy ?? []), p.id];
     if (offer.proposals) offer.proposals = offer.proposals.filter(proposal => proposal.player !== p.id);
     log(g, `${p.name} declined the trade offer.`);
@@ -295,23 +299,21 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     return g;
   }
   if (a.kind === 'proposeTrade' || a.kind === 'withdrawProposal') {
-    requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && g.trade.open && g.trade.player === activePlayer(g).id, 'That open trade is no longer available');
+    requireRule(g.phase === 'actions' && !isActive && g.trade?.id === a.tradeId && (a.kind === 'withdrawProposal' || g.trade.open) && g.trade.player === activePlayer(g).id, 'That trade is no longer available');
     const offer = g.trade;
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
+    requireRule(a.kind !== 'withdrawProposal', 'Your acceptance is committed until this offer ends');
+    requireRule(!offer.proposals?.some(proposal => proposal.player === p.id), 'Your acceptance is committed until this offer ends');
     if (a.kind === 'proposeTrade') {
       requireRule(total(a.give) > 0 && RESOURCES.every(r => !a.give[r] || !offer.give[r]), 'Offer cards with no resource on both sides');
       requireRule(canPay(p.hand, a.give), 'You do not have the proposed cards');
       offer.proposals = [...(offer.proposals ?? []).filter(proposal => proposal.player !== p.id), { player: p.id, give: a.give }];
       log(g, `${p.name} proposed ${resourceText(a.give)} for ${activePlayer(g).name}'s ${resourceText(offer.give)}.`);
-    } else {
-      requireRule(offer.proposals?.some(proposal => proposal.player === p.id), 'You have no proposal to withdraw');
-      offer.proposals = (offer.proposals ?? []).filter(proposal => proposal.player !== p.id);
-      log(g, `${p.name} withdrew their trade proposal.`);
     }
     return g;
   }
   if (a.kind === 'acceptProposal') {
-    requireRule(g.phase === 'actions' && isActive && g.trade?.id === a.tradeId && g.trade.open && g.trade.player === p.id, 'That proposal is no longer available');
+    requireRule(g.phase === 'actions' && isActive && g.trade?.id === a.tradeId && g.trade.player === p.id, 'That proposal is no longer available');
     const offer = g.trade, proposal = offer.proposals?.find(proposal => proposal.player === a.player);
     const responder = g.players.find(other => other.id === a.player && other.id !== p.id && !other.resigned);
     requireRule(proposal && responder && !offer.declinedBy?.includes(a.player), 'That proposal is no longer available');
@@ -325,19 +327,23 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     const maker = activePlayer(g), offer = g.trade;
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
     requireRule(canPay(maker.hand, offer.give) && canPay(p.hand, offer.want), 'A player no longer has the offered cards');
-    transfer(maker.hand, p.hand, offer.give); transfer(p.hand, maker.hand, offer.want);
-    log(g, `${maker.name} traded ${resourceText(offer.give)} to ${p.name} for ${resourceText(offer.want)}.`); g.trade = null; return g;
+    requireRule(!offer.proposals?.some(proposal => proposal.player === p.id), 'You already accepted this offer');
+    offer.proposals = [...(offer.proposals ?? []), { player: p.id, give: { ...offer.want } }];
+    log(g, `${p.name} is willing to trade with ${maker.name}.`); return g;
   }
   requireRule(isActive, 'Wait for your turn');
   const owned = pieces(g, p.id);
   if (g.phase === 'setupSettlement') {
     requireRule(a.kind === 'settlement' && settlementSites(g, p.id, true).includes(a.vertex), 'Choose an empty corner at least two edges from another settlement');
     g.buildings[a.vertex] = { player: p.id, kind: 'settlement' }; g.setupVertex = a.vertex; g.phase = 'setupRoad';
+    const startingResources = emptyHand();
     if (g.setupIndex >= g.players.length) for (const id of g.board.vertices[a.vertex]!.hexes) {
       const resource = g.board.hexes[id]!.terrain;
-      if (resource !== 'desert') { p.hand[resource]++; g.bank[resource]--; }
+      if (resource !== 'desert') { p.hand[resource]++; g.bank[resource]--; startingResources[resource]++; }
     }
-    log(g, `${p.name} placed a starting settlement at corner ${a.vertex + 1}.`); return g;
+    log(g, `${p.name} placed a starting settlement at corner ${a.vertex + 1}.`);
+    if (total(startingResources)) log(g, `${p.name} received ${resourceText(startingResources)} from the starting settlement.`);
+    return g;
   }
   if (g.phase === 'setupRoad') {
     requireRule(a.kind === 'road' && roadSites(g, p.id, g.setupVertex).includes(a.edge), 'Place a road touching your new settlement');
@@ -387,7 +393,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   }
   if (a.kind === 'roll') {
     requireRule(g.phase === 'roll', 'You have already rolled or must finish the current action');
-    g.dice = rollDice(g.diceMode ?? 'classic', random);
+    if (g.diceMode === 'balanced') g.balancedDice ??= { remaining: [] };
+    g.dice = rollDice(g.diceMode ?? 'classic', random, g.balancedDice);
     const sum = g.dice[0] + g.dice[1]; log(g, `${p.name} rolled ${g.dice[0]} + ${g.dice[1]} = ${sum}.`);
     if (sum === 7) {
       g.discards = Object.fromEntries(g.players.filter(other => !other.resigned && total(other.hand) > 7).map(other => [other.id, Math.floor(total(other.hand) / 2)]));
@@ -396,8 +403,9 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     return g;
   }
   requireRule(g.phase === 'actions', 'Finish the current action first');
-  // A new action withdraws an old offer; it cannot later be accepted against changed intent.
-  if (a.kind !== 'offerTrade') g.trade = null;
+  // Keep one live offer; cancelling it deliberately permits another with no per-turn cap.
+  if (a.kind === 'offerTrade' || a.kind === 'openTrade') requireRule(!g.trade, 'Cancel your current offer before creating another');
+  else g.trade = null;
   switch (a.kind) {
     case 'road':
       requireRule(owned.roads < 15 && roadSites(g, p.id).includes(a.edge), 'Choose a legal road site'); transfer(p.hand, g.bank, COSTS.road); g.roads[a.edge] = p.id; log(g, `${p.name} built a road on edge ${a.edge + 1}.`); break;
@@ -414,16 +422,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       log(g, `${p.name} traded ${rate} ${RESOURCE_NAMES[a.give]} for 1 ${RESOURCE_NAMES[a.receive]} at ${rate}:1.`); break;
     }
     case 'offerTrade':
-      requireRule(tradeOffersRemaining(g) > 0, 'You have used all five trade offers for this turn');
       requireRule(total(a.give) > 0 && total(a.want) > 0 && RESOURCES.every(r => !a.give[r] || !a.want[r]), 'Both sides must offer cards, with no resource on both sides');
       requireRule(canPay(p.hand, a.give), 'You do not have the offered cards');
-      g.tradeOffersThisTurn = (g.tradeOffersThisTurn ?? 0) + 1;
       g.trade = { id: g.nextTrade++, player: p.id, give: a.give, want: a.want }; log(g, `${p.name} offered ${resourceText(a.give)} for ${resourceText(a.want)}.`); break;
     case 'openTrade':
-      requireRule(tradeOffersRemaining(g) > 0, 'You have used all five trade offers for this turn');
       requireRule(total(a.give) > 0, 'Offer at least one resource card');
       requireRule(canPay(p.hand, a.give), 'You do not have the offered cards');
-      g.tradeOffersThisTurn = (g.tradeOffersThisTurn ?? 0) + 1;
       g.trade = { id: g.nextTrade++, player: p.id, give: a.give, want: emptyHand(), open: true, proposals: [] };
       log(g, `${p.name} offered ${resourceText(a.give)} and invited trade proposals.`); break;
     case 'cancelTrade': log(g, `${p.name} withdrew the trade offer.`); break;
@@ -436,12 +440,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
 
 export const CARD_NAMES: Record<CardKind, string> = { knight: 'Knight', roadBuilding: 'Road Building', yearOfPlenty: 'Year of Plenty', monopoly: 'Monopoly', victoryPoint: 'Victory Point' };
 export type PlayerView = { id: string; name: string; resigned?: boolean; resourceCount: number; cardCount: number; knights: number; points: number; roadLength: number; pieces: ReturnType<typeof pieces>; hand?: Hand; cards?: Card[] };
-export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 'nextTrade'> & {
+export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 'nextTrade' | 'balancedDice'> & {
   deckCount: number; players: PlayerView[];
   legal: { roads: number[]; settlements: number[]; cities: number[]; playableCards: string[]; canBuyCard: boolean; rates: Hand };
 };
 export function gameView(g: Game, viewer: string): GameView {
-  const { deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
+  const { balancedDice: _balancedDice, deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
   const me = players.find(p => p.id === viewer)!; const active = !me.resigned && activePlayer(g).id === viewer; const owned = pieces(g, viewer);
   const build = active && g.phase === 'actions', setup = active && g.phase === 'setupSettlement';
   return {

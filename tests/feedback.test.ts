@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -8,7 +10,7 @@ import {
   RollPresentationTracker,
 } from '../apps/client/src/feedback.js';
 import { PresentationBuffer, presentationHold } from '../apps/client/src/useFeedback.js';
-import { nextDicePresentation } from '../apps/client/src/GameEffects.js';
+import { GameEffects, nextDicePresentation } from '../apps/client/src/GameEffects.js';
 import { DEFAULT_PREFERENCES, parsePreferences } from '../apps/client/src/preferences.js';
 import { SoundEngine, soundScore } from '../apps/client/src/sound.js';
 import type { SoundCue } from '../apps/client/src/sound.js';
@@ -465,7 +467,13 @@ test('actual trades have a public sound for observers, while Monopoly and sugges
     { kind: 'offerTrade', give: { ...emptyHand(), wood: 1 }, want: { ...emptyHand(), sheep: 1 } },
     () => 0.34,
   );
-  const traded = move(offered, { kind: 'acceptTrade', tradeId: offered.trade!.id }, 'p2');
+  const accepted = applyAction(
+    offered,
+    'p2',
+    { kind: 'acceptTrade', tradeId: offered.trade!.id },
+    () => 0.34,
+  );
+  const traded = move(accepted, { kind: 'acceptProposal', tradeId: accepted.trade!.id, player: 'p2' }, 'p1');
   assert.ok(
     traded.event.sounds.includes('trade'),
     'observers hear a trade even when their own hand stays unchanged',
@@ -489,6 +497,12 @@ test('actual trades have a public sound for observers, while Monopoly and sugges
   monopoly.players[1]!.cards = [{ id: 'old-monopoly', kind: 'monopoly', boughtTurn: 0 }];
   const seized = move(monopoly, { kind: 'playCard', cardId: 'old-monopoly', resource: 'wood' }, 'p1');
   assert.ok(seized.event.sounds.includes('development'));
+  assert.deepEqual(seized.event.cardPlay, { kind: 'monopoly', playerName: 'Bob' });
+  assert.equal(
+    seized.after.game!.players[1]!.cards,
+    undefined,
+    'announcements use the public play, not a private hand',
+  );
   assert.ok(!seized.event.sounds.includes('trade'), 'Monopoly is a development action, not an agreed trade');
   const misleading = setup();
   misleading.players[0]!.name = 'Alice played Knight traded';
@@ -497,6 +511,7 @@ test('actual trades have a public sound for observers, while Monopoly and sugges
   fund(misleading, 'p0', COSTS.road);
   const built = move(misleading, { kind: 'road', edge: gameView(misleading, 'p0').legal.roads[0]! });
   assert.ok(!built.event.sounds.includes('trade') && !built.event.sounds.includes('knight'));
+  assert.equal(built.event.cardPlay, undefined);
 });
 
 test('award celebrations and win cues follow the committed state without duplicate award or turn sounds', () => {
@@ -519,6 +534,9 @@ test('award celebrations and win cues follow the committed state without duplica
   game.phase = 'actions';
   const ended = move(game, { kind: 'endTurn' });
   assert.ok(!ended.event.sounds.includes('turn'));
+  assert.ok(ended.event.sounds.includes('pass'), 'only a committed turn change gives the local pass cue');
+  const observed = move(game, { kind: 'endTurn' }, 'p0', 'p1');
+  assert.ok(!observed.event.sounds.includes('pass'), 'other players do not hear the local pass cue');
   assert.ok(ended.event.notices.some((line) => line.includes('Bob')));
 });
 
@@ -537,6 +555,7 @@ test('all original sound cues are short, finite, non-silent, and safely bounded'
     knight: true,
     robber: true,
     turn: true,
+    pass: true,
     award: true,
     win: true,
     warning: true,
@@ -590,8 +609,57 @@ test('saved preferences accept only known booleans and a finite clamped volume',
       activity: false,
       extra: true,
     }),
-    { sound: false, volume: 1, music: false, musicVolume: 0.3 },
+    { sound: false, volume: 1, music: false, musicVolume: 0.3, boardTheme: 'storybook' },
   );
   assert.equal(parsePreferences({ volume: -0.5 }).volume, 0);
   assert.equal(parsePreferences({ volume: 0.37 }).volume, 0.37);
+});
+
+test('coalesced construction and card purchases send only the card price to the purchase button', () => {
+  const before = setup();
+  clearHands(before);
+  before.phase = 'actions';
+  fund(before, 'p0', { wood: 1, brick: 1, sheep: 1, wheat: 1, ore: 1 });
+  const bought = applyAction(before, 'p0', { kind: 'buyCard' }, () => 0.34);
+  const road = gameView(bought, 'p0').legal.roads[0]!;
+  const built = applyAction(bought, 'p0', { kind: 'road', edge: road }, () => 0.34);
+  const room = (g: Game, revision: number): RoomState => ({
+    roomId: 'costs',
+    roomCode: 'TEST',
+    revision,
+    counter: 0,
+    players: [],
+    game: gameView(g, 'p0'),
+  });
+  const event = deriveFeedback(room(before, 1), room(built, 3), 'p0')!;
+  assert.deepEqual(
+    event.flights
+      .filter((f) => f.to === '[data-development-purchase]')
+      .map((f) => f.resource)
+      .sort(),
+    ['ore', 'sheep', 'wheat'],
+  );
+  assert.deepEqual(
+    event.flights
+      .filter((f) => f.spending && f.to !== '[data-development-purchase]')
+      .map((f) => f.resource)
+      .sort(),
+    ['brick', 'wood'],
+  );
+});
+
+test('resource gains use their animations without a misleading one-player announcement', () => {
+  const base = setup();
+  base.phase = 'roll';
+  const { event } = move(base, { kind: 'roll' });
+  const render = (notices: string[]) =>
+    renderToStaticMarkup(
+      createElement(GameEffects, {
+        event: { ...event, dice: undefined, notices },
+        reducedMotion: false,
+        activity: true,
+      }),
+    );
+  assert.doesNotMatch(render(['Bob received 1 Sheep.', 'Cara received 1 Sheep.']), /move-announcement/);
+  assert.match(render(['Bob played Knight.']), /Bob played Knight/);
 });

@@ -13,12 +13,14 @@ export function FriendsDrawer({
   room,
   invites,
   onOpenRoom,
+  roomEntryBlocked,
 }: {
   auth: ReturnType<typeof useAuth>;
   onClose: () => void;
   room?: RoomState;
   invites?: RoomInvitesController;
   onOpenRoom?: (roomId: string) => void;
+  roomEntryBlocked?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
     surface = useRef<HTMLDivElement>(null),
@@ -93,6 +95,17 @@ export function FriendsDrawer({
             <X size={24} />
           </button>
         </header>
+        {invites && onOpenRoom && (
+          <RoomInviteInbox
+            invitations={invites.incoming.filter((invite) => invite.roomId !== room?.roomId)}
+            busy={!!invites.busy}
+            onOpen={onOpenRoom}
+            onDismiss={(id) => void invites.dismiss(id)}
+            blockedReason={
+              roomEntryBlocked ?? (room ? 'Leave your current room to join another.' : undefined)
+            }
+          />
+        )}
         {room ? (
           <RoomInvitePanel
             key={`${auth.account?.id}:${room.roomId}`}
@@ -102,14 +115,6 @@ export function FriendsDrawer({
           />
         ) : (
           <>
-            {invites && onOpenRoom && (
-              <RoomInviteInbox
-                invitations={invites.incoming}
-                busy={!!invites.busy}
-                onOpen={onOpenRoom}
-                onDismiss={(id) => void invites.dismiss(id)}
-              />
-            )}
             <FriendsPanel auth={auth} />
           </>
         )}

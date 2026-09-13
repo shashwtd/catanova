@@ -51,7 +51,7 @@ There is **one background music track**: RandomMind's complete 57.73-second _The
 - The 15 effect files total **214,245 bytes**: 11 mono 22.05 kHz PCM WAV clips and four mono 44.1 kHz AAC stingers. They warm after an audio-enabled user gesture, without delaying rendering or play.
 - Music is disabled by default and has its own volume. Its **925,576-byte** AAC loop loads only after enabling music during a game. It has a 60-second download deadline for slower links; the smaller effects have an eight-second deadline. Failed downloads back off for 30 seconds.
 - All audio filenames contain a 12-character SHA-256 prefix and use immutable caching. No audio is preloaded by the landing HTML. Decoded effects are cached in memory; unavailable effects use an immediate bounded synthesis fallback instead of queuing stale sounds.
-- Dice contacts follow the visible bounce times. Settlements use three hammer strikes, cities heavier wood/stone, roads plank impacts, and resource/trade actions paper sounds. Short pizzicato cues identify your turn and awards.
+- Dice contacts follow the visible bounce times. Settlements use three hammer strikes, cities heavier wood/stone, roads plank impacts, and resource/trade actions paper sounds. Your-turn attention layers a short, lower-pitched pluck with a soft wood contact; passing your own committed turn uses paper and wood. Awards retain their short musical cue.
 - A user gesture unlocks the shared AudioContext. Effects and music have separate gains. Music runs as one native looping source, pauses when hidden and resumes at its saved position. Ordinary effects remain silent when hidden; `playAttention('turn' | 'warning')` permits only an explicitly requested short reminder after activation.
 - `setScene('menu' | 'game')` controls music eligibility; `refresh()` applies preferences and foreground changes. `silence()` stops voices/music and aborts in-flight downloads. `dispose()` also clears buffers and closes the context. The engine caps voices and suspends when idle.
 
@@ -66,3 +66,9 @@ python scripts/prepare-audio.py /path/to/source-archives
 ```
 
 This command is never part of a normal build. It crops selected sounds, mixes to mono, applies an antialias filter when downsampling, normalizes peaks, and adds short edge fades. It writes hashed exports, the TypeScript catalog, provenance and license copies, removing only superseded outputs recorded in the previous manifest. Source archives and temporary decoded recordings are not shipped. Encoder changes may produce new hashes; review the generated files and listen before publishing.
+
+## Auditioning effects
+
+The local `/dev/lounge` preview now uses the same `SoundEngine` and committed-snapshot presentation path as play. Its previous placeholder callbacks produced no audio. Open **Preview → Events & sounds** to audition effects or trigger game events; Settings retains the normal mute/volume controls. Audio still unlocks on user interaction and respects muted settings. Button/hover layers are slightly more audible, with the effects master at `volume × 0.75`; the optional music mix is unchanged. No new audio downloads or dependencies were added for this adjustment.
+
+Preview event resets now clear only transient sound effects. They preserve the current music source, playback offset and running audio context; a scenario switch no longer stops and restarts the loop. Normal leave/visibility teardown still silences audio. An audio-engine regression test checks that resetting a scenario neither suspends the clock nor recreates the music source.

@@ -17,31 +17,9 @@
     max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   position: relative;
   isolation: isolate;
-  background-image:
-    url('/art/ui/surface-grain.svg'), radial-gradient(ellipse at 50% 25%, #8674504a, transparent 66%),
-    linear-gradient(#3a3d38, #1b2e2b);
-  background-size:
-    128px 128px,
-    cover,
-    cover;
+  background: none;
 }
-.room-lobby::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  pointer-events: none;
-  left: 50%;
-  top: 47%;
-  transform: translate(-50%, -50%);
-  width: min(1040px, 90%);
-  height: min(500px, 53vh);
-  border-radius: 50%;
-  border: 2px solid #bea57830;
-  background: radial-gradient(ellipse at 45% 40%, #6870528c, #385047b3 68%, #263b3494);
-  box-shadow:
-    inset 0 0 0 11px #102a2426,
-    0 20px 70px #101e203d;
-}
+
 .room-lobby .lobby-heading,
 .room-lobby .lobby-center,
 .room-lobby .lobby-footer {
@@ -318,7 +296,7 @@
 .room-lobby .lobby-launch > span {
   color: #d2ddc8;
 }
-.room-lobby .lobby-launch > .gold-button:not(:disabled) {
+.room-lobby .lobby-start-controls > .gold-button:not(:disabled) {
   background: linear-gradient(#f4d979 0%, #ecc35a 42%, #d6a440 100%);
   color: #44321d;
   border-color: #f8df9a;
@@ -328,7 +306,7 @@
     0 4px 0 #593e28,
     0 5px 20px #e3ba3938;
 }
-.room-lobby .lobby-launch > .gold-button:hover:not(:disabled) {
+.room-lobby .lobby-start-controls > .gold-button:hover:not(:disabled) {
   background: linear-gradient(#fbe39a, #f1cb69 45%, #e2b450);
 }
 .room-lobby .lobby-launch > button {

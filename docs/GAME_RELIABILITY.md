@@ -15,20 +15,28 @@ The server already used cryptographic random integers from Node, independently o
 
 ## Lobby dice modes
 
-- **Classic (default):** two independent six-sided dice. Total 7 has a 6/36 chance; 2 and 12 each have a 1/36 chance. Old rooms and saves without a mode keep Classic behavior.
-- **Flat totals (house rule):** choose one total uniformly from 2 through 12, then choose a valid ordered dice pair for that total. Every total has a 1/11 chance. The displayed dice are not independent in this mode.
+- **Natural (default, stored as `classic`):** two independent six-sided dice. Total 7 has a 6/36 chance; 2 and 12 each have a 1/36 chance. Old rooms and saves without a mode keep Classic behavior.
+- **Balanced:** draw without replacement from the 36 ordered dice pairs. Before a roll, refresh to all 36 pairs if 12 or fewer remain. Each remaining pair has weight 10, except pairs matching the previous total have weight 7. Select with the same unbiased server random sampler, remove the pair, and remember its total. This reduces short-game swings and repeat streaks while retaining the familiar frequency curve. Individual rolls are dependent; it does not promise exact percentages or equal resources.
 
-The host chooses the mode before starting. It is stored in the match and cannot change during play. Flat totals deliberately changes the game's economy: 2 and 12 become more productive, 6 and 8 less productive, and a rolled 7 drops from about 16.7% to 9.1%. Knights still move the robber normally. Scarce terrain counts, number-token duplicates, blocked production and the finite resource bank still affect supply; equal totals do not imply equal resources or equally strong starting positions.
+This is Catanova's implementation of the [published Colonist deck-and-repeat-weight design](https://blog.colonist.io/designing-balanced-dice/), not a claim of identical current behavior. There are no score, seat, resource, catch-up, or player-specific adjustments (including for sevens). Natural remains the default.
 
-The map generator is unchanged. Its production-pip checks were designed for Classic dice, so they are not a promise of equal production under Flat totals. Terrain spread still applies. Flat mode should not display the usual Classic probability pips as if they represented its odds.
+The host chooses before starting; the choice is persisted and locked during play. The remaining balanced deck and previous total are stored with the authoritative game snapshot and omitted from every client projection. Duplicate commands replay their receipt without drawing again. Refreshing the page, reconnecting, and restarting the server cannot reset the deck.
 
-## Five trade offers per turn
+Flat odds are no longer accepted in new settings. Saved, unstarted flat lobbies open with Natural. Already-started legacy flat matches retain their original rule until finished; changing odds midway through a live game would be unfair. The compatibility branch is not selectable for new games.
 
-Catanova limits the active player to **five new player-trade offers per turn**. This is a house rule, not a base CATAN limit. New offers, replacement prices and open requests all count. Cancelling does not restore an offer. Invalid actions and repeated delivery of the same accepted command do not consume another offer.
+Probability dots describe the standard two-dice distribution: 2/12 have one combination each, 3/11 two, 4/10 three, 5/9 four, 6/8 five; seven has six. Divide by 36 for the Natural probability. These markers do not modify rolls; Balanced uses this frequency curve as its starting deck, not fixed per-roll odds. The map generator is unchanged.
 
-Replies, declines, accepting an offer or proposal, withdrawing a proposal, and bank or harbor trades do not consume this allowance. The fifth offer can still finish normally. The allowance resets when the next player begins their turn. The client locks pending submissions immediately, but the authoritative limit and receipt handling are on the server.
+### Waiting-room player removal
 
-The [official CATAN rulebook](https://www.catan.com/sites/default/files/2021-06/catan_base_rules_2020_200707.pdf), pages 4 and 14, permits repeated trading during the active player's trading phase while the player has resources; it does not impose a five-offer cap.
+The host opens a player's info menu and confirms removal. The server verifies the host, exact room revision, target membership, and that the game has not started. Removal and its intent-bound receipt commit atomically; a retry cannot remove a second player. The departing seat becomes unusable, its socket receives a terminal notice, and remaining players receive the updated roster. This removes a seat, not a permanent account ban.
+
+## Player trades
+
+There is no per-turn offer limit. The active player can keep trading, with one live offer at a time. Cancel an offer before sending a different one; a repeated submit cannot silently replace it. The client locks pending submissions immediately, and the server validates the current offer and deduplicates command receipts.
+
+Opponents can decline before accepting. Exact acceptances and open-return proposals stay committed until the offer ends; they cannot be withdrawn, declined or repriced. Multiple willing players are shown in one row. The active player selects a partner and confirms the visible exchange. Both hands are rechecked and both transfers commit atomically. Ending the turn, cancelling the offer or taking another active-player game action expires old replies. Resigning removes that player's response.
+
+Concurrent first responses to the same immutable offer may use the same revision. Financial confirmation always requires the latest revision. No private unoffered cards are exposed.
 
 ## Harbor audit
 

@@ -70,7 +70,14 @@ export type ClientMessage =
   | { type: 'increment'; commandId: string; expectedRevision: number }
   | { type: 'leave'; commandId: string; expectedRevision: number }
   | { type: 'action'; commandId: string; expectedRevision: number; action: GameAction }
-  | { type: 'lobby'; commandId: string; expectedRevision: number; ready: boolean; profile?: Profile }
+  | {
+      type: 'lobby';
+      commandId: string;
+      expectedRevision: number;
+      ready: boolean;
+      profile?: Profile;
+      kickPlayerId?: string;
+    }
   | { type: 'settings'; commandId: string; expectedRevision: number; settings: RoomSettings }
   | { type: 'launchReady'; id: string; success: boolean }
   | { type: 'sync' }
@@ -132,10 +139,18 @@ export function parseClientMessage(input: string): ClientMessage {
     if (v.type === 'settings') return { type: 'settings', ...base, settings: parseRoomSettings(v.settings) };
     if (v.type === 'lobby') {
       if (typeof v.ready !== 'boolean') throw new Error('Invalid ready state');
+      if (
+        v.kickPlayerId !== undefined &&
+        (typeof v.kickPlayerId !== 'string' ||
+          !/^[a-zA-Z0-9_-]{1,80}$/.test(v.kickPlayerId) ||
+          v.profile !== undefined)
+      )
+        throw new Error('Invalid player removal');
       return {
         type: 'lobby',
         ...base,
         ready: v.ready,
+        ...(typeof v.kickPlayerId === 'string' ? { kickPlayerId: v.kickPlayerId } : {}),
         ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
       };
     }

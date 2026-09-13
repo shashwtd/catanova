@@ -1,4 +1,4 @@
-export const DICE_MODES = ['classic', 'flat'] as const;
+export const DICE_MODES = ['classic', 'balanced'] as const;
 export type DiceMode = (typeof DICE_MODES)[number];
 const RANDOM_SPACE = 2 ** 32;
 
@@ -16,7 +16,37 @@ function sampleIndex(random: () => number, count: number): number {
 }
 
 /** Flat totals is a house rule: choose a total first, then a valid ordered pair for that total. */
-export function rollDice(mode: DiceMode, random: () => number): [number, number] {
+export type BalancedDiceState = { remaining: number[]; lastTotal?: number };
+
+/** A server-only weighted deck. Refresh before the last twelve pairs become predictable. */
+export function balancedRoll(random: () => number, state: BalancedDiceState): [number, number] {
+  if (state.remaining.length <= 12) state.remaining = Array.from({ length: 36 }, (_, i) => i);
+  const pair = (id: number): [number, number] => [Math.floor(id / 6) + 1, (id % 6) + 1];
+  const weights = state.remaining.map((id) => {
+    const [a, b] = pair(id);
+    return a + b === state.lastTotal ? 7 : 10;
+  });
+  let ticket = sampleIndex(
+    random,
+    weights.reduce((sum, weight) => sum + weight, 0),
+  );
+  let index = 0;
+  while (ticket >= weights[index]!) ticket -= weights[index++]!;
+  const result = pair(state.remaining.splice(index, 1)[0]!);
+  state.lastTotal = result[0] + result[1];
+  return result;
+}
+
+// 'flat' is read-only compatibility for matches already started under the retired rule.
+export function rollDice(
+  mode: DiceMode | 'flat',
+  random: () => number,
+  state?: BalancedDiceState,
+): [number, number] {
+  if (mode === 'balanced') {
+    if (!state) throw new Error('Balanced dice require persisted deck state');
+    return balancedRoll(random, state);
+  }
   if (mode === 'classic') return [sampleIndex(random, 6) + 1, sampleIndex(random, 6) + 1];
   if (mode !== 'flat') throw new Error('Unknown dice mode');
   const sum = sampleIndex(random, 11) + 2;

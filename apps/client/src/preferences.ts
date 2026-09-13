@@ -1,10 +1,24 @@
+import type { BoardTheme } from './board-theme.js';
 import { useEffect, useState } from 'react';
-export type Preferences = { sound: boolean; volume: number; music: boolean; musicVolume: number };
-export const DEFAULT_PREFERENCES: Preferences = { sound: true, volume: 0.55, music: false, musicVolume: 0.3 };
+export type Preferences = {
+  boardTheme: BoardTheme;
+  sound: boolean;
+  volume: number;
+  music: boolean;
+  musicVolume: number;
+};
+export const DEFAULT_PREFERENCES: Preferences = {
+  boardTheme: 'storybook',
+  sound: true,
+  volume: 0.55,
+  music: false,
+  musicVolume: 0.3,
+};
 /** Ignore retired display options so old saved settings cannot hide gameplay feedback. */
 export function parsePreferences(input: unknown): Preferences {
   const p = input && typeof input === 'object' ? (input as Partial<Preferences>) : {};
   return {
+    boardTheme: p.boardTheme === 'classic' ? 'classic' : 'storybook',
     sound: typeof p.sound === 'boolean' ? p.sound : true,
     volume:
       typeof p.volume === 'number' && Number.isFinite(p.volume) ? Math.max(0, Math.min(1, p.volume)) : 0.55,

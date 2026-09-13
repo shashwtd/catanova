@@ -1,19 +1,22 @@
+import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
 import {
   Check,
   Clock3,
+  Dices,
   Copy,
   Crown,
   DoorOpen,
   Link,
   Plus,
-  Sailboat,
+  Play,
   Settings2,
   Share2,
   Users,
+  Trophy,
   WifiOff,
 } from './GameIcons.js';
-import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState, useId } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
@@ -120,6 +123,40 @@ export function Invite({ code, roomId = code ?? '' }: { code?: string; roomId?: 
     </div>
   );
 }
+function RoomSheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const id = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="game-dialog lobby-sheet"
+      aria-labelledby={id}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="dialog-surface">
+        <h2 id={id}>{title}</h2>
+        {children}
+      </div>
+    </dialog>
+  );
+}
+
 export function Lobby({
   room,
   me,
@@ -144,7 +181,9 @@ export function Lobby({
   onEdit: () => void;
   onSettings: () => void;
   onFriends?: () => void;
+  onKick?: (playerId: string) => Promise<void>;
 }) {
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const self = room.players.find((p) => p.id === me),
     host = room.players[0]?.id === me;
   const canStart =
@@ -152,42 +191,33 @@ export function Lobby({
   return (
     <section className="lobby-screen room-lobby" aria-label="Room lobby">
       <header className="lobby-heading">
-        {self && (
-          <button type="button" className="lobby-self" onClick={onEdit} aria-label="Your profile">
-            <Avatar profile={self.profile ?? defaultProfile(self.name)} />
-            <strong title={self.name}>{self.name}</strong>
-          </button>
-        )}
+        <button
+          type="button"
+          className="lobby-back"
+          onClick={() => setConfirmLeave(true)}
+          disabled={busy}
+          aria-label="Leave lobby"
+        >
+          <DoorOpen size={20} />
+          <span>Leave lobby</span>
+        </button>
         <div className="lobby-tools">
           {onFriends && (
-            <button className="icon-button" title="Friends" aria-label="Friends" onClick={onFriends}>
+            <button className="lobby-friends" title="Friends" aria-label="Friends" onClick={onFriends}>
               <Users />
+              <span>Friends</span>
             </button>
           )}
-          <button
-            className="icon-button"
-            title="Game settings"
-            aria-label="Game settings"
-            onClick={onSettings}
-          >
-            <Settings2 />
-          </button>
-          <button
-            className="icon-button"
-            title="Leave lobby"
-            aria-label="Leave lobby"
-            onClick={onLeave}
-            disabled={busy}
-          >
-            <DoorOpen />
-          </button>
         </div>
       </header>
       <div className="lobby-center">
         <div className="lobby-caption">
           <h1>Game room</h1>
           <div className="lobby-room-options">
-            <span>2–4 players</span>
+            <button className="lobby-goal" onClick={onSettings} aria-label="Points to win. Game settings">
+              <Trophy size={18} />
+              <span>{room.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS} points</span>
+            </button>
             <button
               type="button"
               className="lobby-timer"
@@ -203,6 +233,10 @@ export function Lobby({
                 Turn timer{' '}
                 <b>{room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'Off'}</b>
               </span>
+            </button>
+            <button className="lobby-dice-rule" onClick={onSettings} aria-label="Dice mode. Game settings">
+              <Dices size={18} />
+              <span>{room.settings?.diceMode === 'balanced' ? 'Balanced' : 'Natural'} dice</span>
             </button>
           </div>
         </div>
@@ -229,9 +263,20 @@ export function Lobby({
                 className={`lobby-seat ${p.id === me ? 'self' : ''} ${!p.connected ? 'seat-offline' : ''}`}
                 key={p.id}
               >
+                {p.id === me && (
+                  <button
+                    type="button"
+                    className="lobby-seat-edit"
+                    onClick={onEdit}
+                    aria-label="Your profile"
+                    title="Edit profile"
+                  >
+                    Edit
+                  </button>
+                )}
                 <div className="lobby-avatar">
                   <Avatar profile={p.profile ?? defaultProfile(p.name)} />
-                  {i === 0 && <Crown className="host-mark" size={23} />}
+                  {i === 0 && <Crown className="host-mark" size={34} />}
                   {!p.connected && (
                     <span className="offline-mark" title="Disconnected">
                       <WifiOff size={30} />
@@ -283,24 +328,59 @@ export function Lobby({
                     : 'Waiting for host'
                   : 'Waiting for players'}
           </span>
-          {host ? (
-            <button className="gold-button" disabled={busy || !connected || !canStart} onClick={onStart}>
-              Start game
-              <Sailboat size={21} />
-            </button>
-          ) : (
+          <div className="lobby-start-controls">
             <button
-              className={self?.ready ? 'dark-button' : 'gold-button'}
-              aria-pressed={!!self?.ready}
-              disabled={busy || !connected}
-              onClick={() => onReady(!self?.ready)}
+              className="lobby-configure hub-room-button"
+              onClick={onSettings}
+              disabled={busy}
+              aria-label="Game settings"
             >
-              <Check size={21} />
-              {self?.ready ? 'Not ready' : 'Ready'}
+              <Settings2 size={22} />
+              <span>Settings</span>
             </button>
-          )}
+            {host ? (
+              <button
+                className="gold-button hub-room-button hub-create-button"
+                disabled={busy || !connected || !canStart}
+                onClick={onStart}
+              >
+                Start game
+                <Play size={21} />
+              </button>
+            ) : (
+              <button
+                className={`hub-room-button ${self?.ready ? 'dark-button' : 'gold-button hub-create-button'}`}
+                aria-pressed={!!self?.ready}
+                disabled={busy || !connected}
+                onClick={() => onReady(!self?.ready)}
+              >
+                <Check size={21} />
+                {self?.ready ? 'Not ready' : 'Ready'}
+              </button>
+            )}
+          </div>
         </div>
       </footer>
+      {confirmLeave && (
+        <RoomSheet title="Leave this lobby?" onClose={() => setConfirmLeave(false)}>
+          <p>Your seat will be released.</p>
+          <div className="room-sheet-actions">
+            <button autoFocus className="hub-room-button" onClick={() => setConfirmLeave(false)}>
+              Stay
+            </button>
+            <button
+              className="hub-room-button lobby-leave-confirm"
+              disabled={busy}
+              onClick={() => {
+                setConfirmLeave(false);
+                onLeave();
+              }}
+            >
+              Leave lobby
+            </button>
+          </div>
+        </RoomSheet>
+      )}
     </section>
   );
 }

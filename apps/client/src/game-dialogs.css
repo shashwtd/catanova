@@ -1,0 +1,782 @@
+/* Soft parchment, readable ink, and small brass edges shared by game panels. */
+:root {
+  --dialog-fill: linear-gradient(140deg, #f6ead0, #e9d8b6 64%, #dfcca6);
+  --dialog-ink: #443725;
+  --dialog-muted: #7d684b;
+  --dialog-edge: #bb9c6380;
+  --dialog-shadow: inset 0 1px #fff7e5b3, 0 8px 24px #241a1247;
+  --turn-border-duration: 3.6s;
+  --site-marker-duration: 6s;
+  --acc-expand: 250ms;
+  --acc-collapse: 250ms;
+  --acc-chevron: 250ms;
+  --acc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.game-world .game-dialog,
+.game-world .game-dialog:has(.settings-menu, .rules-book, .profile-editor, .player-overview),
+.playing .game-panel.game-side-panel,
+.playing .game-panel.trade-panel,
+.playing .incoming-trade,
+.playing .floating-panel.development-detail,
+.playing .robber-flow {
+  color: var(--dialog-ink);
+  background: var(--dialog-fill);
+  border: 1px solid var(--dialog-edge);
+  border-radius: 12px;
+  box-shadow: var(--dialog-shadow);
+  backdrop-filter: none;
+}
+.game-world .game-dialog .dialog-surface {
+  background: transparent;
+}
+.game-world .game-dialog::backdrop {
+  background: #1d180f75;
+  backdrop-filter: blur(3px);
+}
+.game-world .game-dialog .panel-heading,
+.playing .game-side-panel .panel-heading {
+  border-bottom: 1px solid #b79a6640;
+}
+.game-world .game-dialog .panel-heading h2,
+.playing .game-side-panel .panel-heading h2 {
+  color: #574128;
+  font:
+    600 19px/1.25 Cinzel,
+    serif;
+}
+.game-world .game-dialog :is(.quiet-note, .muted, .field, .field label),
+.playing .game-panel :is(.quiet-note, .muted),
+.playing .development-detail p {
+  color: var(--dialog-muted);
+}
+.playing .development-detail :is(h3, .field-caption) {
+  color: #5c4329;
+}
+.playing .development-detail :is(.development-resources button, .plenty-picked button) {
+  color: #55432d;
+  background: #fff2d15e;
+  border-color: #bca07066;
+}
+.playing .development-detail .development-resources button[aria-pressed='true'] {
+  color: #4a3a26;
+  background: #d9bd73;
+  border-color: #a27b32;
+}
+.playing .development-detail .card-unavailable {
+  color: #7d684b;
+}
+.game-world .game-dialog :is(input[type='text'], input:not([type]), input[type='search']) {
+  background: #fff7e05c;
+  border-color: #bda16c66;
+  color: #493a27;
+}
+.game-world .game-dialog :is(input[type='text'], input:not([type]), input[type='search'])::placeholder {
+  color: #96805e;
+}
+.game-world .game-dialog .panel-heading .icon-button,
+.playing .game-side-panel .panel-heading .icon-button,
+.playing .trade-panel .trade-close,
+.playing .development-detail .development-close {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 6px;
+  flex: none;
+  background: #c4a37118;
+  border: 1px solid #b5945e3b;
+  color: #745331;
+  box-shadow: none;
+  border-radius: 7px;
+}
+.game-world .game-dialog .panel-heading .icon-button .game-icon,
+.playing .game-side-panel .panel-heading .icon-button .game-icon,
+.playing .trade-panel .trade-close .game-icon {
+  width: 100%;
+  height: 100%;
+}
+.game-world :is(.game-dialog, .game-panel, .incoming-trade, .development-detail) .gold-button {
+  color: #fff4da;
+  background: linear-gradient(#63825c, #486843);
+  border: 1px solid #47613c;
+  border-radius: 7px;
+  box-shadow:
+    inset 0 1px #ebefb947,
+    0 2px #35482929;
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  padding: 10px 12px;
+}
+.game-world
+  :is(.game-dialog, .game-panel, .incoming-trade, .development-detail)
+  .gold-button:hover:not(:disabled) {
+  background: linear-gradient(#749669, #54774c);
+  color: #fff9e9;
+}
+.game-world
+  :is(.game-dialog, .game-panel, .incoming-trade, .development-detail)
+  :is(.text-button, .dark-button) {
+  color: #745337;
+  background: #ffffff24;
+  border: 1px solid #b99d704b;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.game-world
+  :is(.game-dialog, .game-panel, .incoming-trade, .development-detail)
+  :is(.text-button, .dark-button):hover:not(:disabled) {
+  background: #fff5dd75;
+  color: #593e28;
+}
+.game-world :is(.game-dialog, .game-panel, .incoming-trade) button:focus-visible {
+  outline: 2px solid #8b6939;
+  outline-offset: 3px;
+}
+.playing .game-panel.trade-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 18px;
+  overflow: auto;
+  z-index: 45;
+}
+.playing .trade-panel .trade-header {
+  margin: 0 0 16px;
+}
+.playing .trade-panel .trade-header .trade-close {
+  margin: 0;
+}
+.playing .trade-panel .live-offer {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.playing .incoming-trade.trade-notice {
+  width: min(360px, calc(100vw - 24px));
+  padding: 16px;
+  max-height: calc(100dvh - 30px);
+  overflow: auto;
+}
+.playing .incoming-trade.trade-notice:has(.card-picker) {
+  width: min(520px, calc(100vw - 24px));
+}
+/* Settings keep generous hit areas without losing the selected state on hover. */
+.playing .game-side-panel:has(.settings-menu) {
+  width: min(310px, calc(100vw - 70px));
+  overflow: visible;
+}
+.playing .game-side-panel:has(.settings-menu)::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: var(--panel-notch-y, 72%);
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%) rotate(45deg);
+  background: #edddbf;
+  border-left: 1px solid var(--dialog-edge);
+  border-bottom: 1px solid var(--dialog-edge);
+}
+.game-world .settings-audio-group {
+  width: min(100%, 310px);
+  align-self: center;
+}
+.game-world
+  .settings-menu
+  :is(
+    .settings-row-heading label,
+    .settings-theme legend,
+    .settings-dice legend,
+    .settings-dice-option strong
+  ) {
+  color: #59472f;
+}
+.game-world
+  .settings-menu
+  :is(
+    .settings-row-heading output,
+    .settings-duration output,
+    .settings-duration output strong,
+    .settings-audio-icon
+  ) {
+  color: #7b623b;
+}
+.game-world .settings-menu :is(.settings-caption, .settings-timer-stops, .settings-dice-option small) {
+  color: #867051;
+}
+.game-world .settings-menu .settings-timer-stops [data-selected='true'] {
+  color: #523d24;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option) {
+  color: #715a3d;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 10px;
+  margin-top: 3px;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option):hover {
+  color: #55452e;
+  background: #ffffff3b;
+  border-color: #b9a17b4d;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option)[data-selected='true'] {
+  color: #453921;
+  background: #c4b37c47;
+  border-color: #a496646b;
+  box-shadow: inset 3px 0 #849263;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option)[data-selected='true']:hover {
+  background: #c4b37c60;
+}
+.game-world .settings-menu input[type='radio'] {
+  accent-color: #697d4e;
+}
+.game-world .settings-menu .settings-range {
+  --range-track: linear-gradient(to right, #8f9b64 0 var(--range-fill), #c9b995 var(--range-fill) 100%);
+  accent-color: #718350;
+}
+.game-world .settings-menu .settings-room {
+  border-color: #b5986640;
+}
+/* One topic at a time; all rule details remain available. */
+.quick-guide {
+  display: grid;
+  gap: 0;
+  color: #5d4a32;
+}
+.guide-goal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 16px;
+}
+.guide-goal > .game-icon {
+  flex: none;
+}
+.guide-goal strong {
+  display: block;
+  color: #544024;
+  font:
+    700 17px/1.25 Barlow,
+    sans-serif;
+}
+.guide-goal span {
+  display: block;
+  margin-top: 3px;
+  font:
+    400 13px/1.35 Barlow,
+    sans-serif;
+  color: #816b4b;
+}
+.guide-section {
+  border-top: 1px solid #bfa4754b;
+}
+.guide-section .t-acc-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 45px;
+  padding: 9px 3px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #614b30;
+  text-align: left;
+  font:
+    600 15px/1.3 Barlow,
+    sans-serif;
+}
+.guide-section .t-acc-head:hover {
+  color: #3c5030;
+  background: #fff4d525;
+}
+.guide-section .t-acc-head > .game-icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.guide-section .t-acc-chevron {
+  margin-left: auto;
+}
+.guide-section .t-acc-chevron svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.guide-section-body {
+  padding: 2px 2px 14px;
+}
+.guide-section-body p {
+  margin: 9px 0 0;
+  font:
+    400 13px/1.55 Barlow,
+    sans-serif;
+  color: #7a6345;
+}
+.guide-section-body b {
+  color: #55432c;
+}
+.guide-turn-steps {
+  padding-left: 21px;
+  margin: 2px 0 12px;
+  color: #6b563b;
+  font:
+    400 14px/1.5 Barlow,
+    sans-serif;
+}
+.guide-turn-steps li + li {
+  margin-top: 9px;
+}
+.guide-costs {
+  margin: 0;
+  display: grid;
+  gap: 7px;
+}
+.guide-costs > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.guide-costs dt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font:
+    600 13px/1.2 Barlow,
+    sans-serif;
+  color: #55432b;
+}
+.guide-costs dt .game-icon {
+  width: 25px;
+  height: 25px;
+  flex: none;
+}
+.guide-costs dd {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+.guide-costs .recipe-pay {
+  color: #917856;
+  font-size: 11px;
+}
+.guide-costs .resource-summary {
+  display: flex;
+  gap: 3px;
+}
+.guide-costs .resource-summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.guide-costs .sprite {
+  width: 22px;
+  height: 24px;
+}
+.guide-costs b {
+  font-size: 14px;
+  color: #5d482b;
+}
+.guide-points {
+  margin: 0 0 12px;
+  font:
+    400 14px/1.5 Barlow,
+    sans-serif;
+}
+.guide-points > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.guide-points dd {
+  margin: 0;
+  color: #66502d;
+  font-weight: 600;
+}
+.guide-award {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-award .game-icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+.guide-award b {
+  display: block;
+}
+.guide-rulebook-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: #736347;
+  font:
+    500 12px/1.3 Barlow,
+    sans-serif;
+  text-underline-offset: 3px;
+}
+/* Accordion motion uses grid tracks; content height needs no measurement. */
+.t-acc-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--acc-collapse) var(--acc-ease);
+}
+.t-acc[data-open='true'] .t-acc-panel {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--acc-expand) var(--acc-ease);
+}
+.t-acc-panel-inner {
+  overflow: hidden;
+  opacity: 0;
+  filter: blur(2px);
+  transition:
+    opacity var(--acc-collapse) var(--acc-ease),
+    filter var(--acc-collapse) var(--acc-ease);
+}
+.t-acc[data-open='true'] .t-acc-panel-inner {
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity var(--acc-expand) var(--acc-ease),
+    filter var(--acc-expand) var(--acc-ease);
+}
+.t-acc-chevron {
+  display: inline-flex;
+  transform: scaleY(1);
+  transform-origin: center;
+  transition: transform var(--acc-chevron) var(--acc-ease);
+}
+.t-acc-chevron path {
+  vector-effect: non-scaling-stroke;
+}
+.t-acc[data-open='true'] .t-acc-chevron {
+  transform: scaleY(-1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-acc-panel,
+  .t-acc-panel-inner,
+  .t-acc-chevron {
+    transition: none !important;
+  }
+}
+[data-motion='reduced'] :is(.t-acc-panel, .t-acc-panel-inner, .t-acc-chevron) {
+  transition: none !important;
+}
+/* A compact journal with strong names and quiet separators. */
+.playing .game-side-panel:has(.turn-journal) {
+  width: min(316px, calc(100vw - 72px));
+}
+.playing .game-side-panel :is(.turn-journal, .journal-move) {
+  color: #786044;
+}
+.playing .game-side-panel .journal-turn h3 {
+  background: #b2966118;
+  color: #8a6a3f;
+  border-color: #b99b6833;
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 5px 7px;
+}
+.playing .game-side-panel .journal-person {
+  color: #4c3b27;
+}
+.playing .game-side-panel .journal-resource {
+  color: #624823;
+  background: transparent;
+  box-shadow: none;
+}
+.playing .game-side-panel .journal-resource b {
+  color: #654821;
+}
+.playing .game-side-panel :is(.journal-item, .journal-action, .journal-empty) {
+  color: #7b6547;
+}
+.playing .game-side-panel .automatic-mark {
+  color: #8a704b;
+  background: #c6ad7b26;
+}
+.playing .journal-move.journal-note {
+  display: block;
+}
+/* Site guidance stays legible without concealing the settlement being upgraded. */
+.road-site-guide {
+  stroke: #f3d397;
+  stroke-width: 4;
+  stroke-dasharray: 9 4;
+  stroke-linecap: butt;
+}
+.road-site-guide.site-guide-back {
+  stroke: #644629;
+  stroke-width: 6.5;
+  stroke-dasharray: none;
+}
+.vertex-site-guide {
+  fill: #ad814929;
+  stroke: #ffdd93;
+  stroke-width: 2.5;
+  stroke-dasharray: 22 11;
+  filter: drop-shadow(0 1px 1px #37220ae6);
+}
+[data-build-site='city'] .vertex-site-guide {
+  fill: none;
+}
+.city-upgrade-mark circle {
+  fill: #65482c;
+  stroke: #ffe4a2;
+  stroke-width: 1.5;
+}
+.city-upgrade-mark path {
+  fill: none;
+  stroke: #ffe9b3;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+[data-build-site]:is([data-guided='true'], :hover, :focus-visible) .vertex-site-guide {
+  animation: site-marker-orbit var(--site-marker-duration) linear infinite;
+}
+[data-build-site='city'] .build-site-preview {
+  display: none;
+}
+[data-build-site='city'][data-pending='true'] .site-guide {
+  opacity: 1;
+}
+.build-ghost[data-pending-build='city'] {
+  display: none;
+}
+@keyframes site-marker-orbit {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+/* Fixed-size, local confirmation keeps the selected spot in view on phones too. */
+.placement-confirmation {
+  position: fixed;
+  z-index: 48;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100vw - 16px);
+  padding: 5px 6px 5px 11px;
+  border: 1px solid #d2ac6a99;
+  border-radius: 8px;
+  color: #59432b;
+  background: var(--dialog-fill);
+  box-shadow: var(--dialog-shadow);
+}
+.placement-confirmation strong {
+  font:
+    600 13px Barlow,
+    sans-serif;
+  white-space: nowrap;
+}
+.placement-confirmation button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid #c19b6347;
+  color: #80633d;
+  background: #fff2d359;
+}
+.placement-confirmation .placement-confirm {
+  background: #c4cf9c77;
+  color: #5c6e3d;
+  border-color: #98aa6b9c;
+}
+.placement-confirmation button:focus-visible {
+  outline: 2px solid #f6d088;
+  outline-offset: 2px;
+}
+/* Follow the outline, rather than putting a shine over the face of the dice. */
+.playing .hand-dock .table-actions {
+  height: 74px;
+}
+.playing .hand-dock .table-actions .turn-action {
+  width: 80px;
+  height: 74px;
+  position: relative;
+}
+.playing .hand-dock .turn-action > .turn-button-attention {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: none;
+  color: #fff0b3;
+}
+/* A solid rim and two small corner glints, with different action colors. */
+.turn-button-attention .turn-rim {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+.turn-button-attention .turn-corner {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px currentColor);
+  vector-effect: non-scaling-stroke;
+}
+.turn-action:not(:disabled) .turn-corner {
+  animation: turn-corner-glow var(--turn-border-duration) ease-in-out infinite;
+}
+.turn-action:disabled .turn-button-attention {
+  display: none;
+}
+.playing .hand-dock .turn-action.roll-turn > .turn-button-attention {
+  color: #ffe0a0;
+}
+.playing .hand-dock .turn-action.end-turn > .turn-button-attention {
+  color: #aaf0c8;
+}
+.playing .hand-dock .turn-action.end-turn:not(:disabled) {
+  color: #ecffec;
+  background: radial-gradient(ellipse at 50% 30%, #63886e, #3d6249 80%);
+  box-shadow:
+    inset 0 1px #c6edcc42,
+    0 3px #263e2c,
+    0 0 10px #8bddac24;
+}
+.playing .hand-dock .turn-action.end-turn > .game-icon {
+  width: 34px;
+  height: 32px;
+  stroke-width: 2.3;
+}
+.playing .hand-dock .turn-action.roll-turn > .game-icon {
+  width: 106%;
+  height: 106%;
+}
+@keyframes turn-corner-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .hand-dock .table-actions {
+    height: 64px;
+  }
+  .playing .hand-dock .table-actions .turn-action {
+    width: 66px;
+    height: 64px;
+  }
+  .playing .game-panel.trade-panel {
+    top: 50%;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    width: min(520px, calc(100vw - 20px));
+    padding: 12px;
+    max-height: calc(100dvh - 20px);
+  }
+  .playing .incoming-trade.trade-notice {
+    left: 50%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(360px, calc(100vw - 20px));
+    max-height: calc(100dvh - 20px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-build-site] .vertex-site-guide,
+  .turn-action:not(:disabled) .turn-corner {
+    animation: none;
+  }
+}
+
+[data-motion='reduced'] [data-build-site] .vertex-site-guide,
+[data-motion='reduced'] .turn-action:not(:disabled) .turn-corner {
+  animation: none;
+}
+
+/* The robber's required-action surface uses the same materials as the other dialogs. */
+.playing .robber-flow :is(.robber-explanation, .robber-next, .robber-steps li, .discard-card small) {
+  color: var(--dialog-muted);
+}
+.playing .robber-flow :is(.robber-flow-heading h2, .discard-selection-heading, .discard-player strong) {
+  color: var(--dialog-ink);
+}
+.playing .robber-flow .robber-steps [data-current='true'] {
+  color: #7e5d2e;
+}
+.playing .robber-flow .robber-steps [data-current='true'] > span {
+  background: #a982493b;
+  border-color: #e4bd77;
+  color: #664a24;
+}
+.playing .robber-flow .robber-steps [data-complete='true'] > span {
+  background: #96784833;
+  border-color: #c5a669;
+}
+.playing .robber-flow :is(.discard-player, .robber-victim) {
+  background: #c5ac7626;
+  color: #5e4a31;
+}
+.playing .robber-flow .discard-selection-heading strong {
+  background: #c5ac7626;
+  color: #7e5d2e;
+}
+.playing .robber-flow .discard-add {
+  background: linear-gradient(#b49a7138, #77603e1a);
+  color: #67512d;
+  border-color: #c3a16a88;
+}
+.playing .robber-flow .discard-card[data-selected='true'] .discard-add {
+  border-color: #f3cb83;
+  background: #bd985b40;
+}
+.playing .robber-flow :is(.discard-remove, .robber-back) {
+  background: #f8ebcf88;
+  color: #765c39;
+  border-color: #c3a16a66;
+}
+.game-world .settings-menu .settings-range::-webkit-slider-thumb {
+  border-color: #8c693c;
+}
+.game-world .settings-menu .settings-range::-moz-range-thumb {
+  border-color: #8c693c;
+}
+[data-build-site]:is([data-guided='true'], :hover, :focus-visible):not([data-pending='true']) .site-guide {
+  opacity: 1;
+}
+
+/* Clip atlas cells even when the display box has a different aspect ratio. */
+.development-art {
+  overflow: hidden;
+}
+.illustrated-tooltip .development-art {
+  height: auto;
+  aspect-ratio: 2 / 3;
+}
+.card-tooltip-portal {
+  max-width: calc(100vw - 20px);
+  max-height: calc(100dvh - 20px);
+  overflow: auto;
+}

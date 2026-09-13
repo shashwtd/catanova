@@ -1,0 +1,93 @@
+.preview-switcher {
+  position: fixed;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  border: 1px solid #897b52;
+  border-radius: 8px;
+  background: #172920;
+  color: #f8ebcd;
+  font:
+    12px Barlow,
+    sans-serif;
+}
+.preview-switcher > summary {
+  min-height: 30px;
+  padding: 7px 12px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.preview-switcher nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 260px;
+  padding: 10px;
+}
+.preview-switcher nav > span {
+  width: 100%;
+  opacity: 0.7;
+}
+.preview-switcher button {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: #344d3d;
+  text-transform: capitalize;
+}
+.preview-switcher button[aria-pressed='true'] {
+  color: #302a1b;
+  background: #dfc07e;
+}
+.preview-switcher label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  cursor: pointer;
+}
+.preview-switcher input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: #b99c5d;
+}
+.preview-switcher > nav {
+  max-height: min(70dvh, 600px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.preview-switcher select {
+  min-width: 0;
+  flex: 1;
+  height: 34px;
+  padding: 4px 6px;
+  font: inherit;
+  color: #fff1d1;
+  background: #344d3d;
+  border: 1px solid #72876a;
+  border-radius: 5px;
+}
+.preview-event-menu {
+  width: 100%;
+}
+.preview-event-menu > summary {
+  cursor: pointer;
+  padding: 9px 0;
+}
+.preview-event-menu > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-block: 5px;
+}
+.preview-event-menu p {
+  font-size: 12px;
+}

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Check, Clock3, LockKeyhole, Play, Plus, ScrollText, X } from './GameIcons.js';
+import { useEffect, useId, useState } from 'react';
+import { GameIcon, Check, Clock3, LockKeyhole, Play, X } from './GameIcons.js';
 import type { CSSProperties } from 'react';
 import { CARD_NAMES, canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { Card, CardKind, GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
@@ -8,9 +8,10 @@ import type { Resource } from '../../../packages/rules/src/index.js';
 import { ResourceIcon } from './Board.js';
 import { CardTooltip } from './CardTooltip.js';
 import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from './cards.js';
-const ART_COLUMNS = [0, 419, 835, 1254],
-  ART_ROWS = [0, 628, 1254];
+const ART_COLUMNS = [0, 418, 836, 1254],
+  ART_ROWS = [0, 627, 1254];
 export function DevelopmentArt({ kind }: { kind: CardKind | 'back' }) {
+  const clip = useId();
   const n = kind === 'back' ? 5 : DEVELOPMENT_ART_INDEX[kind],
     col = n % 3,
     row = Math.floor(n / 3),
@@ -19,10 +20,24 @@ export function DevelopmentArt({ kind }: { kind: CardKind | 'back' }) {
   return (
     <svg
       className="development-art"
-      viewBox={`${x} ${y} ${ART_COLUMNS[col + 1]! - x} ${ART_ROWS[row + 1]! - y}`}
+      viewBox="0 0 418 627"
+      preserveAspectRatio="xMidYMid meet"
+      overflow="hidden"
       aria-hidden="true"
     >
-      <image href="/art/optimized/development-cards.d7fcdf84252a.webp" width="1254" height="1254" />
+      <defs>
+        <clipPath id={clip}>
+          <rect width="418" height="627" />
+        </clipPath>
+      </defs>
+      <image
+        href="/art/optimized/development-cards.e40eabee1fa7.webp"
+        x={-x}
+        y={-y}
+        width="1254"
+        height="1254"
+        clipPath={`url(#${clip})`}
+      />
     </svg>
   );
 }
@@ -80,9 +95,10 @@ export function DevelopmentCards({
   useEffect(() => {
     if (obscured) setSelected(null);
   }, [obscured]);
-  function choose(id: string) {
+  function choose(c: Card) {
+    if (disabled || cardLockReason(c, game, me)) return;
     onSelect?.();
-    setSelected((current) => (current === id ? null : id));
+    setSelected((current) => (current === c.id ? null : c.id));
     setTake(emptyHand());
   }
   function play() {
@@ -99,6 +115,7 @@ export function DevelopmentCards({
       cardId: card.id,
       ...(card.kind === 'monopoly' ? { resource } : card.kind === 'yearOfPlenty' ? { resources: take } : {}),
     });
+    setSelected(null);
   }
   return (
     <section
@@ -150,8 +167,9 @@ export function DevelopmentCards({
                     <button
                       className={`development-card card-finish ${lock ? 'resting-card' : 'playable-card'} ${c.kind === 'victoryPoint' ? 'victory-card' : ''}`}
                       aria-pressed={selected === c.id}
-                      aria-label={`${CARD_NAMES[c.kind]}${stack.count > 1 ? ` × ${stack.count}` : ''}. ${lock ?? 'Choose card to play'}`}
-                      onClick={() => choose(c.id)}
+                      aria-label={`${CARD_NAMES[c.kind]}${stack.count > 1 ? ` × ${stack.count}` : ''}. ${lock ?? 'Review card'}`}
+                      aria-disabled={disabled || !!lock}
+                      onClick={() => choose(c)}
                     >
                       <DevelopmentArt kind={c.kind} />
                       {stack.count > 1 && <span className="development-count">×{stack.count}</span>}
@@ -165,12 +183,12 @@ export function DevelopmentCards({
                         ) : lock ? (
                           <>
                             <Clock3 size={11} />
-                            Held
+                            {c.boughtTurn === game.turn ? 'Next turn' : 'Held'}
                           </>
                         ) : (
                           <>
                             <Play size={11} />
-                            Playable
+                            Review
                           </>
                         )}
                       </span>
@@ -198,7 +216,6 @@ export function DevelopmentCards({
                 <X />
               </button>
               <div className="development-explanation">
-                <span className="field-caption">{CARD_LORE[card.kind].title}</span>
                 <h3>{CARD_NAMES[card.kind]}</h3>
                 <p>{CARD_LORE[card.kind].effect}</p>
                 {reason && (
@@ -297,6 +314,7 @@ export function DevelopmentCards({
 export function DevelopmentPurchase({ disabled, onBuy }: { disabled: boolean; onBuy: () => void }) {
   return (
     <button
+      data-development-purchase
       className="development-buy"
       disabled={disabled}
       aria-label="Buy development card · 1 Sheep, 1 Hay, 1 Rock"
@@ -304,8 +322,7 @@ export function DevelopmentPurchase({ disabled, onBuy }: { disabled: boolean; on
       onClick={onBuy}
     >
       <span className="development-buy-mark" aria-hidden="true">
-        <ScrollText size={30} />
-        <Plus size={18} />
+        <GameIcon name="buy-development" size={40} />
       </span>
       <span className="development-buy-label">Buy</span>
       <span className="development-buy-cost" aria-hidden="true">

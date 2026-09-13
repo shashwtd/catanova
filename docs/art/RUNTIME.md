@@ -35,3 +35,7 @@ Use `scripts/export-branding.mjs` only when deliberately regenerating browser ic
 - The production build writes smaller Brotli/gzip versions of text files. The server negotiates them without compressing on each request; Caddy retains API compression.
 
 These are byte-size and behavior improvements, not a claim that an actual throttled-device benchmark or maximum player capacity has been measured.
+
+## Current development cards
+
+The September 2026 [readability pass](development-cards-readable.md) uses a new, smaller 768px atlas (96,886 bytes). The full-resolution table above and `runtime-art.json` record the legacy art exports, which remain available for old PNG URLs.

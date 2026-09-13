@@ -103,7 +103,8 @@ test('player trades are atomic, active-player-only offers; stale offers and gift
   assert.throws(() => move(g, { kind: 'offerTrade', give, want: emptyHand() }), /Both sides/);
   g = move(g, { kind: 'offerTrade', give, want }); const id = g.trade!.id;
   assert.throws(() => move(g, { kind: 'acceptTrade', tradeId: id }, 'p2'), /no longer has/);
-  g = move(g, { kind: 'acceptTrade', tradeId: id }, 'p1'); assert.equal(g.players[0]!.hand.sheep, 1); assert.equal(g.players[1]!.hand.wood, 2); conserved(g);
+  g = move(g, { kind: 'acceptTrade', tradeId: id }, 'p1'); assert.equal(g.players[0]!.hand.sheep, 0);
+  g = move(g, { kind: 'acceptProposal', tradeId: id, player: 'p1', expectedGive: want }); assert.equal(g.players[0]!.hand.sheep, 1); assert.equal(g.players[1]!.hand.wood, 2); conserved(g);
   assert.throws(() => move(g, { kind: 'acceptTrade', tradeId: id }, 'p1'), /no longer available/);
 });
 test('hidden hands, deck order and victory cards are omitted from opponent projections', () => {

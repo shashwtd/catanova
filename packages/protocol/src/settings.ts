@@ -1,9 +1,14 @@
+import { validVictoryPoints } from '../../rules/src/victory.js';
 import { DICE_MODES } from '../../rules/src/dice.js';
 import type { DiceMode } from '../../rules/src/dice.js';
 export type { DiceMode } from '../../rules/src/dice.js';
 export const TURN_TIMER_STEPS = [40, 65, 90, 115, 140] as const;
 export type TurnTimerSeconds = (typeof TURN_TIMER_STEPS)[number];
-export type RoomSettings = { turnTimerSeconds: TurnTimerSeconds | null; diceMode?: DiceMode };
+export type RoomSettings = {
+  turnTimerSeconds: TurnTimerSeconds | null;
+  diceMode?: DiceMode;
+  victoryPoints?: number;
+};
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = { turnTimerSeconds: null };
 export const DEFAULT_TURN_TIMER_SECONDS: TurnTimerSeconds = 90;
 
@@ -21,12 +26,16 @@ export type TurnClock = {
 export function parseRoomSettings(input: unknown): RoomSettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid room settings');
   const seconds = (input as Record<string, unknown>).turnTimerSeconds;
+  const victoryPoints = (input as Record<string, unknown>).victoryPoints;
+  if (victoryPoints !== undefined && !validVictoryPoints(victoryPoints))
+    throw new Error('Choose a victory target from 8 to 15 points');
   const diceMode = (input as Record<string, unknown>).diceMode;
   if (seconds !== null && !TURN_TIMER_STEPS.includes(seconds as TurnTimerSeconds))
     throw new Error('Turn timer must be off, 40, 65, 90, 115, or 140 seconds');
   if (diceMode !== undefined && !DICE_MODES.includes(diceMode as DiceMode))
-    throw new Error('Choose Classic dice or Flat totals');
+    throw new Error('Choose Natural or Balanced dice');
   return {
+    ...(victoryPoints === undefined ? {} : { victoryPoints }),
     turnTimerSeconds: seconds as TurnTimerSeconds | null,
     ...(diceMode === undefined ? {} : { diceMode: diceMode as DiceMode }),
   };

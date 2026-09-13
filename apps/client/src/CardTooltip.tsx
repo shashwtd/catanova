@@ -118,7 +118,10 @@ export function CardTooltip({
         }
       }}
       onClick={(e) => {
-        if ((e.target as Element).closest('button')) setOpen(false);
+        const button = (e.target as Element).closest('button');
+        // Locked cards still explain themselves on touch, where there is no hover.
+        if (button?.getAttribute('aria-disabled') === 'true') show();
+        else if (button) setOpen(false);
         else if (open) setOpen(false);
         else show();
       }}

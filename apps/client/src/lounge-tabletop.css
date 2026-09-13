@@ -1,0 +1,194 @@
+/* A separate pregame treatment: revert this sheet and its backdrop to restore the scenery. */
+.game-world:is(.player-home, .lobby) {
+  --game-cream: #f6e8ce;
+  --game-muted: #cbbda4;
+  --game-gold: #efd194;
+  --game-trim: #d7b97940;
+  --game-panel-fill: linear-gradient(140deg, #594a3bfa, #3a312bf7 75%);
+  --game-panel-shadow: inset 0 1px #fbe8bc22, 0 4px 0 #211b1670, 0 12px 26px #160f0b35;
+  --lounge-backdrop: #382d27;
+  background: var(--lounge-backdrop);
+}
+.lounge-tabletop {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+.lounge-tabletop > svg {
+  display: block;
+}
+.lounge-tabletop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 48% 35%, #f6dcb312, #241b170c 50%, #18141177);
+}
+.game-world.lobby .room-lobby {
+  z-index: 1;
+}
+.player-home .player-hub {
+  --hub-ink: #45382d;
+}
+.player-home .hub-header {
+  background: #332b24db;
+  box-shadow:
+    inset 0 1px #fbe8bc18,
+    0 3px 8px #170e092b;
+}
+.player-home .hub-character,
+.player-home .hub-room-actions {
+  background: var(--game-panel-fill);
+}
+.player-home .hub-character-portrait .avatar-medallion {
+  box-shadow:
+    0 0 0 5px #352b24,
+    0 0 0 6px #a48a5d,
+    0 10px 15px #180f0a55;
+}
+.player-home :is(.hub-social-button, .hub-edit-profile, .hub-join-submit),
+.lobby .room-lobby :is(.lobby-friends, .lobby-configure),
+.lobby .room-lobby .lobby-start-controls > .hub-room-button:not(.hub-create-button) {
+  color: #fff0d4;
+  background: linear-gradient(#695844, #4b3d31);
+  border-color: #c1a47288;
+  box-shadow:
+    inset 0 1px #fbe8bc2b,
+    inset 0 -2px #30261e,
+    0 3px 6px #190f092e;
+}
+.player-home .hub-room-button:not(.hub-create-button),
+.player-home :is(.hub-resume-button, .hub-return) {
+  background: linear-gradient(#667b85, #435a67);
+  color: #fff2d7;
+  border-color: #9dacb0;
+  box-shadow:
+    inset 0 1px #e2eff435,
+    inset 0 -3px #30414d,
+    0 3px 5px #18120d55;
+}
+.player-home .hub-link-account {
+  background: #4a3c2fe6;
+  border-color: #c9b28950;
+  box-shadow: none;
+}
+.player-home .hub-link-account :is(small, p) {
+  color: var(--game-muted);
+}
+.player-home .hub-play-controls .hub-join-form {
+  background: #302820;
+}
+.player-home .hub-join-form input {
+  color: #493b2a;
+  background: #f0e2c8;
+  border-color: #d7ba89;
+}
+.player-home .hub-join-form input:focus {
+  outline-color: #e7c883;
+  background: #f9edd5;
+}
+.player-home .hub-join-form input::placeholder {
+  color: #786649;
+}
+.player-home :is(.hub-header-profile small, .hub-footer-meta, .hub-identity-detail) {
+  color: var(--game-muted);
+}
+/* The record is a quieter page inside the surrounding wooden furniture. */
+.player-home .match-history {
+  --game-cream: #4f402e;
+  --game-muted: #776447;
+  --game-gold: #89602a;
+  --game-trim: #92795035;
+  color: var(--game-cream);
+  border-color: #c9ac78;
+  background: linear-gradient(115deg, #eee0c1, #dfcca6);
+  box-shadow:
+    inset 0 1px #fff1cf8c,
+    0 4px 0 #241a1360,
+    0 9px 18px #1b100a2b;
+}
+.player-home .match-history .hub-section-heading {
+  border-color: #90744d2b;
+}
+.player-home .match-history .match-row summary:hover {
+  background: #fff8e24d;
+}
+.player-home .match-history .match-detail {
+  background: #7d603412;
+}
+.player-home .match-history :is(.match-outcome, .match-score, .match-scoreboard li > span[title]) {
+  color: #705a39;
+}
+.player-home .match-history .hub-more {
+  background: #fff2d12e;
+  border-color: #957c534d;
+  color: #5d492d;
+}
+.lobby .room-lobby :is(.lobby-caption, .lobby-caption h1) {
+  color: #fff1d6;
+  text-shadow:
+    0 2px 3px #231a12,
+    0 4px 14px #1b120a77;
+}
+.lobby .room-lobby .lobby-room-options {
+  color: #f5e7ca;
+  border-color: #d9bd844a;
+  background: #322a23e8;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 1px #fbe8bc18,
+    0 4px 12px #20150c33;
+}
+.lobby .room-lobby :is(.lobby-seat, .lobby-seat.self) {
+  background: var(--game-panel-fill);
+  border-color: #cbb48a6e;
+  box-shadow: var(--game-panel-shadow);
+}
+.lobby .room-lobby .lobby-seat.self {
+  border-color: #e4c27c;
+}
+.lobby .room-lobby .lobby-invite-tile {
+  background: #372d2480;
+  border: 1px dashed #d7b97966;
+  color: #efd7ac;
+}
+.lobby .room-lobby .lobby-invite-tile:hover {
+  background: #6954407d;
+  border-color: #efd194;
+}
+.lobby .room-lobby .lobby-avatar .avatar-medallion {
+  box-shadow:
+    0 0 0 4px #342b24,
+    0 7px 14px #1c120b55;
+}
+.lobby .room-lobby .ready-status:not(.ready) {
+  color: var(--game-muted);
+}
+.lobby .room-lobby .ready-status.ready {
+  color: #d1e6b2;
+  background: #b7cf8720;
+}
+.lobby .room-lobby .room-share {
+  background: #352c25e8;
+  border-color: #d7b97955;
+}
+.lobby .room-lobby .room-share-actions button:hover {
+  background: #e6c58a20;
+}
+.game-world:is(.player-home, .lobby) .friends-drawer-surface {
+  background: var(--game-panel-fill);
+}
+@media (max-width: 650px) {
+  .player-home .hub-character-portrait .avatar-medallion {
+    box-shadow:
+      0 0 0 3px #352b24,
+      0 0 0 4px #a48a5d,
+      0 5px 10px #180f0a40;
+  }
+  .player-home .hub-character,
+  .lobby .room-lobby .lobby-seat {
+    box-shadow:
+      inset 0 1px #fbe8bc22,
+      0 4px 10px #1b100b30;
+  }
+}

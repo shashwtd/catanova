@@ -108,3 +108,31 @@
     font-size: 20px;
   }
 }
+
+/* Counters rest inside the shelf; only development cards extend above it. */
+.playing .resource-hand.resource-counters {
+  padding-bottom: 0;
+  translate: 0 8px;
+}
+.playing .card-table::before {
+  height: 76px;
+}
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing .hand-zone {
+    align-self: end;
+  }
+  .playing .resource-hand.resource-counters {
+    translate: 0 6px;
+  }
+  .playing .card-table::before {
+    height: calc(126px + var(--mobile-safe-bottom));
+  }
+}
+@media (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .resource-hand.resource-counters {
+    translate: 0 6px;
+  }
+  .playing .card-table::before {
+    height: calc(74px + var(--mobile-safe-bottom));
+  }
+}

@@ -15,11 +15,13 @@ export function RoomInviteInbox({
   busy,
   onOpen,
   onDismiss,
+  blockedReason,
 }: {
   invitations: readonly RoomInvite[];
   busy: boolean;
   onOpen: (roomId: string) => void;
   onDismiss: (id: string) => void;
+  blockedReason?: string;
 }) {
   if (!invitations.length) return null;
   return (
@@ -48,7 +50,8 @@ export function RoomInviteInbox({
             <button
               type="button"
               className="roster-action roster-accept"
-              disabled={busy}
+              disabled={busy || !!blockedReason}
+              title={blockedReason}
               onClick={() => onOpen(invite.roomId)}
             >
               View room
@@ -66,7 +69,67 @@ export function RoomInviteInbox({
           </li>
         ))}
       </ul>
+      {blockedReason && <p className="room-invite-blocked">{blockedReason}</p>}
     </section>
+  );
+}
+
+/** Stays visible until dismissed or expired; never takes focus away from play. */
+export function RoomInviteNotice({
+  invitations,
+  busy,
+  blockedReason,
+  error,
+  onOpen,
+  onDismiss,
+  onShowAll,
+}: Parameters<typeof RoomInviteInbox>[0] & { error?: string; onShowAll: () => void }) {
+  const invite = invitations[0];
+  return (
+    <aside className="invitation-notice" aria-label="Game invitation" hidden={!invite}>
+      <div role="status" aria-live="polite" aria-atomic="true" className="invitation-message">
+        {invite && (
+          <>
+            <Avatar profile={invite.from.profile} />
+            <span>
+              <strong>{invite.from.username}</strong>
+              <span>Invited you to play · {invite.roomCode ?? 'Game room'}</span>
+            </span>
+          </>
+        )}
+      </div>
+      {invite && (
+        <>
+          <button
+            className="invitation-dismiss"
+            aria-label={`Dismiss invitation from ${invite.from.username}`}
+            disabled={busy}
+            onClick={() => onDismiss(invite.id)}
+          >
+            <X size={18} />
+          </button>
+          <div className="invitation-actions">
+            {blockedReason ? (
+              <span>{blockedReason}</span>
+            ) : (
+              <button className="hub-return" disabled={busy} onClick={() => onOpen(invite.roomId)}>
+                View room
+              </button>
+            )}
+            {invitations.length > 1 && (
+              <button className="hub-text-action" onClick={onShowAll}>
+                All invitations ({invitations.length})
+              </button>
+            )}
+          </div>
+          {error && (
+            <p className="roster-error" role="alert">
+              {error}
+            </p>
+          )}
+        </>
+      )}
+    </aside>
   );
 }
 

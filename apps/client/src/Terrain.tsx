@@ -25,6 +25,7 @@ uniform sampler2D uTerrain;
 uniform sampler2D uEnvironment;
 uniform vec3 uLand[19];
 uniform vec4 uWorld;
+uniform float uConcept;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
 float hex(vec2 p,float r){p=abs(p.yx);r*=0.8660254;vec3 k=vec3(-0.8660254,0.5,0.57735027);p-=2.0*min(dot(k.xy,p),0.0)*k.xy;p-=vec2(clamp(p.x,-k.z*r,k.z*r),r);return length(p)*sign(p.y);}
@@ -55,7 +56,7 @@ void main(){
   float bankShade=mix(0.68,1.03,1.0-smoothstep(-2.0,6.0,land+rough));
   color=mix(color,sand*bankShade,coast);
   vec2 local=p-uLand[nearest].xy;
-  float terrainEdge=hex(local,58.5)+rough*0.65;
+  float terrainEdge=hex(local,mix(58.5,57.0,uConcept))+rough*0.65;
   float terrainMask=1.0-smoothstep(-2.0,2.8,terrainEdge);
   float tile=uLand[nearest].z;
   vec2 cell=vec2(mod(tile,3.0),floor(tile/3.0));
@@ -79,7 +80,19 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string) {
   }
   return shader;
 }
-export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boolean) => void }) {
+export type TerrainArt = { terrain: string; environment: string; concept?: boolean };
+export function Terrain({
+  board,
+  onReady,
+  art,
+}: {
+  board: Board;
+  onReady: (ready: boolean) => void;
+  art?: TerrainArt;
+}) {
+  const terrainArt = art?.terrain ?? TERRAIN_ART,
+    environmentArt = art?.environment ?? ENVIRONMENT_ART;
+  const concept = art?.concept ?? false;
   const ref = useRef<HTMLCanvasElement>(null);
   const [generation, setGeneration] = useState(0);
   useEffect(() => {
@@ -102,7 +115,7 @@ export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boo
         powerPreference: 'low-power',
       });
       if (!gl) return;
-      const images = await Promise.all([TERRAIN_ART, ENVIRONMENT_ART].map(decodedGameImage));
+      const images = await Promise.all([terrainArt, environmentArt].map(decodedGameImage));
       if (disposed || gl.isContextLost()) return;
       const vertex = compile(gl, gl.VERTEX_SHADER, vertexSource),
         fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentSource);
@@ -138,6 +151,7 @@ export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boo
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
         return texture;
       });
+      gl.uniform1f(gl.getUniformLocation(program, 'uConcept'), concept ? 1 : 0);
       gl.uniform1i(gl.getUniformLocation(program, 'uTerrain'), 0);
       gl.uniform1i(gl.getUniformLocation(program, 'uEnvironment'), 1);
       gl.uniform3fv(
@@ -180,6 +194,6 @@ export function Terrain({ board, onReady }: { board: Board; onReady: (ready: boo
       canvas.removeEventListener('webglcontextrestored', restored);
     };
     // Board terrain is immutable for a seed. Game actions must not re-upload textures.
-  }, [board.seed, generation, onReady]);
+  }, [board.seed, generation, onReady, terrainArt, environmentArt, concept]);
   return <canvas ref={ref} className="terrain-canvas" aria-hidden="true" />;
 }

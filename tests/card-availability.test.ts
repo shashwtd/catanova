@@ -4,11 +4,23 @@ import { createElement } from 'react';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from '../apps/client/src/cards.js';
-import { DevelopmentCards, developmentStacks } from '../apps/client/src/DevelopmentCards.js';
+import { DevelopmentArt, DevelopmentCards, developmentStacks } from '../apps/client/src/DevelopmentCards.js';
 import { ResourceHand } from '../apps/client/src/ResourceHand.js';
 import { activePlayer, applyAction, createGame, emptyHand, gameView } from '../packages/rules/src/game.js';
 import type { Card, Game, GameView } from '../packages/rules/src/game.js';
 import { DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
+
+test('development previews isolate each atlas cell instead of exposing neighboring cards in wider slots', () => {
+  for (const [kind, cell] of Object.entries(DEVELOPMENT_ART_INDEX)) {
+    const html = renderToStaticMarkup(createElement(DevelopmentArt, { kind: kind as Card['kind'] }));
+    assert.match(html, /viewBox="0 0 418 627"/);
+    assert.match(html, /preserveAspectRatio="xMidYMid meet" overflow="hidden"/);
+    const clip = html.match(/<clipPath id="([^"]+)"><rect width="418" height="627"/);
+    assert.ok(clip, 'the cell has an explicit clip, including any letterboxed area');
+    assert.ok(html.includes(`clip-path="url(#${clip[1]})"`));
+    assert.ok(html.includes(`x="${-(cell % 3) * 418}" y="${-Math.floor(cell / 3) * 627}"`));
+  }
+});
 
 function setup(): Game {
   let game = createGame(
@@ -103,9 +115,7 @@ test('Road Building and Year of Plenty explain unavailable inventory instead of 
 
 test('compact resource counters keep accessible names and flight anchors without card shapes or hover popups', () => {
   const hand = { ...emptyHand(), wood: 2, wheat: 1 };
-  const html = renderToStaticMarkup(
-    createElement(ResourceHand, { hand, pulse: {}, reducedMotion: false, onHover: () => {} }),
-  );
+  const html = renderToStaticMarkup(createElement(ResourceHand, { hand, pulse: {}, reducedMotion: false }));
   assert.equal([...html.matchAll(/data-resource-card=/g)].length, 5);
   assert.equal([...html.matchAll(/data-empty="true"/g)].length, 3);
   assert.equal([...html.matchAll(/class="resource-counter"/g)].length, 5);
@@ -145,7 +155,10 @@ test('development spread displays local card art, playable/held status and reada
   assert.ok(html.includes('You can play this on your next turn.'));
   assert.ok(html.includes('Already counts toward your victory points.'));
   assert.ok(html.includes('+1 point'));
-  assert.ok(html.includes('/art/optimized/development-cards.d7fcdf84252a.webp'));
+  assert.match(html, /Knight\. Review card/);
+  assert.match(html, /aria-disabled="true"/);
+  assert.ok(!html.includes('development-detail'));
+  assert.ok(html.includes('/art/optimized/development-cards.e40eabee1fa7.webp'));
   assert.ok(!html.includes('Monopoly') && !html.includes('private-other-card'));
   assert.equal(new Set(Object.values(DEVELOPMENT_ART_INDEX)).size, 5);
   for (const kind of Object.keys(DEVELOPMENT_DECK) as (keyof typeof DEVELOPMENT_DECK)[]) {
@@ -155,31 +168,20 @@ test('development spread displays local card art, playable/held status and reada
   }
 });
 
-test('resource hover audio works with reduced motion and stays silent for empty cards and touch', () => {
-  let sounds = 0;
+test('resource counters have no hover interaction, including when resources are available', () => {
   const hand = { ...emptyHand(), wood: 2 };
   for (const reducedMotion of [false, true]) {
-    const cards = ResourceHand({ hand, pulse: {}, reducedMotion, onHover: () => sounds++ }).props
-      .children as Array<
-      ReactElement<{ children: ReactElement<{ onPointerEnter: (event: { pointerType: string }) => void }> }>
+    const cards = ResourceHand({ hand, pulse: {}, reducedMotion }).props.children as Array<
+      ReactElement<{ children: ReactElement<{ onPointerEnter?: unknown }> }>
     >;
-    const wood = cards[0]!.props.children.props.onPointerEnter;
-    const clay = cards[1]!.props.children.props.onPointerEnter;
-    const before = sounds;
-    wood({ pointerType: 'mouse' });
-    assert.equal(sounds, before + 1, 'positive resource cards keep audio independent of motion');
-    clay({ pointerType: 'mouse' });
-    wood({ pointerType: 'touch' });
-    assert.equal(sounds, before + 1, 'empty cards and touch do not play a hover cue');
+    assert.ok(cards.every((card) => card.props.children.props.onPointerEnter === undefined));
   }
 });
 
 test('resource arrival updates pulse their number while reduced motion keeps the count static', () => {
   const hand = { ...emptyHand(), wood: 12 };
   const render = (reducedMotion: boolean) =>
-    renderToStaticMarkup(
-      createElement(ResourceHand, { hand, pulse: { wood: 'arrival-1' }, reducedMotion, onHover: () => {} }),
-    );
+    renderToStaticMarkup(createElement(ResourceHand, { hand, pulse: { wood: 'arrival-1' }, reducedMotion }));
   assert.equal([...render(false).matchAll(/\bis-animating\b/g)].length, 1);
   assert.equal([...render(true).matchAll(/\bis-animating\b/g)].length, 0);
   assert.match(render(true), /aria-label="12 Timber"/);
@@ -207,12 +209,12 @@ test('development purchase is a separate buy slot with a visible three-resource 
   for (const resource of ['sheep', 'wheat', 'ore'])
     assert.match(enabled, new RegExp(`data-cost-resource="${resource}"`));
   assert.ok(
-    !enabled.includes('/art/optimized/development-cards.d7fcdf84252a.webp'),
+    !enabled.includes('/art/optimized/development-cards.e40eabee1fa7.webp'),
     'the purchase slot cannot masquerade as a held illustrated card',
   );
   assert.ok(!enabled.includes('class="development-card '));
-  assert.ok(!/<button class="development-buy"[^>]*disabled/.test(enabled));
-  assert.match(render(false), /<button class="development-buy"[^>]*disabled/);
+  assert.ok(!/<button[^>]*class="development-buy"[^>]*disabled/.test(enabled));
+  assert.match(render(false), /<button[^>]*class="development-buy"[^>]*disabled/);
 });
 
 test('identical cards share a stack that chooses an eligible old copy before a fresh copy', () => {

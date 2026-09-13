@@ -92,8 +92,8 @@ test('player lobby exposes history, profile and social controls without opening 
   assert.ok(!html.includes('<form'));
   assert.ok(!html.includes('Continue with Google'));
   assert.ok(!html.includes('guest login'));
-  assert.match(html, /<dd>4<\/dd>/);
-  assert.match(html, /<dd>12<\/dd>/);
+  assert.match(html, /<b>4<\/b><\/dd>/);
+  assert.match(html, /<b>12<\/b><\/dd>/);
 });
 
 test('join intent reveals a labelled explicit form and busy connections disable every room-entry action', () => {
@@ -127,7 +127,7 @@ test('history distinguishes unfinished games, excludes invented dates, and only 
 
 test('unknown stats remain unknown and errors never masquerade as an empty match history', () => {
   const unknown = renderToStaticMarkup(createElement(PlayerStats, {}));
-  assert.equal((unknown.match(/<dd>—<\/dd>/g) ?? []).length, 2);
+  assert.equal((unknown.match(/<b>—<\/b><\/dd>/g) ?? []).length, 2);
   const html = renderToStaticMarkup(
     createElement(MatchHistory, {
       state: { ...state, data: null, error: 'Could not reach your account.' },
@@ -192,4 +192,41 @@ test('guests keep the same player lobby and profile but have a clear account-lin
   assert.ok(html.includes('Guest') && html.includes('Link Google to add friends.'));
   const regular = renderHub();
   assert.ok(!regular.includes('Link Google to add friends.'));
+});
+
+test('room invitations contribute to the friends badge and appear before the main hub content', () => {
+  const html = renderHub({
+    invitationCount: 2,
+    notifications: createElement('aside', { 'aria-label': 'Game invitation' }, 'Mossling invited you'),
+  });
+  assert.ok(html.includes('Friends, 2 invitations and requests'));
+  assert.ok(html.indexOf('Mossling invited you') < html.indexOf('hub-lobby-content'));
+});
+
+test('the hub presents the player identity once rather than repeating it in the header', () => {
+  const html = renderHub();
+  const header = html.match(/<header class="hub-header">([\s\S]*?)<\/header>/)?.[1] ?? '';
+  assert.ok(!header.includes('FernCaptain'));
+  assert.ok(!header.includes('avatar-medallion'));
+  assert.ok(html.includes('hub-character-portrait') && html.includes('View FernCaptain'));
+});
+
+test('the player card owns help and editing, and Edit opens the editor directly', () => {
+  const html = renderHub();
+  assert.ok(!html.includes('<footer'));
+  const player = html.match(/<section class="hub-character"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.ok(player.includes('Edit profile') && player.includes('How to play') && player.includes('Sign out'));
+  const editor = renderToStaticMarkup(
+    createElement(PlayerProfile, {
+      auth,
+      profile,
+      games: state,
+      busy: false,
+      initialEditing: true,
+      onSave: async () => {},
+      onResume: noop,
+    }),
+  );
+  assert.ok(editor.includes('profile-editor') && editor.includes('<input'));
+  assert.ok(!editor.includes('Recent games'));
 });

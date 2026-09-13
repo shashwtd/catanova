@@ -1,12 +1,15 @@
+import { ICON_ATLAS } from './painted-icons.js';
+import { BOARD_THEMES, type BoardTheme } from './board-theme.js';
 export const TERRAIN_ART = '/art/optimized/terrain-fantasy.777e0ac07117.webp';
 export const ENVIRONMENT_ART = '/art/optimized/environment-painted.00c506c983c0.webp';
 export const GAME_ART = [
-  TERRAIN_ART,
-  ENVIRONMENT_ART,
+  BOARD_THEMES.storybook.terrain,
+  BOARD_THEMES.storybook.environment,
+  ICON_ATLAS,
   '/art/optimized/environment-dark.c55c6de597e4.webp',
   '/art/optimized/sprites-fantasy.3aaf69915ec6.webp',
   '/art/optimized/avatars-fantasy.6bf04e83341a.webp',
-  '/art/optimized/development-cards.d7fcdf84252a.webp',
+  '/art/optimized/development-cards.e40eabee1fa7.webp',
   '/art/optimized/portrait-frame.de152d0c9426.webp',
 ] as const;
 
@@ -42,16 +45,20 @@ export function createImageCache(makeImage: () => HTMLImageElement = () => new I
 }
 export const decodedGameImage = createImageCache();
 /** Three concurrent decodes limit memory spikes on phones. Music streams independently. */
-export async function preloadGameArt(onProgress?: (ready: number, total: number) => void) {
+export async function preloadGameArt(
+  onProgress?: (ready: number, total: number) => void,
+  theme: BoardTheme = 'storybook',
+) {
+  const art = [BOARD_THEMES[theme].terrain, BOARD_THEMES[theme].environment, ...GAME_ART.slice(2)];
   let cursor = 0,
     ready = 0;
-  onProgress?.(ready, GAME_ART.length);
+  onProgress?.(ready, art.length);
   await Promise.all(
     Array.from({ length: 3 }, async () => {
-      while (cursor < GAME_ART.length) {
-        const src = GAME_ART[cursor++]!;
+      while (cursor < art.length) {
+        const src = art[cursor++]!;
         await decodedGameImage(src);
-        onProgress?.(++ready, GAME_ART.length);
+        onProgress?.(++ready, art.length);
       }
     }),
   );
@@ -85,6 +92,9 @@ export function preloadGameFonts(fonts: Pick<FontFaceSet, 'load'> = document.fon
   });
   return request;
 }
-export async function preloadGameAssets(onProgress?: (ready: number, total: number) => void) {
-  await Promise.all([preloadGameArt(onProgress), preloadGameFonts()]);
+export async function preloadGameAssets(
+  onProgress?: (ready: number, total: number) => void,
+  theme: BoardTheme = 'storybook',
+) {
+  await Promise.all([preloadGameArt(onProgress, theme), preloadGameFonts()]);
 }

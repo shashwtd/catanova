@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { GameIcon, Layers, ScrollText, Route, Shield, Trophy, WifiOff } from './GameIcons.js';
+import { GameIcon, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -8,6 +8,49 @@ import { Avatar } from './Profile.js';
 import { PLAYER_COLORS } from './Board.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
+import { playerStandings } from './player-ranking.js';
+import { CardTooltip } from './CardTooltip.js';
+
+function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; count: number }) {
+  const label = `${count} ${kind === 'resource' ? 'resource' : 'development'} cards`;
+  return (
+    <span className={`profile-${kind}-count`} data-empty={count === 0} title={label} aria-label={label}>
+      <GameIcon
+        className="profile-inventory-art"
+        name={kind === 'resource' ? 'cards' : 'development'}
+        size={23}
+      />
+      <b>{count}</b>
+    </span>
+  );
+}
+
+export function AwardStandings({ game, kind }: { game: GameView; kind: 'longestRoad' | 'largestArmy' }) {
+  const field = kind === 'longestRoad' ? 'roadLength' : 'knights';
+  const players = game.players
+    .map((player, seat) => ({ player, seat }))
+    .sort((a, b) => b.player[field] - a.player[field] || a.seat - b.seat);
+  return (
+    <span className="award-standings">
+      <strong>{kind === 'longestRoad' ? 'Longest Road' : 'Largest Army'}</strong>
+      <small>{kind === 'longestRoad' ? 'Connected roads · minimum 5' : 'Knights played · minimum 3'}</small>
+      <span role="list" aria-label="Award standings">
+        {players.map(({ player }) => (
+          <span
+            role="listitem"
+            key={player.id}
+            data-holder={game[kind] === player.id}
+            aria-label={`${player.name}: ${player[field]}${game[kind] === player.id ? ', award holder' : ''}`}
+          >
+            <span>{player.name}</span>
+            <b>{player[field]}</b>
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 export function PlayerRail({
   room,
   game,
@@ -21,6 +64,8 @@ export function PlayerRail({
   timer?: ReactNode;
   clockOffset?: number;
 }) {
+  const ranked = playerStandings(game);
+  const tied = ranked.filter((p) => p.leading).length > 1;
   const [now, setNow] = useState(Date.now);
   const fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() });
   if (room.serverNow !== undefined && room.serverNow !== fallback.current.server)
@@ -41,7 +86,7 @@ export function PlayerRail({
   }, [counting]);
   return (
     <aside className="player-rail" aria-label="Players">
-      {game.players.map((p, i) => {
+      {ranked.map(({ player: p, seatIndex: i, publicPoints, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
           activity = playerTurnActivity(game, p.id),
@@ -57,6 +102,15 @@ export function PlayerRail({
           >
             <div className="profile-portrait">
               <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
+              {leading && (
+                <span
+                  className="profile-rank"
+                  aria-label={`${tied ? 'Joint leader' : 'Leader'}, ${publicPoints} public points`}
+                  title={`${tied ? 'Joint leader' : 'Leader'} · ${publicPoints} public points`}
+                >
+                  #1
+                </span>
+              )}
               {!seat?.connected && (
                 <span className="offline-mark" role="img" title="Disconnected" aria-label="Disconnected">
                   <WifiOff size={38} />
@@ -73,57 +127,6 @@ export function PlayerRail({
                   {active && timer}
                 </span>
               )}
-            </div>
-            <div className="profile-caption">
-              <strong className="profile-name-banner" title={p.name}>
-                {p.name}
-              </strong>
-              <div className="profile-stats">
-                <span
-                  className="profile-score"
-                  title={`${p.points} victory points`}
-                  aria-label={`${p.points} victory points`}
-                >
-                  <Trophy size={23} />
-                  <b>{p.points}</b>
-                </span>
-                <span
-                  className="profile-resource-count"
-                  title={`${p.resourceCount} resource cards`}
-                  aria-label={`${p.resourceCount} resource cards`}
-                >
-                  <Layers size={23} />
-                  <b>{p.resourceCount}</b>
-                </span>
-                <span
-                  className="profile-development-count"
-                  title={`${p.cardCount} development cards`}
-                  aria-label={`${p.cardCount} development cards`}
-                >
-                  <ScrollText size={23} />
-                  <b>{p.cardCount}</b>
-                </span>
-              </div>
-              <div className="profile-achievements" aria-label="Award progress">
-                <span
-                  className={`profile-achievement ${road ? 'held road-award' : ''}`}
-                  aria-label={`${road ? 'Longest Road, plus 2 victory points' : 'Longest route'}, ${p.roadLength} connected roads`}
-                  title={`Longest Road · ${p.roadLength} connected roads · ${road ? '+2 points' : 'At least 5 to claim'}`}
-                >
-                  <Route size={15} />
-                  <b>{p.roadLength}</b>
-                  {road && <small>+2</small>}
-                </span>
-                <span
-                  className={`profile-achievement ${army ? 'held army-award' : ''}`}
-                  aria-label={`${army ? 'Largest Army, plus 2 victory points' : 'Knights played'}, ${p.knights} Knights played`}
-                  title={`Largest Army · ${p.knights} Knights played · ${army ? '+2 points' : 'At least 3 to claim'}`}
-                >
-                  <Shield size={15} />
-                  <b>{p.knights}</b>
-                  {army && <small>+2</small>}
-                </span>
-              </div>
               <DisconnectStatus
                 resigned={p.resigned}
                 deadline={!seat?.connected && game.phase !== 'finished' ? seat?.resignAt : undefined}
@@ -131,6 +134,55 @@ export function PlayerRail({
                 paused={room.paused}
               />
             </div>
+            <div className="profile-caption">
+              <div className="profile-name-row">
+                <strong className="profile-name-banner" title={p.name}>
+                  {p.name}
+                </strong>
+              </div>
+              <div className="profile-details">
+                <div className="profile-stats">
+                  <span
+                    className="profile-score"
+                    title={`${p.points} victory points`}
+                    aria-label={`${p.points} victory points`}
+                  >
+                    <Trophy size={23} />
+                    <b>{p.points}</b>
+                  </span>
+                </div>
+                <div className="profile-detail-grid">
+                  <div className="profile-inventories">
+                    <InventoryCount kind="resource" count={p.resourceCount} />
+                    <InventoryCount kind="development" count={p.cardCount} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            {(road || army) && (
+              <div className="profile-held-awards" aria-label="Awards">
+                {road && (
+                  <CardTooltip disabledMotion content={<AwardStandings game={game} kind="longestRoad" />}>
+                    <span
+                      className="profile-medal road-award"
+                      aria-label={`Longest Road, plus 2 victory points, ${p.roadLength} connected roads`}
+                    >
+                      <GameIcon name="road-award" size={30} />
+                    </span>
+                  </CardTooltip>
+                )}
+                {army && (
+                  <CardTooltip disabledMotion content={<AwardStandings game={game} kind="largestArmy" />}>
+                    <span
+                      className="profile-medal army-award"
+                      aria-label={`Largest Army, plus 2 victory points, ${p.knights} Knights played`}
+                    >
+                      <GameIcon name="army-award" size={30} />
+                    </span>
+                  </CardTooltip>
+                )}
+              </div>
+            )}
             {game.winner === p.id && (
               <div className="profile-awards">
                 <span

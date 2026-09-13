@@ -595,7 +595,22 @@ export async function startServer(
               message.expectedRevision,
               message.ready,
               message.profile,
+              message.kickPlayerId,
             );
+            if (message.kickPlayerId) {
+              const removed = activeSeats.get(message.kickPlayerId);
+              if (removed && sessions.get(removed)?.room_id === seat.room_id) {
+                sessions.delete(removed);
+                activeSeats.delete(message.kickPlayerId);
+                store.setConnected({ id: message.kickPlayerId, room_id: seat.room_id, name: '' }, false);
+                send(removed, {
+                  type: 'error',
+                  code: 'LOBBY_REMOVED',
+                  message: 'The host removed you from the lobby.',
+                });
+                removed.close(4002, 'Removed from lobby');
+              }
+            }
             recordGuestActivity();
             send(ws, { type: 'ack', commandId, ...receipt });
             broadcast(seat.room_id);

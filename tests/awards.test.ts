@@ -123,7 +123,7 @@ test('resync, hidden-tab snapshots and room changes discard award playback witho
   assert.deepEqual(queue.observe(otherBefore, other), [], 'switching rooms is a baseline, not an old award');
 });
 
-test('profiles show the longest continuous route, not total pieces, and Knights already played', () => {
+test('profiles show only earned medals outside the name row, retaining their criteria in accessible labels', () => {
   const state = room();
   const saved = createGame(state.players, 42, () => 0.34);
   const junction = saved.board.vertices.find((vertex) => vertex.edges.length === 3)!;
@@ -135,11 +135,13 @@ test('profiles show the longest continuous route, not total pieces, and Knights 
   assert.equal(game.players[1]!.roadLength, 2, 'a fork with three edges has a two-edge continuous route');
   const html = renderToStaticMarkup(createElement(PlayerRail, { room: state, game, me: 'p0' }));
   const bob = html.match(/<article[^>]*data-player-profile="p1"[\s\S]*?<\/article>/)![0];
-  assert.match(bob, /aria-label="Longest route, 2 connected roads"/);
+  assert.ok(!bob.includes('Longest route'));
   assert.match(bob, /aria-label="Largest Army, plus 2 victory points, 4 Knights played"/);
-  assert.match(bob, /<b>4<\/b><small>\+2<\/small>/);
+  assert.doesNotMatch(bob.match(/class="profile-name-row"[\s\S]*?<\/div>/)![0], /profile-medal/);
+  assert.ok(bob.indexOf('profile-medal army-award') > bob.indexOf('profile-details'));
   assert.ok(!html.includes('secret-knight'));
-  assert.equal([...html.matchAll(/aria-label="Award progress"/g)].length, 3);
+  assert.equal([...html.matchAll(/aria-label="Awards"/g)].length, 1);
+  assert.ok(!html.includes('Award progress'));
 });
 
 test('the nonblocking award toast names the recipient, requirement, count and prior holder', () => {

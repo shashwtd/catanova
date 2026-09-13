@@ -157,7 +157,7 @@ Only resource cards can be traded. Both sides must give at least one resource im
 
 Negotiation does not reserve cards. Players may refuse offers. You can discuss future cooperation or bluff about your resources, but promises do not create enforceable future payments. You may trade and then play Monopoly, provided that card is eligible. Non-active players cannot trade with each other, including as one step of an arrangement that later benefits the active player.
 
-In the app, the active player opens Trade and selects resources by clicking cards. A fixed offer specifies both sides and can be accepted by an opponent who can pay. **? Open to offers** specifies the active player's contribution and invites return proposals. Each opponent may submit, replace or withdraw their proposal; the active player chooses one to complete. An empty return is never a gift. Acceptance rechecks the live offer and both hands, then commits both transfers together. Replacing or withdrawing the offer, ending the turn, or taking another active-player game action invalidates old replies; stale acceptance is rejected.
+In the app, Trade shows what you get above what you give. Click resource cards to set a price, or choose the **?** card to invite return offers. There is no per-turn offer limit, but only one offer can be live; cancel it before sending a different one. Multiple opponents can accept a fixed price or submit a return for an open offer. Their responses stay committed until that offer ends. The active player selects one partner and confirms. Both hands are checked again and both transfers happen together; an empty return is never a gift. Cancelling, ending the turn, or taking another active-player game action expires old replies.
 
 ### 7.2 Bank trades
 

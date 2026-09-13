@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Route, Shield, Sparkles } from './GameIcons.js';
-import { ResourceIcon } from './Board.js';
+import { GameIcon, Sparkles } from './GameIcons.js';
 import { DevelopmentArt } from './DevelopmentCards.js';
+import { CARD_NAMES } from '../../../packages/rules/src/game.js';
+import { ResourceIcon } from './Board.js';
+import { HiddenResource } from './HiddenResource.js';
 import { DiceThrow } from './DiceThrow.js';
 import type { AwardCelebration, FeedbackEvent, FlightIntent } from './feedback.js';
 import { resourceFlightStart, RESOURCE_FLIGHT_MS, PROFILE_GAIN_DWELL_MS } from './useFeedback.js';
@@ -31,18 +33,19 @@ export function nextDicePresentation(
     return restored;
   return current;
 }
-/** A phone's top profile row receives cards below each player; side rails keep their left-side badges. */
+/** A phone shows gains inside the recipient's caption so the second profile row stays clear. */
 export function profileGainPosition(
   box: { left: number; top: number; width: number; height: number },
   viewport: { width: number; height: number },
 ) {
   if (viewport.width <= 700 && viewport.width <= viewport.height) {
-    const maxWidth = Math.max(52, Math.min(88, box.width - 6));
+    const portrait = viewport.width <= 380 ? 50 : 58;
+    const maxWidth = Math.max(78, Math.min(108, box.width - portrait - 8));
     return {
-      left: Math.max(maxWidth / 2 + 8, Math.min(viewport.width - maxWidth / 2 - 8, box.left + box.width / 2)),
-      top: box.top + box.height + 7,
+      left: Math.min(viewport.width - maxWidth / 2 - 8, box.left + box.width - maxWidth / 2),
+      top: box.top + box.height - 18,
       maxWidth,
-      placement: 'below' as const,
+      placement: 'within' as const,
     };
   }
   return {
@@ -184,7 +187,7 @@ export function GameEffects({
       gainTimers.forEach((timer) => clearTimeout(timer));
     };
   }, [event?.id, reducedMotion]);
-  const notice = event?.notices.find((s) => /played |wins |claimed /.test(s)) ?? event?.notices[0];
+  const notice = event?.notices.find((s) => /played |wins /.test(s));
   return (
     <>
       {awards[0] && (
@@ -218,11 +221,7 @@ export function GameEffects({
                 key={gain.resource}
                 title={gain.resource === 'any' ? 'Resource cards' : RESOURCE_NAMES[gain.resource]}
               >
-                {gain.resource === 'any' ? (
-                  <DevelopmentArt kind="back" />
-                ) : (
-                  <ResourceIcon resource={gain.resource} />
-                )}
+                {gain.resource === 'any' ? <HiddenResource /> : <ResourceIcon resource={gain.resource} />}
                 <b>+{gain.amount}</b>
               </span>
             ))}
@@ -247,24 +246,58 @@ export function GameEffects({
               }
             >
               <div className="mini-card">
-                {f.resource === 'any' ? (
-                  <DevelopmentArt kind="back" />
-                ) : (
-                  <ResourceIcon resource={f.resource} />
-                )}
+                {f.resource === 'any' ? <HiddenResource /> : <ResourceIcon resource={f.resource} />}
                 <b>{f.amount > 1 ? f.amount : ''}</b>
               </div>
             </div>
           ))}
         </div>
       )}
-      {event && notice && activity && (
+      {event?.cardPlay && activity && !awards.length && (
+        <CardPlayToast key={event.id} card={event.cardPlay} reducedMotion={reducedMotion} />
+      )}
+      {event && notice && !event.cardPlay && activity && !awards.length && (
         <div key={event.id} className="move-announcement" role="status">
           <Sparkles size={16} />
           <span>{notice}</span>
         </div>
       )}
     </>
+  );
+}
+
+const CARD_PLAY_CAPTIONS = {
+  knight: 'The watch rides out. Move the robber.',
+  roadBuilding: 'Two roads, ready to build.',
+  yearOfPlenty: 'Two resources from the bank.',
+  monopoly: 'One resource, gathered from every rival.',
+};
+function CardPlayToast({
+  card,
+  reducedMotion,
+}: {
+  card: NonNullable<FeedbackEvent['cardPlay']>;
+  reducedMotion: boolean;
+}) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 3400);
+    return () => clearTimeout(timer);
+  }, []);
+  if (!visible) return null;
+  return (
+    <div className="card-play-layer" role="status" aria-live="polite">
+      <div className={`card-play-celebration ${reducedMotion ? 'celebration-static' : ''}`}>
+        <div className="card-play-art">
+          <DevelopmentArt kind={card.kind} />
+        </div>
+        <div className="card-play-copy">
+          <span>{card.playerName} played</span>
+          <strong>{CARD_NAMES[card.kind]}</strong>
+          <p>{CARD_PLAY_CAPTIONS[card.kind]}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -318,7 +351,7 @@ export function AwardToast({
         aria-atomic="true"
       >
         <div className="award-emblem" aria-hidden="true">
-          {award.kind === 'longestRoad' ? <Route size={44} /> : <Shield size={44} />}
+          <GameIcon name={award.kind === 'longestRoad' ? 'road-award' : 'army-award'} size={60} />
         </div>
         <div className="award-celebration-copy">
           <span className="award-recipient">
