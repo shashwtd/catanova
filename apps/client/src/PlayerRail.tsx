@@ -86,7 +86,7 @@ export function PlayerRail({
   }, [counting]);
   return (
     <aside className="player-rail" aria-label="Players">
-      {ranked.map(({ player: p, seatIndex: i, publicPoints, leading }) => {
+      {ranked.map(({ player: p, seatIndex: i, points, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
           activity = playerTurnActivity(game, p.id),
@@ -105,8 +105,8 @@ export function PlayerRail({
               {leading && (
                 <span
                   className="profile-rank"
-                  aria-label={`${tied ? 'Joint leader' : 'Leader'}, ${publicPoints} public points`}
-                  title={`${tied ? 'Joint leader' : 'Leader'} · ${publicPoints} public points`}
+                  aria-label={`${tied ? 'Joint leader' : 'Leader'}, ${points} points`}
+                  title={`${tied ? 'Joint leader' : 'Leader'} · ${points} points`}
                 >
                   #1
                 </span>
