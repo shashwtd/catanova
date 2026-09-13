@@ -28,7 +28,7 @@ function setup() {
   }
   return game;
 }
-test('profiles always retain turn order while the leader receives a badge from three public points', () => {
+test('profiles always retain turn order while the leader receives a badge from three visible points', () => {
   const game = setup();
   let view = gameView(game, 'p0');
   assert.deepEqual(
@@ -55,23 +55,75 @@ test('profiles always retain turn order while the leader receives a badge from t
       me: 'p0',
     }),
   );
-  assert.match(html, /Leader, 3 public points/);
+  assert.match(html, /Leader, 3 points/);
   assert.ok(html.indexOf('data-player-profile="p0"') < html.indexOf('data-player-profile="p2"'));
   assert.ok(html.includes(`--player-color:${PLAYER_COLORS[2]}`));
 });
-test('private victory cards never influence ranking or leak through the leader badge', () => {
+test('three private VP cards count toward your five-point lead without revealing the lead to opponents', () => {
   const game = setup();
-  game.players[0]!.cards = [0, 1].map((i) => ({ id: `vp${i}`, kind: 'victoryPoint', boughtTurn: 0 }));
-  for (const { id } of seats) assert.ok(playerStandings(gameView(game, id)).every((p) => !p.leading));
+  game.players[0]!.cards = [0, 1, 2].map((i) => ({ id: `vp${i}`, kind: 'victoryPoint', boughtTurn: 0 }));
   Object.values(game.buildings).find((b) => b.player === 'p3')!.kind = 'city';
-  const expected = playerStandings(gameView(game, 'p0')).map((p) => [p.player.id, p.publicPoints, p.leading]);
-  for (const { id } of seats)
+  const view = gameView(game, 'p0');
+  const own = playerStandings(view);
+  assert.equal(view.players[0]!.points, 5);
+  assert.equal(own[0]!.points, 5, 'the projected score already contains the three VP cards');
+  assert.deepEqual(
+    own.filter((p) => p.leading).map((p) => p.player.id),
+    ['p0'],
+  );
+  const html = renderToStaticMarkup(
+    createElement(PlayerRail, {
+      room: { roomId: 'vp-room', revision: 0, counter: 0, players: seats },
+      game: view,
+      me: 'p0',
+    }),
+  );
+  const profile = html.match(/<article[^>]*data-player-profile="p0"[\s\S]*?<\/article>/)![0];
+  assert.match(profile, /Leader, 5 points/);
+  assert.match(profile, /#1/);
+  assert.doesNotMatch(profile, /5 public points/);
+
+  const withoutHiddenPoints = structuredClone(game);
+  withoutHiddenPoints.players[0]!.cards.forEach((card) => {
+    card.kind = 'knight';
+  });
+  for (const viewer of ['p1', 'p2', 'p3']) {
+    const opponentsView = gameView(game, viewer);
+    assert.equal(opponentsView.players[0]!.cards, undefined);
+    assert.equal(opponentsView.players[0]!.points, 2);
     assert.deepEqual(
-      playerStandings(gameView(game, id)).map((p) => [p.player.id, p.publicPoints, p.leading]),
-      expected,
+      playerStandings(opponentsView),
+      playerStandings(gameView(withoutHiddenPoints, viewer)),
+      'a hidden card type cannot affect another viewer’s badge, points or ordering',
     );
-  assert.equal(expected[3]![2], true);
-  assert.equal(gameView(game, 'p0').players[0]!.points, 4, 'private score still appears on your own profile');
+    assert.deepEqual(
+      playerStandings(opponentsView)
+        .filter((p) => p.leading)
+        .map((p) => p.player.id),
+      ['p3'],
+    );
+  }
+});
+test('five public points plus three VP cards rank as eight, and private-score ties share the badge', () => {
+  const game = setup();
+  Object.values(game.buildings).find((b) => b.player === 'p0')!.kind = 'city';
+  game.longestRoad = 'p0';
+  for (const building of Object.values(game.buildings)) if (building.player === 'p1') building.kind = 'city';
+  game.largestArmy = 'p1';
+  game.players[0]!.cards = [0, 1, 2].map((i) => ({ id: `vp${i}`, kind: 'victoryPoint', boughtTurn: 0 }));
+  let ranked = playerStandings(gameView(game, 'p0'));
+  assert.equal(ranked[0]!.points, 8);
+  assert.equal(ranked[1]!.points, 6);
+  assert.deepEqual(
+    ranked.filter((p) => p.leading).map((p) => p.player.id),
+    ['p0'],
+  );
+  game.players[0]!.cards = game.players[0]!.cards.slice(0, 1);
+  ranked = playerStandings(gameView(game, 'p0'));
+  assert.deepEqual(
+    ranked.filter((p) => p.leading).map((p) => p.player.id),
+    ['p0', 'p1'],
+  );
 });
 test('ties, awards and resignations never disturb turn order', () => {
   const game = setup();
