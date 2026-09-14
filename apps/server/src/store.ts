@@ -311,6 +311,7 @@ export class Store {
         return { id: existing.id, room_id: existing.room_id, name: existing.name };
       }
       if (mode === 'resume') throw new ProtocolError('INVALID_SESSION', 'This seat cannot be resumed');
+      if (identity) this.assertAccountAvailable(identity.id, roomId);
       if (mode === 'create') {
         roomId = randomUUID();
         this.db.prepare('INSERT INTO rooms(id) VALUES (?)').run(roomId);
@@ -411,6 +412,24 @@ export class Store {
     return !!this.db
       .prepare('SELECT 1 FROM seats WHERE room_id = ? AND user_id = ? AND departed = 0')
       .get(roomId, userId);
+  }
+  /** Multiple signed-in devices are fine; one account cannot play simultaneous matches. */
+  private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
+    const conflict = this.db.prepare(`
+      SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
+      WHERE s.user_id=? AND s.departed=0 AND s.room_id<>?
+        AND json_extract(g.state,'$.phase')<>'finished'
+        AND EXISTS (SELECT 1 FROM json_each(g.state,'$.players') p
+          WHERE json_extract(p.value,'$.id')=s.id
+            AND coalesce(json_extract(p.value,'$.resigned'),0)=0)
+      LIMIT 1
+    `).get(userId, roomId ?? '') as { room_id: string } | undefined;
+    if (conflict) {
+      const code = this.roomCode(conflict.room_id);
+      throw new ProtocolError('ACTIVE_GAME', name === 'You'
+        ? `You already have a game${code ? ` in room ${code}` : ''}. Resume or leave it before joining another.`
+        : `${name} is already playing another game. They must finish or leave it first.`);
+    }
   }
   private historyCursor(rawCursor?: string) {
     try {
@@ -1178,6 +1197,12 @@ export class Store {
           throw new ProtocolError('NOT_HOST', 'Only the room creator can start the game');
         if (!room.players.slice(1).every((p) => p.ready))
           throw new ProtocolError('NOT_READY', 'Every other player must be ready');
+        // Recheck every account inside the start transaction: another browser may have
+        // started a different lobby after these players joined or pressed Ready.
+        for (const member of this.db.prepare(
+          'SELECT user_id,name FROM seats WHERE room_id=? AND departed=0 AND user_id IS NOT NULL',
+        ).all(seat.room_id) as { user_id: string; name: string }[])
+          this.assertAccountAvailable(member.user_id, seat.room_id, member.name);
         next = createGame(
           shuffle(
             room.players.map((p) => ({ id: p.id, name: p.name })),

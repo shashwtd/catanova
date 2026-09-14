@@ -17,7 +17,7 @@ const CONTROL_PATHS = {
   menu: 'M5 6h14 M5 12h14 M5 18h14',
   history: 'M4 7a9 9 0 1 1-1 9 M3 3v5h5 M12 7v5l4 2',
   join: 'M14 3h7v18h-7 M3 12h12 m-5-5 5 5-5 5',
-  logout: 'M12 2v10 M6 5a9 9 0 1 0 12 0',
+  logout: 'M10 3H4v18h6 M9 12h12 M16 7l5 5-5 5',
   defeat: 'M5 3h14v8l-4 6-3-3-2 7-5-5V3 M12 3l-2 6 4 3',
   music: 'M9 18V5l11-2v13 M9 8l11-2 M9 18a3 3 0 1 1-3-3c2 0 3 1 3 3 M20 16a3 3 0 1 1-3-3c2 0 3 1 3 3',
   chevron: 'm9 5 7 7-7 7',

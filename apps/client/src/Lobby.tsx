@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
+import { BrandLogo } from './BrandLogo.js';
 import { Avatar } from './Profile.js';
 import { roomPath, visibleRoomCode } from './navigation.js';
 
@@ -201,6 +202,9 @@ export function Lobby({
           <DoorOpen size={20} />
           <span>Leave lobby</span>
         </button>
+        <div className="lobby-wordmark">
+          <BrandLogo />
+        </div>
         <div className="lobby-tools">
           {onFriends && (
             <button className="lobby-friends" title="Friends" aria-label="Friends" onClick={onFriends}>

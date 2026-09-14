@@ -53,7 +53,7 @@ import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { mountApp } from './mount-app.js';
 import {
   GameIcon,
   Settings2,
@@ -117,6 +117,8 @@ import './game-feedback-polish.css';
 import './lounge-tabletop.css';
 import './match-followups.css';
 import './game-popover.css';
+import './hub-entry-refinement.css';
+import './landing-features.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -202,7 +204,10 @@ function ModalDialog({
       ref={ref}
       className={`game-dialog ${compact ? 'compact' : ''}`}
       aria-label={title}
-      onCancel={onClose}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -242,6 +247,9 @@ function App() {
   const [previewRoom, setPreviewRoom] = useState<RoomPreview | null>(null),
     [previewLoading, setPreviewLoading] = useState(false),
     [previewError, setPreviewError] = useState('');
+  const [admitting, setAdmitting] = useState(false);
+  const [admissionLabel, setAdmissionLabel] = useState('Joining room…');
+  const [signingOut, setSigningOut] = useState(false);
   const [room, setRoom] = useState<RoomState | null>(null),
     [me, setMe] = useState<string>();
   const [status, setStatus] = useState<ConnectionStatus>('idle'),
@@ -259,6 +267,7 @@ function App() {
       | 'statistics'
       | 'connection'
       | 'leave'
+      | 'signOut'
       | 'profile'
       | 'editProfile'
       | 'invite'
@@ -274,7 +283,8 @@ function App() {
     player = g?.players.find((p) => p.id === me),
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me && !player?.resigned;
-  const playerHome = !room && showPlayerHome(auth, invite);
+  const entering = !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite)));
+  const playerHome = !room && !entering && showPlayerHome(auth, invite);
   const playerGames = usePlayerGames(
     auth.account?.id,
     auth.accessToken,
@@ -390,6 +400,7 @@ function App() {
     setMe(undefined);
     setStatus('idle');
     setBusy(false);
+    setAdmitting(false);
     setPanel(null);
     setMode(null);
     setError('');
@@ -401,6 +412,10 @@ function App() {
     history.replaceState(null, '', accountHomePath(auth));
   }
   function connect(session: Session, pending?: PendingCommand) {
+    setAdmissionLabel(
+      session.roomId ? (session.joined ? 'Returning to room…' : 'Joining room…') : 'Creating room…',
+    );
+    setAdmitting(true);
     admissionEpoch.current++;
     connectedIdentity.current = currentIdentity.current;
     const old = connection.current;
@@ -464,6 +479,7 @@ function App() {
           }
           previousSnapshot = next;
         }
+        if (next) setAdmitting(false);
         setRoom(next);
         setMe(c.playerId ?? undefined);
         if (message.type === 'welcome' && next)
@@ -485,6 +501,7 @@ function App() {
         return;
       }
       if (message.type === 'error') {
+        if (!c.state) setAdmitting(false);
         if (message.code === 'LOBBY_REMOVED') {
           home(true);
           setToast(message.message);
@@ -580,7 +597,9 @@ function App() {
   }, [room?.roomId, auth.canPlay]);
   function openInvitation(reference: string) {
     if (room) return;
-    home(false);
+    setPanel(null);
+    setEntry('invite');
+    history.pushState(null, '', roomPath(reference));
     initialInvite.current = reference;
     setInvite(reference);
     if (auth.canPlay) {
@@ -590,7 +609,6 @@ function App() {
     }
     setEntry('invite');
     setPreviewRoom(null);
-    history.pushState(null, '', roomPath(reference));
   }
 
   useEffect(() => {
@@ -598,7 +616,10 @@ function App() {
   }, [auth.loading, accountIdentity]);
   useEffect(() => {
     admissionEpoch.current++;
-    if (!connection.current) setBusy(false);
+    if (!connection.current) {
+      setBusy(false);
+      setAdmitting(false);
+    }
   }, [accountIdentity]);
   useEffect(() => {
     if (auth.profile.name) setName(auth.profile.name);
@@ -725,6 +746,8 @@ function App() {
     sessionStorage.removeItem(OUTBOX_KEY);
     localStorage.setItem('catanova.name', chosenName);
     setBusy(true);
+    setAdmitting(true);
+    setAdmissionLabel(kind === 'create' ? 'Creating room…' : 'Joining room…');
     try {
       if (kind === 'join') {
         let resolved = previewJoinReference(target, previewRoom);
@@ -732,6 +755,7 @@ function App() {
           const token = auth.user ? await auth.accessToken() : undefined;
           if (!current()) return;
           const response = await fetch(`/api/rooms/${target}`, {
+            signal: AbortSignal.timeout(10_000),
             ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
           });
           if (!response.ok)
@@ -753,10 +777,17 @@ function App() {
       if (!current()) return;
       setError(e instanceof Error ? e.message : 'Could not save profile');
       setBusy(false);
+      setAdmitting(false);
     }
   }
   async function signOut() {
-    if (await auth.signOut()) home(true);
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      if (await auth.signOut()) home(true);
+    } finally {
+      setSigningOut(false);
+    }
   }
   function resumeGame(roomId: string) {
     if (room || busy || networkBusy || !auth.canPlay) return;
@@ -859,7 +890,7 @@ function App() {
           </BoardViewport>
         </div>
       )}
-      {!g && !room && !playerHome && <div className="title-scenery" aria-hidden="true" />}
+      {!g && !room && !playerHome && !entering && <div className="title-scenery" aria-hidden="true" />}
       {g && (
         <GameTools
           panel={panel}
@@ -930,6 +961,16 @@ function App() {
           )}
         </div>
       )}
+      {entering && (
+        <section className="room-admission" aria-label="Loading room" aria-busy="true">
+          <GameLoader label={auth.loading ? 'Connecting…' : admissionLabel} />
+          {!auth.loading && (
+            <button className="dark-button" onClick={() => home(false)}>
+              Cancel
+            </button>
+          )}
+        </section>
+      )}
       {playerHome && (
         <PlayerHub
           key={auth.account?.id}
@@ -946,11 +987,11 @@ function App() {
           onEditProfile={() => setPanel('editProfile')}
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
-          onSignOut={() => void signOut()}
+          onSignOut={() => setPanel('signOut')}
         />
       )}
       {!playerHome && panel !== 'friends' && <div className="room-notifications">{invitationNotice}</div>}
-      {!room && !playerHome && (
+      {!room && !playerHome && !entering && (
         <EntryScreen
           auth={auth}
           entry={entry}
@@ -981,7 +1022,7 @@ function App() {
           onProfile={() => setPanel('profile')}
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
-          onSignOut={() => void signOut()}
+          onSignOut={() => setPanel('signOut')}
         />
       )}
       {room && !g && (
@@ -1220,7 +1261,7 @@ function App() {
         />
       )}
       {panel === 'settings' && (
-        <Dialog side={!!g} tool="settings" title="Settings" onClose={() => setPanel(null)}>
+        <Dialog side={!!g} tool="settings" title="Settings" compact onClose={() => setPanel(null)}>
           <GameSettings
             preferences={preferences}
             update={update}
@@ -1278,6 +1319,19 @@ function App() {
           roomEntryBlocked={roomEntryBlocked}
         />
       )}
+      {panel === 'signOut' && (
+        <Dialog title="Sign out?" compact onClose={() => !signingOut && setPanel(null)}>
+          <p className="muted">You’ll return to the welcome screen.</p>
+          <div className="dialog-actions">
+            <button className="dark-button" disabled={signingOut} onClick={() => setPanel(null)}>
+              Stay here
+            </button>
+            <button className="gold-button" disabled={signingOut} onClick={() => void signOut()}>
+              {signingOut ? <GameLoader compact /> : <DoorOpen />} Sign out
+            </button>
+          </div>
+        </Dialog>
+      )}
       {panel === 'leave' && (
         <Dialog title="Leave game?" compact onClose={() => setPanel(null)}>
           <p className="muted">Leaving resigns your seat. You cannot rejoin this game.</p>
@@ -1300,7 +1354,7 @@ function App() {
     </main>
   );
 }
-const root = createRoot(document.getElementById('root')!);
+const root = mountApp(document.getElementById('root')!);
 if (designPreview) {
   void import('./dev/LoungePreview.js').then(({ LoungePreview }) => root.render(<LoungePreview />));
 } else {

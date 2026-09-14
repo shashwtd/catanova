@@ -387,7 +387,8 @@ export function useAuth() {
   }
   async function signOut() {
     if (client.current) {
-      const { error } = await client.current.auth.signOut();
+      // Signing out here must not revoke another browser's session.
+      const { error } = await client.current.auth.signOut({ scope: 'local' });
       if (error) {
         accountError(error);
         return false;

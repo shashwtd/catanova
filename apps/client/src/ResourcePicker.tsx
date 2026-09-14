@@ -86,7 +86,7 @@ export function ResourceChoice({
   amount,
   unavailable = [],
 }: {
-  value: Resource;
+  value: Resource | null;
   onChange: (r: Resource) => void;
   label: string;
   amount: (r: Resource) => number;
@@ -95,7 +95,7 @@ export function ResourceChoice({
   return (
     <fieldset className="card-picker">
       <legend>{label}</legend>
-      <div className="picker-cards" data-has-selection="true">
+      <div className="picker-cards" data-has-selection={value !== null}>
         {RESOURCES.map((r) => (
           <button
             type="button"

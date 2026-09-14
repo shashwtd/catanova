@@ -10,13 +10,12 @@
   background: var(--lounge-backdrop);
 }
 .lounge-tabletop {
-  position: fixed;
+  position: absolute;
   z-index: 0;
   inset: 0;
   pointer-events: none;
-}
-.lounge-tabletop > svg {
-  display: block;
+  /* Sample the wood quadrant once; no nested, repeating SVG paint surfaces. */
+  background: url('/art/optimized/environment-dark.c55c6de597e4.webp') right bottom / 200% 200% no-repeat;
 }
 .lounge-tabletop::after {
   content: '';

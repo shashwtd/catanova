@@ -109,8 +109,8 @@ export function TradeExchange({
 
 export function BankTrade({ game, me, disabled, onAction }: Props) {
   const command = useTradeAction(disabled, onAction);
-  const [bankGive, setBankGive] = useState<Resource>('wood');
-  const [bankReceive, setBankReceive] = useState<Resource>('brick');
+  const [bankGive, setBankGive] = useState<Resource | null>(null);
+  const [bankReceive, setBankReceive] = useState<Resource | null>(null);
   const player = game.players.find((p) => p.id === me),
     hand = player?.hand ?? emptyHand();
   const locked =
@@ -119,8 +119,8 @@ export function BankTrade({ game, me, disabled, onAction }: Props) {
     !!player?.resigned ||
     game.players[game.active]?.id !== me ||
     game.phase !== 'actions';
-  const give = { ...emptyHand(), [bankGive]: game.legal.rates[bankGive] },
-    get = { ...emptyHand(), [bankReceive]: 1 };
+  const give = bankGive ? { ...emptyHand(), [bankGive]: game.legal.rates[bankGive] } : emptyHand(),
+    get = bankReceive ? { ...emptyHand(), [bankReceive]: 1 } : emptyHand();
   const [reviewed, setReviewed] = useState('');
   const fingerprint = JSON.stringify({ turn: game.turn, give, get });
   const reviewing = reviewed === fingerprint;
@@ -145,7 +145,10 @@ export function BankTrade({ game, me, disabled, onAction }: Props) {
             <ResourceChoice
               label="You give"
               value={bankGive}
-              onChange={setBankGive}
+              onChange={(next) => {
+                setBankGive(next);
+                if (next === bankReceive) setBankReceive(null);
+              }}
               amount={(r) => game.legal.rates[r]}
               unavailable={RESOURCES.filter((r) => locked || hand[r] < game.legal.rates[r])}
             />
@@ -160,18 +163,33 @@ export function BankTrade({ game, me, disabled, onAction }: Props) {
         )}
         <button
           className="gold-button"
-          disabled={locked || bankGive === bankReceive || !canPay(hand, give) || !game.bank[bankReceive]}
+          disabled={
+            locked ||
+            !bankGive ||
+            !bankReceive ||
+            bankGive === bankReceive ||
+            !canPay(hand, give) ||
+            !game.bank[bankReceive]
+          }
           onClick={async () => {
+            if (!bankGive || !bankReceive) return;
             if (!reviewing) {
               setReviewed(fingerprint);
               return;
             }
-            if (await command.submit({ kind: 'bankTrade', give: bankGive, receive: bankReceive }))
+            if (await command.submit({ kind: 'bankTrade', give: bankGive, receive: bankReceive })) {
               setReviewed('');
+              setBankGive(null);
+              setBankReceive(null);
+            }
           }}
         >
           <Check />
-          {reviewing ? 'Confirm trade' : `Trade ${game.legal.rates[bankGive]}:1`}
+          {reviewing
+            ? 'Confirm trade'
+            : bankGive && bankReceive
+              ? `Trade ${game.legal.rates[bankGive]}:1`
+              : 'Choose resources'}
         </button>
       </div>
       {command.error && (
@@ -220,8 +238,12 @@ export function TradePanel({
     game.phase !== 'actions';
   const trade = game.trade?.player === me ? game.trade : null;
   const key = (id: string, cards: Hand) => JSON.stringify([trade?.id, id, cards]);
+  const opponents = game.players.filter((p) => p.id !== me && !p.resigned);
+  const direct = opponents.length === 1 && !!trade && !trade.open;
   const chosen = trade?.proposals?.find(
-    (p) => key(p.player, p.give) === selection && !trade.declinedBy?.includes(p.player),
+    (p) =>
+      (opponents.length === 1 || key(p.player, p.give) === selection) &&
+      !trade.declinedBy?.includes(p.player),
   );
   const partner = chosen && game.players.find((p) => p.id === chosen.player && !p.resigned);
   const requestLimit = Object.fromEntries(RESOURCES.map((r) => [r, give[r] ? 0 : 19])) as Hand;
@@ -253,47 +275,63 @@ export function TradePanel({
             {trade ? (
               <section className="live-offer" aria-label="Your current offer">
                 <TradeExchange give={trade.give} get={trade.open ? (chosen?.give ?? null) : trade.want} />
-                <div className="trade-partners" role="group" aria-label="Choose a trading partner">
-                  {game.players.map((other, index) => {
-                    if (other.id === me || other.resigned) return null;
-                    const response = trade.proposals?.find((p) => p.player === other.id),
-                      declined = trade.declinedBy?.includes(other.id);
-                    const selected = !!response && selection === key(other.id, response.give);
-                    return (
-                      <button
-                        key={other.id}
-                        className="trade-partner"
-                        aria-label={`Trade with ${other.name}`}
-                        aria-pressed={selected}
-                        aria-description={
-                          declined ? 'Declined' : response ? 'Ready to trade' : 'Waiting for response'
-                        }
-                        data-response={declined ? 'declined' : response ? 'ready' : 'waiting'}
-                        style={
-                          { '--partner-color': PLAYER_COLORS[index % PLAYER_COLORS.length] } as CSSProperties
-                        }
-                        disabled={locked || !response || !!declined || !canPay(hand, trade.give)}
-                        onClick={() => response && setSelection(key(other.id, response.give))}
-                      >
-                        <span className="trade-partner-portrait">
-                          <TradePortrait player={other} roomPlayers={roomPlayers} />
-                          <span className="trade-partner-response">
-                            {declined ? <X /> : response ? <Check /> : <TradeWaiting />}
+                {opponents.length === 1 ? (
+                  <div className="trade-direct-wait" role="status">
+                    <TradePortrait player={opponents[0]!} roomPlayers={roomPlayers} />
+                    {chosen ? <Check /> : <TradeWaiting />}
+                    <span>
+                      {chosen
+                        ? `${opponents[0]!.name} sent an offer`
+                        : `Waiting for ${opponents[0]!.name} ${trade.open ? 'to make an offer' : 'to confirm'}`}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="trade-partners" role="group" aria-label="Choose a trading partner">
+                    {game.players.map((other, index) => {
+                      if (other.id === me || other.resigned) return null;
+                      const response = trade.proposals?.find((p) => p.player === other.id),
+                        declined = trade.declinedBy?.includes(other.id);
+                      const selected = !!response && selection === key(other.id, response.give);
+                      return (
+                        <button
+                          key={other.id}
+                          className="trade-partner"
+                          aria-label={`Trade with ${other.name}`}
+                          aria-pressed={selected}
+                          aria-description={
+                            declined ? 'Declined' : response ? 'Ready to trade' : 'Waiting for response'
+                          }
+                          data-response={declined ? 'declined' : response ? 'ready' : 'waiting'}
+                          style={
+                            {
+                              '--partner-color': PLAYER_COLORS[index % PLAYER_COLORS.length],
+                            } as CSSProperties
+                          }
+                          disabled={locked || !response || !!declined || !canPay(hand, trade.give)}
+                          onClick={() => response && setSelection(key(other.id, response.give))}
+                        >
+                          <span className="trade-partner-portrait">
+                            <TradePortrait player={other} roomPlayers={roomPlayers} />
+                            <span className="trade-partner-response">
+                              {declined ? <X /> : response ? <Check /> : <TradeWaiting />}
+                            </span>
                           </span>
-                        </span>
-                        <span className="trade-partner-name">{other.name}</span>
-                        {trade.open && response && <ResourceSummary hand={response.give} />}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="trade-status" role="status">
-                  {partner
-                    ? `Trade with ${partner.name}`
-                    : trade.proposals?.length
-                      ? 'Choose a player'
-                      : 'Waiting for players…'}
-                </p>
+                          <span className="trade-partner-name">{other.name}</span>
+                          {trade.open && response && <ResourceSummary hand={response.give} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {opponents.length > 1 && (
+                  <p className="trade-status" role="status">
+                    {partner
+                      ? `Trade with ${partner.name}`
+                      : trade.proposals?.length
+                        ? 'Choose a player'
+                        : 'Waiting for players…'}
+                  </p>
+                )}
                 <div className="trade-footer-actions">
                   <button
                     className="text-button trade-cancel"
@@ -303,22 +341,24 @@ export function TradePanel({
                     <X />
                     Cancel offer
                   </button>
-                  <button
-                    className="gold-button"
-                    disabled={locked || !partner || !chosen || !canPay(hand, trade.give)}
-                    onClick={() => {
-                      if (chosen && partner)
-                        void command.submit({
-                          kind: 'acceptProposal',
-                          tradeId: trade.id,
-                          player: partner.id,
-                          expectedGive: chosen.give,
-                        });
-                    }}
-                  >
-                    <Check />
-                    Confirm trade
-                  </button>
+                  {!direct && (
+                    <button
+                      className="gold-button"
+                      disabled={locked || !partner || !chosen || !canPay(hand, trade.give)}
+                      onClick={() => {
+                        if (chosen && partner)
+                          void command.submit({
+                            kind: 'acceptProposal',
+                            tradeId: trade.id,
+                            player: partner.id,
+                            expectedGive: chosen.give,
+                          });
+                      }}
+                    >
+                      <Check />
+                      Confirm trade
+                    </button>
+                  )}
                 </div>
               </section>
             ) : (
@@ -437,7 +477,7 @@ export function IncomingTrade({ game, me, disabled, onAction, roomPlayers }: Pro
       {proposal ? (
         <p className="trade-waiting" role="status">
           <TradeWaiting />
-          Waiting for {name} to choose
+          Waiting for {name} to {game.players.filter((p) => !p.resigned).length === 2 ? 'confirm' : 'choose'}
         </p>
       ) : (
         <>
@@ -466,7 +506,11 @@ export function IncomingTrade({ game, me, disabled, onAction, roomPlayers }: Pro
               }
             >
               <Check />
-              {trade.open ? 'Send offer' : 'Yes, trade'}
+              {trade.open
+                ? 'Send offer'
+                : game.players.filter((p) => !p.resigned).length === 2
+                  ? 'Confirm trade'
+                  : 'Yes, trade'}
             </button>
           </div>
           {!trade.open && !canPay(hand, trade.want) && <p className="quiet-note">Not enough resources</p>}

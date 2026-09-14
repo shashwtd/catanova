@@ -181,7 +181,11 @@ test('only actual participants receive records; expired room codes do not invali
 test('history pages are bounded and stable when start timestamps tie; invalid cursors cannot alter scope', () => {
   const store = new Store(':memory:', { now: () => 1_000_000 });
   try {
-    for (let i = 0; i < MATCH_PAGE_SIZE + 5; i++) start(store, ['Captain', `Friend${i}`]);
+    for (let i = 0; i < MATCH_PAGE_SIZE + 5; i++) {
+      const { host } = start(store, ['Captain', `Friend${i}`]);
+      // Completed history plus one ongoing match; an account cannot start parallel games.
+      if (i < MATCH_PAGE_SIZE + 4) store.leave(host, 'finish-fixture', store.snapshot(host.room_id).revision);
+    }
     start(store, ['Stranger', 'PrivateFriend']);
     const first = store.accountGames('Captain');
     assert.equal(first.games.length, MATCH_PAGE_SIZE);
@@ -190,7 +194,7 @@ test('history pages are bounded and stable when start timestamps tie; invalid cu
     assert.equal(second.games.length, 5);
     assert.equal(second.nextCursor, null);
     assert.equal(new Set([...first.games, ...second.games].map((g) => g.roomId)).size, MATCH_PAGE_SIZE + 5);
-    assert.deepEqual(second.stats, { played: 0, wins: 0 });
+    assert.deepEqual(second.stats, { played: MATCH_PAGE_SIZE + 4, wins: 0 });
     for (const cursor of [
       '',
       '%bad',

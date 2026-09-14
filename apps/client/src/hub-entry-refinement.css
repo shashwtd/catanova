@@ -1,0 +1,355 @@
+/* The hub keeps the same tabletop and compact furniture as the room. */
+.hub-header .hub-brand {
+  width: 148px;
+  flex: 0 0 148px;
+}
+.hub-header .hub-brand .landing-logo {
+  width: 100%;
+  height: auto;
+  max-height: 48px;
+}
+.lobby-heading {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+}
+.lobby-heading .lobby-back {
+  justify-self: start;
+}
+.lobby-heading .lobby-tools {
+  justify-self: end;
+}
+.lobby-wordmark {
+  width: 158px;
+}
+.lobby-wordmark .landing-logo {
+  width: 100%;
+  height: auto;
+}
+.hub-play-controls[data-joining='true'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.hub-play-controls[data-joining='true'] .hub-join-form {
+  width: 100%;
+  grid-column: 1/-1;
+  grid-template-columns: minmax(90px, 1fr) auto 36px;
+}
+.player-home .hub-join-form .hub-join-submit {
+  width: auto;
+  min-width: 122px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  background: linear-gradient(#f0d18e, #dbae59);
+  color: #4d3821;
+  border: 1px solid #efd391;
+  font:
+    600 17px/1.2 Barlow,
+    sans-serif;
+}
+.player-home .hub-join-form .hub-join-submit:hover:not(:disabled) {
+  background: linear-gradient(#f9df9d, #eabe69);
+}
+.hub-player-tools {
+  flex-wrap: wrap;
+}
+.player-home .hub-player-tools :is(.hub-edit-profile, .hub-profile-action) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 12px;
+  color: #f5e6c9;
+  background: #b99a6620;
+  border: 1px solid #d2b47f42;
+  border-radius: 7px;
+  font:
+    600 14px/1.2 Barlow,
+    sans-serif;
+  text-decoration: none;
+  box-shadow: inset 0 1px #f9e6b410;
+}
+.player-home .hub-player-tools :is(.hub-edit-profile, .hub-profile-action):hover {
+  background: #d8b97c32;
+  color: #fff4d6;
+  text-decoration: none;
+}
+.player-home .hub-player-tools .hub-sign-out {
+  width: 40px;
+  padding: 9px;
+  margin-left: auto;
+}
+.player-home .hub-player-tools .hub-sign-out:hover {
+  background: #c8825a33;
+}
+.player-home .hub-character .hub-link-account {
+  grid-column: 1/-1;
+  width: 100%;
+  margin-top: 4px;
+  padding: 13px 14px;
+  text-align: left;
+  border-radius: 8px;
+}
+.hub-character .hub-link-account .provider-mark {
+  width: 22px;
+  height: 22px;
+}
+.hub-character .hub-link-account strong {
+  font-size: 15px;
+}
+.hub-character .hub-link-account small {
+  font-size: 13px;
+}
+.game-world .game-dialog:has(.settings-menu) {
+  width: min(480px, calc(100vw - 28px));
+  max-width: 480px;
+}
+.game-world .game-dialog:has(.settings-menu) .dialog-surface {
+  padding: 20px;
+}
+.game-world .game-dialog:has(.settings-menu) .settings-menu {
+  gap: 14px;
+}
+.game-world .game-dialog:has(.settings-menu) .settings-audio-group {
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.game-world .game-dialog:has(.settings-menu) .settings-theme {
+  margin: 0;
+}
+/* Profile surfaces own their complete palette rather than inheriting light text onto paper. */
+.game-world .game-dialog:has(.player-overview, .player-profile-editor) {
+  --dialog-fill: linear-gradient(145deg, #594a39, #352c24);
+  --dialog-ink: #f6e8cd;
+  --dialog-muted: #d3c3a6;
+  --game-cream: #f6e8cd;
+  --game-muted: #d3c3a6;
+  --game-gold: #e5c17e;
+  --game-trim: #d8bc8340;
+  width: min(590px, calc(100vw - 28px));
+  color: var(--dialog-ink);
+  background: var(--dialog-fill);
+  border-color: #bba27380;
+}
+.game-world
+  .game-dialog:has(.player-overview, .player-profile-editor)
+  :is(
+    .panel-heading h2,
+    .player-overview h2,
+    .player-overview-identity strong,
+    .profile-preview strong,
+    .field,
+    .record-caption,
+    .player-record dd,
+    .player-record dt,
+    .hub-text-action
+  ) {
+  color: var(--dialog-ink);
+}
+.game-world .game-dialog:has(.player-overview, .player-profile-editor) .panel-heading .icon-button {
+  color: #f2d5a0;
+  border-color: #d6b98255;
+  background: #d7b97f18;
+}
+.game-world
+  .game-dialog:has(.player-overview, .player-profile-editor)
+  :is(.muted, .hub-guest-label, .record-caption, .player-record dt, .username-feedback) {
+  color: #d3c3a6;
+}
+.game-world
+  .game-dialog:has(.player-overview, .player-profile-editor)
+  .username-feedback[data-status='available'] {
+  color: #b5daa0;
+}
+.game-world
+  .game-dialog:has(.player-overview, .player-profile-editor)
+  :is(.username-feedback[data-status='error'], .username-feedback[data-status='unavailable'], .entry-error) {
+  color: #ffb59e;
+}
+.game-world
+  .game-dialog:has(.player-overview, .player-profile-editor)
+  :is(.text-button, .dark-button, .hub-text-action) {
+  color: #f4dfb7;
+  border-color: #ceb47d55;
+  background: #cbb58818;
+}
+.game-world
+  .game-dialog:has(.player-overview, .player-profile-editor)
+  :is(.text-button, .dark-button, .hub-text-action):hover {
+  background: #ccb37d30;
+  color: #fff3d6;
+}
+.game-world .game-dialog:has(.player-overview, .player-profile-editor) input {
+  background: #f6e9cc;
+  color: #43382a;
+  border-color: #c6ab74;
+}
+.room-admission {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  background: radial-gradient(ellipse, #5c4b37, #302820);
+  color: #f4e4bf;
+}
+.room-admission .game-loader {
+  font:
+    500 19px Barlow,
+    sans-serif;
+}
+.room-admission .dark-button {
+  padding: 8px 20px;
+  min-height: 40px;
+  border: 1px solid #c4a36b44;
+  border-radius: 7px;
+  background: #e3ca9214;
+  color: #edd8b1;
+  font:
+    500 15px Barlow,
+    sans-serif;
+}
+.trade-direct-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--dialog-ink);
+}
+.trade-direct-wait .avatar-medallion {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #bea06b;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: none;
+}
+.trade-direct-wait .avatar-medallion svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+@media (max-width: 650px) {
+  .hub-header .hub-brand {
+    width: 108px;
+    flex-basis: 108px;
+  }
+  .hub-header {
+    gap: 12px;
+  }
+  .hub-header .hub-navigation {
+    gap: 4px;
+  }
+  .hub-header .hub-navigation button {
+    padding-inline: 9px;
+    font-size: 14px;
+  }
+  .hub-header .hub-header-tools {
+    gap: 0;
+  }
+  .lobby-wordmark {
+    width: 124px;
+  }
+  .lobby-heading {
+    gap: 8px;
+  }
+  .player-home .hub-player-tools :is(.hub-edit-profile, .hub-profile-action) {
+    padding: 7px 9px;
+    font-size: 13px;
+  }
+}
+@media (max-width: 380px) {
+  .hub-header .hub-brand {
+    width: 86px;
+    flex-basis: 86px;
+  }
+  .hub-header {
+    gap: 6px;
+  }
+  .player-home .hub-join-form .hub-join-submit {
+    min-width: 102px;
+    font-size: 15px;
+    padding-inline: 10px;
+  }
+  .lobby-wordmark {
+    width: 94px;
+  }
+  .game-world .game-dialog:has(.settings-menu) .settings-audio-group {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* History is paper in both the hub and profile dialog, including its controls and states. */
+.game-world :is(.player-hub, .game-dialog) .match-history {
+  --game-cream: #493c2b;
+  --game-muted: #685536;
+  --game-gold: #705027;
+  color: var(--game-cream);
+  background: linear-gradient(115deg, #eee0c1, #dfcca6);
+}
+.game-world
+  :is(.player-hub, .game-dialog)
+  .match-history
+  :is(h2, .match-score, .hub-history-empty, .hub-tool, .hub-text-action, .hub-more) {
+  color: var(--game-cream);
+}
+.game-world
+  :is(.player-hub, .game-dialog)
+  .match-history
+  :is(.match-expand, .record-caption, .match-outcome-mark) {
+  color: var(--game-muted);
+}
+.game-world :is(.player-hub, .game-dialog) .match-history .hub-history-error {
+  color: #893722;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history .hub-tool {
+  background: #f5e6c8;
+  border: 1px solid #b69a66;
+  border-radius: 7px;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history :is(.hub-text-action, .hub-more) {
+  background: transparent;
+}
+.game-world
+  :is(.player-hub, .game-dialog)
+  .match-history
+  :is(.hub-tool, .hub-text-action, .hub-more):hover:not(:disabled) {
+  background: #fff4da;
+  color: #46331e;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history :is(button, summary):focus-visible {
+  outline: 2px solid #705027;
+  outline-offset: -3px;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history button:disabled {
+  color: #746650;
+  opacity: 1;
+  cursor: default;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history .match-row summary:hover {
+  background: #fff4da80;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history .match-detail {
+  background: #7d603412;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history .hub-return {
+  background: #405d43;
+  color: #fff1d3;
+}
+.game-world :is(.player-hub, .game-dialog) .match-history .hub-return:hover:not(:disabled) {
+  background: #334d36;
+}
+
+.game-world :is(.player-hub, .game-dialog) .match-history .hub-return:disabled {
+  color: #ded3bd;
+  background: #526052;
+}

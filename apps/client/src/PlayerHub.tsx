@@ -6,18 +6,7 @@ import { Avatar, ProfileEditor } from './Profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { GameLoader } from './GameLoader.js';
 import { GoogleMark } from './ProviderMarks.js';
-import {
-  ArrowRight,
-  CircleHelp,
-  JoinRoom,
-  History,
-  LogOut,
-  Pencil,
-  Plus,
-  Settings2,
-  Users,
-  X,
-} from './GameIcons.js';
+import { ArrowRight, CircleHelp, JoinRoom, History, LogOut, Pencil, Plus, Users, X } from './GameIcons.js';
 import { MatchHistory, PlayerStats } from './MatchHistory.js';
 import type { PlayerGameState } from './MatchHistory.js';
 import { normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
@@ -106,7 +95,6 @@ export function PlayerHub({
   onProfile,
   onEditProfile,
   onFriends,
-  onSettings,
   onSignOut,
 }: {
   auth: Auth;
@@ -138,7 +126,7 @@ export function PlayerHub({
     <section className="player-hub" aria-label="Player lobby">
       <header className="hub-header">
         <div className="hub-brand">
-          <BrandLogo mark />
+          <BrandLogo />
         </div>
         <nav className="hub-navigation" aria-label="Player menu">
           <button aria-current={tab === 'lobby' ? 'page' : undefined} onClick={() => setTab('lobby')}>
@@ -161,9 +149,6 @@ export function PlayerHub({
             <Users size={24} />
             <span>Friends</span>
             {requests > 0 && <b aria-hidden="true">{requests}</b>}
-          </button>
-          <button className="hub-tool" aria-label="Settings" onClick={onSettings}>
-            <Settings2 />
           </button>
         </div>
       </header>
@@ -188,18 +173,33 @@ export function PlayerHub({
               <button className="hub-edit-profile" onClick={onEditProfile ?? onProfile}>
                 <Pencil size={16} /> Edit profile
               </button>
-              <a href="/guide/" target="_blank" rel="noopener noreferrer">
+              <a className="hub-profile-action" href="/guide/" target="_blank" rel="noopener noreferrer">
                 <CircleHelp size={20} /> How to play
               </a>
-              <button className="hub-tool" onClick={onSignOut} aria-label="Sign out" title="Sign out">
+              <button
+                className="hub-profile-action hub-sign-out"
+                onClick={onSignOut}
+                aria-label="Sign out"
+                title="Sign out"
+              >
                 <LogOut size={18} />
               </button>
             </nav>
+            {auth.account?.isGuest && (
+              <button className="hub-link-account" disabled={auth.loading} onClick={() => void auth.signIn()}>
+                <GoogleMark />
+                <span>
+                  <strong>Keep your place</strong>
+                  <small>Link Google to add friends.</small>
+                </span>
+                <ArrowRight size={19} />
+              </button>
+            )}
           </section>
           <div className="hub-sidebar">
             <section className="hub-room-actions" aria-label="Play">
               <h1>Gather your crew</h1>
-              <div className="hub-play-controls">
+              <div className="hub-play-controls" data-joining={joining}>
                 {joining ? (
                   <form
                     className="hub-join-form"
@@ -234,6 +234,7 @@ export function PlayerHub({
                     />
                     <button className="hub-join-submit" disabled={busy} type="submit" aria-label="Join room">
                       {busy ? <GameLoader compact /> : <JoinRoom size={22} />}
+                      Join room
                     </button>
                     <button
                       className="hub-tool"
@@ -271,9 +272,11 @@ export function PlayerHub({
                     Resume game <History size={21} />
                   </button>
                 )}
-                <button className="hub-room-button hub-create-button" disabled={busy} onClick={onCreate}>
-                  {busy ? <GameLoader compact label="Opening room…" /> : <Plus size={24} />} Create room
-                </button>
+                {!joining && (
+                  <button className="hub-room-button hub-create-button" disabled={busy} onClick={onCreate}>
+                    {busy ? <GameLoader compact label="Opening room…" /> : <Plus size={24} />} Create room
+                  </button>
+                )}
               </div>
             </section>
             <MatchHistory
@@ -283,16 +286,6 @@ export function PlayerHub({
               onResume={onResume}
               onAll={() => setTab('history')}
             />
-            {auth.account?.isGuest && (
-              <button className="hub-link-account" disabled={auth.loading} onClick={() => void auth.signIn()}>
-                <GoogleMark />
-                <span>
-                  <strong>Keep your place</strong>
-                  <small>Link Google to add friends.</small>
-                </span>
-                <ArrowRight size={19} />
-              </button>
-            )}
           </div>
         </div>
       ) : (

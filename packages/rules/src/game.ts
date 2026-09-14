@@ -328,6 +328,14 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
     requireRule(canPay(maker.hand, offer.give) && canPay(p.hand, offer.want), 'A player no longer has the offered cards');
     requireRule(!offer.proposals?.some(proposal => proposal.player === p.id), 'You already accepted this offer');
+    // A fixed two-player offer already names the only possible recipient. Their
+    // confirmation completes that exact exchange; open counteroffers still need approval.
+    if (g.players.filter(other => !other.resigned).length === 2) {
+      transfer(maker.hand, p.hand, offer.give); transfer(p.hand, maker.hand, offer.want);
+      log(g, `${maker.name} traded ${resourceText(offer.give)} to ${p.name} for ${resourceText(offer.want)}.`);
+      g.trade = null;
+      return g;
+    }
     offer.proposals = [...(offer.proposals ?? []), { player: p.id, give: { ...offer.want } }];
     log(g, `${p.name} is willing to trade with ${maker.name}.`); return g;
   }

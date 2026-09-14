@@ -298,6 +298,12 @@ export class Connection {
       clearTimeout(this.syncTimer);
       if (event.code === 4001 || event.code === 4002) {
         this.stop();
+        if (event.code === 4001)
+          this.emit({
+            type: 'error',
+            code: 'SEAT_REPLACED',
+            message: 'This seat is now open in another browser.',
+          });
         return;
       }
       if (this.stopped) return;

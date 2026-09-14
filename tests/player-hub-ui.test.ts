@@ -102,7 +102,8 @@ test('join intent reveals a labelled explicit form and busy connections disable 
   assert.match(html, /maxLength="8"/); // Accept older codes while new rooms use four.
   assert.match(html, /autoCapitalize="characters"/);
   assert.ok(!html.includes('Resume game'));
-  for (const label of ['Join room', 'Cancel joining', 'Create room']) {
+  assert.ok(!html.includes('Create room'));
+  for (const label of ['Join room', 'Cancel joining']) {
     assert.ok(
       buttons(html)
         .find((button) => button.includes(label))
@@ -190,6 +191,7 @@ test('guests keep the same player lobby and profile but have a clear account-lin
   const guest = { ...auth, account: { ...account, isGuest: true } };
   const html = renderHub({ auth: guest });
   assert.ok(html.includes('Guest') && html.includes('Link Google to add friends.'));
+  assert.ok(html.indexOf('Link Google to add friends.') < html.indexOf('hub-sidebar'));
   const regular = renderHub();
   assert.ok(!regular.includes('Link Google to add friends.'));
 });
@@ -216,6 +218,8 @@ test('the player card owns help and editing, and Edit opens the editor directly'
   assert.ok(!html.includes('<footer'));
   const player = html.match(/<section class="hub-character"[\s\S]*?<\/section>/)?.[0] ?? '';
   assert.ok(player.includes('Edit profile') && player.includes('How to play') && player.includes('Sign out'));
+  assert.ok(player.includes('hub-profile-action'));
+  assert.ok(!html.includes('aria-label="Settings"'));
   const editor = renderToStaticMarkup(
     createElement(PlayerProfile, {
       auth,
