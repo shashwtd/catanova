@@ -1,7 +1,7 @@
 // Generated from docs/art/runtime-art.json by scripts/optimize-art.mjs.
 export const ART_REDIRECTS: Readonly<Record<string, string>> = {
   '/art/avatars-fantasy.png': '/art/optimized/avatars-fantasy.6bf04e83341a.webp',
-  '/art/branding/catanova-logo-v2.png': '/art/optimized/catanova-logo-v2.a161a887edbc.webp',
+  '/art/branding/catanova-logo-v2.png': '/art/optimized/catanova-logo-v2.322eda63a0e8.webp',
   '/art/branding/catanova-mark-v2.png': '/art/optimized/catanova-mark-v2.77f0ea5ff580.webp',
   '/art/development-cards.png': '/art/optimized/development-cards.d7fcdf84252a.webp',
   '/art/environment-dark.png': '/art/optimized/environment-dark.c55c6de597e4.webp',

@@ -4,9 +4,10 @@
   flex: 0 0 148px;
 }
 .hub-header .hub-brand .landing-logo {
-  width: 100%;
+  width: calc(100% - 12px);
   height: auto;
-  max-height: 48px;
+  max-height: 44px;
+  margin-inline: auto;
 }
 .lobby-heading {
   display: grid;
@@ -24,8 +25,9 @@
   width: 158px;
 }
 .lobby-wordmark .landing-logo {
-  width: 100%;
+  width: calc(100% - 12px);
   height: auto;
+  margin-inline: auto;
 }
 .hub-play-controls[data-joining='true'] {
   grid-template-columns: minmax(0, 1fr);

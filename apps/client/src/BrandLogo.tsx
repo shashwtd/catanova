@@ -12,7 +12,7 @@ export function BrandLogo({ mark = false, className = '' }: { mark?: boolean; cl
         href={
           mark
             ? '/art/optimized/catanova-mark-v2.77f0ea5ff580.webp'
-            : '/art/optimized/catanova-logo-v2.a161a887edbc.webp'
+            : '/art/optimized/catanova-logo-v2.322eda63a0e8.webp'
         }
         width={mark ? 1254 : 2172}
         height={mark ? 1254 : 724}
