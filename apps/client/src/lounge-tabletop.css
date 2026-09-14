@@ -14,8 +14,9 @@
   z-index: 0;
   inset: 0;
   pointer-events: none;
-  /* Sample the wood quadrant once; no nested, repeating SVG paint surfaces. */
-  background: url('/art/optimized/environment-dark.c55c6de597e4.webp') right bottom / 200% 200% no-repeat;
+}
+.lounge-tabletop > svg {
+  display: block;
 }
 .lounge-tabletop::after {
   content: '';

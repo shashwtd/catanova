@@ -973,7 +973,8 @@ function App() {
       )}
       {playerHome && (
         <PlayerHub
-          key={auth.account?.id}
+          // This and the drawer are siblings: account IDs alone collide during reconciliation.
+          key={`hub:${auth.account?.id ?? 'local'}`}
           auth={auth}
           games={playerGames}
           busy={busy || networkBusy}
@@ -1309,7 +1310,7 @@ function App() {
       )}
       {panel === 'friends' && (
         <FriendsDrawer
-          key={auth.account?.id}
+          key={`friends:${auth.account?.id ?? 'local'}`}
           auth={auth}
           onClose={() => setPanel(null)}
           room={room && !g ? room : undefined}
