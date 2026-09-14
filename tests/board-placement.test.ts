@@ -127,6 +127,11 @@ test('robber phase highlights every other tile and keeps the selected destinatio
   assert.equal([...html.matchAll(/class="terrain-hit robber-target"/g)].length, 18);
   assert.equal([...html.matchAll(/data-robber-selected="true"/g)].length, 1);
   assert.equal(view.robber, g.robber);
+  assert.equal([...html.matchAll(/class="robber-selection-orbit"/g)].length, 1);
+  assert.match(html, /class="robber-selection" pointer-events="none" aria-hidden="true"/);
+  assert.ok(!render(view).includes('robber-selection-orbit'));
+  assert.ok(!render(view, { disabled: true, selectedRobberHex: target }).includes('robber-selection-orbit'));
+  assert.ok(!render(view, { selectedRobberHex: g.robber }).includes('robber-selection-orbit'));
   assert.equal(
     [...render(view, { disabled: true, selectedRobberHex: target }).matchAll(/robber-target"/g)].length,
     0,

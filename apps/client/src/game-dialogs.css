@@ -171,18 +171,6 @@
   width: min(310px, calc(100vw - 70px));
   overflow: visible;
 }
-.playing .game-side-panel:has(.settings-menu)::before {
-  content: '';
-  position: absolute;
-  left: -7px;
-  top: var(--panel-notch-y, 72%);
-  width: 12px;
-  height: 12px;
-  transform: translateY(-50%) rotate(45deg);
-  background: #edddbf;
-  border-left: 1px solid var(--dialog-edge);
-  border-bottom: 1px solid var(--dialog-edge);
-}
 .game-world .settings-audio-group {
   width: min(100%, 310px);
   align-self: center;

@@ -1,7 +1,17 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { CircleHelp, DoorOpen, GameIcon, History, Maximize, Minimize, Settings2, X } from './GameIcons.js';
-export type GameToolPanel = 'statistics' | 'journal' | 'rules' | 'settings' | 'leave';
+import {
+  CircleHelp,
+  DoorOpen,
+  GameIcon,
+  History,
+  Maximize,
+  Minimize,
+  Settings2,
+  Wifi,
+  X,
+} from './GameIcons.js';
+export type GameToolPanel = 'connection' | 'statistics' | 'journal' | 'rules' | 'settings' | 'leave';
 export function GameTools({
   panel,
   onPanel,
@@ -41,6 +51,7 @@ export function GameTools({
     else onPanel(next);
   };
   const entries = [
+    { key: 'connection', label: 'Connection', icon: <Wifi />, action: () => togglePanel('connection') },
     {
       key: 'statistics',
       label: 'Dice statistics',
@@ -58,6 +69,7 @@ export function GameTools({
           className="icon-button"
           aria-label="Move history"
           title="Move history"
+          data-game-tool="journal"
           aria-pressed={panel === 'journal'}
           onClick={() => togglePanel('journal')}
         >

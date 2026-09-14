@@ -1,0 +1,176 @@
+/* Position only the outer frame. Motion belongs to the inner surface, never its coordinates. */
+.game-popover {
+  position: fixed;
+  inset: auto;
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  pointer-events: auto;
+  transform: none;
+  translate: none;
+}
+.game-popover-motion {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: inherit;
+  min-height: 0;
+}
+.game-world.playing .game-popover :is(.game-panel.game-side-panel, .development-detail.floating-panel) {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  max-height: inherit;
+  min-height: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 0 1 auto;
+  transform: none;
+  translate: none;
+  animation: none;
+  outline: none;
+}
+.game-world.playing .game-popover .game-side-panel {
+  overflow: visible;
+}
+.game-popover .game-side-panel-content {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 2px;
+}
+.game-world.playing .game-popover .development-detail {
+  gap: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.game-popover .development-explanation,
+.game-popover .development-choice {
+  flex: none;
+}
+.game-popover .development-explanation h3 {
+  margin: 0 32px 8px 0;
+  font-size: 17px;
+}
+.game-popover-notch {
+  position: absolute;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  background: #edddbf;
+  pointer-events: none;
+  border: 1px solid var(--dialog-edge);
+}
+.game-popover[data-notch-side='left'] .game-popover-notch {
+  left: -6px;
+  top: var(--popover-notch);
+  transform: translateY(-50%) rotate(45deg);
+  border-top: 0;
+  border-right: 0;
+}
+.game-popover[data-notch-side='bottom'] .game-popover-notch {
+  bottom: -6px;
+  left: var(--popover-notch);
+  transform: translateX(-50%) rotate(45deg);
+  border-top: 0;
+  border-left: 0;
+}
+.game-popover[data-notch-side='top'] .game-popover-notch {
+  top: -6px;
+  left: var(--popover-notch);
+  transform: translateX(-50%) rotate(45deg);
+  border-bottom: 0;
+  border-right: 0;
+}
+@media (max-width: 700px) {
+  .game-world.playing .game-popover :is(.game-panel.game-side-panel, .development-detail.floating-panel) {
+    padding: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-popover-motion.t-dropdown {
+    transition: none !important;
+  }
+}
+[data-motion='reduced'] .game-popover-motion.t-dropdown {
+  transition: none !important;
+}
+
+/* Browser selection and native image ghosts have no role on the game board. */
+.game-world.playing,
+.game-world.playing * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.game-world.playing :is(input, textarea, [contenteditable='true'], [contenteditable='true'] *) {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+.game-world.playing :is(img, svg, a) {
+  -webkit-user-drag: none;
+}
+
+/* Replace the rectangular SVG focus outline with the actual hex perimeter. */
+.playing .island .robber-target,
+.playing .island .robber-target:focus,
+.playing .island .robber-target:focus-visible {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.playing .robber-target:is(:hover, :focus-visible) .hex-hit {
+  fill: #ffedaa59;
+  stroke: #fff3c3;
+  stroke-width: 4;
+  stroke-dasharray: none;
+}
+.playing .robber-target[data-robber-selected='true'] .hex-hit {
+  fill: #ffe29952;
+  stroke: #704d28;
+  stroke-width: 4;
+  stroke-dasharray: none;
+}
+.robber-selection-base {
+  fill: none;
+  stroke: #7b542b;
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+.robber-selection-orbit {
+  fill: none;
+  stroke: #fff3b5;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 18 15.3333;
+  animation: robber-border-orbit var(--site-marker-duration, 6s) linear infinite;
+}
+@keyframes robber-border-orbit {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .robber-selection-orbit {
+    animation: none;
+  }
+}
+[data-motion='reduced'] .robber-selection-orbit {
+  animation: none;
+}

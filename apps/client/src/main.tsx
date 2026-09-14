@@ -5,6 +5,8 @@ import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
+import { ConnectionPanel } from './ConnectionPanel.js';
+import type { GameToolPanel } from './GameTools.js';
 import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
@@ -114,6 +116,7 @@ import './game-dialogs.css';
 import './game-feedback-polish.css';
 import './lounge-tabletop.css';
 import './match-followups.css';
+import './game-popover.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -169,9 +172,10 @@ function Dialog(props: {
   onClose: () => void;
   compact?: boolean;
   side?: boolean;
+  tool?: GameToolPanel;
 }) {
   return props.side ? (
-    <UtilityPanel title={props.title} onClose={props.onClose}>
+    <UtilityPanel tool={props.tool} title={props.title} onClose={props.onClose}>
       {props.children}
     </UtilityPanel>
   ) : (
@@ -253,6 +257,7 @@ function App() {
       | 'rules'
       | 'journal'
       | 'statistics'
+      | 'connection'
       | 'leave'
       | 'profile'
       | 'editProfile'
@@ -1119,13 +1124,24 @@ function App() {
               onClose={() => setPanel(null)}
             />
           )}
+          {panel === 'connection' && (
+            <UtilityPanel tool="connection" title="Connection" onClose={() => setPanel(null)}>
+              <ConnectionPanel
+                metrics={metrics}
+                status={status}
+                revision={room?.revision ?? 0}
+                pending={busy}
+                onSync={() => connection.current?.sync()}
+              />
+            </UtilityPanel>
+          )}
           {panel === 'statistics' && (
-            <UtilityPanel title="Dice statistics" onClose={() => setPanel(null)}>
+            <UtilityPanel tool="statistics" title="Dice statistics" onClose={() => setPanel(null)}>
               <GameStatistics game={g} statistics={statistics} />
             </UtilityPanel>
           )}
           {panel === 'journal' && (
-            <UtilityPanel title="Move history" onClose={() => setPanel(null)}>
+            <UtilityPanel tool="journal" title="Move history" onClose={() => setPanel(null)}>
               <MoveHistory
                 entries={historyEntries}
                 game={g}
@@ -1204,7 +1220,7 @@ function App() {
         />
       )}
       {panel === 'settings' && (
-        <Dialog side={!!g} title="Settings" onClose={() => setPanel(null)}>
+        <Dialog side={!!g} tool="settings" title="Settings" onClose={() => setPanel(null)}>
           <GameSettings
             preferences={preferences}
             update={update}
@@ -1277,7 +1293,7 @@ function App() {
         </Dialog>
       )}
       {panel === 'rules' && (
-        <Dialog side={!!g} title="Rules" onClose={() => setPanel(null)}>
+        <Dialog side={!!g} tool="rules" title="How to play" onClose={() => setPanel(null)}>
           <QuickRules victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints} />
         </Dialog>
       )}

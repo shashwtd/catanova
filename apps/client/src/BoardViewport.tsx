@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, PointerEvent } from 'react';
+import { useGameInteractionGuards } from './useGameInteractionGuards.js';
 import { BoardGesture, constrainCamera, fitBoard, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
 import { MATERIAL_GUTTER, MATERIAL_QUADRANTS, WORLD } from './scene.js';
@@ -13,6 +14,7 @@ export function BoardViewport({
   children: ReactNode;
   reducedMotion?: boolean;
 }) {
+  useGameInteractionGuards();
   const viewport = useRef<HTMLDivElement>(null),
     current = useRef<Camera>({ scale: 1, x: 0, y: 0 }),
     target = useRef(current.current),

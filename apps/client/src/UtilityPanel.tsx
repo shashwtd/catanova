@@ -1,77 +1,46 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { X } from './GameIcons.js';
+import { GamePopover } from './GamePopover.js';
+import type { GameToolPanel } from './GameTools.js';
 
-/** Nonmodal game help: dismiss the panel without collapsing its tool rail. */
+/** Nonmodal game help follows its tool and dismisses without collapsing the tool rail. */
 export function UtilityPanel({
   title,
   children,
   onClose,
+  tool,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  tool?: GameToolPanel;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  const close = useRef(onClose);
-  close.current = onClose;
-  const opener = useRef<HTMLElement | null>(null);
-  function dismiss() {
-    close.current();
-    if (opener.current?.isConnected) opener.current.focus({ preventScroll: true });
-  }
-  useLayoutEffect(() => {
-    if (title !== 'Settings') return;
-    const trigger = document.querySelector('[data-game-tool="settings"]');
-    const panel = ref.current;
-    if (!trigger || !panel) return;
-    const align = () => {
-      const target = trigger.getBoundingClientRect(),
-        box = panel.getBoundingClientRect();
-      panel.style.setProperty(
-        '--panel-notch-y',
-        `${Math.max(18, Math.min(box.height - 18, target.top + target.height / 2 - box.top))}px`,
-      );
-    };
-    align();
-    const observer = new ResizeObserver(align);
-    observer.observe(panel);
-    window.addEventListener('resize', align);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', align);
-    };
-  }, [title]);
-  useEffect(() => {
-    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    ref.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
-    const outside = (e: PointerEvent) => {
-      if (!(e.target instanceof Node) || ref.current?.contains(e.target)) return;
-      if (e.target instanceof Element && e.target.closest('.side-controls')) return;
-      close.current();
-    };
-    const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      dismiss();
-    };
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', escape, true);
-    return () => {
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', escape, true);
-    };
-  }, []);
+  const fallback = useRef<HTMLElement | null>(null);
+  const anchor = () =>
+    (tool
+      ? document.querySelector<HTMLElement>(`[data-game-tool="${tool}"]`)
+      : (fallback.current ??= document.activeElement?.closest<HTMLElement>('[data-game-tool]') ?? null)) ??
+    document.querySelector<HTMLElement>('.game-menu-trigger');
   return (
-    <aside ref={ref} className="game-panel game-side-panel" role="dialog" aria-label={title}>
-      <div className="panel-heading">
-        <h2>{title}</h2>
-        <button className="icon-button" aria-label={`Close ${title}`} onClick={dismiss}>
-          <X />
-        </button>
-      </div>
-      <div className="game-side-panel-content">{children}</div>
-    </aside>
+    <GamePopover
+      key={tool ?? title}
+      anchor={anchor}
+      placement="beside"
+      width={tool === 'settings' ? 310 : tool === 'journal' ? 330 : 390}
+      onClose={onClose}
+    >
+      {(dismiss) => (
+        <aside className="game-panel game-side-panel" role="dialog" aria-label={title} tabIndex={-1}>
+          <div className="panel-heading">
+            <h2>{title}</h2>
+            <button className="icon-button" aria-label={`Close ${title}`} onClick={dismiss}>
+              <X />
+            </button>
+          </div>
+          <div className="game-side-panel-content">{children}</div>
+        </aside>
+      )}
+    </GamePopover>
   );
 }

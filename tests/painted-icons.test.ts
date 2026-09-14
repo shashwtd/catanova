@@ -34,7 +34,8 @@ test('closed tools are inert and linked to an accessible trigger, with fullscree
     }),
   );
   assert.match(html, /aria-expanded="false"/);
-  assert.ok(!html.includes('aria-label="Connection"'));
+  assert.match(html, /data-game-tool="connection"/);
+  assert.match(html, /data-game-tool="journal"/);
   assert.ok(!html.includes('aria-label="Game rules"'));
   assert.match(html, /aria-label="How to play"/);
   assert.match(html, /inert=""/);

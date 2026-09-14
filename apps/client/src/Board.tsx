@@ -358,6 +358,7 @@ export function Board({
               key={h.id}
               className={`terrain-hit ${canMoveRobber ? 'robber-target' : ''}`}
               data-robber-selected={canMoveRobber && h.id === selectedRobberHex}
+              aria-pressed={canMoveRobber ? h.id === selectedRobberHex : undefined}
               role={canMoveRobber ? 'button' : undefined}
               tabIndex={canMoveRobber ? 0 : undefined}
               aria-label={`${name}${h.number ? `, ${h.number}${game?.diceMode === 'flat' ? ', one chance in eleven' : `, ${pips(h.number)} production pips`}` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
@@ -369,6 +370,12 @@ export function Board({
               }
             >
               <polygon className="hex-hit" points={hexPoints(x, y, 60)} />
+              {canMoveRobber && h.id === selectedRobberHex && (
+                <g className="robber-selection" pointerEvents="none" aria-hidden="true">
+                  <polygon className="robber-selection-base" points={hexPoints(x, y, 58)} />
+                  <polygon className="robber-selection-orbit" points={hexPoints(x, y, 58)} pathLength={100} />
+                </g>
+              )}
               <circle
                 data-effect-hex={h.id}
                 cx={x}

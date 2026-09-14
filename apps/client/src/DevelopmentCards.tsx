@@ -1,5 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useId, useRef, useState } from 'react';
 import { GameIcon, Check, Clock3, LockKeyhole, Play, X } from './GameIcons.js';
 import type { CSSProperties } from 'react';
 import { CARD_NAMES, canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
@@ -9,7 +8,7 @@ import type { Resource } from '../../../packages/rules/src/index.js';
 import { ResourceIcon } from './Board.js';
 import { CardTooltip } from './CardTooltip.js';
 import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from './cards.js';
-import { fitFloatingPanel } from './floating-panel.js';
+import { GamePopover } from './GamePopover.js';
 const ART_COLUMNS = [0, 418, 836, 1254],
   ART_ROWS = [0, 627, 1254];
 export function DevelopmentArt({ kind }: { kind: CardKind | 'back' }) {
@@ -92,61 +91,11 @@ export function DevelopmentCards({
   const card = cards.find((c) => c.id === selected),
     reason = card ? cardLockReason(card, game, me) : null;
   const handRef = useRef<HTMLElement>(null);
-  const detailRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLButtonElement | null>(null);
-  const [detailPosition, setDetailPosition] = useState<CSSProperties>({});
-  const [positionedCard, setPositionedCard] = useState<string | null>(null);
-  function closeDetails(restoreFocus = false) {
+  function closeDetails() {
     setSelected(null);
     onClose?.();
-    if (restoreFocus && anchorRef.current?.isConnected) anchorRef.current.focus({ preventScroll: true });
   }
-  useLayoutEffect(() => {
-    const detail = detailRef.current;
-    if (!card || !detail) return;
-    const position = () => {
-      const anchor = anchorRef.current?.getBoundingClientRect();
-      if (!anchor) return;
-      const viewport = window.visualViewport;
-      const bounds = {
-        left: viewport?.offsetLeft ?? 0,
-        top: viewport?.offsetTop ?? 0,
-        width: viewport?.width ?? innerWidth,
-        height: viewport?.height ?? innerHeight,
-      };
-      detail.style.width = `${Math.min(360, bounds.width - 24)}px`;
-      detail.style.maxHeight = `${bounds.height - 24}px`;
-      setDetailPosition(fitFloatingPanel(anchor, { width: 360, height: detail.offsetHeight }, bounds));
-      setPositionedCard(card.id);
-    };
-    position();
-    const resize = new ResizeObserver(position);
-    resize.observe(detail);
-    const outside = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !detail.contains(event.target) &&
-        !handRef.current?.contains(event.target)
-      )
-        setSelected(null);
-    };
-    document.addEventListener('pointerdown', outside);
-    window.addEventListener('resize', position);
-    window.addEventListener('scroll', position, true);
-    window.visualViewport?.addEventListener('resize', position);
-    window.visualViewport?.addEventListener('scroll', position);
-    return () => {
-      resize.disconnect();
-      document.removeEventListener('pointerdown', outside);
-      window.removeEventListener('resize', position);
-      window.removeEventListener('scroll', position, true);
-      window.visualViewport?.removeEventListener('resize', position);
-      window.visualViewport?.removeEventListener('scroll', position);
-    };
-  }, [card?.id]);
-  useLayoutEffect(() => {
-    if (card && positionedCard === card.id) detailRef.current?.focus({ preventScroll: true });
-  }, [positionedCard, card?.id]);
   useEffect(() => {
     if (!cards.some((c) => c.id === selected)) setSelected(null);
   }, [cards.map((c) => c.id).join('|'), selected]);
@@ -156,7 +105,6 @@ export function DevelopmentCards({
   function choose(c: Card) {
     if (disabled || cardLockReason(c, game, me)) return;
     onSelect?.();
-    setPositionedCard(null);
     setSelected((current) => (current === c.id ? null : c.id));
     setTake(emptyHand());
   }
@@ -183,7 +131,7 @@ export function DevelopmentCards({
       aria-label="Development cards"
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
-          closeDetails(true);
+          closeDetails();
           e.stopPropagation();
         }
       }}
@@ -263,121 +211,123 @@ export function DevelopmentCards({
               );
             })}
           </div>
-          {card && handRef.current
-            ? createPortal(
-                <div className="development-hand-inline development-detail-layer">
-                  <div
-                    ref={detailRef}
-                    className="development-detail floating-panel development-detail-portal"
-                    style={{
-                      ...detailPosition,
-                      visibility: positionedCard === card.id ? 'visible' : 'hidden',
-                    }}
-                    tabIndex={-1}
-                    role="dialog"
-                    aria-label={CARD_NAMES[card.kind]}
+          {card && (
+            <GamePopover
+              key={card.id}
+              anchor={() => anchorRef.current}
+              placement="above"
+              width={360}
+              onClose={closeDetails}
+              notch={false}
+              className="development-popover"
+            >
+              {(dismiss) => (
+                <div
+                  className="development-detail floating-panel"
+                  tabIndex={-1}
+                  role="dialog"
+                  aria-label={CARD_NAMES[card.kind]}
+                >
+                  <button
+                    className="icon-button development-close"
+                    aria-label="Close card details"
+                    onClick={dismiss}
                   >
-                    <button
-                      className="icon-button development-close"
-                      aria-label="Close card details"
-                      onClick={() => closeDetails(true)}
-                    >
-                      <X />
-                    </button>
-                    <div className="development-explanation">
-                      <h3>{CARD_NAMES[card.kind]}</h3>
-                      <p>{CARD_LORE[card.kind].effect}</p>
-                      {reason && (
-                        <div className="card-unavailable">
-                          <LockKeyhole size={14} />
-                          {reason}
-                        </div>
-                      )}
-                    </div>
-                    {!reason && (
-                      <div className="development-choice">
-                        {card.kind === 'monopoly' && (
-                          <>
-                            <span className="field-caption">Choose a resource</span>
-                            <div className="development-resources">
-                              {RESOURCES.map((r) => (
-                                <button
-                                  key={r}
-                                  aria-label={RESOURCE_NAMES[r]}
-                                  aria-pressed={resource === r}
-                                  onClick={() => setResource(r)}
-                                >
-                                  <ResourceIcon resource={r} />
-                                  <span>{RESOURCE_NAMES[r]}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                        {card.kind === 'yearOfPlenty' && (
-                          <>
-                            <span className="field-caption">
-                              Choose {Math.min(2, total(game.bank))} from the bank
-                            </span>
-                            <div className="development-resources">
-                              {RESOURCES.map((r) => (
-                                <button
-                                  key={r}
-                                  aria-label={`Choose ${RESOURCE_NAMES[r]}, ${take[r]} selected, ${game.bank[r]} available`}
-                                  aria-pressed={take[r] > 0}
-                                  disabled={
-                                    take[r] >= game.bank[r] || total(take) >= Math.min(2, total(game.bank))
-                                  }
-                                  onClick={() => setTake((h) => ({ ...h, [r]: h[r] + 1 }))}
-                                >
-                                  <ResourceIcon resource={r} />
-                                  <span>{take[r] ? `${take[r]} selected` : RESOURCE_NAMES[r]}</span>
-                                </button>
-                              ))}
-                            </div>
-                            <div className="plenty-picked">
-                              {RESOURCES.filter((r) => take[r] > 0).map((r) => (
-                                <button
-                                  key={r}
-                                  onClick={() => setTake((h) => ({ ...h, [r]: h[r] - 1 }))}
-                                  title="Remove one selected card"
-                                >
-                                  <ResourceIcon resource={r} />
-                                  {take[r]} · {RESOURCE_NAMES[r]} <X size={12} />
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                        {card.kind === 'yearOfPlenty' && !canPay(game.bank, take) && (
-                          <div className="card-unavailable">
-                            <span role="status">The bank changed.</span>
-                            <button className="text-button" onClick={() => setTake(emptyHand())}>
-                              Choose again
-                            </button>
-                          </div>
-                        )}
-                        <button
-                          className="gold-button"
-                          disabled={
-                            disabled ||
-                            (card.kind === 'yearOfPlenty' &&
-                              (!canPay(game.bank, take) ||
-                                total(take) !== Math.min(2, total(game.bank)) ||
-                                !total(take)))
-                          }
-                          onClick={play}
-                        >
-                          <Play size={15} />
-                          Play {CARD_NAMES[card.kind]}
-                        </button>
+                    <X />
+                  </button>
+                  <div className="development-explanation">
+                    <h3>{CARD_NAMES[card.kind]}</h3>
+                    <p>{CARD_LORE[card.kind].effect}</p>
+                    {reason && (
+                      <div className="card-unavailable">
+                        <LockKeyhole size={14} />
+                        {reason}
                       </div>
                     )}
                   </div>
-                </div>,
-                handRef.current.closest('.game-world') ?? document.body,
-              )
-            : null}
+                  {!reason && (
+                    <div className="development-choice">
+                      {card.kind === 'monopoly' && (
+                        <>
+                          <span className="field-caption">Choose a resource</span>
+                          <div className="development-resources">
+                            {RESOURCES.map((r) => (
+                              <button
+                                key={r}
+                                aria-label={RESOURCE_NAMES[r]}
+                                aria-pressed={resource === r}
+                                onClick={() => setResource(r)}
+                              >
+                                <ResourceIcon resource={r} />
+                                <span>{RESOURCE_NAMES[r]}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {card.kind === 'yearOfPlenty' && (
+                        <>
+                          <span className="field-caption">
+                            Choose {Math.min(2, total(game.bank))} from the bank
+                          </span>
+                          <div className="development-resources">
+                            {RESOURCES.map((r) => (
+                              <button
+                                key={r}
+                                aria-label={`Choose ${RESOURCE_NAMES[r]}, ${take[r]} selected, ${game.bank[r]} available`}
+                                aria-pressed={take[r] > 0}
+                                disabled={
+                                  take[r] >= game.bank[r] || total(take) >= Math.min(2, total(game.bank))
+                                }
+                                onClick={() => setTake((h) => ({ ...h, [r]: h[r] + 1 }))}
+                              >
+                                <ResourceIcon resource={r} />
+                                <span>{take[r] ? `${take[r]} selected` : RESOURCE_NAMES[r]}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="plenty-picked">
+                            {RESOURCES.filter((r) => take[r] > 0).map((r) => (
+                              <button
+                                key={r}
+                                onClick={() => setTake((h) => ({ ...h, [r]: h[r] - 1 }))}
+                                title="Remove one selected card"
+                              >
+                                <ResourceIcon resource={r} />
+                                {take[r]} · {RESOURCE_NAMES[r]} <X size={12} />
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {card.kind === 'yearOfPlenty' && !canPay(game.bank, take) && (
+                        <div className="card-unavailable">
+                          <span role="status">The bank changed.</span>
+                          <button className="text-button" onClick={() => setTake(emptyHand())}>
+                            Choose again
+                          </button>
+                        </div>
+                      )}
+                      <button
+                        className="gold-button"
+                        disabled={
+                          disabled ||
+                          (card.kind === 'yearOfPlenty' &&
+                            (!canPay(game.bank, take) ||
+                              total(take) !== Math.min(2, total(game.bank)) ||
+                              !total(take)))
+                        }
+                        onClick={play}
+                      >
+                        <Play size={15} />
+                        Play {CARD_NAMES[card.kind]}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </GamePopover>
+          )}
         </>
       ) : null}
       {onBuy && <DevelopmentPurchase disabled={disabled || !canBuy} onBuy={onBuy} />}
