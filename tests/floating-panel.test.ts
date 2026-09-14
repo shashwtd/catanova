@@ -84,3 +84,30 @@ test('side panels adapt to phones, narrow landscape and visual viewport offsets 
     );
   }
 });
+
+test('tall tool panels scroll inward from their own top or bottom button edge', () => {
+  const viewport = { left: 0, top: 0, width: 1280, height: 800 };
+  for (const alignment of ['top', 'bottom'] as const) {
+    // The expanded bottom menu can cross the middle of the screen; alignment must not flip.
+    for (const top of [180, 430, 640]) {
+      const anchor = { left: 12, top, width: 44, height: 44 };
+      for (const contentHeight of [Infinity, 1000, 300, 120]) {
+        const result = placeGamePanel(
+          anchor,
+          { width: 390, height: contentHeight },
+          viewport,
+          'beside',
+          alignment,
+        );
+        const height = Math.min(contentHeight, result.maxHeight);
+        assert.equal(
+          alignment === 'bottom' ? result.top + height : result.top,
+          alignment === 'bottom' ? top + 44 : top,
+        );
+        assert.equal(result.bottomAligned, alignment === 'bottom');
+        assert.equal(result.top + result.notch, top + 22);
+        assert.ok(result.top >= 12 && result.top + height <= 788);
+      }
+    }
+  }
+});

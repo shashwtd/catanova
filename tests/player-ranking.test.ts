@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { applyAction, createGame, gameView } from '../packages/rules/src/game.js';
-import { playerStandings } from '../apps/client/src/player-ranking.js';
+import { finalStandings, playerStandings } from '../apps/client/src/player-ranking.js';
+import { GameOver } from '../apps/client/src/GameOver.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { PLAYER_COLORS } from '../apps/client/src/Board.js';
 const seats = Array.from({ length: 4 }, (_, i) => ({
@@ -173,4 +174,60 @@ test('award details list public route lengths and Knight counts, with the curren
   assert.match(html, /Player 3: 3, award holder/);
   assert.equal([...html.matchAll(/aria-label="Award standings"/g)].length, 2);
   assert.equal([...html.matchAll(/role="listitem"/g)].length, 8);
+});
+
+test('results rank the ten-point winner above an eight-point first seat, including revealed VP cards', () => {
+  const game = setup();
+  game.phase = 'finished';
+  game.winner = 'p1';
+  game.players[1]!.cards = [0, 1, 2].map((i) => ({ id: `vp${i}`, kind: 'victoryPoint', boughtTurn: 0 }));
+  const view = gameView(game, 'p0');
+  assert.equal(view.players[1]!.points, 5, 'opponent VP cards are included once at game end');
+  [8, 10, 6, 6].forEach((points, i) => {
+    view.players[i]!.points = points;
+  });
+  const original = structuredClone(view);
+  assert.deepEqual(
+    finalStandings(view).map(({ player, points, place }) => [player.id, points, place]),
+    [
+      ['p1', 10, 1],
+      ['p0', 8, 2],
+      ['p2', 6, 3],
+      ['p3', 6, 3],
+    ],
+  );
+  assert.deepEqual(view, original, 'sorting results cannot mutate server state or gameplay seats');
+  const html = renderToStaticMarkup(
+    createElement(GameOver, {
+      room: { roomId: 'results-room', revision: 0, counter: 0, players: seats, game: view },
+      busy: false,
+      canReturn: true,
+      onReturn() {},
+      onQuit() {},
+    }),
+  );
+  const rows = html.match(/<article class="game-over-player[^]*?<\/article>/g)!;
+  assert.match(rows[0]!, /is-winner/);
+  assert.match(rows[0]!, /game-over-place">1<.*<strong>Player 2<.*<b>10</);
+  assert.match(rows[1]!, /game-over-place">2<.*<strong>Player 1<.*<b>8</);
+});
+
+test('the declared winner leads resignation results and equal-score rivals share places', () => {
+  const view = gameView(setup(), 'p0');
+  view.phase = 'finished';
+  view.winner = 'p3';
+  view.finishReason = 'resignation';
+  [8, 8, 7, 2].forEach((points, i) => {
+    view.players[i]!.points = points;
+    view.players[i]!.resigned = i !== 3;
+  });
+  assert.deepEqual(
+    finalStandings(view).map(({ player, place }) => [player.id, place]),
+    [
+      ['p3', 1],
+      ['p0', 2],
+      ['p1', 2],
+      ['p2', 4],
+    ],
+  );
 });

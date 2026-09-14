@@ -16,3 +16,22 @@ export function playerStandings(game: GameView) {
       enabled && !p.player.resigned && (game.winner ? game.winner === p.player.id : p.points === highest),
   }));
 }
+
+/** Final results rank revealed scores, without reordering the in-game seats.
+ * The declared winner stays first, including a win by resignation. */
+export function finalStandings(game: GameView) {
+  const standings = playerStandings(game).sort(
+    (a, b) =>
+      Number(b.player.id === game.winner) - Number(a.player.id === game.winner) ||
+      b.points - a.points ||
+      a.seatIndex - b.seatIndex,
+  );
+  let place = 1;
+  return standings.map((entry, index) => {
+    const previous = standings[index - 1];
+    if (previous && (previous.player.id === game.winner || previous.points !== entry.points)) {
+      place = index + 1;
+    }
+    return { ...entry, place };
+  });
+}

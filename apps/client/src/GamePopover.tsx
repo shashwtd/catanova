@@ -69,10 +69,18 @@ function PositionedPanel({
         height: viewport?.height ?? innerHeight,
       };
       const rect = target.getBoundingClientRect();
-      const limits = placeGamePanel(rect, { width, height: Infinity }, bounds, placement);
+      const groupAlignment = target.closest<HTMLElement>('[data-panel-align]')?.dataset.panelAlign;
+      const alignment = groupAlignment === 'top' || groupAlignment === 'bottom' ? groupAlignment : 'auto';
+      const limits = placeGamePanel(rect, { width, height: Infinity }, bounds, placement, alignment);
       element.style.width = `${limits.width}px`;
       element.style.maxHeight = `${limits.maxHeight}px`;
-      const result = placeGamePanel(rect, { width, height: element.offsetHeight }, bounds, placement);
+      const result = placeGamePanel(
+        rect,
+        { width, height: element.offsetHeight },
+        bounds,
+        placement,
+        alignment,
+      );
       element.style.left = `${result.left}px`;
       element.style.top = `${result.top}px`;
       element.style.setProperty('--popover-notch', `${result.notch}px`);

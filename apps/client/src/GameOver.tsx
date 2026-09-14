@@ -3,7 +3,7 @@ import type { GameStatistics as Statistics, RoomState } from '../../../packages/
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { GameIcon } from './GameIcons.js';
-import { playerStandings } from './player-ranking.js';
+import { finalStandings } from './player-ranking.js';
 
 /** Results use the final viewer-safe snapshot; scores are revealed by the server at victory. */
 export function GameOver({
@@ -113,12 +113,12 @@ export function GameOver({
             </span>
           </header>
           <div className="game-over-standings">
-            {playerStandings(game).map(({ player, points }, index) => (
+            {finalStandings(game).map(({ player, points, place }) => (
               <article
                 key={player.id}
                 className={`game-over-player ${player.id === game.winner ? 'is-winner' : ''}`}
               >
-                <span className="game-over-place">{index + 1}</span>
+                <span className="game-over-place">{place}</span>
                 <Avatar profile={profile(player.id, player.name)} />
                 <div className="game-over-player-details">
                   <strong>{player.name}</strong>

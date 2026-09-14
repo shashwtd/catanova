@@ -64,20 +64,21 @@ export function GameTools({
   ];
   return (
     <>
-      <nav className="side-controls game-controls" aria-label="Current game tools">
+      <nav className="side-controls game-controls" aria-label="Current game tools" data-panel-align="top">
         <button
           className="icon-button"
           aria-label="Move history"
-          title="Move history"
           data-game-tool="journal"
           aria-pressed={panel === 'journal'}
+          aria-expanded={panel === 'journal'}
+          aria-haspopup="dialog"
           onClick={() => togglePanel('journal')}
         >
           <History />
-          <span className="tool-label">Move history</span>
+          {panel !== 'journal' && <span className="tool-label">Move history</span>}
         </button>
       </nav>
-      <nav className="side-controls room-controls" aria-label="Room tools">
+      <nav className="side-controls room-controls" aria-label="Room tools" data-panel-align="bottom">
         <div
           className="game-tools-menu"
           onKeyDown={(e) => {
@@ -128,12 +129,14 @@ export function GameTools({
                 data-game-tool={entry.key}
                 aria-label={entry.label}
                 aria-pressed={panel === entry.key}
+                aria-expanded={panel === entry.key}
+                aria-haspopup="dialog"
                 disabled={entry.key === 'leave' && busy}
                 style={{ '--tool-order': entries.length - i - 1 } as CSSProperties}
                 onClick={entry.action}
               >
                 {entry.icon}
-                <span>{entry.label}</span>
+                {panel !== entry.key && <span className="tool-label">{entry.label}</span>}
               </button>
             ))}
           </div>
