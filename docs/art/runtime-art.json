@@ -23,14 +23,14 @@
     {
       "source": "assets/source-art/branding/catanova-logo-v2.png",
       "legacyUrl": "/art/branding/catanova-logo-v2.png",
-      "url": "/art/optimized/catanova-logo-v2.322eda63a0e8.webp",
-      "sha256": "322eda63a0e872543ad4b8dcfa9de8a01be1e49f0e93289a9af18f43c3e8e9a3",
-      "sourceSha256": "cf56d204f19d1a05aa74adeb18aa910a344215cc988279ba14fb8cb4722d4d5b",
+      "url": "/art/optimized/catanova-logo-v2.e377bbe647d6.webp",
+      "sha256": "e377bbe647d67a009bd5725f775809e4bc501a714cee0baab486c2098750e9e5",
+      "sourceSha256": "1574a9d4927ad9b463650ec39d35dcde2daed240e6363fce9113f309851c4cdb",
       "width": 2172,
       "height": 724,
       "quality": 90,
-      "originalBytes": 1022081,
-      "bytes": 240050
+      "originalBytes": 1207394,
+      "bytes": 120350
     },
     {
       "source": "assets/source-art/branding/catanova-mark-v2.png",
