@@ -82,10 +82,10 @@ export function FantasyTransition({
           <GameLoader label="Preparing the island…" />
           <div className="island-loading-players">
             {players.map((p) => (
-              <div key={p.id} className={readyPlayers.includes(p.id) ? 'is-ready' : ''}>
+              <div key={p.id} className={p.bot || readyPlayers.includes(p.id) ? 'is-ready' : ''}>
                 <Avatar profile={p.profile} />
                 <strong>{p.name}</strong>
-                <span>{readyPlayers.includes(p.id) ? 'Ready' : 'Loading'}</span>
+                <span>{p.bot || readyPlayers.includes(p.id) ? 'Ready' : 'Loading'}</span>
               </div>
             ))}
           </div>

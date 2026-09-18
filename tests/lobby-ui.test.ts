@@ -331,3 +331,18 @@ test('each pending discard player gets an activity marker which clears independe
   game.winner = 'p0';
   assert.ok(!render().includes('data-turn-activity='));
 });
+
+test('only hosts can remove human or bot guests from the lobby', () => {
+  const room = lobby();
+  room.players[2]!.bot = true;
+  const host = renderLobby(room, 'p0');
+  assert.ok(host.includes('aria-label="Remove Second"'));
+  assert.ok(host.includes('aria-label="Remove Third"'));
+  assert.ok(!host.includes('aria-label="Remove Host"'));
+  assert.ok(!renderLobby(room, 'p1').includes('lobby-remove-player'));
+  for (const button of buttons(renderLobby(room, 'p0', false, false)).filter((b) =>
+    b.includes('lobby-remove-player'),
+  )) {
+    assert.ok(button.includes('disabled=""'));
+  }
+});

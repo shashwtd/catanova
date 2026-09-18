@@ -4,7 +4,7 @@ import { ProtocolError } from './store.js';
 export const LAUNCH_MIN_MS = 2_000;
 export const LAUNCH_LIMIT_MS = 10_000;
 export type LaunchRequest = { roomId: string; hostId: string; commandId: string; revision: number };
-type Pending = LaunchRequest & { startedAt: number; players: string[]; ready: Set<string> };
+type Pending = LaunchRequest & { startedAt: number; players: string[]; humans: string[]; ready: Set<string> };
 
 /** Readiness is temporary coordination. The game itself starts in one ordinary persisted command. */
 export class GameLaunch {
@@ -62,14 +62,15 @@ export class GameLaunch {
     this.pending.set(request.roomId, {
       ...request,
       startedAt: this.dependencies.now(),
-      players: state.players.filter((p) => !p.bot).map((p) => p.id),
+      players: state.players.map((p) => p.id),
+      humans: state.players.filter((p) => !p.bot).map((p) => p.id),
       ready: new Set(),
     });
     this.dependencies.changed(request.roomId);
   }
   ready(roomId: string, playerId: string, id: string, success: boolean) {
     const launch = this.pending.get(roomId);
-    if (!launch || launch.commandId !== id || !launch.players.includes(playerId)) return;
+    if (!launch || launch.commandId !== id || !launch.humans.includes(playerId)) return;
     if (!success)
       return this.cancel(roomId, 'A player could not load the island. Retry when everyone is ready.');
     if (launch.ready.has(playerId)) return;
@@ -102,7 +103,7 @@ export class GameLaunch {
         const elapsed = this.dependencies.now() - launch.startedAt;
         if (elapsed >= LAUNCH_LIMIT_MS) {
           this.cancel(launch.roomId, 'Loading took too long. Check your connection, then try again.');
-        } else if (elapsed >= LAUNCH_MIN_MS && launch.ready.size === launch.players.length) {
+        } else if (elapsed >= LAUNCH_MIN_MS && launch.ready.size === launch.humans.length) {
           this.pending.delete(launch.roomId);
           this.dependencies.commit(launch);
         }

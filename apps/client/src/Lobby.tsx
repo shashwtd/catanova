@@ -189,6 +189,10 @@ export function Lobby({
   onKick?: (playerId: string) => Promise<void>;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [removalBusy, setRemovalBusy] = useState(false);
+  const [removalError, setRemovalError] = useState('');
+  const removalTarget = room.players.find((p) => p.id === removing);
   const self = room.players.find((p) => p.id === me),
     host = room.players[0]?.id === me;
   const canStart =
@@ -306,6 +310,20 @@ export function Lobby({
                     'Not ready'
                   )}
                 </span>
+                {host && p.id !== me && onKick && (
+                  <button
+                    type="button"
+                    className="lobby-remove-player"
+                    disabled={busy || !connected}
+                    aria-label={`Remove ${p.name}`}
+                    onClick={() => {
+                      setRemovalError('');
+                      setRemoving(p.id);
+                    }}
+                  >
+                    <DoorOpen size={17} /> Remove{p.bot ? ' bot' : ''}
+                  </button>
+                )}
               </article>
             ))}
           </div>
@@ -335,6 +353,39 @@ export function Lobby({
           )}
         </div>
       </div>
+      {removalTarget && onKick && (
+        <RoomSheet
+          title={`Remove ${removalTarget.name}?`}
+          onClose={() => {
+            if (!removalBusy) setRemoving(null);
+          }}
+        >
+          <p>They’ll leave this lobby and free up a seat.</p>
+          {removalError && <p role="alert">{removalError}</p>}
+          <div className="dialog-actions">
+            <button className="dark-button" disabled={removalBusy} onClick={() => setRemoving(null)}>
+              Cancel
+            </button>
+            <button
+              className="gold-button"
+              disabled={busy || removalBusy || !connected}
+              onClick={async () => {
+                setRemovalBusy(true);
+                try {
+                  await onKick(removalTarget.id);
+                  setRemoving(null);
+                } catch (error) {
+                  setRemovalError(error instanceof Error ? error.message : 'Could not remove player');
+                } finally {
+                  setRemovalBusy(false);
+                }
+              }}
+            >
+              {removalBusy ? 'Removing…' : 'Remove'}
+            </button>
+          </div>
+        </RoomSheet>
+      )}
       <footer className="lobby-footer">
         <Invite code={visibleRoomCode(room) ?? undefined} roomId={room.roomId} />
         <div className="lobby-launch">

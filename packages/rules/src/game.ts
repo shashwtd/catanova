@@ -454,7 +454,7 @@ export type GameView = Omit<Game, 'deck' | 'players' | 'nextCard' | 'nextLog' | 
 };
 export function gameView(g: Game, viewer: string): GameView {
   const { balancedDice: _balancedDice, deck, players, nextCard: _card, nextLog: _log, nextTrade: _trade, ...publicState } = g;
-  const me = players.find(p => p.id === viewer)!; const active = !me.resigned && activePlayer(g).id === viewer; const owned = pieces(g, viewer);
+  const me = players.find(p => p.id === viewer); const active = !!me && !me.resigned && activePlayer(g).id === viewer; const owned = pieces(g, viewer);
   const build = active && g.phase === 'actions', setup = active && g.phase === 'setupSettlement';
   return {
     ...structuredClone(publicState), deckCount: deck.length,

@@ -33,6 +33,7 @@ export function EntryScreen({
   onEnter,
   onCreate,
   onResume,
+  onWatch,
   onBack,
   onProfile,
   onFriends,
@@ -55,6 +56,7 @@ export function EntryScreen({
   onEnter: (event: FormEvent, kind: 'create' | 'join') => void;
   onCreate?: () => void;
   onResume: () => void;
+  onWatch?: () => void;
   onBack: () => void;
   onProfile: () => void;
   onFriends: () => void;
@@ -298,9 +300,15 @@ export function EntryScreen({
                       </label>
                     )}
                     {blockedInvite ? (
-                      <p className="entry-error">
-                        {previewRoom?.started ? 'This game has started.' : 'This room is full.'}
-                      </p>
+                      previewRoom?.started && onWatch ? (
+                        <button type="button" className="gold-button" disabled={busy} onClick={onWatch}>
+                          Watch match <ArrowRight />
+                        </button>
+                      ) : (
+                        <p className="entry-error">
+                          {previewRoom?.started ? 'This game has started.' : 'This room is full.'}
+                        </p>
+                      )
                     ) : resumableInvite ? (
                       <button type="button" className="gold-button" disabled={busy} onClick={onResume}>
                         Resume room

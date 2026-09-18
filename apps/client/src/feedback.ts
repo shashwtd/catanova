@@ -198,8 +198,9 @@ export function deriveFeedback(
     return null;
   const before = previous.game,
     g = next.game;
-  const old = before.players.find((p) => p.id === me)?.hand,
-    hand = g.players.find((p) => p.id === me)?.hand;
+  const old =
+      before.players.find((p) => p.id === me)?.hand ?? (previous.spectating ? emptyHand() : undefined),
+    hand = g.players.find((p) => p.id === me)?.hand ?? (next.spectating ? emptyHand() : undefined);
   if (!old || !hand) return null;
   const lines = g.log.filter((e) => e.id > (before.log.at(-1)?.id ?? -1)).map((e) => e.text);
   const roll = latestRoll(previous, next);

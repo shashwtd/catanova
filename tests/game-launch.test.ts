@@ -59,6 +59,39 @@ test('fast cached assets still keep the two-second minimum', () => {
   f.advance(1);
   assert.equal(f.commits(), 1);
 });
+
+test('bot seats stay in the roster check but never require asset acknowledgements', () => {
+  const f = fixture();
+  f.state.players[1]!.bot = true;
+  f.state.players.push({ id: 'bot-c', name: 'Bot C', connected: true, ready: true, bot: true });
+  f.gate.begin(f.request);
+  f.gate.ready('island', 'b', 'start-1234', false);
+  f.gate.ready('island', 'a', 'start-1234', true);
+  f.advance(LAUNCH_MIN_MS - 1);
+  assert.equal(f.commits(), 0);
+  assert.deepEqual(f.failures, []);
+  f.advance(1);
+  assert.equal(f.commits(), 1);
+});
+
+test('a human alongside bots must finish loading and bot roster changes still cancel', () => {
+  const f = fixture();
+  f.state.players.push({ id: 'bot-c', name: 'Bot C', connected: true, ready: true, bot: true });
+  f.gate.begin(f.request);
+  f.gate.ready('island', 'a', 'start-1234', true);
+  f.advance(LAUNCH_MIN_MS);
+  assert.equal(f.commits(), 0);
+  assert.deepEqual(f.failures, []);
+  f.gate.ready('island', 'b', 'start-1234', true);
+  assert.equal(f.commits(), 1);
+  const changed = fixture();
+  changed.state.players[1]!.bot = true;
+  changed.gate.begin(changed.request);
+  changed.state.players[1]!.id = 'replacement-bot';
+  changed.advance(1);
+  assert.equal(changed.failures.length, 1);
+  assert.equal(changed.commits(), 0);
+});
 test('replayed start does not reset loading deadline and slow clients leave the game unstarted', () => {
   const f = fixture();
   f.gate.begin(f.request);

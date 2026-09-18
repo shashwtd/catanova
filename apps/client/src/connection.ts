@@ -81,7 +81,8 @@ export class Connection {
       pingIntervalMs?: number;
     } = {},
   ) {
-    if (options.pending) this.pending = { message: options.pending, resolve: () => {}, reject: () => {} };
+    if (options.pending && !session.spectating)
+      this.pending = { message: options.pending, resolve: () => {}, reject: () => {} };
   }
   get awaitingConfirmation() {
     return !!this.pending;
@@ -182,7 +183,13 @@ export class Connection {
           ws.close();
           return;
         }
-        const type = this.session.joined ? 'resume' : this.session.roomId ? 'join' : 'create';
+        const type = this.session.spectating
+          ? 'spectate'
+          : this.session.joined
+            ? 'resume'
+            : this.session.roomId
+              ? 'join'
+              : 'create';
         this.send({
           type,
           version: PROTOCOL_VERSION,
@@ -324,6 +331,7 @@ export class Connection {
       | Omit<Extract<PendingCommand, { type: 'settings' }>, 'commandId' | 'expectedRevision'>
       | { type: 'increment' | 'leave' },
   ): Promise<Ack> {
+    if (this.session.spectating) return Promise.reject(new Error('Spectators cannot change the game'));
     if (this.status !== 'connected' || !this.state || this.socket?.readyState !== WebSocket.OPEN)
       return Promise.reject(new Error('Wait until connected'));
     if (this.pending) return Promise.reject(new Error('An action is already awaiting confirmation'));

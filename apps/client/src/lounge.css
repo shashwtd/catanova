@@ -896,3 +896,41 @@
     width: 68px;
   }
 }
+
+.lobby-remove-player {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  color: #ffe1ca;
+  background: #703f32;
+  border: 1px solid #d69b775c;
+  border-radius: 7px;
+  font: 600 15px Barlow, sans-serif;
+  cursor: pointer;
+}
+.lobby-remove-player:hover:not(:disabled) { background: #88503e; }
+.lobby-remove-player:disabled { opacity: .5; cursor: default; }
+.spectator-banner {
+  position: absolute;
+  z-index: 15;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100% - 140px);
+  padding: 10px 16px;
+  background: #30271fee;
+  color: #f9eacb;
+  border: 1px solid #d7b97955;
+  border-radius: 10px;
+  font: 600 16px Barlow, sans-serif;
+}
+@media (max-width: 600px) {
+  .spectator-banner { gap: 8px; padding: 8px; font-size: 13px; }
+}
+.spectator-dice { position: relative; flex: 0 0 68px; width: 68px; height: 32px; pointer-events: none; }

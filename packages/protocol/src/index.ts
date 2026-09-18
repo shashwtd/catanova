@@ -17,7 +17,14 @@ import { parseGameAction } from '../../rules/src/game.js';
 import type { GameAction, GameView } from '../../rules/src/game.js';
 import type { Board } from '../../rules/src/board.js';
 export const PROTOCOL_VERSION = 1;
-export type Session = { token: string; name: string; roomId?: string; joined?: boolean; profile?: Profile };
+export type Session = {
+  token: string;
+  name: string;
+  roomId?: string;
+  joined?: boolean;
+  profile?: Profile;
+  spectating?: boolean;
+};
 export type HistoryEntry = {
   revision: number;
   actor: string | null;
@@ -46,6 +53,7 @@ export type RoomPlayer = {
   resignAt?: number;
 };
 export type RoomState = {
+  spectating?: boolean;
   roomId: string;
   roomCode?: string;
   revision: number;
@@ -72,7 +80,7 @@ export type RoomPreview = {
 };
 export type ClientMessage =
   | {
-      type: 'create' | 'join' | 'resume';
+      type: 'create' | 'join' | 'resume' | 'spectate';
       version: number;
       token: string;
       name: string;
@@ -120,7 +128,7 @@ export function parseClientMessage(input: string): ClientMessage {
   const m: unknown = JSON.parse(input);
   if (!m || typeof m !== 'object' || Array.isArray(m)) throw new Error('Expected an object');
   const v = m as Record<string, unknown>;
-  if (v.type === 'create' || v.type === 'join' || v.type === 'resume') {
+  if (v.type === 'create' || v.type === 'join' || v.type === 'resume' || v.type === 'spectate') {
     if (v.version !== PROTOCOL_VERSION) throw new Error('Unsupported protocol version');
     if (typeof v.token !== 'string' || !/^[a-f0-9]{64}$/.test(v.token)) throw new Error('Invalid seat token');
     if (typeof v.name !== 'string' || v.name.trim().length < 1 || v.name.trim().length > 32)
@@ -156,7 +164,10 @@ export function parseClientMessage(input: string): ClientMessage {
     if (v.type === 'settings') return { type: 'settings', ...base, settings: parseRoomSettings(v.settings) };
     if (v.type === 'lobby') {
       if (typeof v.ready !== 'boolean') throw new Error('Invalid ready state');
-      if (v.addBot !== undefined && (!isBotLevel(v.addBot) || v.profile !== undefined || v.kickPlayerId !== undefined))
+      if (
+        v.addBot !== undefined &&
+        (!isBotLevel(v.addBot) || v.profile !== undefined || v.kickPlayerId !== undefined)
+      )
         throw new Error('Invalid bot request');
       if (
         v.kickPlayerId !== undefined &&

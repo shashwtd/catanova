@@ -265,3 +265,26 @@ test('a storage failure at the launch commit leaves no game, clock, or success r
   assert.ok(!f.a.messages.some((m) => m.type === 'ack' && m.commandId === start.commandId));
   assert.equal(f.a.state().launch, undefined);
 });
+
+test('preloaded bot rooms start after human readiness without waiting for bots', async (t) => {
+  const f = await fixture(t),
+    roomId = f.a.session.roomId!;
+  f.server.store.lobby(
+    { id: f.a.id, name: 'Host', room_id: roomId },
+    'add-launch-bot',
+    f.server.store.snapshot(roomId).revision,
+    false,
+    undefined,
+    undefined,
+    'steady',
+  );
+  await f.b.command({ type: 'lobby', ready: true });
+  const start = await f.start();
+  f.a.send({ type: 'launchReady', id: start.commandId, success: true });
+  f.b.send({ type: 'launchReady', id: start.commandId, success: true });
+  await until(() => f.a.state().launch?.readyPlayers.length === 2);
+  f.advance(2000);
+  await until(() => !!f.a.state().game);
+  assert.equal(f.a.state().game!.players.length, 3);
+  assert.equal(f.server.store.history(roomId).entries.filter((e) => e.kind === 'start').length, 1);
+});

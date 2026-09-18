@@ -273,3 +273,15 @@ test('permanent invitation links display the friendly code and never a UUID in t
   const share = renderToStaticMarkup(createElement(Invite, { code: 'AB2C', roomId }));
   assert.match(share, /<code>AB2C<\/code>/);
 });
+
+test('started invites offer watching without exposing a join-seat action', () => {
+  const html = renderEntry({
+    auth: authState({ canPlay: true }),
+    entry: 'invite',
+    invite: 'AB2C',
+    previewRoom: preview({ started: true }),
+    onWatch: () => {},
+  });
+  assert.ok(buttonWith(html, 'Watch match'));
+  assert.ok(!buttonWith(html, 'Join room'));
+});

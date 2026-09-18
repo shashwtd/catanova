@@ -306,6 +306,8 @@ export async function startServer(
   });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 24576, perMessageDeflate: false });
   const sessions = new Map<WebSocket, Seat>();
+  // Watchers never acquire a seat, presence deadline, or authority to send moves.
+  const spectators = new Map<WebSocket, string>();
   const activeSeats = new Map<string, WebSocket>();
   const alive = new Set<WebSocket>();
   const preloadClients = new WeakSet<WebSocket>();
@@ -330,6 +332,18 @@ export async function startServer(
   }
   function broadcast(roomId: string) {
     if (closing) return;
+    for (const [ws, watchedRoom] of spectators) {
+      if (watchedRoom !== roomId) continue;
+      try {
+        send(ws, { type: 'state', state: { ...snapshot(roomId, '@spectator'), spectating: true } });
+      } catch {
+        send(ws, {
+          type: 'error',
+          code: 'STORAGE_ERROR',
+          message: 'Saved game unavailable; reconnect after recovery',
+        });
+      }
+    }
     for (const [ws, seat] of sessions) {
       if (seat.room_id !== roomId) continue;
       try {
@@ -388,11 +402,11 @@ export async function startServer(
     ws.on('error', () => ws.terminate());
     ws.on('pong', () => {
       alive.add(ws);
-      if (accountIdentity && sessions.has(ws))
+      if (accountIdentity && (sessions.has(ws) || spectators.has(ws)))
         accountPresence.touch(accountIdentity.id, now(), accountIdentity.expiresAt);
     });
     const handshakeTimeout = setTimeout(() => {
-      if (!sessions.has(ws)) ws.close(1008, 'Join a room first');
+      if (!sessions.has(ws) && !spectators.has(ws)) ws.close(1008, 'Join a room first');
     }, 12000);
     handshakeTimeout.unref();
     let windowStart = Date.now();
@@ -431,7 +445,12 @@ export async function startServer(
       void accounts
         .touch(accountToken)
         .then((account) => {
-          if (ws.readyState !== WebSocket.OPEN || accountIdentity !== identity || !sessions.has(ws)) return;
+          if (
+            ws.readyState !== WebSocket.OPEN ||
+            accountIdentity !== identity ||
+            (!sessions.has(ws) && !spectators.has(ws))
+          )
+            return;
           if (account.id !== identity.id || !account.registered || !account.profile) {
             ws.close(4003, 'Account unavailable');
             return;
@@ -472,8 +491,14 @@ export async function startServer(
           commandId = validationCommandId(data.toString());
           throw error;
         }
-        if (message.type === 'create' || message.type === 'join' || message.type === 'resume') {
-          if (sessions.has(ws)) throw new ProtocolError('ALREADY_JOINED', 'Socket already has a seat');
+        if (
+          message.type === 'create' ||
+          message.type === 'join' ||
+          message.type === 'resume' ||
+          message.type === 'spectate'
+        ) {
+          if (sessions.has(ws) || spectators.has(ws))
+            throw new ProtocolError('ALREADY_JOINED', 'Socket already joined a room');
           if (authenticating) throw new ProtocolError('ALREADY_JOINING', 'Joining is already in progress');
           // A saved seat uses a strong token plus its permanent ID. Code-guessing limits must
           // never strand admitted players reconnecting through the same unreliable network.
@@ -497,6 +522,28 @@ export async function startServer(
                 ? 'GUEST_EXPIRED'
                 : 'AUTH_REQUIRED',
             );
+          if (message.type === 'spectate') {
+            const roomId = store.resolveRoom(message.roomId!);
+            if (!store.loadGame(roomId))
+              throw new ProtocolError('NOT_STARTED', 'This match has not started. Join the lobby instead.');
+            if ([...spectators.values()].filter((id) => id === roomId).length >= 24)
+              throw new ProtocolError('CAPACITY', 'This room already has 24 spectators.');
+            if (identity) {
+              accountToken = message.accessToken;
+              accountIdentity = identity;
+              setAuthDeadline();
+            }
+            spectators.set(ws, roomId);
+            if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
+            clearTimeout(handshakeTimeout);
+            send(ws, {
+              type: 'welcome',
+              playerId: '@spectator',
+              version: PROTOCOL_VERSION,
+              state: { ...snapshot(roomId, '@spectator'), spectating: true },
+            });
+            return;
+          }
           const seat = store.enter(
             message.type,
             message.token,
@@ -531,6 +578,37 @@ export async function startServer(
           });
           broadcast(seat.room_id);
         } else {
+          const watchedRoom = spectators.get(ws);
+          if (watchedRoom) {
+            if (accountIdentity && accountIdentity.expiresAt <= Date.now())
+              throw accountFailure('AUTH_REQUIRED');
+            if (message.type === 'sync')
+              send(ws, {
+                type: 'state',
+                state: { ...snapshot(watchedRoom, '@spectator'), spectating: true },
+              });
+            else if (message.type === 'ping')
+              send(ws, {
+                type: 'pong',
+                nonce: message.nonce,
+                revision: store.snapshot(watchedRoom).revision,
+                serverNow: now(),
+              });
+            else if (message.type === 'history')
+              send(ws, {
+                type: 'history',
+                ...store.history(watchedRoom, message.before),
+                ...(message.before === undefined ? {} : { before: message.before }),
+              });
+            else if (message.type === 'statistics')
+              send(ws, { type: 'statistics', statistics: store.statistics(watchedRoom) });
+            else {
+              commandId = 'commandId' in message ? message.commandId : undefined;
+              throw new ProtocolError('SPECTATOR_READ_ONLY', 'Spectators cannot change the game.');
+            }
+            recordGuestActivity();
+            return;
+          }
           const seat = sessions.get(ws);
           if (!seat) throw new ProtocolError('NOT_JOINED', 'Join or resume before sending actions');
           assertSession(seat);
@@ -735,6 +813,7 @@ export async function startServer(
       }
     });
     ws.on('close', () => {
+      spectators.delete(ws);
       clearTimeout(handshakeTimeout);
       clearTimeout(authExpiry);
       alive.delete(ws);

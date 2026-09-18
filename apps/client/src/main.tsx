@@ -302,6 +302,7 @@ function App() {
   const [launchVisualExpired, setLaunchVisualExpired] = useState(false);
   const connected = status === 'connected',
     disabled =
+      !!room?.spectating ||
       !connected ||
       busy ||
       !!room?.launch ||
@@ -442,7 +443,7 @@ function App() {
         },
         onSession: (saved) => {
           sessionStorage.setItem(SESSION_KEY, JSON.stringify(saved));
-          localStorage.setItem(LAST_SEAT_KEY, JSON.stringify(saved));
+          if (!saved.spectating) localStorage.setItem(LAST_SEAT_KEY, JSON.stringify(saved));
         },
         onPending: (command) => {
           if (command) sessionStorage.setItem(OUTBOX_KEY, JSON.stringify(command));
@@ -501,6 +502,10 @@ function App() {
         return;
       }
       if (message.type === 'error') {
+        if (message.code === 'GAME_STARTED' && !c.state && !c.session.joined && !c.session.spectating) {
+          connect({ ...c.session, spectating: true });
+          return;
+        }
         if (!c.state) setAdmitting(false);
         if (message.code === 'LOBBY_REMOVED') {
           home(true);
@@ -520,7 +525,7 @@ function App() {
         if (['SEAT_LEFT', 'INVALID_SESSION', 'ROOM_NOT_FOUND', 'AUTH_MISMATCH'].includes(message.code)) {
           sessionStorage.removeItem(SESSION_KEY);
           sessionStorage.removeItem(OUTBOX_KEY);
-          localStorage.removeItem(LAST_SEAT_KEY);
+          if (!c.session.spectating) localStorage.removeItem(LAST_SEAT_KEY);
           setBusy(false);
         }
       }
@@ -550,10 +555,10 @@ function App() {
       if (active) setAssetProgress(ready / total);
     }, preferences.boardTheme).then(
       () => {
-        if (active && connection.current === c) c.launchReady(launchId, true);
+        if (active && connection.current === c && !c.session.spectating) c.launchReady(launchId, true);
       },
       () => {
-        if (active && connection.current === c) c.launchReady(launchId, false);
+        if (active && connection.current === c && !c.session.spectating) c.launchReady(launchId, false);
       },
     );
     return () => {
@@ -703,6 +708,10 @@ function App() {
   }
   async function leave() {
     const c = connection.current;
+    if (c?.session.spectating) {
+      home(false);
+      return;
+    }
     if (!c || busy) return;
     if (!connected) {
       setError('Reconnect to confirm leaving the game.');
@@ -723,7 +732,7 @@ function App() {
     e.preventDefault();
     await enterRoom(kind);
   }
-  async function enterRoom(kind: 'create' | 'join', requestedCode?: string) {
+  async function enterRoom(kind: 'create' | 'join', requestedCode?: string, watch = false) {
     setError('');
     if (!auth.canPlay) {
       await auth.signIn(invite ? roomPath(invite) : '/');
@@ -750,6 +759,7 @@ function App() {
     setAdmissionLabel(kind === 'create' ? 'Creating room…' : 'Joining room…');
     try {
       if (kind === 'join') {
+        let targetPreview = previewRoom;
         let resolved = previewJoinReference(target, previewRoom);
         if (!resolved) {
           const token = auth.user ? await auth.accessToken() : undefined;
@@ -760,11 +770,13 @@ function App() {
           });
           if (!response.ok)
             throw new Error(response.status === 404 ? 'Room not found' : 'Room unavailable. Try again.');
-          resolved = previewJoinReference(target, (await response.json()) as RoomPreview);
+          targetPreview = (await response.json()) as RoomPreview;
+          resolved = previewJoinReference(target, targetPreview);
           if (!current()) return;
         }
         if (!resolved) throw new Error('The room link changed. Open it again.');
         target = resolved;
+        watch ||= !!targetPreview?.started && !targetPreview.canResume;
       }
       if (!current()) return;
       const profile =
@@ -772,7 +784,10 @@ function App() {
           ? auth.profile
           : await auth.saveProfile({ ...auth.profile, name: chosenName });
       if (!current()) return;
-      connect(newSession(profile.name, kind === 'join' ? target : undefined, profile));
+      connect({
+        ...newSession(profile.name, kind === 'join' ? target : undefined, profile),
+        ...(watch ? { spectating: true } : {}),
+      });
     } catch (e) {
       if (!current()) return;
       setError(e instanceof Error ? e.message : 'Could not save profile');
@@ -863,7 +878,7 @@ function App() {
   }
   const phaseText = !g
     ? ''
-    : player?.resigned || room?.paused
+    : room?.spectating || player?.resigned || room?.paused
       ? (gameNotice?.prompt ?? '')
       : ['discard', 'robber'].includes(g.phase)
         ? ''
@@ -911,7 +926,7 @@ function App() {
           fullscreen={isFullscreen}
           onFullscreen={() => void fullscreen()}
           busy={busy}
-          onLeave={() => (g.phase !== 'finished' ? setPanel('leave') : void leave())}
+          onLeave={() => (room?.spectating || g.phase === 'finished' ? void leave() : setPanel('leave'))}
         />
       )}
       {g && room && (
@@ -1031,6 +1046,7 @@ function App() {
                 : last;
             if (seat) connect(seat);
           }}
+          onWatch={() => void enterRoom('join', undefined, true)}
           onBack={() => home(false)}
           onProfile={() => setPanel('profile')}
           onFriends={() => setPanel('friends')}
@@ -1038,7 +1054,16 @@ function App() {
           onSignOut={() => setPanel('signOut')}
         />
       )}
-      {room && !g && (
+      {room?.spectating && (
+        <div className="spectator-banner" role="status">
+          <span>{g ? 'Spectating · Public view' : 'Waiting for the next match'}</span>
+          {g && <div className="spectator-dice" data-dice-dock />}
+          <button className="dark-button" onClick={() => home(false)}>
+            Stop watching
+          </button>
+        </div>
+      )}
+      {room && !g && !room.spectating && (
         <Lobby
           room={room}
           me={me}
@@ -1096,71 +1121,73 @@ function App() {
               )}
             </div>
           )}
-          <GameHandDock
-            resources={
-              <ResourceHand
-                hand={feedback.hand ?? hand}
-                pulse={feedback.pulse}
-                reducedMotion={reducedMotion}
-              />
-            }
-            development={
-              me &&
-              !!player?.cards?.length && (
-                <DevelopmentCards
-                  game={g}
-                  me={me}
-                  disabled={disabled}
+          {!room?.spectating && (
+            <GameHandDock
+              resources={
+                <ResourceHand
+                  hand={feedback.hand ?? hand}
+                  pulse={feedback.pulse}
                   reducedMotion={reducedMotion}
-                  onAction={(a) => void act(a)}
-                  onHover={() => feedback.sound.play('hover')}
-                  obscured={panel !== null || placementReady}
-                  onSelect={() => {
-                    setPanel(null);
-                    setPlacement(null);
-                  }}
                 />
-              )
-            }
-            purchase={
-              <DevelopmentPurchase
-                disabled={disabled || !g.legal.canBuyCard}
-                onBuy={() => void act({ kind: 'buyCard' })}
-              />
-            }
-            actions={
-              <>
-                <div className="dice-dock" data-dice-dock />
-                <div className="utility-actions">
-                  <button
-                    className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
-                    aria-label="Trade"
-                    title="Trade"
-                    disabled={disabled || !actionPhase}
-                    onClick={() => {
-                      setPanel(panel === 'trade' ? null : 'trade');
-                      setMode(null);
+              }
+              development={
+                me &&
+                !!player?.cards?.length && (
+                  <DevelopmentCards
+                    game={g}
+                    me={me}
+                    disabled={disabled}
+                    reducedMotion={reducedMotion}
+                    onAction={(a) => void act(a)}
+                    onHover={() => feedback.sound.play('hover')}
+                    obscured={panel !== null || placementReady}
+                    onSelect={() => {
+                      setPanel(null);
+                      setPlacement(null);
                     }}
+                  />
+                )
+              }
+              purchase={
+                <DevelopmentPurchase
+                  disabled={disabled || !g.legal.canBuyCard}
+                  onBuy={() => void act({ kind: 'buyCard' })}
+                />
+              }
+              actions={
+                <>
+                  <div className="dice-dock" data-dice-dock />
+                  <div className="utility-actions">
+                    <button
+                      className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
+                      aria-label="Trade"
+                      title="Trade"
+                      disabled={disabled || !actionPhase}
+                      onClick={() => {
+                        setPanel(panel === 'trade' ? null : 'trade');
+                        setMode(null);
+                      }}
+                    >
+                      <ArrowLeftRight size={33} />
+                      <span>Trade</span>
+                    </button>
+                  </div>
+                  <button
+                    className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
+                    aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
+                    title={actionPhase ? 'Next turn' : 'Roll dice'}
+                    disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
+                    onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
                   >
-                    <ArrowLeftRight size={33} />
-                    <span>Trade</span>
+                    <TurnButtonAttention />
+                    {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
+                    {actionPhase && <span>Next</span>}
                   </button>
-                </div>
-                <button
-                  className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
-                  aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
-                  title={actionPhase ? 'Next turn' : 'Roll dice'}
-                  disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
-                  onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
-                >
-                  <TurnButtonAttention />
-                  {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
-                  {actionPhase && <span>Next</span>}
-                </button>
-              </>
-            }
-          />
-          {me && (
+                </>
+              }
+            />
+          )}
+          {me && !room?.spectating && (
             <IncomingTrade
               roomPlayers={room!.players}
               game={g}
@@ -1218,7 +1245,7 @@ function App() {
               }}
             />
           )}
-          {room && !feedback.presentationBusy && (
+          {room && !room.spectating && !feedback.presentationBusy && (
             <RobberFlow
               room={room}
               me={me}
@@ -1237,7 +1264,7 @@ function App() {
         <GameOver
           room={room}
           busy={busy || !connected || feedback.presentationBusy}
-          canReturn={!player?.resigned}
+          canReturn={!room.spectating && !player?.resigned}
           error={error}
           onReturn={() => void act({ kind: 'returnToLobby' })}
           onQuit={() => {

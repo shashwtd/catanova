@@ -702,3 +702,15 @@ test('a seven keeps the board at its pre-roll state until the result is readable
   );
   assert.equal(dicePresentationGame({ ...moved, roomId: 'other-room' }, before), moved.game);
 });
+
+test('spectators receive public dice feedback without a private hand', () => {
+  const game = setup();
+  const before = { ...snapshot(game, 1, '@spectator'), spectating: true };
+  const next = applyAction(game, activePlayer(game).id, { kind: 'roll' }, () => 0.34);
+  const after = { ...snapshot(next, 2, '@spectator'), spectating: true };
+  const feedback = deriveFeedback(before, after, '@spectator')!;
+  assert.deepEqual(feedback.dice, next.dice);
+  assert.ok(feedback.sounds.includes('dice'));
+  assert.deepEqual(feedback.changed, []);
+  assert.deepEqual(feedback.hand, emptyHand());
+});
