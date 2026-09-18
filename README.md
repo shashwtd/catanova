@@ -36,6 +36,23 @@ The local URL works on this machine. Other devices can use the hosted playtest; 
 
 The same application serves the browser and WebSocket endpoint. No separate client deployment or paid cloud service is required for local play. SQLite uses Node's built-in module (experimental in Node 24) and saves into `data/probe.sqlite`, excluded from Git. A restart preserves accepted actions, the board, hands, deck, dice, phases and seats.
 
+## Bots for the empty seats
+
+A host can fill any free seat with a bot from the lobby, so two friends can play
+a game of four. Bots take their turns on the server, follow the same rules and
+appear in the roster and move history like anyone else. They decide with
+TypeSafe AI's Jev, a model that picks among options rather than writing text, so
+a bot can only ever choose a move the rules already offered. It needs a
+`TYPESAFE_API_KEY`; without one the bots still play from their own heuristics. Everything
+countable, production pips, affordability, road distance, who is ahead, is
+computed in code.
+
+Each bot keeps a short typed plan between turns and tells you what it is doing
+in a sentence assembled from that plan. With no API key configured the bots
+still play, from their deterministic fallbacks; a bot never stalls a table. A
+room whose only remaining players are bots pauses rather than playing itself
+out. [How the bots work, and what a game costs](docs/BOTS.md).
+
 ## A fairer starting island
 
 The default **balanced-v1** preset keeps the standard resource and number supplies, with explicit bounds:

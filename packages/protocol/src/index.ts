@@ -9,6 +9,10 @@ import { parseProfile } from './profile.js';
 import type { Profile } from './profile.js';
 import { parseRoomSettings } from './settings.js';
 import type { RoomSettings, TurnClock } from './settings.js';
+import { isBotLevel } from './bots.js';
+import type { BotLevel } from './bots.js';
+export { BOT_LEVELS, BOT_LEVEL_LABEL, BOT_NAMES, botName, isBotLevel } from './bots.js';
+export type { BotLevel } from './bots.js';
 import { parseGameAction } from '../../rules/src/game.js';
 import type { GameAction, GameView } from '../../rules/src/game.js';
 import type { Board } from '../../rules/src/board.js';
@@ -33,6 +37,9 @@ export type RoomPlayer = {
   id: string;
   name: string;
   connected: boolean;
+  /** A seat played by the server's own decision agent rather than a person. */
+  bot?: boolean;
+  botLevel?: string;
   profile?: Profile;
   ready?: boolean;
   disconnectedAt?: number;
@@ -84,6 +91,7 @@ export type ClientMessage =
       ready: boolean;
       profile?: Profile;
       kickPlayerId?: string;
+      addBot?: BotLevel;
     }
   | { type: 'settings'; commandId: string; expectedRevision: number; settings: RoomSettings }
   | { type: 'launchReady'; id: string; success: boolean }
@@ -148,6 +156,8 @@ export function parseClientMessage(input: string): ClientMessage {
     if (v.type === 'settings') return { type: 'settings', ...base, settings: parseRoomSettings(v.settings) };
     if (v.type === 'lobby') {
       if (typeof v.ready !== 'boolean') throw new Error('Invalid ready state');
+      if (v.addBot !== undefined && (!isBotLevel(v.addBot) || v.profile !== undefined || v.kickPlayerId !== undefined))
+        throw new Error('Invalid bot request');
       if (
         v.kickPlayerId !== undefined &&
         (typeof v.kickPlayerId !== 'string' ||
@@ -160,6 +170,7 @@ export function parseClientMessage(input: string): ClientMessage {
         ...base,
         ready: v.ready,
         ...(typeof v.kickPlayerId === 'string' ? { kickPlayerId: v.kickPlayerId } : {}),
+        ...(isBotLevel(v.addBot) ? { addBot: v.addBot } : {}),
         ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
       };
     }

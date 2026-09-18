@@ -26,6 +26,7 @@ const CONTROL_PATHS = {
   exchange: 'M4 8h15 m-4-4 4 4-4 4 M20 16H5 m4-4-4 4 4 4',
   'next-turn': 'M5 20v-7a5 5 0 0 1 5-5h10 m-5-5 5 5-5 5',
   play: 'm7 3 14 9-14 9V3',
+  bot: 'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
 export const GAME_ICON_NAMES = [
@@ -70,7 +71,8 @@ export function GameIcon({ name, size = 24, className = '', ...props }: IconProp
   );
 }
 const icon = (name: GameIconName) => (props: IconProps) => <GameIcon name={name} {...props} />;
-export const Dices = icon('dice'),
+export const Bot = icon('bot'),
+  Dices = icon('dice'),
   ArrowRight = icon('next'),
   ArrowLeftRight = icon('trade'),
   House = icon('settlement'),

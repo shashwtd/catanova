@@ -62,7 +62,7 @@ export class GameLaunch {
     this.pending.set(request.roomId, {
       ...request,
       startedAt: this.dependencies.now(),
-      players: state.players.map((p) => p.id),
+      players: state.players.filter((p) => !p.bot).map((p) => p.id),
       ready: new Set(),
     });
     this.dependencies.changed(request.roomId);

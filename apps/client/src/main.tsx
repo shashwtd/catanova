@@ -825,6 +825,18 @@ function App() {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
   }
+  async function addBot() {
+    const c = connection.current;
+    if (!c || disabled) return;
+    setBusy(true);
+    try {
+      await c.addBot();
+    } catch (e) {
+      setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Could not add a bot');
+    } finally {
+      if (connection.current === c) setBusy(c.awaitingConfirmation);
+    }
+  }
   async function saveSettings(settings: RoomSettings) {
     const c = connection.current;
     if (!c || disabled) throw new Error('Reconnect before changing room rules');
@@ -1033,6 +1045,7 @@ function App() {
           busy={busy || !!room.launch}
           connected={connected}
           onReady={(v) => void ready(v)}
+          onAddBot={addBot}
           onKick={async (playerId) => {
             const c = connection.current;
             if (!c || disabled) throw new Error('Reconnect before removing a player');

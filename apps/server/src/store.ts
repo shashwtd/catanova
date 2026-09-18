@@ -5,6 +5,8 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
 } from '../../../packages/protocol/src/room-reference.js';
+import { botName } from '../../../packages/protocol/src/bots.js';
+import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
@@ -64,6 +66,10 @@ export class Store {
   private readonly trackPresence: boolean;
   private readonly records: PlayerRecords;
   private connectedSeats = new Set<string>();
+  /** Bot seats never hold a socket, so they are treated as permanently present.
+   *  They are kept separate from `connectedSeats` because a room with only bots
+   *  left in it must still pause rather than play on with nobody watching. */
+  private botSeats = new Set<string>();
   private readonly pendingPresence = new Set<string>();
   private dueRoomCursor = '';
   private readonly statisticsCache = new Map<
@@ -179,12 +185,16 @@ export class Store {
       ['user_id', 'TEXT'],
       ['profile', 'TEXT'],
       ['ready', 'INTEGER NOT NULL DEFAULT 0'],
+      ['bot', 'INTEGER NOT NULL DEFAULT 0'],
+      ['bot_level', 'TEXT'],
     ])
       if (!columns.includes(name)) this.db.exec('ALTER TABLE seats ADD COLUMN ' + name + ' ' + type);
     this.db.exec(
       'CREATE UNIQUE INDEX IF NOT EXISTS seat_account_room ON seats(user_id, room_id) WHERE user_id IS NOT NULL AND departed = 0',
     );
     this.records = new PlayerRecords(this.db);
+    for (const row of this.db.prepare('SELECT id FROM seats WHERE bot = 1 AND departed = 0').all())
+      this.botSeats.add(row.id as string);
     if (this.trackPresence) this.initializePresence();
   }
   private transaction<T>(run: () => T): T {
@@ -350,13 +360,15 @@ export class Store {
     const game = this.loadGame(roomId);
     const players = (
       this.db
-        .prepare('SELECT id, name, profile, ready, departed FROM seats WHERE room_id = ? ORDER BY rowid')
+        .prepare('SELECT id, name, profile, ready, departed, bot, bot_level FROM seats WHERE room_id = ? ORDER BY rowid')
         .all(roomId) as {
         id: string;
         name: string;
         profile: string | null;
         ready: number;
         departed: number;
+        bot: number;
+        bot_level: string | null;
       }[]
     ).filter((p) => (game ? game.players.some((player) => player.id === p.id) : !p.departed));
     const presence = this.presence(roomId);
@@ -370,6 +382,7 @@ export class Store {
         name: p.name,
         profile: p.profile ? (JSON.parse(p.profile) as Profile) : defaultProfile(p.name),
         ready: !!p.ready,
+        ...(p.bot ? { bot: true, botLevel: (p.bot_level as string | null) ?? 'steady' } : {}),
         ...presence?.seats[p.id],
       })),
       ...(presence?.pausedAt !== undefined ? { paused: true } : {}),
@@ -660,6 +673,7 @@ export class Store {
     ready: boolean,
     input?: Profile,
     kickPlayerId?: string,
+    addBot?: BotLevel,
   ) {
     const profile = input ? parseProfile(input) : undefined;
     const payloadHash = hash(
@@ -707,6 +721,25 @@ export class Store {
         this.db
           .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE id = ? AND room_id = ?')
           .run(kickPlayerId, seat.room_id);
+        this.botSeats.delete(kickPlayerId);
+      }
+      if (addBot) {
+        if (room.players[0]?.id !== seat.id)
+          throw new ProtocolError('NOT_HOST', 'Only the host can add a bot');
+        if (expectedRevision !== room.revision)
+          throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
+        if (room.players.length >= 4) throw new ProtocolError('INVALID_PLAYER', 'The room already has four seats');
+        const name = botName(room.players.map((p) => p.name));
+        const botProfile = { ...defaultProfile(name), avatar: room.players.length % 12 };
+        const id = randomUUID();
+        this.db
+          .prepare(
+            'INSERT INTO seats(id, room_id, token_hash, name, user_id, profile, ready, bot, bot_level) VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)',
+          )
+          // The token hash is random and never shared, so no client handshake
+          // can ever resolve to a bot's seat.
+          .run(id, seat.room_id, hash(randomUUID()), name, null, JSON.stringify(botProfile), addBot);
+        this.botSeats.add(id);
       }
       if (profile) {
         this.db
@@ -715,7 +748,7 @@ export class Store {
         const account = this.db.prepare('SELECT user_id FROM seats WHERE id = ?').get(seat.id)!;
         if (typeof account.user_id === 'string') this.saveProfile(account.user_id, profile);
       }
-      if (!kickPlayerId)
+      if (!kickPlayerId && !addBot)
         this.db.prepare('UPDATE seats SET ready = ? WHERE id = ?').run(Number(ready), seat.id);
       const revision = room.revision + 1;
       this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
@@ -725,6 +758,27 @@ export class Store {
       this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, duplicate: false };
     });
+  }
+  /** Rooms with at least one bot seat and a game still running. Kept as a
+   *  query rather than a subscription so a restart needs no rebuilding. */
+  botRooms(): string[] {
+    return this.db
+      .prepare(
+        'SELECT DISTINCT s.room_id AS room_id FROM seats s JOIN games g ON g.room_id = s.room_id WHERE s.bot = 1 AND s.departed = 0',
+      )
+      .all()
+      .map((row) => row.room_id as string);
+  }
+  /** The bot seats in one room, with the level the host picked for each. */
+  botSeatsIn(roomId: string): { id: string; name: string; level: BotLevel }[] {
+    return this.db
+      .prepare('SELECT id, name, bot_level FROM seats WHERE room_id = ? AND bot = 1 AND departed = 0')
+      .all(roomId)
+      .map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+        level: ((row.bot_level as string | null) ?? 'steady') as BotLevel,
+      }));
   }
   settings(roomId: string): RoomSettings {
     const row = this.db.prepare('SELECT settings FROM room_settings WHERE room_id = ?').get(roomId) as
@@ -809,7 +863,7 @@ export class Store {
         // a full grace. In v2, an already disconnected player's deadline survives restarts.
         const previous = old?.version === 2 ? old : undefined;
         const state: Presence = { version: 2, pausedAt: previous?.pausedAt ?? now, seats: {} };
-        for (const player of game.players.filter((p) => !p.resigned))
+        for (const player of game.players.filter((p) => !p.resigned && !this.botSeats.has(p.id)))
           state.seats[player.id] = previous?.seats[player.id] ?? {
             disconnectedAt: now,
             resignAt: now + RECONNECT_GRACE_MS,
@@ -835,12 +889,14 @@ export class Store {
     const old = this.presence(roomId),
       now = this.now();
     const remaining = game.players.filter((p) => !p.resigned);
-    const paused = !remaining.some((p) => connected.has(p.id));
+    // Bots cannot watch a game. A room whose only present seats are bots is
+    // paused, so a table nobody is sitting at does not play itself out.
+    const paused = !remaining.some((p) => !this.botSeats.has(p.id) && connected.has(p.id));
     const resumed = old?.pausedAt !== undefined && !paused;
     const state: Presence = { version: 2, seats: {} };
     if (paused) state.pausedAt = old?.pausedAt ?? now;
     for (const p of remaining)
-      if (!connected.has(p.id)) {
+      if (!connected.has(p.id) && !this.botSeats.has(p.id)) {
         state.seats[p.id] = old?.seats[p.id] || {
           disconnectedAt: now,
           resignAt: now + RECONNECT_GRACE_MS,
@@ -1103,7 +1159,13 @@ export class Store {
       throw new ProtocolError('VERSION_MISMATCH', 'This saved game needs a compatible server version');
     return game;
   }
-  action(seat: Seat, commandId: string, expectedRevision: number, input: GameAction, automatic = false) {
+  action(
+    seat: Seat,
+    commandId: string,
+    expectedRevision: number,
+    input: GameAction,
+    automatic: boolean | 'bot' = false,
+  ) {
     const action = parseGameAction(input);
     if (!automatic) this.expireRoom(seat.room_id);
     const payloadHash = hash(
@@ -1216,7 +1278,7 @@ export class Store {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');
         next = applyAction(current, seat.id, action, this.random);
       }
-      if (automatic) {
+      if (automatic === true) {
         next.log.push({
           id: next.nextLog++,
           text: `${seat.name}'s timer expired; ${timeoutDescription(action)}.`,
@@ -1247,7 +1309,7 @@ export class Store {
         next,
         next.log.filter((e) => e.id >= (current?.nextLog ?? 0)).map((e) => e.text),
         action.kind,
-        automatic,
+        automatic === true,
       );
       this.db
         .prepare(

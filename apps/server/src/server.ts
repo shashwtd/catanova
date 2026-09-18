@@ -19,6 +19,7 @@ import { serveClient } from './static.js';
 import { GameLaunch } from './game-launch.js';
 import { RoomInviteService } from './room-invites.js';
 import { AccountPresence } from './account-presence.js';
+import { BotDriver } from './bots.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
 function validationCommandId(input: string): string | undefined {
@@ -323,7 +324,7 @@ export async function startServer(
       ...(launches.view(roomId) ? { launch: launches.view(roomId) } : {}),
       players: state.players.map((p) => ({
         ...p,
-        connected: activeSeats.get(p.id)?.readyState === WebSocket.OPEN,
+        connected: !!p.bot || activeSeats.get(p.id)?.readyState === WebSocket.OPEN,
       })),
     };
   }
@@ -600,6 +601,7 @@ export async function startServer(
               message.ready,
               message.profile,
               message.kickPlayerId,
+              message.addBot,
             );
             if (message.kickPlayerId) {
               const removed = activeSeats.get(message.kickPlayerId);
@@ -656,7 +658,7 @@ export async function startServer(
             !store.loadGame(seat.room_id) &&
             !store
               .snapshot(seat.room_id)
-              .players.every((p) => activeSeats.get(p.id)?.readyState === WebSocket.OPEN)
+              .players.every((p) => p.bot || activeSeats.get(p.id)?.readyState === WebSocket.OPEN)
           )
             throw new ProtocolError('NOT_CONNECTED', 'Wait for every player to reconnect');
           if (
@@ -667,6 +669,7 @@ export async function startServer(
           ) {
             if (
               store.snapshot(seat.room_id).players.some((p) => {
+                if (p.bot) return false;
                 const client = activeSeats.get(p.id);
                 return !client || !preloadClients.has(client);
               })
@@ -802,12 +805,18 @@ export async function startServer(
     }
   }, 500);
   clockScheduler.unref();
+  // Bots take their turns on their own timer, in the same shape as the clock
+  // above: find rooms that owe a move, commit one through the ordinary rules
+  // path, broadcast. A room with no bots costs one indexed query per tick.
+  const bots = new BotDriver({ store, changed: broadcast });
+  bots.start();
   try {
     await new Promise<void>((resolve, reject) => {
       http.once('error', reject);
       http.listen(options.port ?? 3000, options.host ?? '127.0.0.1', resolve);
     });
   } catch (error) {
+    bots.stop();
     clearInterval(heartbeat);
     clearInterval(launchScheduler);
     launches.clear();
@@ -824,6 +833,7 @@ export async function startServer(
     store,
     async close() {
       closing = true;
+      bots.stop();
       clearInterval(heartbeat);
       clearInterval(launchScheduler);
       launches.clear();
