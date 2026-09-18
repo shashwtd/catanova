@@ -6,11 +6,10 @@
  * Every question here is answered from options this codebase computed, so a bot
  * can never invent a move that the rules did not offer.
  *
- * Three routes reach the same model and their dialects differ: TypeSafe's own
- * API and OpenRouter call the yes/no primitive `noul`, while Vercel renames it
- * `boolean` and carries the model id in a header. Questions are written once in
- * the neutral dialect and translated on the way out. TypeSafe is preferred
- * because it is the most direct path, with no gateway in between.
+ * Calls go straight to TypeSafe's own API. Gateways resell the same model, but
+ * a direct account is the one that holds the credits and the only one that can
+ * be held to a rate limit we can read, so there is deliberately no fallback: if
+ * the service is unreachable the bots play from their own heuristics instead.
  */
 
 export type Resource = 'wood' | 'brick' | 'sheep' | 'wheat' | 'ore';
@@ -50,71 +49,19 @@ export const noul = (instructions: Entry, criteria?: { true?: Entry; false?: Ent
   ...(criteria ? { criteria } : {}),
 });
 
-export type RouteName = 'typesafe' | 'openrouter' | 'vercel';
-type Route = {
-  name: RouteName;
-  url: string;
-  model: string;
-  key: string;
-  boolean: boolean;
-  header: boolean;
-};
+type Route = { url: string; model: string; key: string };
 
-/** The same model, reachable three ways. Only the dialect differs: Vercel
- *  renames the yes/no primitive `boolean` and puts the model id in a header,
- *  while TypeSafe and OpenRouter use `noul` and carry it in the body. */
-const ROUTES: Record<
-  RouteName,
-  { env: string; url: string; model: string; boolean: boolean; header: boolean }
-> = {
-  // TypeSafe's own API. The most direct path, with no gateway in between.
-  typesafe: {
-    env: 'TYPESAFE_API_KEY',
-    url: 'https://api.typesafe.ai/v1/systemone',
-    model: 'jev-latest',
-    boolean: false,
-    header: false,
-  },
-  openrouter: {
-    env: 'OPENROUTER_API_KEY',
-    url: 'https://openrouter.ai/api/alpha/decisions',
-    model: '~typesafe/jev-latest',
-    boolean: false,
-    header: false,
-  },
-  vercel: {
-    env: 'AI_GATEWAY_API_KEY',
-    url: 'https://ai-gateway.vercel.sh/v4/ai/evaluation-model',
-    model: 'typesafe-ai/jev',
-    boolean: true,
-    header: true,
-  },
-};
-
-const ORDER: RouteName[] = ['typesafe', 'openrouter', 'vercel'];
+const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
+const DEFAULT_MODEL = 'jev-latest';
 
 /**
- * Resolve a route from the environment, preferring TypeSafe's own API and
- * falling back to a gateway. `CATANOVA_BOT_ROUTE` forces one when more than one
- * key is present; `CATANOVA_BOT_MODEL` pins a build, which is worth doing in
- * production because the `-latest` aliases move.
+ * Resolve the route from the environment. `CATANOVA_BOT_MODEL` pins a build,
+ * which is worth doing in production because the `-latest` alias moves.
  */
 export function route(env: NodeJS.ProcessEnv = process.env): Route | null {
-  const forced = env.CATANOVA_BOT_ROUTE as RouteName | undefined;
-  const names = forced && forced in ROUTES ? [forced] : ORDER;
-  for (const name of names) {
-    const spec = ROUTES[name];
-    const key = env[spec.env];
-    if (key)
-      return {
-        name,
-        url: spec.url,
-        model: env.CATANOVA_BOT_MODEL ?? spec.model,
-        key,
-        ...{ boolean: spec.boolean, header: spec.header },
-      };
-  }
-  return null;
+  const key = env.TYPESAFE_API_KEY;
+  if (!key) return null;
+  return { url: env.TYPESAFE_BASE_URL ?? ENDPOINT, model: env.CATANOVA_BOT_MODEL ?? DEFAULT_MODEL, key };
 }
 
 /** Confidence computed here rather than read from the provider, so both routes
@@ -129,8 +76,8 @@ function confidenceOf(probabilities: Record<string, number> | undefined, probabi
 export class JevUnavailable extends Error {}
 
 export type JevClient = {
-  /** Which route is in use, for logs and the bot status line. */
-  readonly route: RouteName;
+  /** The model build in use, for logs and the bot status line. */
+  readonly model: string;
   evaluate(state: unknown, questions: Record<string, Question>): Promise<Evaluation>;
 };
 
@@ -143,25 +90,13 @@ export function createJevClient(
   const doFetch = options.fetchImpl ?? fetch;
 
   return {
-    route: chosen.name,
+    model: chosen.model,
     async evaluate(state, questions) {
-      const translated: Record<string, unknown> = {};
-      for (const [id, q] of Object.entries(questions))
-        translated[id] = q.type === 'noul' && chosen.boolean ? { ...q, type: 'boolean' } : q;
-
-      const headers: Record<string, string> = {
+      const headers = {
         Authorization: `Bearer ${chosen.key}`,
         'Content-Type': 'application/json',
       };
-      if (chosen.header)
-        Object.assign(headers, {
-          'ai-gateway-protocol-version': '0.0.1',
-          'ai-gateway-auth-method': 'api-key',
-          'ai-evaluation-model-specification-version': '4',
-          'ai-model-id': chosen.model,
-        });
-      const body: Record<string, unknown> = { state, questions: translated };
-      if (!chosen.header) body.model = chosen.model;
+      const body = { state, model: chosen.model, questions };
 
       const started = Date.now();
       const controller = new AbortController();
@@ -202,19 +137,20 @@ export function createJevClient(
             confidence: confidenceOf(probabilities),
           };
         else {
-          const probability = Number(raw.probability ?? raw.noul);
+          const probability = Number(raw.noul);
           answers[id] = { type: 'noul', probability, confidence: confidenceOf(undefined, probability) };
         }
       }
       for (const id of Object.keys(questions))
         if (!answers[id]) throw new JevUnavailable(`no answer for "${id}"`);
 
-      const usage = payload?.usage ?? {};
-      const inputTokens = Number(usage.inputTokens ?? usage.input_tokens ?? 0);
+      // TypeSafe bills input tokens only and does not return a cost, so it is
+      // computed here at the published rate.
+      const inputTokens = Number(payload?.usage?.input_tokens ?? 0);
       return {
         answers,
         inputTokens,
-        costUsd: Number(usage.cost ?? (inputTokens / 1e6) * 0.042),
+        costUsd: (inputTokens / 1e6) * 0.042,
         latencyMs: Date.now() - started,
         model: String(payload?.model ?? chosen.model),
       };

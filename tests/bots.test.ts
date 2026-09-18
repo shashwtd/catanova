@@ -210,65 +210,58 @@ test('a plan reads as a sentence and never invents one', () => {
   assert.ok(line.endsWith('.'));
 });
 
-test('TypeSafe is preferred, gateways are fallbacks, and a route can be forced', () => {
+test('the decision service is TypeSafe only, and absent without a key', () => {
   assert.equal(route({} as NodeJS.ProcessEnv), null, 'no key means no decision service');
-
-  const all = {
-    TYPESAFE_API_KEY: 't',
-    OPENROUTER_API_KEY: 'o',
-    AI_GATEWAY_API_KEY: 'v',
-  } as NodeJS.ProcessEnv;
-  assert.equal(route(all)?.name, 'typesafe', 'their own API wins when present');
   assert.equal(
-    route({ OPENROUTER_API_KEY: 'o', AI_GATEWAY_API_KEY: 'v' } as NodeJS.ProcessEnv)?.name,
-    'openrouter',
+    route({ OPENROUTER_API_KEY: 'o', AI_GATEWAY_API_KEY: 'v' } as NodeJS.ProcessEnv),
+    null,
+    'a gateway key is not a substitute',
   );
-  assert.equal(route({ AI_GATEWAY_API_KEY: 'v' } as NodeJS.ProcessEnv)?.name, 'vercel');
 
-  assert.equal(route({ ...all, CATANOVA_BOT_ROUTE: 'vercel' } as NodeJS.ProcessEnv)?.name, 'vercel');
-  assert.equal(route({ ...all, CATANOVA_BOT_ROUTE: 'nonsense' } as NodeJS.ProcessEnv)?.name, 'typesafe');
-  assert.equal(route({ ...all, CATANOVA_BOT_MODEL: 'jev-1.13.0' } as NodeJS.ProcessEnv)?.model, 'jev-1.13.0');
+  const resolved = route({ TYPESAFE_API_KEY: 'k' } as NodeJS.ProcessEnv);
+  assert.equal(resolved?.url, 'https://api.typesafe.ai/v1/systemone');
+  assert.equal(resolved?.model, 'jev-latest');
+  assert.equal(
+    route({ TYPESAFE_API_KEY: 'k', CATANOVA_BOT_MODEL: 'jev-1.13.0' } as NodeJS.ProcessEnv)?.model,
+    'jev-1.13.0',
+    'a build can be pinned',
+  );
 });
 
-test('each route speaks its own dialect and the client hides the difference', async () => {
-  const sent: { url: string; body: any; headers: Record<string, string> }[] = [];
-  const fakeFetch = (reply: unknown) =>
-    (async (url: string, init: any) => {
-      sent.push({ url, body: JSON.parse(init.body), headers: init.headers });
-      return { ok: true, json: async () => reply } as Response;
-    }) as unknown as typeof fetch;
-
-  // TypeSafe answers in its own dialect: `noul`, and no cost in usage.
-  const direct = createJevClient({
+test('a request matches the TypeSafe wire shape and its answers are normalised', async () => {
+  let sent: { url: string; body: any; headers: Record<string, string> } | null = null;
+  const client = createJevClient({
     route: route({ TYPESAFE_API_KEY: 'k' } as NodeJS.ProcessEnv),
-    fetchImpl: fakeFetch({
-      model: 'jev-1.13.0',
-      answers: { ok: { type: 'noul', noul: 0.9 } },
-      usage: { input_tokens: 1_000_000 },
-    }),
+    fetchImpl: (async (url: string, init: any) => {
+      sent = { url, body: JSON.parse(init.body), headers: init.headers };
+      return {
+        ok: true,
+        json: async () => ({
+          model: 'jev-1.13.0',
+          answers: {
+            pick: { type: 'choice', choice: 'b', probabilities: { a: 0.2, b: 0.8 } },
+            sure: { type: 'noul', noul: 0.9 },
+          },
+          usage: { input_tokens: 1_000_000, output_tokens: 40 },
+        }),
+      } as Response;
+    }) as unknown as typeof fetch,
   })!;
-  const a = await direct.evaluate('x', { ok: { type: 'noul', instructions: 'yes?' } });
-  assert.equal(direct.route, 'typesafe');
-  assert.equal(sent[0]!.url, 'https://api.typesafe.ai/v1/systemone');
-  assert.equal(sent[0]!.body.model, 'jev-latest', 'the model rides in the body');
-  assert.equal(sent[0]!.body.questions.ok.type, 'noul', 'no translation needed');
-  assert.equal(a.answers.ok?.type, 'noul');
-  assert.equal((a.answers.ok as { probability: number }).probability, 0.9);
-  assert.ok(Math.abs(a.costUsd - 0.042) < 1e-9, 'cost is computed from tokens when not reported');
 
-  // Vercel renames the primitive and moves the model into a header.
-  const gateway = createJevClient({
-    route: route({ AI_GATEWAY_API_KEY: 'k' } as NodeJS.ProcessEnv),
-    fetchImpl: fakeFetch({
-      answers: { ok: { type: 'boolean', probability: 0.25 } },
-      usage: { inputTokens: 10 },
-    }),
-  })!;
-  const b = await gateway.evaluate('x', { ok: { type: 'noul', instructions: 'yes?' } });
-  assert.equal(gateway.route, 'vercel');
-  assert.equal(sent[1]!.body.questions.ok.type, 'boolean', 'translated on the way out');
-  assert.equal(sent[1]!.body.model, undefined, 'the model rides in a header instead');
-  assert.equal(sent[1]!.headers['ai-model-id'], 'typesafe-ai/jev');
-  assert.equal(b.answers.ok?.type, 'noul', 'and normalised on the way back');
-  assert.equal((b.answers.ok as { probability: number }).probability, 0.25);
+  const result = await client.evaluate('a board', {
+    pick: { type: 'choice', instructions: 'which?', criteria: { a: null, b: null } },
+    sure: { type: 'noul', instructions: 'certain?' },
+  });
+
+  assert.equal(sent!.url, 'https://api.typesafe.ai/v1/systemone');
+  assert.equal(sent!.headers.Authorization, 'Bearer k');
+  assert.equal(sent!.body.model, 'jev-latest', 'the model rides in the body');
+  assert.equal(sent!.body.questions.sure.type, 'noul', "sent in TypeSafe's own dialect");
+  assert.equal(sent!.body.state, 'a board');
+
+  assert.equal(client.model, 'jev-latest');
+  assert.equal((result.answers.pick as { choice: string }).choice, 'b');
+  assert.ok(Math.abs((result.answers.pick as { confidence: number }).confidence - 0.6) < 1e-9);
+  assert.equal((result.answers.sure as { probability: number }).probability, 0.9);
+  assert.ok(Math.abs(result.costUsd - 0.042) < 1e-9, 'cost is computed from input tokens');
 });

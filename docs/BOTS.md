@@ -77,30 +77,20 @@ Bots work with no configuration: without a key they play from their
 deterministic fallbacks, which is also what happens whenever the decision
 service is slow or unreachable. A bot never stalls a table.
 
-To let them think, set one key in the server environment. The same model is
-reachable three ways and the first key found wins, in this order:
-
-| Route        | Endpoint                                      | Key                  | Default model          |
-| ------------ | --------------------------------------------- | -------------------- | ---------------------- |
-| `typesafe`   | `api.typesafe.ai/v1/systemone`                | `TYPESAFE_API_KEY`   | `jev-latest`           |
-| `openrouter` | `openrouter.ai/api/alpha/decisions`           | `OPENROUTER_API_KEY` | `~typesafe/jev-latest` |
-| `vercel`     | `ai-gateway.vercel.sh/v4/ai/evaluation-model` | `AI_GATEWAY_API_KEY` | `typesafe-ai/jev`      |
-
-TypeSafe's own API is preferred: it is the most direct path, with no gateway in
-between, and it bills the account the credits sit on.
+To let them think, set a TypeSafe API key in the server environment:
 
 ```sh
-TYPESAFE_API_KEY=...
-CATANOVA_BOT_ROUTE=typesafe    # force one when several keys are present
-CATANOVA_BOT_MODEL=jev-1.13.0  # pin a build; the -latest aliases move
+TYPESAFE_API_KEY=...           # https://console.typesafe.ai/settings/keys
+CATANOVA_BOT_MODEL=jev-1.13.0  # optional: pin a build; the -latest alias moves
 ```
 
-The dialects differ and the client absorbs it: Vercel renames the yes/no
-primitive `boolean` and returns `probability`, and carries the model id in a
-header, while TypeSafe and OpenRouter use `noul` and put the model in the body.
-Questions are written once and translated on the way out. OpenRouter also
-reports the real cost of a call; on the other two it is computed from input
-tokens at $0.042 per million.
+Requests go straight to `api.typesafe.ai/v1/systemone`. Gateways resell the same
+model, but there is deliberately no fallback to one: a direct account is the one
+that holds the credits, and a silent switch to a different biller is worse than
+a bot playing from its heuristics for a few turns.
+
+TypeSafe bills input tokens only and does not return a cost, so cost is computed
+from the token count at the published rate of $0.042 per million.
 
 Keys stay on the server. The browser never sees one, and the bot package is
 never bundled into the client.

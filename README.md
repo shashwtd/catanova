@@ -42,7 +42,8 @@ A host can fill any free seat with a bot from the lobby, so two friends can play
 a game of four. Bots take their turns on the server, follow the same rules and
 appear in the roster and move history like anyone else. They decide with
 TypeSafe AI's Jev, a model that picks among options rather than writing text, so
-a bot can only ever choose a move the rules already offered. Everything
+a bot can only ever choose a move the rules already offered. It needs a
+`TYPESAFE_API_KEY`; without one the bots still play from their own heuristics. Everything
 countable, production pips, affordability, road distance, who is ahead, is
 computed in code.
 
