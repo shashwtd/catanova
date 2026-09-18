@@ -95,6 +95,11 @@ from the token count at the published rate of $0.042 per million.
 Keys stay on the server. The browser never sees one, and the bot package is
 never bundled into the client.
 
+On the production VM, add `TYPESAFE_API_KEY` to `/etc/catanova/production.env`
+using `sudoedit`, then recreate the `game` service with that env file and
+`deploy/single-vm/compose.yaml`. A plain container restart does not reload env
+values. Never commit the key or put it in a client-side environment variable.
+
 ## Operational notes
 
 - A bot seat has no socket and is treated as permanently present, so it is never
