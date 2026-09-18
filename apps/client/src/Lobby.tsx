@@ -1,5 +1,6 @@
 import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
 import {
+  Bot,
   Check,
   Clock3,
   Dices,
@@ -170,6 +171,8 @@ export function Lobby({
   onEdit,
   onSettings,
   onFriends,
+  onAddBot,
+  onKick,
 }: {
   room: RoomState;
   me?: string;
@@ -182,6 +185,7 @@ export function Lobby({
   onEdit: () => void;
   onSettings: () => void;
   onFriends?: () => void;
+  onAddBot?: () => void;
   onKick?: (playerId: string) => Promise<void>;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -314,6 +318,19 @@ export function Lobby({
               onClick={onInvite}
             >
               <Plus size={32} />
+            </button>
+          )}
+          {host && onAddBot && room.players.length < 4 && (
+            <button
+              type="button"
+              className="lobby-invite-tile lobby-bot-tile"
+              aria-label="Add bot player"
+              title="Add a bot to this seat"
+              disabled={busy || !connected}
+              onClick={onAddBot}
+            >
+              <Bot size={30} />
+              <span className="lobby-bot-tile-label">Add bot</span>
             </button>
           )}
         </div>

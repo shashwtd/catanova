@@ -400,6 +400,30 @@
   border-radius: 10px;
   background: var(--game-panel-fill);
 }
+/* The bot tile sits beside the invite tile and reads as the quieter of the two:
+   inviting a friend is the main action, filling a seat is the fallback. */
+.room-lobby .lobby-bot-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-style: dashed;
+  opacity: 0.85;
+}
+.room-lobby .lobby-bot-tile:hover:not(:disabled) {
+  opacity: 1;
+  border-style: solid;
+}
+.room-lobby .lobby-bot-tile:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.lobby-bot-tile-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .room-share {
   border: 1px solid var(--game-trim);
   border-radius: 10px;
