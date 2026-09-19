@@ -655,6 +655,57 @@
   box-shadow:
     inset 0 1px #e4c69425,
     inset 0 -1px #15110b35;
+  transition: background 0.22s ease;
+}
+
+/*
+ * Whose turn it is.
+ *
+ * The portrait used to carry it: a second border, a ring and a coloured halo,
+ * three things competing to say one thing, and between them they buried the
+ * colour the frame exists for. The cloth the name sits on says it instead —
+ * it is the largest quiet surface on the card, it is already there, and a
+ * lighter one reads instantly without drawing anything new.
+ */
+.playing .player-profile.active::before {
+  background: linear-gradient(100deg, #7d6749d9, #66543edb 72%, #574a38ea);
+  box-shadow:
+    inset 0 1px #f2dcab40,
+    inset 0 -1px #15110b35;
+}
+
+/*
+ * And an engraving on the empty end of it.
+ *
+ * The right-hand end of the strip carries nothing, which is what makes the
+ * lighter cloth easy to miss on a wide screen. A groove and a highlight drawn
+ * as one pair of lines is what reads as cut into a surface rather than printed
+ * on it, and a mask keeps the whole thing behind the empty end, well clear of
+ * the name and the counts.
+ */
+.playing .player-profile.active::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  inset: 13px -40px 13px 66px;
+  border-radius: 2px 0 0 2px;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 11px,
+      #0000002e 11px 12px,
+      #ffffff17 12px 13px,
+      transparent 13px 24px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 11px,
+      #0000002e 11px 12px,
+      #ffffff17 12px 13px,
+      transparent 13px 24px
+    );
+  mask-image: linear-gradient(90deg, transparent 0 42%, #000 82%);
 }
 .playing .player-profile .profile-name-banner,
 .playing .player-profile.self .profile-name-banner,

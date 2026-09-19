@@ -86,23 +86,10 @@
   font-variant-numeric: tabular-nums;
   text-shadow: 0 2px 1px #352816;
 }
-/* Whose turn it is, without losing whose colour it is.
-   This used to mix the frame 40% into cream and lay a cream ring outside it,
-   which on the lighter house colours left a washed-out band that read as a
-   blur rather than as a turn — and took away the one thing the frame is for.
-   The colour stays exactly as it is; the halo around it is that same colour,
-   so the card gets brighter without getting a different hue. */
-.player-profile.active .profile-portrait::before {
-  border-color: var(--player-color);
-  box-shadow:
-    0 0 0 1px #12191b,
-    0 0 0 3px color-mix(in srgb, var(--player-color), transparent 52%),
-    0 0 18px color-mix(in srgb, var(--player-color), transparent 42%),
-    0 3px 6px #10171a99;
-}
-.player-profile.active .avatar-medallion {
-  filter: none;
-}
+/* Whose turn it is is said by the cloth strip the name sits on, over in
+   `lounge-controls.css`. The portrait keeps exactly the frame it always has:
+   a ring, a halo and a second border around it were three things competing to
+   say one thing, and between them they buried the colour the frame is for. */
 .player-profile.active .profile-name-banner {
   background: linear-gradient(105deg, color-mix(in srgb, var(--player-color), #344233 40%), #324231ef);
   box-shadow:
