@@ -427,6 +427,22 @@ export class Store {
       .get(roomId, userId);
   }
   /** Multiple signed-in devices are fine; one account cannot play simultaneous matches. */
+  /**
+   * The unfinished game an account is seated in, if any, so a friend can be
+   * watched without asking them for a code. Only the room code is exposed:
+   * enough to watch, and nothing about what is in their hand.
+   */
+  watchableRoomOf(userId: string): { roomId: string; roomCode?: string } | null {
+    const row = this.db.prepare(`
+      SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
+      WHERE s.user_id=? AND s.departed=0
+        AND json_extract(g.state,'$.phase')<>'finished'
+      LIMIT 1
+    `).get(userId) as { room_id: string } | undefined;
+    if (!row) return null;
+    const roomCode = this.roomCode(row.room_id);
+    return { roomId: row.room_id, ...(roomCode ? { roomCode } : {}) };
+  }
   private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
     const conflict = this.db.prepare(`
       SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id

@@ -28,5 +28,10 @@ export type PlayerGames = {
   nextCursor: string | null;
 };
 export type FriendPresenceState = Omit<FriendsState, 'friends'> & {
-  friends: (PublicAccount & { online: boolean })[];
+  friends: (PublicAccount & {
+    online: boolean;
+    /** Present only for an online friend in an unfinished game, so the client
+     *  can offer to watch. Carries no information about their position. */
+    watchable?: { roomId: string; roomCode?: string };
+  })[];
 };

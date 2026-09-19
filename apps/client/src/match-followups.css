@@ -782,3 +782,51 @@
   color: inherit;
   opacity: 0.8;
 }
+
+/* ------------------------------------------------------------------ *
+ * Phone layout: one coordinate system
+ *
+ * The bottom of a phone screen was scattered because two groups of
+ * elements were measured against different boxes. `.game-world` carries
+ * a `min-height` taller than a real phone viewport (750px at <=640px,
+ * against roughly 610px of visible `dvh`), and it clips. Everything
+ * absolutely positioned inside it, the board, the rail, the prompt, the
+ * menu column, was therefore laid out against that taller box and its
+ * `bottom` offsets landed below the fold. The hand dock and the dice,
+ * being `position: fixed`, stayed with the real viewport. The two drifted
+ * apart, which is exactly what reads as "scattered".
+ *
+ * Letting the world be the viewport puts everything back in one frame.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .game-world,
+  .game-world.lobby,
+  .entry-world {
+    min-height: 0;
+  }
+}
+
+/* The dock's height depends on whether the player is holding development
+   cards, so a constant reserve was either overlapping the board by about
+   60px or leaving dead space. Reserve what is actually there. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing {
+    --hud-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--dock-reserve, 132px));
+  }
+  .playing:has(.hand-dock .development-tray) {
+    --dock-reserve: 200px;
+  }
+}
+
+/* The dice belong to the dock they are named after. Pinning them to the
+   reserve instead left them floating over the development cards. */
+@media (max-width: 700px) {
+  .playing [data-dice-dock] {
+    position: static;
+    right: auto;
+    bottom: auto;
+  }
+  .playing .table-actions {
+    align-items: center;
+  }
+}

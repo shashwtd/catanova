@@ -252,7 +252,9 @@ test('room sharing exposes distinct Share, Copy link and Copy code actions witho
       onSettings: () => {},
     }),
   );
-  assert.equal(buttons(lobby).filter((button) => button.includes('aria-label="Invite player"')).length, 2);
+  // Inviting a friend and adding a bot are one decision now, behind one control.
+  assert.equal(buttons(lobby).filter((button) => button.includes('aria-label="Fill this seat"')).length, 1);
+  assert.equal(buttons(lobby).filter((button) => button.includes('aria-label="Invite player"')).length, 0);
   for (const label of ['Share room', 'Copy invite link', 'Copy room code'])
     assert.ok(lobby.includes(`aria-label="${label}"`));
   assert.ok(!buttonWith(lobby, 'Start game')?.includes('disabled=""'));

@@ -48,6 +48,7 @@ import {
 } from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
 import { BoardViewport } from './BoardViewport.js';
+import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
@@ -83,6 +84,7 @@ import { normalizeRoomReference } from '../../../packages/protocol/src/room-refe
 import './style.css';
 import './card-motion.css';
 import './dice.css';
+import './reactions.css';
 import './presentation.css';
 import './board-camera.css';
 import './fantasy-transition.css';
@@ -228,6 +230,7 @@ function App() {
   const auth = useAuth();
   const { preferences, update, reducedMotion } = usePreferences();
   const feedback = useFeedback(preferences, reducedMotion);
+  const reactions = useFlyingReactions();
   const [transitionId, setTransitionId] = useState<string | null>(null);
   const connection = useRef<Connection | null>(null);
   const admissionEpoch = useRef(0);
@@ -457,6 +460,10 @@ function App() {
     let previousSnapshot: RoomState | null = null;
     c.subscribe((message) => {
       if (connection.current !== c) return;
+      if (message.type === 'reaction') {
+        reactions.add(message.reaction, message.name);
+        return;
+      }
       if (message.type === 'welcome' || message.type === 'state') {
         const next = c.state;
         if (next && c.playerId) {
@@ -915,6 +922,7 @@ function App() {
               onRobber={chooseRobber}
             />
           </BoardViewport>
+          <ReactionLayer flying={reactions.flying} />
         </div>
       )}
       {!g && !room && !playerHome && !entering && <div className="title-scenery" aria-hidden="true" />}
@@ -927,6 +935,18 @@ function App() {
           onFullscreen={() => void fullscreen()}
           busy={busy}
           onLeave={() => (room?.spectating || g.phase === 'finished' ? void leave() : setPanel('leave'))}
+          reactions={
+            !room?.spectating && (
+              <ReactionButton
+                disabled={!connected || !!player?.resigned || g.phase === 'finished'}
+                onReact={(reaction) => {
+                  connection.current?.react(reaction);
+                  // The server echoes accepted reactions to every player, including us.
+                  feedback.sound.play('hover');
+                }}
+              />
+            )
+          }
         />
       )}
       {g && room && (
@@ -1358,6 +1378,14 @@ function App() {
           invites={roomInvites}
           onOpenRoom={openInvitation}
           roomEntryBlocked={roomEntryBlocked}
+          onWatch={
+            roomEntryBlocked
+              ? undefined
+              : (reference) => {
+                  setPanel(null);
+                  void enterRoom('join', reference, true);
+                }
+          }
         />
       )}
       {panel === 'signOut' && (

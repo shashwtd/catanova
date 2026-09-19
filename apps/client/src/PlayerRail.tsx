@@ -139,6 +139,11 @@ export function PlayerRail({
                 <strong className="profile-name-banner" title={p.name}>
                   {p.name}
                 </strong>
+                {seat?.bot && (
+                  <span className="player-bot-tag" title="Played by Catanova" aria-label="Bot player">
+                    BOT
+                  </span>
+                )}
               </div>
               <div className="profile-details">
                 <div className="profile-stats">

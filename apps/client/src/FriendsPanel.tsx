@@ -1,12 +1,15 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FriendsState, PublicAccount } from '../../../packages/protocol/src/profile.js';
 import type { useAuth } from './auth.js';
-import { Check, Plus, RefreshCw, Users, X } from './GameIcons.js';
+import { Check, Eye, Plus, RefreshCw, Users, X } from './GameIcons.js';
 import { Avatar } from './Profile.js';
 import { GoogleMark } from './ProviderMarks.js';
 
 type Auth = ReturnType<typeof useAuth>;
-type Friend = PublicAccount & { online?: boolean };
+type Friend = PublicAccount & {
+  online?: boolean;
+  watchable?: { roomId: string; roomCode?: string };
+};
 const failure = (error: unknown) => (error instanceof Error ? error.message : 'Please try again.');
 
 /** Invalidating a search also invalidates its eventual error, not just its result. */
@@ -177,12 +180,16 @@ export function FriendRemovalConfirmation({
 }
 
 /** A new account gets a new request lifetime, even if this drawer stays open. */
-export function FriendsPanel({ auth }: { auth: Auth }) {
+export function FriendsPanel({ auth, onWatch }: { auth: Auth; onWatch?: (reference: string) => void }) {
   return (
-    <FriendsContents key={`${auth.account?.id ?? 'signed-out'}:${!!auth.account?.isGuest}`} auth={auth} />
+    <FriendsContents
+      key={`${auth.account?.id ?? 'signed-out'}:${!!auth.account?.isGuest}`}
+      auth={auth}
+      onWatch={onWatch}
+    />
   );
 }
-function FriendsContents({ auth }: { auth: Auth }) {
+function FriendsContents({ auth, onWatch }: { auth: Auth; onWatch?: (reference: string) => void }) {
   const guest = !auth.account || auth.account.isGuest;
   const [query, setQuery] = useState(''),
     [results, setResults] = useState<PublicAccount[]>([]),
@@ -376,20 +383,36 @@ function FriendsContents({ auth }: { auth: Auth }) {
                     <X size={21} />
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    className="roster-action roster-icon roster-remove"
-                    disabled={!!busy}
-                    aria-label={`Remove ${account.username} from friends`}
+                  <>
+                    {onWatch && account.watchable && (
+                      <button
+                        type="button"
+                        className="roster-action roster-icon roster-watch"
+                        disabled={!!busy}
+                        aria-label={`Watch ${account.username}'s game`}
+                        title="Watch their game"
+                        onClick={() =>
+                          onWatch(account.watchable!.roomCode ?? account.watchable!.roomId)
+                        }
+                      >
+                        <Eye size={20} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="roster-action roster-icon roster-remove"
+                      disabled={!!busy}
+                      aria-label={`Remove ${account.username} from friends`}
                     aria-expanded={removing?.id === account.id}
                     title="Remove friend"
-                    onClick={(event) => {
-                      removeTrigger.current = event.currentTarget;
-                      setRemoving(account);
-                    }}
-                  >
-                    <FriendRemoveIcon />
-                  </button>
+                      onClick={(event) => {
+                        removeTrigger.current = event.currentTarget;
+                        setRemoving(account);
+                      }}
+                    >
+                      <FriendRemoveIcon />
+                    </button>
+                  </>
                 )}
               </div>
               {removing?.id === account.id && (

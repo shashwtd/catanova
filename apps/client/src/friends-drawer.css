@@ -726,3 +726,14 @@
     max-height: 140px;
   }
 }
+
+/* Watching a friend is an ordinary roster action, one step quieter than the
+   destructive one it sits beside. */
+.roster-watch {
+  color: var(--game-cream);
+  opacity: 0.78;
+}
+.roster-watch:hover:not(:disabled),
+.roster-watch:focus-visible {
+  opacity: 1;
+}
