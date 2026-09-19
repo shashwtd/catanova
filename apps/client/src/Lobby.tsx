@@ -6,12 +6,12 @@ import {
   Clock3,
   Dices,
   Copy,
-  Crown,
   DoorOpen,
   Link,
   Pencil,
   Plus,
   Play,
+  Configure,
   Settings2,
   Share2,
   Users,
@@ -225,6 +225,7 @@ export function Lobby({
   onLeave,
   onEdit,
   onSettings,
+  onConfigure,
   onFriends,
   onAddBot,
   onKick,
@@ -239,6 +240,7 @@ export function Lobby({
   onLeave: () => void;
   onEdit: () => void;
   onSettings: () => void;
+  onConfigure: () => void;
   onFriends?: () => void;
   onAddBot?: () => void;
   onKick?: (playerId: string) => Promise<void>;
@@ -281,24 +283,35 @@ export function Lobby({
               <span>Friends</span>
             </button>
           )}
+          {/* Yours, not the table's: sound, board, privacy. The table's own
+              rules live behind the sliders in the footer. */}
+          <button
+            type="button"
+            className="lobby-preferences"
+            title="Your settings"
+            aria-label="Your settings"
+            onClick={onSettings}
+          >
+            <Settings2 />
+          </button>
         </div>
       </header>
       <div className="lobby-center">
         <div className="lobby-caption">
           <h1>Game room</h1>
           <div className="lobby-room-options">
-            <button className="lobby-goal" onClick={onSettings} aria-label="Points to win. Game settings">
+            <button className="lobby-goal" onClick={onConfigure} aria-label="Points to win. Room setup">
               <Trophy size={18} />
               <span>{room.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS} points</span>
             </button>
             <button
               type="button"
               className="lobby-timer"
-              onClick={onSettings}
+              onClick={onConfigure}
               aria-label={
                 room.settings?.turnTimerSeconds
-                  ? `Turn timer: ${room.settings.turnTimerSeconds} seconds. Game settings`
-                  : 'Turn timer off. Game settings'
+                  ? `Turn timer: ${room.settings.turnTimerSeconds} seconds. Room setup`
+                  : 'Turn timer off. Room setup'
               }
             >
               <Clock3 size={18} />
@@ -307,7 +320,7 @@ export function Lobby({
                 <b>{room.settings?.turnTimerSeconds ? `${room.settings.turnTimerSeconds}s` : 'Off'}</b>
               </span>
             </button>
-            <button className="lobby-dice-rule" onClick={onSettings} aria-label="Dice mode. Game settings">
+            <button className="lobby-dice-rule" onClick={onConfigure} aria-label="Dice mode. Room setup">
               <Dices size={18} />
               <span>{room.settings?.diceMode === 'balanced' ? 'Balanced' : 'Natural'} dice</span>
             </button>
@@ -341,11 +354,6 @@ export function Lobby({
                   )}
                   <div className="seat-portrait">
                     <Avatar profile={p.profile ?? defaultProfile(p.name)} />
-                    {i === 0 && (
-                      <span className="seat-badge is-host" role="img" aria-label="Host" title="Host">
-                        <Crown size={16} />
-                      </span>
-                    )}
                     {p.id === me && (
                       <button
                         type="button"
@@ -442,12 +450,12 @@ export function Lobby({
           <div className="lobby-start-controls">
             <button
               className="lobby-configure hub-room-button"
-              onClick={onSettings}
+              onClick={onConfigure}
               disabled={busy}
-              aria-label="Game settings"
+              aria-label={host ? 'Room setup' : 'Room setup, chosen by the host'}
             >
-              <Settings2 size={22} />
-              <span>Settings</span>
+              <Configure size={22} />
+              <span>Room setup</span>
             </button>
             {host ? (
               <button

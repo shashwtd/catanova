@@ -11,10 +11,7 @@ import { parseProfile } from '../../../packages/protocol/src/profile.js';
 import { createServer } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseClientMessage, PROTOCOL_VERSION } from '../../../packages/protocol/src/index.js';
-import {
-  REACTION_WINDOW_MS,
-  reactionAllowedAt,
-} from '../../../packages/protocol/src/reactions.js';
+import { REACTION_WINDOW_MS, reactionAllowedAt } from '../../../packages/protocol/src/reactions.js';
 import type { RoomState, ServerMessage } from '../../../packages/protocol/src/index.js';
 import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
@@ -23,6 +20,7 @@ import { serveClient } from './static.js';
 import { GameLaunch } from './game-launch.js';
 import { RoomInviteService } from './room-invites.js';
 import { AccountPresence } from './account-presence.js';
+import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { BotDriver } from './bots.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
@@ -148,6 +146,7 @@ export async function startServer(
             });
           else {
             accountPresence.touch(account.id, now(), expiresAt);
+            store.markSeen(account.id, now());
             result = { online: true };
           }
         } else if (request.method === 'POST' && url.pathname === '/api/account/activity')
@@ -157,8 +156,23 @@ export async function startServer(
         else if (request.method === 'PUT' && url.pathname === '/api/account/profile') {
           const account = await accounts.save(token, await body());
           result = account;
+        } else if (
+          url.pathname === '/api/account/privacy' &&
+          (request.method === 'GET' || request.method === 'PUT')
+        ) {
+          const account = await accounts.get(token);
+          if (!account.registered) throw accountFailure('ONBOARDING_REQUIRED');
+          result =
+            request.method === 'GET'
+              ? store.accountPrivacy(account.id)
+              : store.saveAccountPrivacy(account.id, parseAccountPrivacy(await body()));
         } else if (request.method === 'GET' && url.pathname === '/api/friends')
-          result = accountPresence.friends(await accounts.friends(token), now(), watchableRoom);
+          result = accountPresence.friends(
+            await accounts.friends(token),
+            now(),
+            watchableRoom,
+            friendLastSeen,
+          );
         else if (request.method === 'GET' && url.pathname === '/api/account/room-invites')
           result = await roomInvites!.list(token);
         else if (request.method === 'POST' && url.pathname === '/api/account/room-invites')
@@ -175,6 +189,7 @@ export async function startServer(
             await accounts.friendAction(token, value.action, value.other),
             now(),
             watchableRoom,
+            friendLastSeen,
           );
         } else {
           response.writeHead(404).end();
@@ -327,6 +342,10 @@ export async function startServer(
   /** A friend's in-progress room, for the Watch button. Only rooms with a code
    *  are offered, since that is what the client can act on. */
   const watchableRoom = (userId: string) => store.watchableRoomOf(userId);
+  /** Only for a friend who left the switch on. Off means the field is simply
+   *  absent, not zero or "a long time ago": the client is told nothing. */
+  const friendLastSeen = (userId: string) =>
+    store.accountPrivacy(userId).shareLastSeen ? store.lastSeen(userId) : null;
   function snapshot(roomId: string, viewer: string): RoomState {
     const state = store.snapshot(roomId, viewer);
     return {

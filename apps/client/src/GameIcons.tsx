@@ -16,6 +16,10 @@ const CONTROL_PATHS = {
   bank: 'M3 9l9-6 9 6H3 M5 10v9 M10 10v9 M14 10v9 M19 10v9 M3 21h18',
   statistics: 'M4 20h17 M7 16v-5 M12 16V4 M17 16V8',
   menu: 'M5 6h14 M5 12h14 M5 18h14',
+  // Sliders, not a cog. A cog is the everyday settings a player keeps for
+  // themselves; this is the board being set up, which only the host touches.
+  configure:
+    'M3 7h3.5 M11.5 7h9.5 M3 12h9.5 M17.5 12h3.5 M3 17h4.5 M12.5 17h8.5 M6.5 7a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0 M12.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0 M7.5 17a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0',
   history: 'M4 7a9 9 0 1 1-1 9 M3 3v5h5 M12 7v5l4 2',
   join: 'M14 3h7v18h-7 M3 12h12 m-5-5 5 5-5 5',
   logout: 'M10 3H4v18h6 M9 12h12 M16 7l5 5-5 5',
@@ -134,7 +138,8 @@ export const JoinRoom = icon('join'),
   NextTurn = icon('next-turn'),
   Exchange = icon('exchange'),
   LightClose = icon('light-close'),
-  LightCheck = icon('light-check');
+  LightCheck = icon('light-check'),
+  Configure = icon('configure');
 
 /**
  * The champion.

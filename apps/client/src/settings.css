@@ -377,3 +377,76 @@
     gap: 10px;
   }
 }
+
+/*
+ * Tabs, and the room's own panel.
+ *
+ * The settings used to be one column with everything in it: two volumes, the
+ * board, and — if you happened to be the host, and happened to be in a lobby —
+ * four more controls that changed the game for everybody. Nothing on the page
+ * said which was which. They are now two panels behind two different icons,
+ * and the personal one is divided by subject, so each view is short enough to
+ * take in at a glance.
+ */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 22px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #e5d9ba;
+  box-shadow: inset 0 1px 3px #2a3c3420;
+}
+.settings-tab {
+  flex: 1;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: #5e7263;
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+.settings-tab:hover:not([aria-selected='true']) {
+  background: #efe5cb;
+}
+.settings-tab[aria-selected='true'] {
+  background: #fffbeb;
+  color: #2f5246;
+  box-shadow: 0 1px 3px #2a3c3426;
+}
+/* Each panel is its own subject, so nothing inside needs a divider to explain
+   that it belongs to a different one. */
+.settings-panel > * + * {
+  margin-top: 26px;
+}
+.settings-panel .settings-room {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+.settings-privacy .settings-caption {
+  max-width: 44ch;
+}
+/* The room panel opens on its own, so its first section has nothing above it
+   to be separated from. */
+.settings-configure .settings-room {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+.settings-owner-note {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  background: #e9dfc2;
+  color: #5b6f60;
+  font-size: 14px;
+  line-height: 1.45;
+}

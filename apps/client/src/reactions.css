@@ -560,10 +560,12 @@
      a panel. The faces take the width the padding used to. */
   .reaction-tray {
     width: var(--game-tool-edge, 44px);
-    /* No border and barely any padding: at this width every pixel spent on the
-       frame comes straight off the faces, which are the point. The edge is
-       drawn as an inset ring instead. */
-    padding: 2px;
+    /* No border and no padding: at this width every pixel spent on the frame
+       comes straight off the faces, which are the point. A face is a circle of
+       exactly the tray's width, and the pill's end caps are semicircles of the
+       same radius, so the first and last faces sit inside the curve rather
+       than being clipped by it. The edge is drawn as an inset ring instead. */
+    padding: 0;
     border: 0;
     border-radius: 999px;
     overflow: hidden;
@@ -573,7 +575,7 @@
   }
   .reaction-scroll {
     grid-template-columns: 1fr;
-    gap: 3px;
+    gap: 2px;
     max-height: min(58vh, 420px);
     overflow-y: auto;
     overscroll-behavior-y: contain;

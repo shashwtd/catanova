@@ -361,3 +361,43 @@
     white-space: nowrap;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Two doors, two icons
+ *
+ * A cog in the header for the things you keep — sound, board, privacy —
+ * and sliders in the footer for the things the host sets for the table.
+ * They used to be one button, which meant a guest pressing "Settings"
+ * could not tell whether they were about to change their own volume or
+ * everybody's turn timer.
+ * ------------------------------------------------------------------ */
+.room-lobby .lobby-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.room-lobby .lobby-preferences {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 1px solid #c8b18380;
+  border-radius: 12px;
+  background: linear-gradient(#3c5344e0, #24392ff2);
+  color: #f2e4c2;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px #e4cd9d26,
+    0 3px 6px #15332444;
+  transition:
+    background 0.16s ease,
+    transform 0.16s ease;
+}
+.room-lobby .lobby-preferences:hover {
+  background: linear-gradient(#496353e0, #2c453af2);
+}
+.room-lobby .lobby-preferences:active {
+  transform: translateY(1px);
+}

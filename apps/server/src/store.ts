@@ -10,6 +10,8 @@ import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
+import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
+import type { AccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { DEFAULT_ROOM_SETTINGS, parseRoomSettings } from '../../../packages/protocol/src/settings.js';
 import type { RoomSettings, TurnClock } from '../../../packages/protocol/src/settings.js';
 import type { Identity } from './auth.js';
@@ -174,6 +176,17 @@ export class Store {
         revision INTEGER NOT NULL, counter INTEGER NOT NULL, released INTEGER NOT NULL,
         PRIMARY KEY(room_id, player_id, command_id)
       );
+      /* When each account was last here, and whether it agreed to let its
+         friends see that. Both live in this server's own database rather than
+         in the account provider: the moment is ours to observe, and a switch
+         about what other people are told has to be checked where the answer is
+         assembled. */
+      CREATE TABLE IF NOT EXISTS account_last_seen (
+        user_id TEXT PRIMARY KEY, at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS account_privacy (
+        user_id TEXT PRIMARY KEY, share_last_seen INTEGER NOT NULL DEFAULT 1
+      );
     `);
     if (
       !this.db
@@ -330,7 +343,8 @@ export class Store {
       if (mode === 'create') {
         roomId = randomUUID();
         this.db.prepare('INSERT INTO rooms(id) VALUES (?)').run(roomId);
-        this.db.prepare('INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, 0)')
+        this.db
+          .prepare('INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, 0)')
           .run(roomId, JSON.stringify(DEFAULT_ROOM_SETTINGS));
         this.renewRoomCode(roomId, true);
         this.board(roomId);
@@ -365,7 +379,9 @@ export class Store {
     const game = this.loadGame(roomId);
     const players = (
       this.db
-        .prepare('SELECT id, name, profile, ready, departed, bot, bot_level FROM seats WHERE room_id = ? ORDER BY rowid')
+        .prepare(
+          'SELECT id, name, profile, ready, departed, bot, bot_level FROM seats WHERE room_id = ? ORDER BY rowid',
+        )
         .all(roomId) as {
         id: string;
         name: string;
@@ -438,18 +454,24 @@ export class Store {
    * enough to watch, and nothing about what is in their hand.
    */
   watchableRoomOf(userId: string): { roomId: string; roomCode?: string } | null {
-    const row = this.db.prepare(`
+    const row = this.db
+      .prepare(
+        `
       SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0
         AND json_extract(g.state,'$.phase')<>'finished'
       LIMIT 1
-    `).get(userId) as { room_id: string } | undefined;
+    `,
+      )
+      .get(userId) as { room_id: string } | undefined;
     if (!row) return null;
     const roomCode = this.roomCode(row.room_id);
     return { roomId: row.room_id, ...(roomCode ? { roomCode } : {}) };
   }
   private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
-    const conflict = this.db.prepare(`
+    const conflict = this.db
+      .prepare(
+        `
       SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0 AND s.room_id<>?
         AND json_extract(g.state,'$.phase')<>'finished'
@@ -457,12 +479,17 @@ export class Store {
           WHERE json_extract(p.value,'$.id')=s.id
             AND coalesce(json_extract(p.value,'$.resigned'),0)=0)
       LIMIT 1
-    `).get(userId, roomId ?? '') as { room_id: string } | undefined;
+    `,
+      )
+      .get(userId, roomId ?? '') as { room_id: string } | undefined;
     if (conflict) {
       const code = this.roomCode(conflict.room_id);
-      throw new ProtocolError('ACTIVE_GAME', name === 'You'
-        ? `You already have a game${code ? ` in room ${code}` : ''}. Resume or leave it before joining another.`
-        : `${name} is already playing another game. They must finish or leave it first.`);
+      throw new ProtocolError(
+        'ACTIVE_GAME',
+        name === 'You'
+          ? `You already have a game${code ? ` in room ${code}` : ''}. Resume or leave it before joining another.`
+          : `${name} is already playing another game. They must finish or leave it first.`,
+      );
     }
   }
   private historyCursor(rawCursor?: string) {
@@ -749,7 +776,8 @@ export class Store {
           throw new ProtocolError('NOT_HOST', 'Only the host can add a bot');
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
-        if (room.players.length >= 4) throw new ProtocolError('INVALID_PLAYER', 'The room already has four seats');
+        if (room.players.length >= 4)
+          throw new ProtocolError('INVALID_PLAYER', 'The room already has four seats');
         // Drawn here, not asked for: the host fills a seat and finds out who
         // sat down by playing them.
         const level = this.botLevel();
@@ -803,6 +831,37 @@ export class Store {
         name: row.name as string,
         level: ((row.bot_level as string | null) ?? 'steady') as BotLevel,
       }));
+  }
+  /** Remember that this account was here. Called on the presence heartbeat, so
+   *  it is written often and read rarely. */
+  markSeen(userId: string, at: number): void {
+    this.db
+      .prepare(
+        'INSERT INTO account_last_seen(user_id, at) VALUES(?, ?) ON CONFLICT(user_id) DO UPDATE SET at = excluded.at',
+      )
+      .run(userId, Math.round(at));
+  }
+  lastSeen(userId: string): number | null {
+    const row = this.db.prepare('SELECT at FROM account_last_seen WHERE user_id = ?').get(userId) as
+      { at: number } | undefined;
+    return row ? row.at : null;
+  }
+  /** Sharing is the default, because a friends list where nobody can see
+   *  anything is not a friends list. Turning it off is one switch away. */
+  accountPrivacy(userId: string): AccountPrivacy {
+    const row = this.db
+      .prepare('SELECT share_last_seen FROM account_privacy WHERE user_id = ?')
+      .get(userId) as { share_last_seen: number } | undefined;
+    return { shareLastSeen: row ? row.share_last_seen === 1 : true };
+  }
+  saveAccountPrivacy(userId: string, privacy: AccountPrivacy): AccountPrivacy {
+    const next = parseAccountPrivacy(privacy);
+    this.db
+      .prepare(
+        'INSERT INTO account_privacy(user_id, share_last_seen) VALUES(?, ?) ON CONFLICT(user_id) DO UPDATE SET share_last_seen = excluded.share_last_seen',
+      )
+      .run(userId, next.shareLastSeen ? 1 : 0);
+    return next;
   }
   settings(roomId: string): RoomSettings {
     const row = this.db.prepare('SELECT settings FROM room_settings WHERE room_id = ?').get(roomId) as
@@ -1285,9 +1344,9 @@ export class Store {
           throw new ProtocolError('NOT_READY', 'Every other player must be ready');
         // Recheck every account inside the start transaction: another browser may have
         // started a different lobby after these players joined or pressed Ready.
-        for (const member of this.db.prepare(
-          'SELECT user_id,name FROM seats WHERE room_id=? AND departed=0 AND user_id IS NOT NULL',
-        ).all(seat.room_id) as { user_id: string; name: string }[])
+        for (const member of this.db
+          .prepare('SELECT user_id,name FROM seats WHERE room_id=? AND departed=0 AND user_id IS NOT NULL')
+          .all(seat.room_id) as { user_id: string; name: string }[])
           this.assertAccountAvailable(member.user_id, seat.room_id, member.name);
         next = createGame(
           shuffle(

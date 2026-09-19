@@ -177,6 +177,7 @@ test('only the host sees the control that seats a bot', () => {
     onLeave: () => {},
     onEdit: () => {},
     onSettings: () => {},
+    onConfigure: () => {},
     onAddBot: () => {},
   };
   const asHost = renderToStaticMarkup(createElement(Lobby, { ...props, me: 'host' }));

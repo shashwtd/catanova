@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   FriendRequestQueue,
   SOCIAL_HEARTBEAT_MS,
   SOCIAL_HEARTBEAT_TIMEOUT_MS,
+  lastSeenLabel,
   startSocialPresence,
 } from '../apps/client/src/social-presence.js';
+import { FriendIdentity } from '../apps/client/src/FriendsPanel.js';
+import { defaultProfile } from '../packages/protocol/src/profile.js';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -343,4 +348,40 @@ test('duplicate friend mutations cannot execute concurrently', async () => {
   assert.equal(duplicateRuns, 0);
   first.resolve('done');
   await one;
+});
+
+test('last seen is phrased the way a person would, and gets vaguer as it ages', () => {
+  const now = Date.UTC(2026, 2, 14, 12, 0, 0);
+  const ago = (ms: number) => lastSeenLabel(now - ms, now);
+  const second = 1000,
+    minute = 60 * second,
+    hour = 60 * minute,
+    day = 24 * hour;
+  assert.equal(ago(0), 'Last seen just now');
+  assert.equal(ago(45 * second), 'Last seen just now');
+  assert.equal(ago(minute), 'Last seen 1 minute ago');
+  assert.equal(ago(42 * minute), 'Last seen 42 minutes ago');
+  assert.equal(ago(hour), 'Last seen 1 hour ago');
+  assert.equal(ago(5 * hour), 'Last seen 5 hours ago');
+  assert.equal(ago(day), 'Last seen yesterday');
+  assert.equal(ago(4 * day), 'Last seen 4 days ago');
+  assert.equal(ago(9 * day), 'Last seen 1 week ago');
+  assert.equal(ago(40 * day), 'Last seen 1 month ago');
+  assert.equal(ago(400 * day), 'Last seen over a year ago');
+  // A clock that disagrees with the server must never read as the future.
+  assert.equal(ago(-5000), 'Last seen just now');
+});
+
+test('an offline friend shows when they were here; an online one never does', () => {
+  const base = { id: 'a', username: 'ada', isGuest: false, profile: defaultProfile('Ada') };
+  const render = (friend: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      createElement(FriendIdentity, { account: { ...base, ...friend }, showPresence: true }),
+    );
+  assert.match(render({ online: false, lastSeenAt: Date.now() - 3 * 60_000 }), /Last seen 3 minutes ago/);
+  // Sharing turned off: no field at all, and the row falls back to the plain word.
+  assert.match(render({ online: false }), /Offline/);
+  const online = render({ online: true, lastSeenAt: Date.now() - 3 * 60_000 });
+  assert.match(online, /Online/);
+  assert.ok(!online.includes('Last seen'), 'online already answers the question');
 });

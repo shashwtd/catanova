@@ -176,13 +176,10 @@ export function PlayerHub({
               <a className="hub-profile-action" href="/guide/" target="_blank" rel="noopener noreferrer">
                 <CircleHelp size={20} /> How to play
               </a>
-              <button
-                className="hub-profile-action hub-sign-out"
-                onClick={onSignOut}
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut size={18} />
+              {/* A door on its own said nothing to anyone who was looking for
+                  the way out, so it says it. */}
+              <button className="hub-profile-action hub-sign-out" onClick={onSignOut} title="Sign out">
+                <LogOut size={18} /> Sign out
               </button>
             </nav>
             {auth.account?.isGuest && (

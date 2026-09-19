@@ -6,7 +6,7 @@ import { TurnTimer } from '../apps/client/src/TurnTimer.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { Invite, Lobby } from '../apps/client/src/Lobby.js';
 import { BotMark } from '../apps/client/src/GameIcons.js';
-import { GameSettings } from '../apps/client/src/GameSettings.js';
+import { PlayerSettings, RoomConfiguration } from '../apps/client/src/GameSettings.js';
 import { ProfileEditor } from '../apps/client/src/Profile.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
 import { BOT_LEVELS, BOT_LEVEL_LABEL } from '../packages/protocol/src/bots.js';
@@ -48,6 +48,7 @@ function renderLobby(
       onLeave: () => {},
       onEdit: () => {},
       onSettings: () => {},
+      onConfigure: () => {},
       onKick: async () => {},
       ...extra,
     }),
@@ -152,12 +153,12 @@ test('room options name the turn timer explicitly and long player names remain a
   const room = lobby();
   room.players[1]!.name = 'Alexandria of the Northern Isles';
   let html = renderLobby(room, 'p0');
-  assert.match(html, /aria-label="Turn timer: 90 seconds\. Game settings"/);
+  assert.match(html, /aria-label="Turn timer: 90 seconds\. Room setup"/);
   assert.match(html, /title="Alexandria of the Northern Isles"/);
   assert.match(html, /aria-label="Edit your profile"/);
   room.settings = { turnTimerSeconds: null };
   html = renderLobby(room, 'p1');
-  assert.match(html, /aria-label="Turn timer off\. Game settings"/);
+  assert.match(html, /aria-label="Turn timer off\. Room setup"/);
   assert.ok(html.includes('Turn timer <b>Off</b>'));
 });
 
@@ -206,22 +207,11 @@ test('readiness, minimum seats, connection and pending commands all gate the hos
 test('room timer controls are editable only by the host before play and expose all five duration choices', () => {
   const room = lobby();
   const render = (me: string) =>
-    renderToStaticMarkup(
-      createElement(GameSettings, {
-        preferences: DEFAULT_PREFERENCES,
-        update: () => {},
-        room,
-        me,
-        busy: false,
-        save: async () => {},
-        previewSound: () => {},
-        osReduced: false,
-      }),
-    );
+    renderToStaticMarkup(createElement(RoomConfiguration, { room, me, busy: false, save: async () => {} }));
   const duration = (html: string) => html.match(/<input\b[^>]*aria-label="Turn duration"[^>]*>/)?.[0];
   assert.ok(duration(render('p0')) && !duration(render('p0'))!.includes('disabled=""'));
   assert.ok(duration(render('p1'))!.includes('disabled=""'));
-  assert.ok(render('p1').includes('Chosen by the host.'));
+  assert.ok(render('p1').includes('The host sets these for the table.'));
   for (const seconds of [40, 65, 90, 115, 140]) assert.ok(render('p0').includes(`>${seconds}</span>`));
   room.game = gameView(
     createGame(
@@ -231,9 +221,18 @@ test('room timer controls are editable only by the host before play and expose a
     ),
     'p0',
   );
-  assert.equal(duration(render('p0')), undefined, 'started-game settings contain personal audio only');
-  assert.match(render('p0'), /Effects volume/);
-  assert.match(render('p0'), /Music volume/);
+  assert.ok(duration(render('p0'))!.includes('disabled=""'), 'the table rules lock once play starts');
+  // A player's own panel carries sound and appearance, and nothing of the table's.
+  const mine = renderToStaticMarkup(
+    createElement(PlayerSettings, {
+      preferences: DEFAULT_PREFERENCES,
+      update: () => {},
+      previewSound: () => {},
+    }),
+  );
+  assert.equal(duration(mine), undefined);
+  assert.match(mine, /Effects volume/);
+  assert.match(mine, /Music volume/);
 });
 
 test('profile editing presents names and twelve fantasy portraits without the removed accent or frame selectors', () => {

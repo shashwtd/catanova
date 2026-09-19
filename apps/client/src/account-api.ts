@@ -4,7 +4,11 @@ import type {
   Profile,
   UsernameAvailability,
 } from '../../../packages/protocol/src/profile.js';
-import type { FriendPresenceState, PlayerGames } from '../../../packages/protocol/src/player-hub.js';
+import type {
+  AccountPrivacy,
+  FriendPresenceState,
+  PlayerGames,
+} from '../../../packages/protocol/src/player-hub.js';
 import type { RoomInvite, RoomInvitesState } from '../../../packages/protocol/src/room-invites.js';
 
 export class AccountApiError extends Error {
@@ -69,6 +73,10 @@ export const accountApi = {
     accountRequest<Account>(token, '/api/account/profile', 'PUT', profile),
   username: (token: string | undefined, name: string) =>
     accountRequest<UsernameAvailability>(token, `/api/account/username?name=${encodeURIComponent(name)}`),
+  privacy: (token: string | undefined, signal?: AbortSignal) =>
+    accountRequest<AccountPrivacy>(token, '/api/account/privacy', 'GET', undefined, signal),
+  savePrivacy: (token: string | undefined, privacy: AccountPrivacy) =>
+    accountRequest<AccountPrivacy>(token, '/api/account/privacy', 'PUT', privacy),
   friends: (token: string | undefined, signal?: AbortSignal) =>
     accountRequest<FriendPresenceState>(token, '/api/friends', 'GET', undefined, signal),
   search: (token: string | undefined, query: string) =>

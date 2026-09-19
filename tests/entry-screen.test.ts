@@ -22,6 +22,7 @@ const actions = {
   onProfile: () => {},
   onFriends: () => {},
   onSettings: () => {},
+  onConfigure: () => {},
   onSignOut: () => {},
 };
 function authState(overrides: Partial<Auth> = {}): Auth {
@@ -250,6 +251,7 @@ test('room sharing exposes distinct Share, Copy link and Copy code actions witho
       onLeave: () => {},
       onEdit: () => {},
       onSettings: () => {},
+      onConfigure: () => {},
     }),
   );
   // One open place, offering its answers in the open rather than behind a menu.

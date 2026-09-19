@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { parsePreferences } from '../apps/client/src/preferences.js';
 import { BOARD_THEMES } from '../apps/client/src/board-theme.js';
 import { HiddenResource } from '../apps/client/src/HiddenResource.js';
-import { GameSettings } from '../apps/client/src/GameSettings.js';
+import { PlayerSettings } from '../apps/client/src/GameSettings.js';
 
 test('new and existing players default to Storybook; a saved Classic preference survives parsing', () => {
   for (const saved of [null, {}, { sound: false }, { boardTheme: 'invalid' }])
@@ -29,12 +29,9 @@ test('both personal themes have versioned atlases and stay within the texture bu
 
 test('personal appearance remains selectable without host privileges or a room', () => {
   const html = renderToStaticMarkup(
-    createElement(GameSettings, {
+    createElement(PlayerSettings, {
       preferences: parsePreferences({ boardTheme: 'classic' }),
       update() {},
-      room: null,
-      busy: false,
-      async save() {},
       previewSound() {},
     }),
   );

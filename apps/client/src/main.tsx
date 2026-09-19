@@ -20,7 +20,7 @@ import { dicePresentationGame, useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
-import { GameSettings } from './GameSettings.js';
+import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -38,6 +38,7 @@ import { RoomInviteNotice, visibleRoomInvitations } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
+import { useAccountPrivacy } from './usePrivacy.js';
 import {
   showPlayerHome,
   browserRoomPath,
@@ -269,6 +270,7 @@ function App() {
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
       | 'settings'
+      | 'configure'
       | 'trade'
       | 'rules'
       | 'journal'
@@ -293,6 +295,10 @@ function App() {
     myTurn = !!me && active?.id === me && !player?.resigned;
   const entering = !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite)));
   const playerHome = !room && !entering && showPlayerHome(auth, invite);
+  const privacy = useAccountPrivacy(
+    auth.accessToken,
+    auth.config?.mode === 'authenticated' && !!auth.account && !auth.account.isGuest,
+  );
   const playerGames = usePlayerGames(
     auth.account?.id,
     auth.accessToken,
@@ -1131,6 +1137,7 @@ function App() {
           onLeave={() => void leave()}
           onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
+          onConfigure={() => setPanel('configure')}
         />
       )}
       {g && (
@@ -1347,15 +1354,18 @@ function App() {
       )}
       {panel === 'settings' && (
         <Dialog side={!!g} tool="settings" title="Settings" compact onClose={() => setPanel(null)}>
-          <GameSettings
+          <PlayerSettings
             preferences={preferences}
             update={update}
-            room={room}
-            me={me}
-            busy={disabled}
-            save={saveSettings}
+            privacy={privacy.value}
+            savePrivacy={privacy.save}
             previewSound={() => feedback.sound.play('settlement')}
           />
+        </Dialog>
+      )}
+      {panel === 'configure' && (
+        <Dialog title="Room setup" compact onClose={() => setPanel(null)}>
+          <RoomConfiguration room={room} me={me} busy={disabled} save={saveSettings} />
         </Dialog>
       )}
       {panel === 'invite' && room && (
