@@ -5,9 +5,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { TurnTimer } from '../apps/client/src/TurnTimer.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { Invite, Lobby } from '../apps/client/src/Lobby.js';
-import { GameSettings } from '../apps/client/src/GameSettings.js';
+import { BotMark } from '../apps/client/src/GameIcons.js';
+import { PlayerSettings, RoomConfiguration } from '../apps/client/src/GameSettings.js';
 import { ProfileEditor } from '../apps/client/src/Profile.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
+import { BOT_LEVELS, BOT_LEVEL_LABEL } from '../packages/protocol/src/bots.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { createGame, gameView } from '../packages/rules/src/game.js';
@@ -27,7 +29,13 @@ function lobby(): RoomState {
     })),
   };
 }
-function renderLobby(room: RoomState, me: string, busy = false, connected = true) {
+function renderLobby(
+  room: RoomState,
+  me: string,
+  busy = false,
+  connected = true,
+  extra: Record<string, unknown> = {},
+) {
   return renderToStaticMarkup(
     createElement(Lobby, {
       room,
@@ -40,7 +48,9 @@ function renderLobby(room: RoomState, me: string, busy = false, connected = true
       onLeave: () => {},
       onEdit: () => {},
       onSettings: () => {},
+      onConfigure: () => {},
       onKick: async () => {},
+      ...extra,
     }),
   );
 }
@@ -76,7 +86,7 @@ test('nonhosts can ready or unready and cannot start the room', () => {
   assert.ok(ready.includes('aria-pressed="true"'));
 });
 
-test('room gathering shows actual players with small invitations instead of four mandatory-looking slots', () => {
+test('room gathering shows actual players and one open place, never four mandatory-looking slots', () => {
   for (const count of [1, 2, 3, 4]) {
     const room = lobby();
     room.players = Array.from({ length: count }, (_, i) => ({
@@ -88,11 +98,10 @@ test('room gathering shows actual players with small invitations instead of four
     }));
     const html = renderLobby(room, 'p0');
     assert.equal([...html.matchAll(/<article\b/g)].length, count);
-    // One control fills a seat, and it disappears once the room is full.
-    assert.equal(
-      buttons(html).filter((button) => button.includes('aria-label="Fill this seat"')).length,
-      count < 4 ? 1 : 0,
-    );
+    // Exactly one place is open, at the same size as a seat, and it goes once
+    // the room is full.
+    assert.equal([...html.matchAll(/class="seat-card seat-open"/g)].length, count < 4 ? 1 : 0);
+    assert.equal([...html.matchAll(/>Open seat</g)].length, count < 4 ? 1 : 0);
     assert.ok(html.includes('10 points'));
     assert.ok(!html.includes('Your crew') && !html.includes('open-seat'));
     assert.ok(!html.includes(`${count}/4`));
@@ -101,16 +110,55 @@ test('room gathering shows actual players with small invitations instead of four
   }
 });
 
+test('an open place offers both answers where you can see them, and both are host-only for bots', () => {
+  const room = lobby();
+  room.players = [room.players[0]!];
+  const withBots = { onAddBot: () => {} };
+  const asHost = renderLobby(room, 'p0', false, true, withBots);
+  // Inviting is one press from the place itself rather than two through a menu.
+  assert.ok(asHost.includes('Invite a friend'));
+  assert.ok(!asHost.includes('aria-haspopup="menu"'), 'no hidden menu stands between them');
+  // Seating a bot is one action. Which of the three sits down is the room's
+  // draw, so there is nothing here to choose.
+  assert.ok(asHost.includes('Add a bot'));
+  for (const level of BOT_LEVELS) assert.ok(!asHost.includes(`Add a ${level}`));
+
+  const asGuest = renderLobby(room, 'pX', false, true, withBots);
+  assert.ok(asGuest.includes('Invite a friend'));
+  assert.ok(!asGuest.includes('Add a bot'), 'only a host seats a bot');
+});
+
+test('each bot level is marked by its own machine, never the word BOT', () => {
+  const marks = new Set<string>();
+  for (const level of BOT_LEVELS) {
+    const room = lobby();
+    room.players[1] = { ...room.players[1]!, bot: true, botLevel: level, name: 'Anchor' };
+    const html = renderLobby(room, 'p0');
+    assert.ok(!/>\s*BOT\s*</.test(html), 'the word is gone');
+    assert.match(html, new RegExp(`player-bot-tag[^>]*data-level="${level}"`));
+    // The mark says "bot" and never which one: naming the difficulty on the
+    // seat would give away a game that has not been played yet.
+    assert.match(html, /player-bot-tag[^>]*aria-label="Bot"/);
+    assert.ok(!html.includes(`${BOT_LEVEL_LABEL[level]} bot`), 'the level is not announced');
+    assert.ok(html.includes('>Bot<'), 'the seat says bot, and stops there');
+    // Three levels, three drawings: a shared shape with nothing to tell them
+    // apart would make the mark decoration rather than information. Rendered
+    // on its own, so this cannot accidentally match another seat's icon.
+    marks.add(renderToStaticMarkup(createElement(BotMark, { level })));
+  }
+  assert.equal(marks.size, BOT_LEVELS.length, 'every level looks different');
+});
+
 test('room options name the turn timer explicitly and long player names remain accessible', () => {
   const room = lobby();
   room.players[1]!.name = 'Alexandria of the Northern Isles';
   let html = renderLobby(room, 'p0');
-  assert.match(html, /aria-label="Turn timer: 90 seconds\. Game settings"/);
+  assert.match(html, /aria-label="Turn timer: 90 seconds\. Room setup"/);
   assert.match(html, /title="Alexandria of the Northern Isles"/);
-  assert.match(html, /aria-label="Your profile"/);
+  assert.match(html, /aria-label="Edit your profile"/);
   room.settings = { turnTimerSeconds: null };
   html = renderLobby(room, 'p1');
-  assert.match(html, /aria-label="Turn timer off\. Game settings"/);
+  assert.match(html, /aria-label="Turn timer off\. Room setup"/);
   assert.ok(html.includes('Turn timer <b>Off</b>'));
 });
 
@@ -159,22 +207,11 @@ test('readiness, minimum seats, connection and pending commands all gate the hos
 test('room timer controls are editable only by the host before play and expose all five duration choices', () => {
   const room = lobby();
   const render = (me: string) =>
-    renderToStaticMarkup(
-      createElement(GameSettings, {
-        preferences: DEFAULT_PREFERENCES,
-        update: () => {},
-        room,
-        me,
-        busy: false,
-        save: async () => {},
-        previewSound: () => {},
-        osReduced: false,
-      }),
-    );
+    renderToStaticMarkup(createElement(RoomConfiguration, { room, me, busy: false, save: async () => {} }));
   const duration = (html: string) => html.match(/<input\b[^>]*aria-label="Turn duration"[^>]*>/)?.[0];
   assert.ok(duration(render('p0')) && !duration(render('p0'))!.includes('disabled=""'));
   assert.ok(duration(render('p1'))!.includes('disabled=""'));
-  assert.ok(render('p1').includes('Chosen by the host.'));
+  assert.ok(render('p1').includes('The host sets these for the table.'));
   for (const seconds of [40, 65, 90, 115, 140]) assert.ok(render('p0').includes(`>${seconds}</span>`));
   room.game = gameView(
     createGame(
@@ -184,9 +221,18 @@ test('room timer controls are editable only by the host before play and expose a
     ),
     'p0',
   );
-  assert.equal(duration(render('p0')), undefined, 'started-game settings contain personal audio only');
-  assert.match(render('p0'), /Effects volume/);
-  assert.match(render('p0'), /Music volume/);
+  assert.ok(duration(render('p0'))!.includes('disabled=""'), 'the table rules lock once play starts');
+  // A player's own panel carries sound and appearance, and nothing of the table's.
+  const mine = renderToStaticMarkup(
+    createElement(PlayerSettings, {
+      preferences: DEFAULT_PREFERENCES,
+      update: () => {},
+      previewSound: () => {},
+    }),
+  );
+  assert.equal(duration(mine), undefined);
+  assert.match(mine, /Effects volume/);
+  assert.match(mine, /Music volume/);
 });
 
 test('profile editing presents names and twelve fantasy portraits without the removed accent or frame selectors', () => {

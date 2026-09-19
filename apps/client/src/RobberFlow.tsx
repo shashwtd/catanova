@@ -7,7 +7,8 @@ import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js'
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { ResourceIcon, PLAYER_COLORS } from './Board.js';
+import { ResourceIcon } from './Board.js';
+import { playerHexColor } from './player-colors.js';
 import { Check, GameIcon, WifiOff } from './GameIcons.js';
 import { TurnTimer } from './TurnTimer.js';
 
@@ -203,7 +204,7 @@ export function RobberFlow({
                   className="discard-player"
                   style={
                     {
-                      '--player-color': PLAYER_COLORS[game.players.findIndex((v) => v.id === p.id)],
+                      '--player-color': playerHexColor(room.players, p.id),
                     } as CSSProperties
                   }
                 >

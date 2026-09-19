@@ -11,20 +11,160 @@ import type { useAuth } from './auth.js';
 
 export const SITE_URL = 'https://catanova.io';
 export const REPOSITORY_URL = 'https://github.com/shashwtd/catanova';
+export const SOCIAL_CARD_ALT =
+  'The Catanova wordmark in gold above a sunny island coast, under the line Build. Trade. Settle.';
+/**
+ * What a search result says.
+ *
+ * Written as sentences a person would say out loud. The old ones were title
+ * case with an em dash in the middle and a list of keywords after it, which is
+ * how a page announces that nobody wrote it. Catan is named because that is
+ * genuinely the fastest way to tell somebody what this is, and the footer of
+ * every page says plainly that this is not an official CATAN game.
+ */
 export const PUBLIC_PAGES = [
   {
     path: '/',
-    title: 'Catanova — Build. Trade. Settle.',
+    title: 'Catanova: play a Catan-style game with friends',
     description:
-      'Build, trade and settle an island together. A free online Catan alternative for 2–4 friends, with private multiplayer rooms. Play in your browser.',
+      'A free island trading game for two to four friends, in your browser. Build, trade and race to ten points. If you know Catan, you already know how to play.',
   },
   {
     path: '/guide/',
-    title: 'How to Play Catanova — Rules, Resources & Multiplayer Guide',
+    title: 'How to play Catanova: rules, costs and your first game',
     description:
-      'Learn to play Catanova: create a room, invite friends, build settlements, trade resources and race to 10 points. A quick guide for your first game.',
+      'Create a room, invite friends and learn what everything costs. A short guide to your first game of Catanova, from the opening placements to the tenth point.',
   },
 ] as const;
+
+/**
+ * The questions people actually arrive with.
+ *
+ * Kept here rather than inline in the page because they are rendered twice:
+ * once for a reader, and once as structured data for search engines and the
+ * assistants that now answer these questions on a site's behalf. Two copies
+ * that could drift apart would eventually be a page that says one thing and a
+ * search result that says another, so there is only one.
+ */
+export const GUIDE_FAQ = [
+  {
+    question: 'What is Catanova?',
+    answer:
+      'Catanova is a free online island-building game for two to four friends: collect resources, trade, and build your way to ten points. It is an independent game with its own artwork, rules text and interface, not an official CATAN game, and its code is open source on GitHub.',
+  },
+  {
+    question: 'Is Catanova free to play?',
+    answer:
+      'Yes. The whole game is free, there is nothing to buy inside it, and no part of the board is held back. You can start a room as a guest without making an account.',
+  },
+  {
+    question: 'Can phones and computers play together?',
+    answer:
+      'Yes. Open catanova.io in any modern browser and join the same private room from a phone, tablet or computer. Nothing is installed. You need an internet connection while you play.',
+  },
+  {
+    question: 'How many players do you need?',
+    answer:
+      'Two to four. Three and four player games follow the familiar rules. Two player games are our own option, on the same island and to the same ten points, without neutral players.',
+  },
+  {
+    question: 'Can I play on my own, or fill an empty seat?',
+    answer:
+      'Yes. The host can add a bot to any open seat, and bots also cover a seat if somebody loses their connection mid-game, handing it straight back when that player returns. There is no public matchmaking: rooms are private and you share a code or a link.',
+  },
+  {
+    question: 'What happens if someone disconnects?',
+    answer:
+      'Nothing is lost. Their settlements, roads and cards stay exactly where they were, a bot plays their turns after about half a minute so the rest of the table is not left waiting, and the seat goes back to them the moment they reconnect.',
+  },
+] as const;
+
+/**
+ * What the machines are told.
+ *
+ * Two audiences read a page now: search engines, which want the facts as
+ * data, and the assistants people increasingly ask instead of searching,
+ * which quote whatever is unambiguous. Both are served by saying the same
+ * things the page says, in a shape that cannot be misread: the number of
+ * players, the price, that it runs in a browser, and that it is not an
+ * official CATAN game. None of it claims anything the page does not.
+ */
+function structuredData(page: (typeof PUBLIC_PAGES)[number]) {
+  const game = {
+    '@type': 'VideoGame',
+    '@id': `${SITE_URL}/#game`,
+    name: 'Catanova',
+    alternateName: 'Catanova island trading game',
+    url: `${SITE_URL}/`,
+    description: PUBLIC_PAGES[0].description,
+    image: `${SITE_URL}/branding/social-card-v3.jpg`,
+    applicationCategory: 'GameApplication',
+    genre: ['Strategy', 'Board game', 'Multiplayer'],
+    gamePlatform: 'Web browser',
+    operatingSystem: 'Any modern web browser',
+    playMode: 'MultiPlayer',
+    numberOfPlayers: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 4 },
+    inLanguage: 'en',
+    isAccessibleForFree: true,
+    isFamilyFriendly: true,
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+    },
+    license: `${REPOSITORY_URL}/blob/main/LICENSE`,
+    sameAs: [REPOSITORY_URL],
+    disambiguatingDescription:
+      'An independent, open-source game inspired by Catan. Not affiliated with or endorsed by the owners of the CATAN trademark.',
+  };
+  const graph: Record<string, unknown>[] =
+    page.path === '/guide/'
+      ? [
+          {
+            '@type': 'HowTo',
+            '@id': `${SITE_URL}/guide/#howto`,
+            name: page.title,
+            description: page.description,
+            url: `${SITE_URL}/guide/`,
+            about: { '@id': `${SITE_URL}/#game` },
+            step: [
+              {
+                '@type': 'HowToStep',
+                name: 'Open a room',
+                text: 'Create a room, or join a friend with their code or invite link.',
+              },
+              {
+                '@type': 'HowToStep',
+                name: 'Place your first settlements',
+                text: 'Each player places two settlements and two roads, in order and then back again.',
+              },
+              {
+                '@type': 'HowToStep',
+                name: 'Take turns',
+                text: 'Roll the dice, collect what your settlements and cities produce, then build or trade.',
+              },
+              {
+                '@type': 'HowToStep',
+                name: 'Reach ten points',
+                text: 'Settlements, cities, the longest road, the largest army and victory point cards all score. Ten on your own turn wins.',
+              },
+            ],
+          },
+          {
+            '@type': 'FAQPage',
+            '@id': `${SITE_URL}/guide/#faq`,
+            mainEntity: GUIDE_FAQ.map((entry) => ({
+              '@type': 'Question',
+              name: entry.question,
+              acceptedAnswer: { '@type': 'Answer', text: entry.answer },
+            })),
+          },
+          game,
+        ]
+      : [game];
+  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph });
+}
 
 export function PublicMetadata({ page }: { page: (typeof PUBLIC_PAGES)[number] }) {
   return (
@@ -42,23 +182,18 @@ export function PublicMetadata({ page }: { page: (typeof PUBLIC_PAGES)[number] }
       <meta property="og:image:type" content="image/jpeg" />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
-      <meta
-        property="og:image:alt"
-        content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."
-      />
+      <meta property="og:image:alt" content={SOCIAL_CARD_ALT} />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={page.title} />
       <meta name="twitter:description" content={page.description} />
       <meta name="twitter:image" content={`${SITE_URL}/branding/social-card-v3.jpg`} />
-      <meta
-        name="twitter:image:alt"
-        content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."
-      />
+      <meta name="twitter:image:alt" content={SOCIAL_CARD_ALT} />
       <link rel="icon" type="image/x-icon" href="/branding/favicon.ico" />
       <link rel="icon" type="image/png" sizes="48x48" href="/branding/favicon-48.png" />
       <link rel="icon" type="image/png" sizes="96x96" href="/branding/favicon-96.png" />
       <link rel="apple-touch-icon" sizes="180x180" href="/branding/apple-touch-icon.png" />
       <link rel="manifest" href="/site.webmanifest" />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: structuredData(page) }} />
     </>
   );
 }
@@ -689,18 +824,16 @@ export function PublicGuide() {
               </article>
             </div>
             <details className="guide-note" open>
-              <summary>Disconnected players & auto-resign</summary>
+              <summary>If someone loses connection</summary>
               <p>
-                While another player is connected, a disconnected player has <strong>three minutes</strong> to
-                return. Reconnecting in time cancels the countdown. Otherwise, that player automatically
-                resigns and can only watch if they return later. This is Catanova’s room rule, separate from
-                the optional turn timer.
+                Nothing is lost and nobody waits. After about <strong>half a minute</strong>, a bot picks up
+                the empty seat and plays its turns, keeping every settlement, road and card exactly where it
+                was. The seat goes straight back the moment that player reconnects.
               </p>
               <p>
-                Their pieces stay on the island, and their resources return to the bank. With at least two
-                players remaining, the game continues; the last remaining player wins by resignation. If
-                everyone disconnects, the game pauses. When someone returns, absent players get a fresh
-                reconnect countdown.
+                Leaving the game on purpose is different: that is a resignation, their pieces stay on the
+                island and their resources go back to the bank. If <em>everyone</em> disconnects the game
+                pauses rather than playing itself out, and closes without a winner if nobody comes back.
               </p>
             </details>
           </section>
@@ -708,30 +841,17 @@ export function PublicGuide() {
             <GuideHeading number="08" icon="help">
               Before you play
             </GuideHeading>
-            <details className="guide-note" open>
-              <summary>What is Catanova?</summary>
-              <p>
-                Catanova is a free online island-building game for friends: collect resources, trade and build
-                your way to ten points. It is an independent Catan alternative with its own artwork and
-                interface, not an official CATAN game. The project’s code is{' '}
-                <a href={REPOSITORY_URL}>available on GitHub</a>.
-              </p>
-            </details>
-            <details className="guide-note" open>
-              <summary>Can phones and computers play together?</summary>
-              <p>
-                Yes. Open catanova.io in your browser and join the same private room from a phone, tablet or
-                computer. No installation is needed. Keep an internet connection while you play.
-              </p>
-            </details>
-            <details className="guide-note" open>
-              <summary>Do we need four players?</summary>
-              <p>
-                Rooms support two to four friends. Three- and four-player games are the base-game
-                compatibility target. Two-player games are Catanova’s custom option, using the same island and
-                ten-point goal without neutral players. There are no solo bots or public matchmaking.
-              </p>
-            </details>
+            {GUIDE_FAQ.map((entry) => (
+              <details className="guide-note" key={entry.question} open>
+                <summary>{entry.question}</summary>
+                <p>{entry.answer}</p>
+              </details>
+            ))}
+            <p className="guide-note-source">
+              Catanova is open source. The rules this page describes are the ones in{' '}
+              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>the rulebook</a>, and the code that
+              enforces them is <a href={REPOSITORY_URL}>on GitHub</a>.
+            </p>
           </section>
           <div className="guide-ready">
             <div>

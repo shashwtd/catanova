@@ -1,10 +1,14 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { pips } from '../../../packages/rules/src/board.js';
 import type { Board as Island } from '../../../packages/rules/src/board.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
 import { Terrain, type TerrainArt } from './Terrain.js';
+import { DEFAULT_SEAT_HEX } from './player-colors.js';
+
+/** One shared empty map, so an unsupplied `colors` is not a new object. */
+const EMPTY_COLORS: Record<string, string> = {};
 import { DICE_READABLE_MS } from './DiceThrow.js';
 import type { BuildAction } from './placement.js';
 import {
@@ -23,7 +27,10 @@ import {
   WORLD,
 } from './scene.js';
 
-export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#f2ce56'] as const;
+/** The seat colours a board falls back to when nothing tells it otherwise —
+ *  a preview, or the first frame before the room arrives. A real table passes
+ *  its own through `colors`, because seats can choose. */
+export { DEFAULT_SEAT_HEX as PLAYER_COLORS } from './player-colors.js';
 // Visible immediately, underneath the artwork, even when a texture is still downloading.
 const TERRAIN_BASE = {
   wood: '#57815a',
@@ -117,7 +124,178 @@ export function ResourceIcon({
     />
   );
 }
-export function Board({
+/**
+ * Everything on the board that the game cannot change: the filters, the
+ * material patterns, the per-hex masks, the coastline and the painted ground.
+ *
+ * It was being rebuilt and re-diffed on every state message — a couple of
+ * hundred SVG elements that only depend on which board was dealt. Split out
+ * and memoised, a turn's worth of state changes no longer touches any of it.
+ */
+const BoardScenery = memo(function BoardScenery({
+  board,
+  art,
+  coast,
+  water,
+}: {
+  board: Island;
+  art?: TerrainArt;
+  coast: string;
+  water: string;
+}) {
+  return (
+    <>
+      <defs>
+        <filter
+          id="water-feather"
+          filterUnits="userSpaceOnUse"
+          x={WORLD.x}
+          y={WORLD.y}
+          width={WORLD.width}
+          height={WORLD.height}
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur stdDeviation={WATER_FEATHER / 6} />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="1.006" intercept="-0.003" />
+          </feComponentTransfer>
+        </filter>
+        <mask
+          id="water-fade-mask"
+          maskUnits="userSpaceOnUse"
+          x={WORLD.x}
+          y={WORLD.y}
+          width={WORLD.width}
+          height={WORLD.height}
+          style={{ maskType: 'alpha' }}
+        >
+          <polygon points={water} fill="white" filter="url(#water-feather)" />
+        </mask>
+        <filter id="piece-shadow" x="-60%" y="-60%" width="220%" height="220%">
+          <feDropShadow dx="1" dy="3" stdDeviation="1.5" floodColor="#0b1519" floodOpacity=".7" />
+        </filter>
+        <filter id="ground-edge" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency=".09" numOctaves="2" seed="7" result="noise" />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="noise"
+            scale="4"
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+          <feGaussianBlur stdDeviation=".65" />
+        </filter>
+        {[
+          { id: 'ocean-material', size: 240, row: 0 },
+          { id: 'sand-material', size: 150, row: 1 },
+        ].map(({ id, size, row }) => (
+          <pattern key={id} id={id} width={size * 2} height={size * 2} patternUnits="userSpaceOnUse">
+            {MATERIAL_QUADRANTS.map(({ x, y, sx, sy }, index) => (
+              <g key={index} transform={`translate(${x * size} ${y * size}) scale(${sx} ${sy})`}>
+                <svg
+                  width={size}
+                  height={size}
+                  viewBox={`${MATERIAL_GUTTER} ${row * 512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
+                >
+                  <image
+                    href={art?.environment ?? '/art/optimized/environment-painted.00c506c983c0.webp'}
+                    width="1024"
+                    height="1024"
+                  />
+                </svg>
+              </g>
+            ))}
+          </pattern>
+        ))}
+        {board.hexes.map((h) => (
+          <mask
+            key={h.id}
+            id={`terrain-${h.id}`}
+            maskUnits="userSpaceOnUse"
+            x={h.x * SIZE - SIZE - 8}
+            y={h.y * SIZE - SIZE - 8}
+            width={SIZE * 2 + 16}
+            height={SIZE * 2 + 16}
+          >
+            <polygon points={hexPoints(h.x * SIZE, h.y * SIZE, 59)} fill="white" filter="url(#ground-edge)" />
+          </mask>
+        ))}
+      </defs>
+      <g className="terrain-fallback" aria-hidden="true">
+        <rect
+          className="water-band"
+          x={WORLD.x}
+          y={WORLD.y}
+          width={WORLD.width}
+          height={WORLD.height}
+          fill="url(#ocean-material)"
+          mask="url(#water-fade-mask)"
+        />
+        <polygon
+          points={coast}
+          fill="#52bebf"
+          stroke="#73dcd2"
+          strokeWidth="27"
+          strokeLinejoin="round"
+          filter="url(#ground-edge)"
+        />
+        <polygon
+          points={coast}
+          fill="url(#sand-material)"
+          stroke="#a68d53"
+          strokeWidth="8"
+          strokeLinejoin="round"
+          filter="url(#ground-edge)"
+        />
+        {board.hexes.map((h) => {
+          const n = TERRAIN_INDEX[h.terrain];
+          return (
+            <g key={h.id} mask={`url(#terrain-${h.id})`}>
+              <polygon
+                className="terrain-base"
+                points={hexPoints(h.x * SIZE, h.y * SIZE, 63)}
+                fill={TERRAIN_BASE[h.terrain]}
+              />
+              <text
+                className="terrain-base-label"
+                x={h.x * SIZE}
+                y={h.y * SIZE + 34}
+                textAnchor="middle"
+                fontFamily="Barlow, sans-serif"
+                fontSize="12"
+                fontWeight="600"
+                fill="#172d25"
+              >
+                {h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain]}
+              </text>
+              <svg
+                x={h.x * SIZE - SIZE}
+                y={h.y * SIZE - SIZE}
+                width={SIZE * 2}
+                height={SIZE * 2}
+                viewBox={`${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
+              >
+                <image
+                  href={art?.terrain ?? '/art/optimized/terrain-fantasy.777e0ac07117.webp'}
+                  width="1536"
+                  height="1024"
+                />
+              </svg>
+            </g>
+          );
+        })}
+      </g>
+    </>
+  );
+});
+
+/**
+ * Memoised because it is the most expensive thing on the screen — roughly
+ * 18ms a commit, measured — and it was being re-rendered by every unrelated
+ * state change in the app: a panel opening, a timer ticking, a reaction
+ * arriving. Now it only runs when something it draws has actually changed.
+ */
+export const Board = memo(function Board({
   board,
   game,
   me,
@@ -129,6 +307,7 @@ export function Board({
   effectId,
   pendingBuild = null,
   selectedRobberHex = null,
+  colors = EMPTY_COLORS,
   art,
 }: {
   board: Island;
@@ -142,6 +321,9 @@ export function Board({
   effectId?: string;
   pendingBuild?: BuildAction | null;
   selectedRobberHex?: number | null;
+  /** Every player's colour, keyed by player id. Never by index: the game
+   *  shuffles the seats at the start, so the two orders differ. */
+  colors?: Record<string, string>;
   art?: TerrainArt;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
@@ -153,8 +335,10 @@ export function Board({
         .join(' '),
     [board.seed],
   );
+  // A board with no room to ask — a preview, a test — falls back to the four
+  // the game has always started with, in whatever order it has.
   const color = (id: string) =>
-    PLAYER_COLORS[game?.players.findIndex((p) => p.id === id) ?? 0] ?? PLAYER_COLORS[0];
+    colors[id] ?? DEFAULT_SEAT_HEX[game?.players.findIndex((p) => p.id === id) ?? 0] ?? DEFAULT_SEAT_HEX[0]!;
   const ownTurn = !!game && game.players[game.active]?.id === me && !game.winner;
   const interactive = ownTurn && !disabled;
   const setupSettlement = game?.phase === 'setupSettlement',
@@ -204,150 +388,7 @@ export function Board({
         role="group"
         aria-label="Island board"
       >
-        <defs>
-          <filter
-            id="water-feather"
-            filterUnits="userSpaceOnUse"
-            x={WORLD.x}
-            y={WORLD.y}
-            width={WORLD.width}
-            height={WORLD.height}
-            colorInterpolationFilters="sRGB"
-          >
-            <feGaussianBlur stdDeviation={WATER_FEATHER / 6} />
-            <feComponentTransfer>
-              <feFuncA type="linear" slope="1.006" intercept="-0.003" />
-            </feComponentTransfer>
-          </filter>
-          <mask
-            id="water-fade-mask"
-            maskUnits="userSpaceOnUse"
-            x={WORLD.x}
-            y={WORLD.y}
-            width={WORLD.width}
-            height={WORLD.height}
-            style={{ maskType: 'alpha' }}
-          >
-            <polygon points={water} fill="white" filter="url(#water-feather)" />
-          </mask>
-          <filter id="piece-shadow" x="-60%" y="-60%" width="220%" height="220%">
-            <feDropShadow dx="1" dy="3" stdDeviation="1.5" floodColor="#0b1519" floodOpacity=".7" />
-          </filter>
-          <filter id="ground-edge" x="-10%" y="-10%" width="120%" height="120%">
-            <feTurbulence type="fractalNoise" baseFrequency=".09" numOctaves="2" seed="7" result="noise" />
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="noise"
-              scale="4"
-              xChannelSelector="R"
-              yChannelSelector="G"
-            />
-            <feGaussianBlur stdDeviation=".65" />
-          </filter>
-          {[
-            { id: 'ocean-material', size: 240, row: 0 },
-            { id: 'sand-material', size: 150, row: 1 },
-          ].map(({ id, size, row }) => (
-            <pattern key={id} id={id} width={size * 2} height={size * 2} patternUnits="userSpaceOnUse">
-              {MATERIAL_QUADRANTS.map(({ x, y, sx, sy }, index) => (
-                <g key={index} transform={`translate(${x * size} ${y * size}) scale(${sx} ${sy})`}>
-                  <svg
-                    width={size}
-                    height={size}
-                    viewBox={`${MATERIAL_GUTTER} ${row * 512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
-                  >
-                    <image
-                      href={art?.environment ?? '/art/optimized/environment-painted.00c506c983c0.webp'}
-                      width="1024"
-                      height="1024"
-                    />
-                  </svg>
-                </g>
-              ))}
-            </pattern>
-          ))}
-          {board.hexes.map((h) => (
-            <mask
-              key={h.id}
-              id={`terrain-${h.id}`}
-              maskUnits="userSpaceOnUse"
-              x={h.x * SIZE - SIZE - 8}
-              y={h.y * SIZE - SIZE - 8}
-              width={SIZE * 2 + 16}
-              height={SIZE * 2 + 16}
-            >
-              <polygon
-                points={hexPoints(h.x * SIZE, h.y * SIZE, 59)}
-                fill="white"
-                filter="url(#ground-edge)"
-              />
-            </mask>
-          ))}
-        </defs>
-        <g className="terrain-fallback" aria-hidden="true">
-          <rect
-            className="water-band"
-            x={WORLD.x}
-            y={WORLD.y}
-            width={WORLD.width}
-            height={WORLD.height}
-            fill="url(#ocean-material)"
-            mask="url(#water-fade-mask)"
-          />
-          <polygon
-            points={coast}
-            fill="#52bebf"
-            stroke="#73dcd2"
-            strokeWidth="27"
-            strokeLinejoin="round"
-            filter="url(#ground-edge)"
-          />
-          <polygon
-            points={coast}
-            fill="url(#sand-material)"
-            stroke="#a68d53"
-            strokeWidth="8"
-            strokeLinejoin="round"
-            filter="url(#ground-edge)"
-          />
-          {board.hexes.map((h) => {
-            const n = TERRAIN_INDEX[h.terrain];
-            return (
-              <g key={h.id} mask={`url(#terrain-${h.id})`}>
-                <polygon
-                  className="terrain-base"
-                  points={hexPoints(h.x * SIZE, h.y * SIZE, 63)}
-                  fill={TERRAIN_BASE[h.terrain]}
-                />
-                <text
-                  className="terrain-base-label"
-                  x={h.x * SIZE}
-                  y={h.y * SIZE + 34}
-                  textAnchor="middle"
-                  fontFamily="Barlow, sans-serif"
-                  fontSize="12"
-                  fontWeight="600"
-                  fill="#172d25"
-                >
-                  {h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain]}
-                </text>
-                <svg
-                  x={h.x * SIZE - SIZE}
-                  y={h.y * SIZE - SIZE}
-                  width={SIZE * 2}
-                  height={SIZE * 2}
-                  viewBox={`${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
-                >
-                  <image
-                    href={art?.terrain ?? '/art/optimized/terrain-fantasy.777e0ac07117.webp'}
-                    width="1536"
-                    height="1024"
-                  />
-                </svg>
-              </g>
-            );
-          })}
-        </g>
+        <BoardScenery board={board} art={art} coast={coast} water={water} />
         {board.hexes.map((h) => {
           const x = h.x * SIZE,
             y = h.y * SIZE;
@@ -655,4 +696,4 @@ export function Board({
       </svg>
     </div>
   );
-}
+});

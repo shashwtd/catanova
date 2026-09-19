@@ -1,0 +1,250 @@
+/*
+ * The phone layout, in two bands.
+ *
+ * What was here before was assembled from constants. Everything below the
+ * player rail was positioned against a fixed 116px, whatever the rail actually
+ * measured, so a table of two left a band of empty wood where a third row of
+ * portraits would have been and a table of four overflowed it. At the bottom,
+ * the dock started 64px from the left edge to keep a notch clear for two
+ * floating buttons, and its two rows were each pushed to the right, which is
+ * where the gaps came from: a wide pale slab of resource counters, then a row
+ * of buttons huddled at one end with nothing at the other.
+ *
+ * So: the rail publishes its own height (`--rail-height`, set in PlayerRail),
+ * everything below flows from it, and the bottom becomes one shelf running the
+ * full width of the screen.
+ *
+ *     ┌───────────────────────────┐
+ *     │        the players        │  measured, one row or two
+ *     │       what to do now      │  the prompt
+ *     │ [history]     [menu][react] │  the tools, split to the edges
+ *     │                           │
+ *     │           board           │
+ *     │                           │
+ *     │  ┌─────────────────────┐  │
+ *     │  │ cards you are holding│ │  only when you hold some
+ *     │  │ [buy][trade]   [dice]│ │  what you can do, what you rolled
+ *     │  │ 🪵 🧱 🐑 🌾 ⛰  [roll]│ │  what you have, and the one action
+ *     │  └─────────────────────┘  │
+ *     └───────────────────────────┘
+ *
+ * The two bottom rows line up in a column on the right: the die you press sits
+ * directly under the dice it throws.
+ */
+
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing {
+    /* Where the rail ends. Everything below is measured from here. */
+    --rail-block: calc(var(--mobile-safe-top, 0px) + var(--rail-height, 116px));
+    --shelf-inline: 8px;
+    --shelf-pad: 9px;
+    --hud-left: calc(var(--mobile-safe-left, 0px) + var(--shelf-inline));
+    --hud-right: calc(var(--mobile-safe-right, 0px) + var(--shelf-inline));
+    /* The board clears the shelf's measured height (GameHandDock publishes it)
+       rather than a constant chosen for one of the shelf's two shapes. */
+    --hud-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--dock-height, 134px) + 18px);
+  }
+
+  /* --- the top band ----------------------------------------------------- */
+
+  .playing .player-rail {
+    max-height: none;
+  }
+  .playing .action-prompt {
+    top: calc(var(--rail-block) + 10px);
+  }
+  .playing .side-controls.game-controls {
+    top: calc(var(--rail-block) + 46px);
+    left: var(--hud-left);
+  }
+  /* The menu and reactions used to sit in the bottom-left corner, which is why
+     the shelf could not start at the edge. They pair with the history button
+     across the same line instead, where there is nothing else. */
+  .playing .side-controls.room-controls {
+    top: calc(var(--rail-block) + 46px);
+    right: var(--hud-right);
+    bottom: auto;
+    left: auto;
+    align-items: flex-end;
+  }
+  /* Both of these used to hang off a control in the bottom-left corner, so
+     they opened upward and to the right. From the top right they have to do
+     the opposite, or they open off two edges at once. */
+  .playing .room-controls .game-tools-popover.t-dropdown,
+  .playing .room-controls .reaction-tray {
+    top: calc(100% + 8px);
+    bottom: auto;
+    left: auto;
+    right: 0;
+    transform-origin: top right;
+  }
+  .playing .room-controls .reaction-tray {
+    max-width: calc(
+      100vw - 2 * var(--shelf-inline) - var(--mobile-safe-left, 0px) - var(--mobile-safe-right, 0px)
+    );
+  }
+  .playing .board-anchor {
+    inset: calc(var(--rail-block) + 96px) var(--hud-right) var(--hud-bottom) var(--hud-left);
+  }
+
+  /* --- the bottom: a table, and the dice beside it ----------------------- */
+
+  /* Two objects, not one. The table holds what you own and what you can spend
+     it on; the dice are their own tile next to it. Putting the roll inside the
+     same panel as the resource counters made one undifferentiated block out of
+     two things that have nothing to do with each other. */
+  .playing .hand-dock.hand-dock-separated {
+    left: var(--hud-left);
+    right: var(--hud-right);
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    display: grid;
+    /* buy · trade · where the dice land · the dice tile */
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    /* Declared, not implied: `grid-row: 1 / -1` below counts explicit lines,
+       and with none declared it silently collapsed to the first row, which
+       left the one action stranded above the table with a hole beneath it. */
+    grid-template-rows: auto auto;
+    /* Everything down here stands on the same line. */
+    align-items: end;
+    gap: 8px;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+  /* This wrapper exists to group the buttons on a wide screen; here the dock
+     places its children itself, so it steps out of the way. */
+  .playing .hand-dock-separated .table-actions {
+    display: contents;
+  }
+
+  /* The wrappers group things on a wide screen; here the dock places their
+     children itself, so both step out of the way. */
+  .playing .hand-dock-separated .card-table {
+    display: contents;
+  }
+
+  /* The table: what you own, along the bottom. */
+  .playing .hand-dock-separated .hand-zone {
+    grid-column: 1 / 4;
+    grid-row: 2;
+    justify-self: stretch;
+    align-self: end;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2px;
+    padding: 10px var(--shelf-pad);
+    border: 1px solid #c8a87845;
+    border-radius: 13px;
+    background: linear-gradient(#2c2620f2, #211c17f7);
+    box-shadow:
+      inset 0 1px #f3deb330,
+      inset 0 -3px #1a1410,
+      0 4px 14px #0d0b0955;
+  }
+  .playing .hand-dock-separated .card-table::before {
+    content: none;
+  }
+  .playing .hand-dock-separated .resource-hand.resource-counters {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    justify-content: space-between;
+    gap: 2px;
+  }
+  .playing .hand-dock-separated .resource-counter {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  /* The line above it, left to right: trade, buy, and the cards you hold.
+     The cards used to open a row of their own, which took sixty more pixels
+     off the board the moment you bought one. They sit on this line instead. */
+  .playing .hand-dock-separated .utility-actions {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .playing .hand-dock-separated .purchase-control {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .playing .hand-dock-separated .development-tray {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+    justify-content: flex-start;
+    min-width: 0;
+    gap: 4px;
+    margin: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .playing .hand-dock-separated .development-tray::-webkit-scrollbar {
+    display: none;
+  }
+  /* The fan carries 38px of vertical padding for a hover lift there is no
+     hover for here, which was most of what made a bought card cost the board
+     sixty pixels. Two pixels is enough for the card's own shadow. */
+  .playing .hand-dock.hand-dock-separated .development-tray .development-fan {
+    gap: 4px;
+    padding: 2px 0;
+  }
+  .playing .hand-dock.hand-dock-separated .development-tray :is(.development-slot, .development-card) {
+    width: 44px;
+    height: 60px;
+  }
+
+  /* The dice, and the button that throws them, down the right. The throw goes
+     above the button rather than out in the middle of the row: that corner is
+     empty until you roll, and this puts the result where it came from. */
+  .playing .hand-dock-separated [data-dice-dock] {
+    grid-column: 4;
+    grid-row: 1;
+    align-self: start;
+    justify-self: center;
+  }
+  .playing .hand-dock-separated .turn-action {
+    grid-column: 4;
+    grid-row: 1 / -1;
+    align-self: end;
+    justify-self: center;
+  }
+  /* Both of these keep their height and take a little more width, which is
+     what they needed: they were two narrow slabs beside a wide table. */
+  .playing .hand-dock.hand-dock-separated .table-actions :is(.trade-action, .development-buy) {
+    width: 58px;
+  }
+
+  /* Trade and the turn action carry their words here as they do everywhere
+     else. A narrow-screen rule drops them below 480px, which left the phone
+     with two unlabelled shapes where the desktop has two labelled buttons. */
+  .playing .hand-dock-separated :is(.trade-action, .turn-action) > span {
+    display: block;
+    font-size: 9px;
+    line-height: 1.15;
+  }
+  .playing .hand-dock-separated :is(.trade-action, .turn-action) .game-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* An empty cradle should not hold its row open before the first roll. */
+  .playing .hand-dock-separated [data-dice-dock]:not(:has(*)) {
+    height: 0;
+  }
+}
+
+/* A short phone cannot spare a row for cards it is not holding, and the board
+   is the thing being squeezed. */
+@media (max-width: 700px) and (orientation: portrait) and (max-height: 700px) {
+  .playing .hand-dock.hand-dock-separated {
+    gap: 6px;
+    padding: 7px;
+  }
+}

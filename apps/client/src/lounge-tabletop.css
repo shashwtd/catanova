@@ -139,35 +139,7 @@
     inset 0 1px #fbe8bc18,
     0 4px 12px #20150c33;
 }
-.lobby .room-lobby :is(.lobby-seat, .lobby-seat.self) {
-  background: var(--game-panel-fill);
-  border-color: #cbb48a6e;
-  box-shadow: var(--game-panel-shadow);
-}
-.lobby .room-lobby .lobby-seat.self {
-  border-color: #e4c27c;
-}
-.lobby .room-lobby .lobby-invite-tile {
-  background: #372d2480;
-  border: 1px dashed #d7b97966;
-  color: #efd7ac;
-}
-.lobby .room-lobby .lobby-invite-tile:hover {
-  background: #6954407d;
-  border-color: #efd194;
-}
-.lobby .room-lobby .lobby-avatar .avatar-medallion {
-  box-shadow:
-    0 0 0 4px #342b24,
-    0 7px 14px #1c120b55;
-}
-.lobby .room-lobby .ready-status:not(.ready) {
-  color: var(--game-muted);
-}
-.lobby .room-lobby .ready-status.ready {
-  color: #d1e6b2;
-  background: #b7cf8720;
-}
+
 .lobby .room-lobby .room-share {
   background: #352c25e8;
   border-color: #d7b97955;
@@ -185,8 +157,7 @@
       0 0 0 4px #a48a5d,
       0 5px 10px #180f0a40;
   }
-  .player-home .hub-character,
-  .lobby .room-lobby .lobby-seat {
+  .player-home .hub-character {
     box-shadow:
       inset 0 1px #fbe8bc22,
       0 4px 10px #1b100b30;

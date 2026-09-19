@@ -10,7 +10,7 @@ import { parseRoomSettings } from '../packages/protocol/src/settings.js';
 import { Store } from '../apps/server/src/store.js';
 import { newSession } from '../apps/client/src/connection.js';
 import { readyLobby } from './helpers.js';
-import { GameSettings } from '../apps/client/src/GameSettings.js';
+import { PlayerSettings, RoomConfiguration } from '../apps/client/src/GameSettings.js';
 import { QuickRules } from '../apps/client/src/QuickRules.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
 const seats = [
@@ -105,13 +105,14 @@ test('host target persists across restart, reaches the match snapshot, and locks
       save: async () => {},
       previewSound: () => {},
     };
-    const lobby = renderToStaticMarkup(createElement(GameSettings, props));
+    const lobby = renderToStaticMarkup(createElement(RoomConfiguration, props));
     assert.match(lobby, /Points to win/);
     assert.match(lobby, /aria-valuetext="12 victory points"/);
-    const spectator = renderToStaticMarkup(createElement(GameSettings, { ...props, me: friend.id }));
+    const spectator = renderToStaticMarkup(createElement(RoomConfiguration, { ...props, me: friend.id }));
     assert.match(spectator, /<input[^>]*id="victory-target"[^>]*disabled=""/);
-    const playing = renderToStaticMarkup(createElement(GameSettings, { ...props, room }));
-    assert.ok(!playing.includes('victory-target'), 'in-game settings remain audio-only');
+    // The goal is the table's, so it is never in a player's own settings.
+    const playing = renderToStaticMarkup(createElement(PlayerSettings, props));
+    assert.ok(!playing.includes('victory-target'), 'personal settings never carry the table rules');
     assert.match(
       renderToStaticMarkup(createElement(QuickRules, { victoryPoints: 12 })),
       /First to 12 points/,

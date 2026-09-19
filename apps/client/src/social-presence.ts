@@ -1,6 +1,32 @@
 export const SOCIAL_HEARTBEAT_MS = 25_000;
 export const SOCIAL_HEARTBEAT_TIMEOUT_MS = 15_000;
 
+/**
+ * How long ago someone was here, in the words a person would use.
+ *
+ * Deliberately vague at the top end. A friends list is not a log: "last week"
+ * is as much as anyone needs, and the exact hour of someone's Tuesday is not
+ * ours to publish even when we happen to know it. Anything under a minute
+ * reads as "just now" rather than counting seconds, which would make an
+ * offline friend look like they were being watched.
+ */
+export function lastSeenLabel(at: number, now: number): string {
+  const seconds = Math.max(0, Math.round((now - at) / 1000));
+  if (seconds < 60) return 'Last seen just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `Last seen ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Last seen ${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Last seen yesterday';
+  if (days < 7) return `Last seen ${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `Last seen ${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `Last seen ${months} ${months === 1 ? 'month' : 'months'} ago`;
+  return 'Last seen over a year ago';
+}
+
 /** One foreground heartbeat at a time; hidden tabs stop fetching and expire naturally on the server. */
 export function startSocialPresence(
   ping: (signal: AbortSignal) => Promise<unknown>,

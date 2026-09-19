@@ -11,12 +11,23 @@ import { parseRoomSettings } from './settings.js';
 import type { RoomSettings, TurnClock } from './settings.js';
 import { isReaction } from './reactions.js';
 import type { ReactionName } from './reactions.js';
-import { isBotLevel } from './bots.js';
 import type { BotLevel } from './bots.js';
+import { isPlayerColor } from './colors.js';
+import type { PlayerColor } from './colors.js';
 export { REACTIONS, REACTION_LIST, isReaction } from './reactions.js';
 export type { ReactionName } from './reactions.js';
-export { BOT_LEVELS, BOT_LEVEL_LABEL, BOT_NAMES, botName, isBotLevel } from './bots.js';
+export { BOT_LEVELS, BOT_LEVEL_LABEL, BOT_NAMES, botName, isBotLevel, randomBotLevel } from './bots.js';
 export type { BotLevel } from './bots.js';
+export {
+  PLAYER_COLORS,
+  PLAYER_COLOR_LIST,
+  PLAYER_COLOR_LABEL,
+  DEFAULT_SEAT_COLORS,
+  availableColors,
+  isPlayerColor,
+  seatColors,
+} from './colors.js';
+export type { PlayerColor } from './colors.js';
 import { parseGameAction } from '../../rules/src/game.js';
 import type { GameAction, GameView } from '../../rules/src/game.js';
 import type { Board } from '../../rules/src/board.js';
@@ -52,6 +63,11 @@ export type RoomPlayer = {
   bot?: boolean;
   botLevel?: string;
   profile?: Profile;
+  /** What this seat asked to be. Absent means "whatever is free". */
+  color?: PlayerColor;
+  /** A bot is playing this seat while its player is away. They keep their
+   *  pieces, their hand and their points; only the turns are being covered. */
+  standIn?: true;
   ready?: boolean;
   disconnectedAt?: number;
   resignAt?: number;
@@ -103,7 +119,10 @@ export type ClientMessage =
       ready: boolean;
       profile?: Profile;
       kickPlayerId?: string;
-      addBot?: BotLevel;
+      /** Ask for a bot. The server draws which one; the client never picks. */
+      addBot?: true;
+      /** Ask to play in this colour. Refused if somebody else already holds it. */
+      color?: PlayerColor;
     }
   | { type: 'settings'; commandId: string; expectedRevision: number; settings: RoomSettings }
   | { type: 'launchReady'; id: string; success: boolean }
@@ -172,9 +191,14 @@ export function parseClientMessage(input: string): ClientMessage {
       if (typeof v.ready !== 'boolean') throw new Error('Invalid ready state');
       if (
         v.addBot !== undefined &&
-        (!isBotLevel(v.addBot) || v.profile !== undefined || v.kickPlayerId !== undefined)
+        (v.addBot !== true || v.profile !== undefined || v.kickPlayerId !== undefined)
       )
         throw new Error('Invalid bot request');
+      if (
+        v.color !== undefined &&
+        (!isPlayerColor(v.color) || v.addBot !== undefined || v.kickPlayerId !== undefined)
+      )
+        throw new Error('Invalid colour');
       if (
         v.kickPlayerId !== undefined &&
         (typeof v.kickPlayerId !== 'string' ||
@@ -187,7 +211,8 @@ export function parseClientMessage(input: string): ClientMessage {
         ...base,
         ready: v.ready,
         ...(typeof v.kickPlayerId === 'string' ? { kickPlayerId: v.kickPlayerId } : {}),
-        ...(isBotLevel(v.addBot) ? { addBot: v.addBot } : {}),
+        ...(v.addBot === true ? { addBot: true as const } : {}),
+        ...(isPlayerColor(v.color) ? { color: v.color } : {}),
         ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
       };
     }

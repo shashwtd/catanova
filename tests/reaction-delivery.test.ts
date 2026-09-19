@@ -72,14 +72,14 @@ test('accepted reactions reach each player and spectator once, without revisions
     await until(() => watcher.reactions().length === i + 2);
   }
   now += 500;
-  a.send({ type: 'react', reaction: 'fire' });
+  a.send({ type: 'react', reaction: 'shock' });
   a.send({ type: 'ping', nonce: 'burst-limit' });
   await until(() => a.messages.some((m) => m.type === 'pong' && m.nonce === 'burst-limit'));
   assert.equal(a.reactions().length, 4);
   watcher.send({ type: 'react', reaction: 'evil' });
   await until(() => watcher.messages.some((m) => m.type === 'error' && m.code === 'SPECTATOR_READ_ONLY'));
   now += 6000;
-  a.send({ type: 'react', reaction: 'trade' });
+  a.send({ type: 'react', reaction: 'pleading' });
   await until(() => [a, b, watcher].every((c) => c.reactions().length === 5));
   assert.equal(server.store.snapshot(room).revision, revision);
 });

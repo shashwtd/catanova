@@ -4,10 +4,13 @@ import type { useAuth } from './auth.js';
 import { Check, Eye, Plus, RefreshCw, Users, X } from './GameIcons.js';
 import { Avatar } from './Profile.js';
 import { GoogleMark } from './ProviderMarks.js';
+import { lastSeenLabel } from './social-presence.js';
 
 type Auth = ReturnType<typeof useAuth>;
 type Friend = PublicAccount & {
   online?: boolean;
+  /** Only present for an offline friend who chose to share it. */
+  lastSeenAt?: number;
   watchable?: { roomId: string; roomCode?: string };
 };
 const failure = (error: unknown) => (error instanceof Error ? error.message : 'Please try again.');
@@ -61,7 +64,13 @@ function SearchIcon() {
     </svg>
   );
 }
-function FriendIdentity({ account, showPresence = false }: { account: Friend; showPresence?: boolean }) {
+export function FriendIdentity({
+  account,
+  showPresence = false,
+}: {
+  account: Friend;
+  showPresence?: boolean;
+}) {
   return (
     <>
       <Avatar profile={account.profile} />
@@ -72,7 +81,11 @@ function FriendIdentity({ account, showPresence = false }: { account: Friend; sh
         ) : showPresence && typeof account.online === 'boolean' ? (
           <small className="roster-presence" data-online={account.online}>
             <span aria-hidden="true" />
-            {account.online ? 'Online' : 'Offline'}
+            {account.online
+              ? 'Online'
+              : account.lastSeenAt === undefined
+                ? 'Offline'
+                : lastSeenLabel(account.lastSeenAt, Date.now())}
           </small>
         ) : null}
       </span>
@@ -391,9 +404,7 @@ function FriendsContents({ auth, onWatch }: { auth: Auth; onWatch?: (reference: 
                         disabled={!!busy}
                         aria-label={`Watch ${account.username}'s game`}
                         title="Watch their game"
-                        onClick={() =>
-                          onWatch(account.watchable!.roomCode ?? account.watchable!.roomId)
-                        }
+                        onClick={() => onWatch(account.watchable!.roomCode ?? account.watchable!.roomId)}
                       >
                         <Eye size={20} />
                       </button>
@@ -403,8 +414,8 @@ function FriendsContents({ auth, onWatch }: { auth: Auth; onWatch?: (reference: 
                       className="roster-action roster-icon roster-remove"
                       disabled={!!busy}
                       aria-label={`Remove ${account.username} from friends`}
-                    aria-expanded={removing?.id === account.id}
-                    title="Remove friend"
+                      aria-expanded={removing?.id === account.id}
+                      title="Remove friend"
                       onClick={(event) => {
                         removeTrigger.current = event.currentTarget;
                         setRemoving(account);

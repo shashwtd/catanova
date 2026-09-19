@@ -8,7 +8,7 @@ import { ArrowLeftRight, LightCheck as Check, Exchange, GameIcon, Users, X } fro
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { PLAYER_COLORS } from './Board.js';
+import { playerHexColor } from './player-colors.js';
 import { ResourceChoice, ResourcePicker, ResourceSummary } from './ResourcePicker.js';
 import { TradeSubmission } from './trade-submission.js';
 import type { TradeSender } from './trade-submission.js';
@@ -304,7 +304,7 @@ export function TradePanel({
                           data-response={declined ? 'declined' : response ? 'ready' : 'waiting'}
                           style={
                             {
-                              '--partner-color': PLAYER_COLORS[index % PLAYER_COLORS.length],
+                              '--partner-color': playerHexColor(roomPlayers, other.id),
                             } as CSSProperties
                           }
                           disabled={locked || !response || !!declined || !canPay(hand, trade.give)}

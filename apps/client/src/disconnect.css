@@ -27,6 +27,13 @@
   color: #e7c1b3;
   background: #382a2adb;
 }
+/* A covered seat is a calmer state than an absent one: nothing is being lost,
+   somebody is just playing it for now. Green rather than the amber of a chair
+   that is still empty. */
+.profile-absence.is-standin {
+  color: #cfe8c4;
+  background: #26372adb;
+}
 @media (max-width: 700px) and (orientation: portrait) {
   .playing:has(.profile-absence) {
     --mobile-profile-height: 142px;

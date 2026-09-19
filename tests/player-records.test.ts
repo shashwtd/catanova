@@ -111,17 +111,17 @@ test('completed game and resignation statistics commit atomically and are never 
     assert.deepEqual(initial.stats, { played: 0, wins: 0 });
     assert.equal(initial.games.length, 1);
     assert.equal(initial.games[0]!.startedAt, now);
-    store.setConnected(players[1]!, false);
-    now += RECONNECT_GRACE_MS;
+    // Leaving outright, which is the remaining way a game ends in a resignation:
+    // a dropped connection is covered by a bot and finishes the match instead.
+    const leaveAt = () => store.snapshot(host.room_id).revision;
     store.db.exec(
       "CREATE TEMP TRIGGER reject_summary BEFORE UPDATE ON match_records BEGIN SELECT RAISE(ABORT,'Summary storage failed'); END;",
     );
-    assert.throws(() => store.expireRoom(host.room_id), /Summary storage failed/);
+    assert.throws(() => store.leave(players[1]!, 'leave-match', leaveAt()), /Summary storage failed/);
     assert.equal(store.loadGame(host.room_id)!.winner, null);
     assert.deepEqual(store.accountGames('Captain'), initial);
     store.db.exec('DROP TRIGGER reject_summary');
-    assert.equal(store.expireRoom(host.room_id), true);
-    assert.equal(store.expireRoom(host.room_id), false);
+    assert.equal(store.leave(players[1]!, 'leave-match', leaveAt()).released, true);
     const winner = store.accountGames('Captain'),
       loser = store.accountGames('Builder');
     assert.deepEqual(winner.stats, { played: 1, wins: 1 });
@@ -225,16 +225,13 @@ test('an already resigned player is not counted as completed until the remaining
   const store = new Store(':memory:', { now: () => now, trackPresence: true });
   try {
     const { players, host } = start(store, ['Captain', 'Builder', 'Trader']);
-    store.setConnected(players[1]!, false);
-    now += RECONNECT_GRACE_MS;
-    store.expireRoom(host.room_id);
+    const at = () => store.snapshot(host.room_id).revision;
+    store.leave(players[1]!, 'builder-leaves', at());
     const record = store.accountGames('Builder');
     assert.deepEqual(record.stats, { played: 0, wins: 0 });
     assert.equal(record.games[0]!.outcome, 'resigned');
     assert.equal(record.games[0]!.resumable, false);
-    store.setConnected(players[2]!, false);
-    now += RECONNECT_GRACE_MS;
-    store.expireRoom(host.room_id);
+    store.leave(players[2]!, 'trader-leaves', at());
     assert.deepEqual(store.accountGames('Builder').stats, { played: 1, wins: 0 });
   } finally {
     store.close();

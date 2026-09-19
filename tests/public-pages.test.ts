@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
+import { GUIDE_FAQ, PUBLIC_PAGES, SOCIAL_CARD_ALT } from '../apps/client/src/PublicPages.js';
 
 test('the production entry is readable before JavaScript and only public pages enter discovery files', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'catanova-public-'));
@@ -16,10 +17,21 @@ test('the production entry is readable before JavaScript and only public pages e
   const guide = await readFile(join(directory, 'guide', 'index.html'), 'utf8');
   const shell = await readFile(join(directory, 'app.html'), 'utf8');
   assert.equal((home.match(/<title>/g) ?? []).length, 1);
-  assert.ok(home.includes('<title>Catanova — Build. Trade. Settle.</title>'));
+  assert.ok(home.includes(`<title>${PUBLIC_PAGES[0].title}</title>`));
   assert.ok(home.includes(`<title>${HOME_TITLE}</title>`), 'hydration must retain the public brand title');
-  assert.ok(home.includes('property="og:title" content="Catanova — Build. Trade. Settle."'));
-  assert.ok(home.includes('name="twitter:title" content="Catanova — Build. Trade. Settle."'));
+  assert.ok(home.includes(`property="og:title" content="${PUBLIC_PAGES[0].title}"`));
+  assert.ok(home.includes(`name="twitter:title" content="${PUBLIC_PAGES[0].title}"`));
+  // A search result is a sentence somebody wrote, not a keyword list with an
+  // em dash in the middle of it.
+  for (const page of PUBLIC_PAGES) {
+    assert.ok(!page.title.includes('\u2014'), page.title);
+    assert.ok(!page.description.includes('\u2014'), page.description);
+    assert.ok(page.title.length <= 60, `${page.title} is ${page.title.length} characters`);
+    assert.ok(
+      page.description.length >= 110 && page.description.length <= 160,
+      `${page.description.length} characters`,
+    );
+  }
   assert.match(home, /itemscope="" itemType="https:\/\/schema.org\/WebSite"/i);
   assert.ok(home.includes('itemProp="name" content="Catanova"'));
   assert.ok(home.includes('itemProp="url" href="https://catanova.io/"'));
@@ -35,31 +47,28 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.match(guide, /rel="preload" as="image" type="image\/webp"/);
   assert.ok(!shell.includes('as="image"'), 'private game routes must not prefetch the welcome scenery');
   assert.ok(!shell.includes('Create room') && !shell.includes('Connecting…'));
-  assert.ok(guide.includes('How to Play Catanova') && guide.includes('City upgrade'));
+  assert.ok(guide.includes('How to play') && guide.includes('City upgrade'));
   assert.ok(guide.includes('3 Rock') && guide.includes('2 Hay'));
   assert.ok(guide.includes('cannot add friends while still guests'));
-  assert.ok(guide.includes('Disconnected players &amp; auto-resign') && guide.includes('three minutes'));
-  assert.ok(guide.includes('last remaining player wins by resignation'));
+  assert.ok(guide.includes('If someone loses connection') && guide.includes('half a minute'));
+  assert.ok(!guide.includes('auto-resign'), 'a dropped connection is covered, not punished');
   assert.ok(guide.includes('id="questions"') && guide.includes('Can phones and computers play together?'));
   assert.ok(guide.includes('not an official CATAN game'));
-  assert.ok(guide.includes('There are no solo bots or public matchmaking.'));
-  assert.ok(!guide.includes('<script') && !guide.includes('/src/main.tsx'));
+  assert.ok(guide.includes('There is no public matchmaking'));
+  // The guide still ships no executable code; the only script on it is data.
+  assert.deepEqual(
+    [...guide.matchAll(/<script([^>]*)>/g)].map((m) => m[1]!.trim()),
+    ['type="application/ld+json"'],
+  );
+  assert.ok(!guide.includes('/src/main.tsx'));
   for (const html of [home, guide]) {
     assert.equal((html.match(/name="description"/g) ?? []).length, 1);
     assert.ok(html.includes('property="og:image" content="https://catanova.io/branding/social-card-v3.jpg"'));
     assert.ok(
       html.includes('name="twitter:image" content="https://catanova.io/branding/social-card-v3.jpg"'),
     );
-    assert.ok(
-      html.includes(
-        'property="og:image:alt" content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."',
-      ),
-    );
-    assert.ok(
-      html.includes(
-        'name="twitter:image:alt" content="Catanova — Build. Trade. Settle. Golden logo above a sunny island coast."',
-      ),
-    );
+    assert.ok(html.includes(`property="og:image:alt" content="${SOCIAL_CARD_ALT}"`));
+    assert.ok(html.includes(`name="twitter:image:alt" content="${SOCIAL_CARD_ALT}"`));
     assert.ok(html.includes('name="twitter:card" content="summary_large_image"'));
     assert.ok(html.includes('sizes="48x48"') && html.includes('rel="apple-touch-icon"'));
     assert.ok(!html.includes('sb_publishable_') && !html.includes('supabase.co'));
@@ -71,10 +80,51 @@ test('the production entry is readable before JavaScript and only public pages e
     [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((m) => m[1]),
     ['https://catanova.io/', 'https://catanova.io/guide/'],
   );
-  assert.equal(
-    await readFile(join(directory, 'robots.txt'), 'utf8'),
-    'User-agent: *\nAllow: /\n\nSitemap: https://catanova.io/sitemap.xml\n',
+  const robots = await readFile(join(directory, 'robots.txt'), 'utf8');
+  assert.match(robots, /^User-agent: \*\nAllow: \/\n/);
+  assert.match(robots, /Sitemap: https:\/\/catanova\.io\/sitemap\.xml\n$/);
+  // Named, not merely covered by the wildcard: several of these are refused by
+  // default elsewhere, and a site that wants to be quotable should say so.
+  for (const agent of ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended', 'Applebot-Extended'])
+    assert.match(robots, new RegExp(`User-agent: ${agent}\\nAllow: /`), agent);
+  assert.ok(!/Disallow:/.test(robots));
+
+  // The structured data says what the page says, and never more than it says.
+  const data = (html: string) =>
+    JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!) as {
+      '@graph': Record<string, any>[];
+    };
+  const homeGraph = data(home)['@graph'];
+  assert.deepEqual(
+    homeGraph.map((node) => node['@type']),
+    ['VideoGame'],
   );
+  assert.equal(homeGraph[0]!.isAccessibleForFree, true);
+  assert.equal(homeGraph[0]!.offers.price, '0');
+  assert.deepEqual(homeGraph[0]!.numberOfPlayers, {
+    '@type': 'QuantitativeValue',
+    minValue: 2,
+    maxValue: 4,
+  });
+  assert.match(homeGraph[0]!.disambiguatingDescription, /[Nn]ot affiliated with/);
+  const guideGraph = data(guide)['@graph'];
+  assert.deepEqual(
+    guideGraph.map((node) => node['@type']),
+    ['HowTo', 'FAQPage', 'VideoGame'],
+  );
+  // Every answer offered to a search engine is on the page a reader gets.
+  const faq = guideGraph[1]!.mainEntity as { name: string; acceptedAnswer: { text: string } }[];
+  assert.equal(faq.length, GUIDE_FAQ.length);
+  for (const entry of faq) {
+    assert.ok(guide.includes(entry.name), entry.name);
+    assert.ok(guide.includes(entry.acceptedAnswer.text.replaceAll("'", '&#x27;')), entry.name);
+  }
+
+  const llms = await readFile(join(directory, 'llms.txt'), 'utf8');
+  assert.match(llms, /^# Catanova\n/);
+  assert.match(llms, /not a CATAN product/);
+  assert.match(llms, /https:\/\/catanova\.io\/guide\//);
+  for (const entry of GUIDE_FAQ) assert.ok(llms.includes(entry.answer), entry.question);
   // Anchor navigation should never strand readers at a nonexistent section.
   for (const match of guide.matchAll(/href="#([^"]+)"/g)) assert.ok(guide.includes(`id="${match[1]}"`));
 });

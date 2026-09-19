@@ -1,4 +1,5 @@
 import type { SVGProps } from 'react';
+import { isBotLevel } from '../../../packages/protocol/src/bots.js';
 import { PAINTED_ICONS, ICON_ATLAS, ICON_ATLAS_WIDTH, ICON_ATLAS_HEIGHT } from './painted-icons.js';
 // Everyday controls use crisp, contextual ink; game pieces keep their painted artwork.
 const CONTROL_PATHS = {
@@ -15,6 +16,10 @@ const CONTROL_PATHS = {
   bank: 'M3 9l9-6 9 6H3 M5 10v9 M10 10v9 M14 10v9 M19 10v9 M3 21h18',
   statistics: 'M4 20h17 M7 16v-5 M12 16V4 M17 16V8',
   menu: 'M5 6h14 M5 12h14 M5 18h14',
+  // Sliders, not a cog. A cog is the everyday settings a player keeps for
+  // themselves; this is the board being set up, which only the host touches.
+  configure:
+    'M3 7h3.5 M11.5 7h9.5 M3 12h9.5 M17.5 12h3.5 M3 17h4.5 M12.5 17h8.5 M6.5 7a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0 M12.5 12a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0 M7.5 17a2.5 2.5 0 1 0 5 0 2.5 2.5 0 1 0-5 0',
   history: 'M4 7a9 9 0 1 1-1 9 M3 3v5h5 M12 7v5l4 2',
   join: 'M14 3h7v18h-7 M3 12h12 m-5-5 5 5-5 5',
   logout: 'M10 3H4v18h6 M9 12h12 M16 7l5 5-5 5',
@@ -26,7 +31,13 @@ const CONTROL_PATHS = {
   exchange: 'M4 8h15 m-4-4 4 4-4 4 M20 16H5 m4-4-4 4 4 4',
   'next-turn': 'M5 20v-7a5 5 0 0 1 5-5h10 m-5-5 5 5-5 5',
   play: 'm7 3 14 9-14 9V3',
-  bot: 'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
+  // Three machines from one drawing. The head, the ears and the aerial stay put
+  // so they read as the same kind of thing; only the face and what is on top
+  // change, which is enough to tell three players apart at portrait size.
+  bot: 'M8.6 3.2 10 6 M15.4 3.2 14 6 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
+  'bot-sharp':
+    'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M8.4 11.4 10.8 13 M15.6 11.4 13.2 13 M2 11v4 M22 11v4',
+
   smile: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18 M9 10v.5 M15 10v.5 M8 14a5 5 0 0 0 8 0',
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
 } as const;
@@ -74,6 +85,7 @@ export function GameIcon({ name, size = 24, className = '', ...props }: IconProp
 }
 const icon = (name: GameIconName) => (props: IconProps) => <GameIcon name={name} {...props} />;
 export const Bot = icon('bot'),
+  BotSharp = icon('bot-sharp'),
   Eye = icon('eye'),
   Smile = icon('smile'),
   Dices = icon('dice'),
@@ -126,4 +138,63 @@ export const JoinRoom = icon('join'),
   NextTurn = icon('next-turn'),
   Exchange = icon('exchange'),
   LightClose = icon('light-close'),
-  LightCheck = icon('light-check');
+  LightCheck = icon('light-check'),
+  Configure = icon('configure');
+
+/**
+ * The champion.
+ *
+ * The same machine as the other two — one head, one pair of ears, one face —
+ * wearing a crown instead of an aerial. What sets it apart is the finish: it is
+ * the only one struck in gold rather than a flat ink, because it is the one you
+ * are meant to spot across the table.
+ */
+const CHAMP = 'catanova-champion-gold';
+export function BotChamp({ size = 24, className = '', ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={`game-icon control-icon bot-champion ${className}`}
+      fill="none"
+      stroke={`url(#${CHAMP})`}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      {...props}
+    >
+      <defs>
+        {/* One id for every copy: they are identical, so a document holding
+            four champions still paints the same gold. */}
+        <linearGradient id={CHAMP} x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor="#fff2c6" />
+          <stop offset="0.45" stopColor="#e8b24d" />
+          <stop offset="1" stopColor="#a9682b" />
+        </linearGradient>
+      </defs>
+      <path d="M8.4 4 10.3 6 12 3.1 13.7 6 15.6 4" />
+      <path d="M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3" />
+      <path d="M9 12v2 M15 12v2 M2 11v4 M22 11v4" />
+    </svg>
+  );
+}
+
+/**
+ * The mark beside a bot's name.
+ *
+ * It says "bot" and nothing else. Which of the three you have drawn is
+ * something the drawing tells you and the game teaches you; naming the
+ * difficulty on the seat would give away a game you have not played yet.
+ */
+export function BotMark({ level, size = 17 }: { level?: string; size?: number }) {
+  const known = isBotLevel(level) ? level : 'steady';
+  const Mark = known === 'champ' ? BotChamp : known === 'sharp' ? BotSharp : Bot;
+  return (
+    <span className="player-bot-tag" data-level={known} role="img" aria-label="Bot" title="Bot">
+      <Mark size={size} />
+    </span>
+  );
+}

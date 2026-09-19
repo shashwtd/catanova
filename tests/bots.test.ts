@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Store } from '../apps/server/src/store.js';
 import { newSession } from '../apps/client/src/connection.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
+import { BOT_LEVELS, BOT_LEVEL_ODDS, randomBotLevel } from '../packages/protocol/src/bots.js';
 import { Lobby } from '../apps/client/src/Lobby.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { createGame, gameView, applyAction } from '../packages/rules/src/game.js';
@@ -26,17 +27,20 @@ test('a host can seat a bot; nobody else can, and the seat is ready and present'
     const revision = store.snapshot(host.room_id).revision;
 
     assert.throws(
-      () => store.lobby(guest, 'guest-bot', revision, false, undefined, undefined, 'steady'),
+      () => store.lobby(guest, 'guest-bot', revision, false, undefined, undefined, true),
       /Only the host/,
     );
-    store.lobby(host, 'add-bot', revision, false, undefined, undefined, 'steady');
+    store.lobby(host, 'add-bot', revision, false, undefined, undefined, true);
 
     const players = store.snapshot(host.room_id).players;
     assert.equal(players.length, 3);
     const bot = players.find((p) => p.bot);
     assert.ok(bot, 'the bot appears in the roster');
     assert.equal(bot.ready, true, 'a bot is always ready');
-    assert.equal(bot.botLevel, 'steady');
+    assert.ok(
+      BOT_LEVELS.includes(bot.botLevel as (typeof BOT_LEVELS)[number]),
+      `drawn level was ${bot.botLevel}`,
+    );
     assert.notEqual(bot.name, 'A');
     assert.notEqual(bot.name, 'B');
   } finally {
@@ -50,19 +54,11 @@ test('a bot fills the fourth seat and no more, and the host can remove it again'
     const host = store.enter('create', newSession('A').token, 'A');
     store.enter('join', newSession('B').token, 'B', host.room_id);
     for (const id of ['bot-1', 'bot-2'])
-      store.lobby(host, id, store.snapshot(host.room_id).revision, false, undefined, undefined, 'steady');
+      store.lobby(host, id, store.snapshot(host.room_id).revision, false, undefined, undefined, true);
     assert.equal(store.snapshot(host.room_id).players.length, 4);
     assert.throws(
       () =>
-        store.lobby(
-          host,
-          'bot-3',
-          store.snapshot(host.room_id).revision,
-          false,
-          undefined,
-          undefined,
-          'steady',
-        ),
+        store.lobby(host, 'bot-3', store.snapshot(host.room_id).revision, false, undefined, undefined, true),
       /four seats/,
     );
 
@@ -80,15 +76,7 @@ test('a bot never counts as disconnected, and a room of only bots is paused', ()
   const store = new Store(':memory:', { trackPresence: true });
   try {
     const host = store.enter('create', newSession('A').token, 'A');
-    store.lobby(
-      host,
-      'add-bot',
-      store.snapshot(host.room_id).revision,
-      false,
-      undefined,
-      undefined,
-      'steady',
-    );
+    store.lobby(host, 'add-bot', store.snapshot(host.room_id).revision, false, undefined, undefined, true);
     store.setConnected(host, true);
     store.lobby(host, 'host-ready', store.snapshot(host.room_id).revision, true);
     store.action(host, 'start', store.snapshot(host.room_id).revision, { kind: 'start' });
@@ -111,15 +99,61 @@ test('a bot never counts as disconnected, and a room of only bots is paused', ()
   }
 });
 
-test('the add-bot command is validated like any other lobby command', () => {
+test('the add-bot command asks for a bot and cannot choose which one', () => {
   const base = { type: 'lobby', commandId: 'c'.repeat(10), expectedRevision: 1, ready: false };
-  assert.equal(parseClientMessage(JSON.stringify({ ...base, addBot: 'steady' })).type, 'lobby');
-  assert.throws(() => parseClientMessage(JSON.stringify({ ...base, addBot: 'godlike' })), /bot request/);
-  assert.throws(() => parseClientMessage(JSON.stringify({ ...base, addBot: true })), /bot request/);
+  assert.equal(parseClientMessage(JSON.stringify({ ...base, addBot: true })).type, 'lobby');
+  // Naming a level is refused: the draw belongs to the server, so a client
+  // cannot ask for the easy one.
+  for (const bad of ['steady', 'champ', 'godlike', 1])
+    assert.throws(() => parseClientMessage(JSON.stringify({ ...base, addBot: bad })), /bot request/);
   assert.throws(
-    () => parseClientMessage(JSON.stringify({ ...base, addBot: 'steady', kickPlayerId: 'x' })),
+    () => parseClientMessage(JSON.stringify({ ...base, addBot: true, kickPlayerId: 'x' })),
     /bot request/,
   );
+});
+
+test('the draw favours the ordinary bots and keeps the champion rare', () => {
+  assert.equal(
+    Object.values(BOT_LEVEL_ODDS).reduce((a, b) => a + b, 0),
+    1,
+    'the odds are a distribution',
+  );
+  assert.ok(BOT_LEVEL_ODDS.champ < BOT_LEVEL_ODDS.steady, 'a champion is the rare one');
+
+  // Each band of the random source lands in the level that owns it.
+  assert.equal(
+    randomBotLevel(() => 0),
+    'steady',
+  );
+  assert.equal(
+    randomBotLevel(() => 0.39),
+    'steady',
+  );
+  assert.equal(
+    randomBotLevel(() => 0.4),
+    'sharp',
+  );
+  assert.equal(
+    randomBotLevel(() => 0.79),
+    'sharp',
+  );
+  assert.equal(
+    randomBotLevel(() => 0.8),
+    'champ',
+  );
+  assert.equal(
+    randomBotLevel(() => 1),
+    'champ',
+    'never off the end',
+  );
+
+  const counts: Record<string, number> = { steady: 0, sharp: 0, champ: 0 };
+  for (let i = 0; i < 20_000; i++) counts[randomBotLevel()]! += 1;
+  for (const level of BOT_LEVELS)
+    assert.ok(
+      Math.abs(counts[level]! / 20_000 - BOT_LEVEL_ODDS[level]) < 0.02,
+      `${level} came up ${((counts[level]! / 20_000) * 100).toFixed(1)}%`,
+    );
 });
 
 test('only the host sees the control that seats a bot', () => {
@@ -143,16 +177,19 @@ test('only the host sees the control that seats a bot', () => {
     onLeave: () => {},
     onEdit: () => {},
     onSettings: () => {},
+    onConfigure: () => {},
     onAddBot: () => {},
   };
   const asHost = renderToStaticMarkup(createElement(Lobby, { ...props, me: 'host' }));
   const asGuest = renderToStaticMarkup(createElement(Lobby, { ...props, me: 'guest' }));
 
-  // Both see one control for filling a seat, because that is one decision.
-  for (const html of [asHost, asGuest]) assert.ok(html.includes('aria-label="Fill this seat"'));
-  // Only the host is offered the choice; for anyone else it invites directly.
-  assert.ok(asHost.includes('aria-haspopup="menu"'), 'the host chooses friend or bot');
-  assert.ok(!asGuest.includes('aria-haspopup="menu"'), 'a guest just invites');
+  // Both see the open place and can invite from it.
+  for (const html of [asHost, asGuest]) assert.ok(html.includes('Invite a friend'));
+  // Only the host can seat one, and it is one action: which of the three
+  // turns up is drawn, not chosen.
+  assert.ok(asHost.includes('Add a bot'), 'the host seats a bot');
+  for (const level of BOT_LEVELS) assert.ok(!asHost.includes(`Add a ${level}`), 'and cannot pick one');
+  assert.ok(!asGuest.includes('Add a bot'), 'a guest just invites');
 });
 
 test('every move a bot makes is legal, through a whole offline game', async () => {
@@ -212,6 +249,168 @@ test('a plan reads as a sentence and never invents one', () => {
   assert.match(line, /^Saving for a city/);
   assert.match(line, /Rock and Hay|rock and hay/i);
   assert.ok(line.endsWith('.'));
+});
+
+test('steady and sharp are the same rules with different attention on the leader', async () => {
+  // A board where the leader sits on a modest tile and somebody else sits on
+  // the busiest one. The two levels should want different tiles.
+  const game = createGame(
+    [
+      { id: 'me', name: 'Me' },
+      { id: 'leader', name: 'Leader' },
+      { id: 'other', name: 'Other' },
+    ],
+    11,
+    Math.random,
+  );
+  const pips = (n: number | null) => (n === null ? 0 : 6 - Math.abs(7 - n));
+  const numbered = game.board.hexes.filter((h) => h.terrain !== 'desert' && h.number !== null);
+  const busiest = numbered.reduce((a, b) => (pips(b.number) > pips(a.number) ? b : a));
+  // A quieter tile that shares no corner with the busiest, so the two choices
+  // can never be the same hex.
+  const quiet = numbered.find(
+    (h) => h.id !== busiest.id && !h.vertices.some((v) => busiest.vertices.includes(v)),
+  )!;
+  game.buildings[busiest.vertices[0]!] = { player: 'other', kind: 'settlement' };
+  game.buildings[quiet.vertices[0]!] = { player: 'leader', kind: 'settlement' };
+  game.players[1]!.hand.wood = 3;
+  game.players[2]!.hand.wood = 3;
+  game.phase = 'robber';
+  game.active = 0;
+  game.robber = game.board.hexes.find((h) => h.terrain === 'desert')!.id;
+
+  const move = async (level: 'steady' | 'sharp') =>
+    (
+      await decide({
+        view: gameView(game, 'me'),
+        board: game.board,
+        meId: 'me',
+        plan: initialPlan(game.turn),
+        jev: null,
+        level,
+      })
+    ).action as { kind: string; hex: number; victim?: string };
+
+  const steady = await move('steady'),
+    sharp = await move('sharp');
+  assert.equal(steady.kind, 'robber');
+  assert.equal(sharp.kind, 'robber');
+  // Steady blocks the most production on the board; sharp follows the leader.
+  assert.equal(steady.hex, busiest.id, 'steady blocks the busiest tile, whoever owns it');
+  assert.equal(sharp.hex, quiet.id, 'sharp gives up production to hit the leader');
+  assert.equal(sharp.victim, 'leader');
+  assert.notEqual(steady.hex, sharp.hex, 'the two levels are not the same bot');
+});
+
+test('a bot plays the cards it holds, and is told what it is holding', async () => {
+  const game = createGame(
+    [
+      { id: 'me', name: 'Me' },
+      { id: 'b', name: 'B' },
+    ],
+    3,
+    Math.random,
+  );
+  game.phase = 'actions';
+  game.active = 0;
+  game.players[0]!.cards = [
+    { id: 'c1', kind: 'monopoly', boughtTurn: 0 },
+    { id: 'c2', kind: 'knight', boughtTurn: 0 },
+  ];
+  game.turn = 4;
+  assert.equal(gameView(game, 'me').legal.playableCards.length, 2);
+
+  // With nothing to ask, the bot used to end the turn and keep the cards for a
+  // game that was over before it played them.
+  const offline = await decide({
+    view: gameView(game, 'me'),
+    board: game.board,
+    meId: 'me',
+    plan: initialPlan(game.turn),
+    jev: null,
+    level: 'steady',
+  });
+  assert.equal(offline.action.kind, 'playCard');
+  assert.equal(
+    (offline.action as { cardId: string }).cardId,
+    'c2',
+    'the knight goes first: never wasted, and it counts toward largest army',
+  );
+
+  // And with a service to ask, it is told what is in its hand — without which
+  // it was being asked whether to play a card it could not see.
+  let seen: { me: { playable_cards: Record<string, number> } } | null = null;
+  await decide({
+    view: gameView(game, 'me'),
+    board: game.board,
+    meId: 'me',
+    plan: initialPlan(game.turn),
+    level: 'steady',
+    jev: {
+      model: 'test',
+      async evaluate(state: unknown) {
+        seen = state as typeof seen;
+        return { answers: {}, inputTokens: 0, costUsd: 0 };
+      },
+    } as never,
+  });
+  assert.deepEqual(seen!.me.playable_cards, { monopoly: 1, knight: 1 });
+});
+
+test('a champion never passes on a useful turn, and reads the standings', async () => {
+  const seats = [
+    { id: 'me', name: 'Me' },
+    { id: 'b', name: 'B' },
+    { id: 'c', name: 'C' },
+  ];
+  const game = createGame(seats, 5, Math.random);
+  // A position with a road affordable and nothing that scores a point: one
+  // settlement on the board to build from, and timber and clay in hand.
+  game.phase = 'actions';
+  game.active = 0;
+  game.buildings[0] = { player: 'me', kind: 'settlement' };
+  game.players[0]!.hand = { wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 };
+  const legal = gameView(game, 'me').legal;
+  assert.ok(legal.roads.length, 'the position offers a road');
+
+  const asked: Record<string, Record<string, unknown>> = {};
+  const state: Record<string, unknown> = {};
+  const spy = (level: 'sharp' | 'champ') => ({
+    model: 'test',
+    async evaluate(seen: unknown, questions: Record<string, unknown>) {
+      asked[level] = questions as Record<string, unknown>;
+      state[level] = seen;
+      return { answers: {}, inputTokens: 0, costUsd: 0 };
+    },
+  });
+  const run = (level: 'sharp' | 'champ') =>
+    decide({
+      view: gameView(game, 'me'),
+      board: game.board,
+      meId: 'me',
+      plan: { ...initialPlan(game.turn), targetSite: 0 },
+      jev: spy(level) as never,
+      level,
+    });
+  await run('sharp');
+  await run('champ');
+
+  const moves = (level: 'sharp' | 'champ') =>
+    Object.keys((asked[level]!.move as { criteria: Record<string, string> }).criteria);
+  assert.ok(moves('sharp').includes('endTurn'), 'a sharp bot may sit on its resources');
+  assert.ok(!moves('champ').includes('endTurn'), 'a champion spends a turn it can use');
+  assert.ok(moves('champ').includes('road'));
+
+  // A champion is told where the two awards stand and how far it is from the
+  // target. Every number in that is on the portraits already.
+  assert.ok(!('awards' in (state.sharp as object)), 'the others are not');
+  const champState = state.champ as { awards: Record<string, string>; points_still_needed: number };
+  assert.match(champState.awards.longest_road!, /longest run on the board/);
+  assert.match(champState.awards.largest_army!, /knights played/);
+  // One settlement on the board, so one point of the target is already in.
+  const mine = gameView(game, 'me').players.find((p) => p.id === 'me')!;
+  assert.equal(champState.points_still_needed, (game.victoryPoints ?? 10) - mine.points);
+  assert.equal(mine.points, 1);
 });
 
 test('the decision service is TypeSafe only, and absent without a key', () => {
@@ -277,7 +476,7 @@ test('a bot pauses before each move, longer over the decisions that matter', asy
   const store = new Store(':memory:', { trackPresence: true });
   try {
     const host = store.enter('create', newSession('A').token, 'A');
-    store.lobby(host, 'bot', store.snapshot(host.room_id).revision, false, undefined, undefined, 'steady');
+    store.lobby(host, 'bot', store.snapshot(host.room_id).revision, false, undefined, undefined, true);
     store.setConnected(host, true);
     store.lobby(host, 'ready', store.snapshot(host.room_id).revision, true);
     store.action(host, 'start', store.snapshot(host.room_id).revision, { kind: 'start' });
@@ -324,7 +523,7 @@ test('the driver holds its first move, cancels stale plans and commits one actio
   const store = new Store(':memory:', { trackPresence: true });
   try {
     const host = store.enter('create', newSession('A').token, 'A');
-    store.lobby(host, 'bot', store.snapshot(host.room_id).revision, false, undefined, undefined, 'steady');
+    store.lobby(host, 'bot', store.snapshot(host.room_id).revision, false, undefined, undefined, true);
     store.setConnected(host, true);
     store.action(host, 'start', store.snapshot(host.room_id).revision, { kind: 'start' });
     // Advance any human opening moves until a bot must place its first house.
@@ -375,5 +574,19 @@ test('the driver holds its first move, cancels stale plans and commits one actio
     assert.equal(revision(), resumed + 1, 'the next action also waits');
   } finally {
     store.db.close();
+  }
+});
+
+test('add-bot retries are idempotent and cannot reuse a readiness command receipt', () => {
+  const store = new Store(':memory:');
+  try {
+    const host = store.enter('create', newSession('A').token, 'A');
+    const revision = store.snapshot(host.room_id).revision;
+    store.lobby(host, 'one-bot', revision, false, undefined, undefined, true);
+    store.lobby(host, 'one-bot', revision, false, undefined, undefined, true);
+    assert.equal(store.snapshot(host.room_id).players.length, 2);
+    assert.throws(() => store.lobby(host, 'one-bot', revision, false), /reused|different/i);
+  } finally {
+    store.close();
   }
 });

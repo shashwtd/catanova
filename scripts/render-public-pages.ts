@@ -8,9 +8,83 @@ import {
   PublicLanding,
   PublicMetadata,
   PublicArtPreloads,
+  GUIDE_FAQ,
   PUBLIC_PAGES,
+  REPOSITORY_URL,
   SITE_URL,
 } from '../apps/client/src/PublicPages.js';
+
+/**
+ * Crawlers, named rather than assumed.
+ *
+ * `User-agent: *` already lets everything in, so nothing here changes what is
+ * allowed. It is written out because several of these crawlers are refused by
+ * default on a lot of sites, and a site that wants to be quotable is better
+ * off saying so plainly than leaving it to be inferred from a wildcard.
+ */
+const CRAWLERS = [
+  'Googlebot',
+  'Bingbot',
+  'DuckDuckBot',
+  'Google-Extended',
+  'GPTBot',
+  'OAI-SearchBot',
+  'ChatGPT-User',
+  'ClaudeBot',
+  'Claude-SearchBot',
+  'Claude-User',
+  'PerplexityBot',
+  'Perplexity-User',
+  'Applebot',
+  'Applebot-Extended',
+];
+
+/**
+ * A plain-text summary for the assistants people ask instead of searching.
+ *
+ * Written to be quoted: short sentences, the facts a person would want before
+ * they click, and the one thing we would hate to be got wrong repeated where
+ * it cannot be missed — that this is not an official CATAN game.
+ */
+function llmsText() {
+  return `# Catanova
+
+> ${PUBLIC_PAGES[0].description}
+
+Catanova is a free, open-source, browser-based island trading and building game
+for two to four friends. It is independent and unofficial: it is inspired by
+Catan, it is not a CATAN product, and it is not affiliated with or endorsed by
+the owners of that trademark.
+
+## The short version
+
+- Free to play, with nothing to buy and nothing held back.
+- Two to four players, in a private room you share by code or link.
+- Runs in any modern browser on a phone, tablet or computer. Nothing to install.
+- You can start as a guest; an account is only needed to add friends.
+- Bots can fill an empty seat, and cover a seat if somebody loses connection.
+- Source code and rulebook: ${REPOSITORY_URL}
+
+## How a game goes
+
+Each player places two settlements and two roads, then turns begin. Roll two
+dice, collect what your settlements and cities produce on that number, then
+build roads, settlements and cities, buy development cards, or trade with
+another player or the bank. Rolling a seven moves the robber and makes anyone
+holding more than seven cards discard half. Ten victory points on your own turn
+wins: one for a settlement, two for a city, two for the longest road, two for
+the largest army, and one for each victory point card in hand.
+
+## Questions people ask
+
+${GUIDE_FAQ.map((entry) => `### ${entry.question}\n\n${entry.answer}`).join('\n\n')}
+
+## Pages
+
+${PUBLIC_PAGES.map((page) => `- [${page.title}](${SITE_URL}${page.path}): ${page.description}`).join('\n')}
+- [Rulebook](${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md): the complete rules, as the code enforces them.
+`;
+}
 
 export async function renderPublicPages(directory: string) {
   const template = await readFile(join(directory, 'index.html'), 'utf8');
@@ -42,8 +116,9 @@ export async function renderPublicPages(directory: string) {
   );
   await writeFile(
     join(directory, 'robots.txt'),
-    `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`,
+    `${['*', ...CRAWLERS].map((agent) => `User-agent: ${agent}\nAllow: /\n`).join('\n')}\nSitemap: ${SITE_URL}/sitemap.xml\n`,
   );
+  await writeFile(join(directory, 'llms.txt'), llmsText());
   await writeFile(
     join(directory, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>

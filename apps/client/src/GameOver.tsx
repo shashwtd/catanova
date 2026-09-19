@@ -3,7 +3,24 @@ import type { GameStatistics as Statistics, RoomState } from '../../../packages/
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { GameIcon } from './GameIcons.js';
-import { finalStandings } from './player-ranking.js';
+import { finalStandings, pointBreakdown } from './player-ranking.js';
+import { playerHexColor } from './player-colors.js';
+import type { CSSProperties } from 'react';
+
+/**
+ * Who took an award, and on what.
+ *
+ * "Most roads" used to sit here, which was worth nothing: every player has
+ * fifteen roads and the count says only how many they spent. The award is the
+ * thing that was actually contested and actually scored.
+ */
+function award(game: NonNullable<RoomState['game']>, kind: 'longestRoad' | 'largestArmy') {
+  const holder = game.players.find((p) => p.id === game[kind]);
+  if (!holder) return 'Nobody claimed it';
+  return kind === 'longestRoad'
+    ? `${holder.name} · ${holder.roadLength} roads`
+    : `${holder.name} · ${holder.knights} knights`;
+}
 
 /** Results use the final viewer-safe snapshot; scores are revealed by the server at victory. */
 export function GameOver({
@@ -97,80 +114,105 @@ export function GameOver({
             )}
           </svg>
           <header className="game-over-hero">
-            <div className="game-over-laurel" aria-hidden="true">
-              <GameIcon name="trophy" size={76} />
-            </div>
-            {winner && <Avatar profile={profile(winner.id, winner.name)} />}
+            {winner && (
+              <span
+                className="game-over-winner-portrait"
+                style={{ '--player-color': playerHexColor(room.players, winner.id) } as CSSProperties}
+              >
+                <Avatar profile={profile(winner.id, winner.name)} />
+                <span className="game-over-laurel" aria-hidden="true">
+                  <GameIcon name="trophy" size={34} />
+                </span>
+              </span>
+            )}
             <p>{winner ? 'The island has a champion' : 'Game over'}</p>
-            <h1>{winner ? `${winner.name} wins!` : 'The island rests'}</h1>
-            <span>
-              {game.finishReason === 'resignation'
-                ? 'Victory by resignation'
-                : game.finishReason === 'abandoned'
-                  ? 'Everyone left the game'
-                  : `${winner?.points ?? 0} victory points`}{' '}
-              · {game.turn} turns
-            </span>
+            <h1>{winner ? `${winner.name} wins` : 'The island rests'}</h1>
+            {/* Why, not just how many. A results screen that says "8 points"
+                and stops is a number without the ten minutes behind it. */}
+            {winner && game.finishReason !== 'resignation' ? (
+              <>
+                <p className="game-over-total">
+                  <b>{winner.points}</b> victory points
+                </p>
+                <ul className="game-over-reason" aria-label={`How ${winner.name} scored`}>
+                  {pointBreakdown(game, winner).map((part) => (
+                    <li key={part.key}>
+                      <span>{part.label}</span>
+                      <b>+{part.points}</b>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="game-over-total">
+                {game.finishReason === 'resignation'
+                  ? 'Won by resignation'
+                  : 'Everyone left before the island was settled'}
+              </p>
+            )}
           </header>
           <div className="game-over-standings">
-            {finalStandings(game).map(({ player, points, place }) => (
-              <article
-                key={player.id}
-                className={`game-over-player ${player.id === game.winner ? 'is-winner' : ''}`}
-              >
-                <span className="game-over-place">{place}</span>
-                <Avatar profile={profile(player.id, player.name)} />
-                <div className="game-over-player-details">
-                  <strong>{player.name}</strong>
-                  <span>
-                    {player.pieces.roads} roads · {player.pieces.settlements} houses · {player.pieces.cities}{' '}
-                    cities · {player.knights} Knights
+            <h2 className="game-over-standings-heading">Final standings</h2>
+            {finalStandings(game).map(({ player, points, place }) => {
+              const parts = pointBreakdown(game, player);
+              return (
+                <article
+                  key={player.id}
+                  className={`game-over-player ${player.id === game.winner ? 'is-winner' : ''} ${player.resigned ? 'has-resigned' : ''}`}
+                  style={{ '--player-color': playerHexColor(room.players, player.id) } as CSSProperties}
+                >
+                  <span className="game-over-place" aria-label={`Place ${place}`}>
+                    {place}
                   </span>
-                  <div className="game-over-awards">
-                    {game.longestRoad === player.id && (
-                      <span>
-                        <GameIcon name="road-award" size={24} /> Longest Road · {player.roadLength}
-                      </span>
-                    )}
-                    {game.largestArmy === player.id && (
-                      <span>
-                        <GameIcon name="army-award" size={24} /> Largest Army · {player.knights}
-                      </span>
-                    )}
-                    {player.resigned && <span>Resigned</span>}
+                  <span className="game-over-player-portrait">
+                    <Avatar profile={profile(player.id, player.name)} />
+                  </span>
+                  <div className="game-over-player-details">
+                    <strong>
+                      {player.name}
+                      {player.resigned && <em className="game-over-resigned">Resigned</em>}
+                    </strong>
+                    {/* The same breakdown for everyone, so the table can see
+                        the margin rather than only the winner's total. */}
+                    <ul className="game-over-parts" aria-label={`How ${player.name} scored`}>
+                      {parts.length ? (
+                        parts.map((part) => (
+                          <li key={part.key} data-part={part.key}>
+                            {part.key === 'longestRoad' && <GameIcon name="road-award" size={18} />}
+                            {part.key === 'largestArmy' && <GameIcon name="army-award" size={18} />}
+                            <span>{part.label}</span>
+                            <b>+{part.points}</b>
+                          </li>
+                        ))
+                      ) : (
+                        <li data-part="none">
+                          <span>No points scored</span>
+                        </li>
+                      )}
+                    </ul>
                   </div>
-                </div>
-                <div className="game-over-score">
-                  <b>{points}</b>
-                  <small>points</small>
-                </div>
-              </article>
-            ))}
-            <div className="game-over-highlights">
-              {(
-                [
-                  { field: 'roads', label: 'Most roads', icon: 'road' },
-                  { field: 'cities', label: 'Most cities', icon: 'city' },
-                ] as const
-              ).map(({ field, label, icon }) => {
-                const best = Math.max(...game.players.map((p) => p.pieces[field]));
-                return best ? (
-                  <div key={field}>
-                    <GameIcon name={icon} size={28} />
-                    <span>
-                      <small>
-                        {label} · {best}
-                      </small>
-                      {game.players
-                        .filter((p) => p.pieces[field] === best)
-                        .map((p) => p.name)
-                        .join(' & ')}
-                    </span>
+                  <div className="game-over-score">
+                    <b>{points}</b>
+                    <small>{points === 1 ? 'point' : 'points'}</small>
                   </div>
-                ) : null;
-              })}
-            </div>
+                </article>
+              );
+            })}
           </div>
+          <dl className="game-over-facts" aria-label="This match">
+            <div>
+              <dt>Turns</dt>
+              <dd>{game.turn}</dd>
+            </div>
+            <div>
+              <dt>Longest Road</dt>
+              <dd>{award(game, 'longestRoad')}</dd>
+            </div>
+            <div>
+              <dt>Largest Army</dt>
+              <dd>{award(game, 'largestArmy')}</dd>
+            </div>
+          </dl>
           {error && (
             <p className="game-over-error" role="alert">
               {error}

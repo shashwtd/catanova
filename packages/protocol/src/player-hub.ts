@@ -27,9 +27,21 @@ export type PlayerGames = {
   games: MatchSummary[];
   nextCursor: string | null;
 };
+/** What a player lets their friends see. Kept deliberately small: one switch,
+ *  one meaning, and off is always a safe answer. */
+export type AccountPrivacy = { shareLastSeen: boolean };
+export const DEFAULT_ACCOUNT_PRIVACY: AccountPrivacy = { shareLastSeen: true };
+export function parseAccountPrivacy(value: unknown): AccountPrivacy {
+  const v = value && typeof value === 'object' ? (value as Partial<AccountPrivacy>) : {};
+  return { shareLastSeen: typeof v.shareLastSeen === 'boolean' ? v.shareLastSeen : true };
+}
 export type FriendPresenceState = Omit<FriendsState, 'friends'> & {
   friends: (PublicAccount & {
     online: boolean;
+    /** Epoch milliseconds, and only for a friend who chose to share it. An
+     *  online friend does not carry one: "online" already answers the
+     *  question, and the exact moment would say more than they agreed to. */
+    lastSeenAt?: number;
     /** Present only for an online friend in an unfinished game, so the client
      *  can offer to watch. Carries no information about their position. */
     watchable?: { roomId: string; roomCode?: string };

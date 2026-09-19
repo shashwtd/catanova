@@ -868,26 +868,76 @@
   align-items: center;
   justify-content: space-between;
 }
-.playing .connection-detail {
-  color: #c5d5ca;
+/*
+ * The connection panel, in the ink of the surface it is actually on.
+ *
+ * It used to open on a dark blue-green card, and every colour in it was
+ * chosen for that: pale sage labels, cream values, a translucent dark well
+ * behind the graph. The panel later became one of the parchment side panels
+ * and nothing here followed, so the whole thing was near-white text on a
+ * near-white card — a dialog you could open and read nothing from. The rules
+ * that would have kept it dark point at `.utility-panel`, a class this markup
+ * has not carried for some time, so they were quietly doing nothing.
+ *
+ * Everything below is scoped to the parchment panel and measured against it:
+ * every piece of text clears 4.5:1 on the cream, and the graph line is dark
+ * enough to read against the well rather than being a highlight on a dark one.
+ */
+.playing .game-side-panel .connection-detail {
+  color: #4c5f52;
 }
-.connection-detail .connection-quality {
-  background: #153c416b;
-  color: #d4e4cd;
-  border-color: #a0c5b240;
+.game-side-panel .connection-detail .connection-quality {
+  padding: 6px 10px;
+  border: 1px solid #bda97f7a;
+  border-radius: 9px;
+  background: #e7dcbe;
+  color: #8a5a33;
 }
-.connection-detail .connection-stats {
-  color: #c6d7cb;
+.game-side-panel .connection-detail .connection-quality.online {
+  color: #2f6b4d;
 }
-.connection-detail .connection-stats dd {
-  color: #eee0ba;
+.game-side-panel .connection-detail .connection-quality b {
+  color: #2c4a3d;
 }
-.connection-detail .ping-graph {
-  background: #172f3b60;
-  border-color: #a2c0b237;
+.game-side-panel .connection-detail .ping-graph {
+  border: 1px solid #bfae86;
+  background: #efe6cd;
 }
-.connection-detail .connection-note {
-  color: #a9beb7;
+.game-side-panel .connection-detail .graph-grid {
+  stroke: #8a7c5a3d;
+}
+.game-side-panel .connection-detail .graph-line {
+  stroke: #35704e;
+}
+.game-side-panel .connection-detail .graph-missed {
+  fill: #a84a2c;
+}
+.game-side-panel .connection-detail .ping-graph text {
+  fill: #6b5d41;
+}
+.game-side-panel .connection-detail .connection-stats dt {
+  color: #55634f;
+}
+.game-side-panel .connection-detail .connection-stats dd {
+  color: #2f4438;
+  font-weight: 600;
+}
+/* The refresh button had no surface of its own here, so it read as a line of
+   text in a box rather than as something to press. */
+.game-side-panel .connection-detail .connection-refresh {
+  width: 100%;
+  justify-content: center;
+  border: 1px solid #b09a6c;
+  border-radius: 9px;
+  background: linear-gradient(#f3e7c7, #e4d3aa);
+  color: #4a3a23;
+  box-shadow: inset 0 1px #fffaec;
+}
+.game-side-panel .connection-detail .connection-refresh:hover:not(:disabled) {
+  background: linear-gradient(#f8eed4, #eadcb6);
+}
+.game-side-panel .connection-detail .connection-note {
+  color: #665c42;
 }
 
 @media (max-width: 1000px) {

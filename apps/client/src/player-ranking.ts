@@ -35,3 +35,33 @@ export function finalStandings(game: GameView) {
     return { ...entry, place };
   });
 }
+
+/**
+ * Where a score came from.
+ *
+ * A results screen that says "8 points" and nothing else is a number without a
+ * reason, and the reason is the whole interest of the last ten minutes. Every
+ * part is derived from the revealed final view rather than tracked during play:
+ * buildings are on the board, the two awards are declared, and whatever is left
+ * over must have been victory point cards, which are only revealed at the end.
+ *
+ * The parts always add up to the score. If a future rule adds points from
+ * somewhere else, the remainder absorbs it rather than the total disagreeing
+ * with the sum of its own breakdown.
+ */
+export type PointPart = { key: string; label: string; points: number; count?: number };
+export function pointBreakdown(game: GameView, player: GameView['players'][number]): PointPart[] {
+  const parts: PointPart[] = [];
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const add = (key: string, label: string, points: number, count?: number) => {
+    if (points > 0) parts.push({ key, label, points, ...(count === undefined ? {} : { count }) });
+  };
+  const { settlements, cities } = player.pieces;
+  add('settlements', plural(settlements, 'settlement', 'settlements'), settlements, settlements);
+  add('cities', plural(cities, 'city', 'cities'), cities * 2, cities);
+  add('longestRoad', 'Longest Road', game.longestRoad === player.id ? 2 : 0);
+  add('largestArmy', 'Largest Army', game.largestArmy === player.id ? 2 : 0);
+  const hidden = player.points - parts.reduce((n, part) => n + part.points, 0);
+  add('cards', plural(hidden, 'victory point card', 'victory point cards'), hidden, hidden);
+  return parts;
+}

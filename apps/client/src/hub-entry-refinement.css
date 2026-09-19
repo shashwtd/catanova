@@ -80,10 +80,13 @@
   color: #fff4d6;
   text-decoration: none;
 }
+/* It says "Sign out" now, so it needs room for the words. It keeps its place
+   at the end of the row and stays the quietest thing there. */
 .player-home .hub-player-tools .hub-sign-out {
-  width: 40px;
-  padding: 9px;
+  width: auto;
+  padding: 8px 14px;
   margin-left: auto;
+  white-space: nowrap;
 }
 .player-home .hub-player-tools .hub-sign-out:hover {
   background: #c8825a33;

@@ -2149,61 +2149,7 @@ svg.game-icon {
   gap: 32px;
   padding: 23px 0;
 }
-.lobby-seats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 15px;
-}
-.lobby-seat {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 190px;
-  border: 1px solid #c1b08b88;
-  border-radius: 12px;
-  background: #f8efdcaa;
-  padding: 17px 10px;
-}
-.lobby-seat.self {
-  border-color: #829274;
-  background: #f8f1df;
-}
-.lobby-avatar {
-  position: relative;
-}
-.lobby-avatar .avatar-medallion {
-  width: 86px;
-  height: 86px;
-}
-.host-mark {
-  position: absolute;
-  top: -8px;
-  right: -1px;
-  color: #997d3c;
-  fill: #e4c46a;
-  filter: drop-shadow(0 1px 2px #63471e55);
-}
-.lobby-seat strong {
-  font-size: 16px;
-  margin-top: 9px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ready-status {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: #978e77;
-  margin-top: 4px;
-}
-.ready-status.ready {
-  color: #537b5f;
-}
+
 .edit-profile {
   position: absolute;
   top: 8px;
@@ -2216,14 +2162,7 @@ svg.game-icon {
   color: #7d8667;
   padding: 3px;
 }
-.open-seat {
-  background: #ccbc9840;
-  border: 1px dashed #b29d7288;
-  color: #ab9973;
-}
-.open-seat:hover {
-  background: #f3e9d280;
-}
+
 .lobby-invite {
   padding-top: 7px;
 }
@@ -2996,13 +2935,7 @@ svg.game-icon {
     grid-template-columns: 1fr 170px;
     gap: 18px;
   }
-  .lobby-seat {
-    min-height: 168px;
-  }
-  .lobby-avatar .avatar-medallion {
-    width: 68px;
-    height: 68px;
-  }
+
   .lobby-footer > span {
     max-width: 120px;
   }
@@ -3135,16 +3068,7 @@ svg.game-icon {
     gap: 14px;
     padding: 14px 0;
   }
-  .lobby-seats {
-    gap: 9px;
-  }
-  .lobby-seat {
-    min-height: 160px;
-    padding-top: 24px;
-  }
-  .lobby-seat strong {
-    font-size: 13px;
-  }
+
   .lobby-invite {
     padding: 0;
   }
@@ -3257,7 +3181,11 @@ svg.game-icon {
     height: 31px;
     padding: 6px;
   }
-  .side-controls svg {
+  /* Every icon in the side rail comes down to 17px on a small screen. A
+     reaction face is not an icon on a button, though — it is the whole of one,
+     and this rule was quietly shrinking each one to 17px inside a 44px pill,
+     which is what actually made the tray look padded. */
+  .side-controls svg:not(.reaction-face) {
     width: 17px;
     height: 17px;
   }

@@ -20,7 +20,7 @@ import { dicePresentationGame, useFeedback } from './useFeedback.js';
 import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
-import { GameSettings } from './GameSettings.js';
+import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -38,6 +38,9 @@ import { RoomInviteNotice, visibleRoomInvitations } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
+import { seatColorMap } from './player-colors.js';
+import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
+import { useAccountPrivacy } from './usePrivacy.js';
 import {
   showPlayerHome,
   browserRoomPath,
@@ -52,7 +55,7 @@ import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.j
 import { initialMetrics } from './connection.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { mountApp } from './mount-app.js';
 import {
@@ -121,6 +124,12 @@ import './match-followups.css';
 import './game-popover.css';
 import './hub-entry-refinement.css';
 import './landing-features.css';
+import './room-seats.css';
+import './mobile-shelf.css';
+import './table-light.css';
+
+/** One shared empty list, so `glowHexes` is not a new array every render. */
+const NO_GLOW: number[] = [];
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -264,6 +273,7 @@ function App() {
   const [mode, setMode] = useState<BuildMode>(null),
     [panel, setPanel] = useState<
       | 'settings'
+      | 'configure'
       | 'trade'
       | 'rules'
       | 'journal'
@@ -288,6 +298,11 @@ function App() {
     myTurn = !!me && active?.id === me && !player?.resigned;
   const entering = !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite)));
   const playerHome = !room && !entering && showPlayerHome(auth, invite);
+  const privacy = useAccountPrivacy(
+    auth.accessToken,
+    auth.config?.mode === 'authenticated' && !!auth.account && !auth.account.isGuest,
+    auth.account?.id,
+  );
   const playerGames = usePlayerGames(
     auth.account?.id,
     auth.accessToken,
@@ -357,6 +372,32 @@ function App() {
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
   }, [placement]);
+  /**
+   * The board is dealt once and never changes, but every state message arrives
+   * as fresh JSON, so `g.board` was a new object each time and the scenery was
+   * rebuilt with it. Pinning it to the seed lets the static half of the board
+   * render once for the whole game.
+   */
+  const stableBoard = useMemo(() => g?.board, [g?.board.seed]);
+  /** Seat colours change only when somebody picks one, so they are derived from
+   *  the seats' own colours rather than rebuilt on every render — `Board` is
+   *  memoised and a fresh array each time would defeat it. */
+  const seatColors = useMemo(
+    () => seatColorMap(room?.players),
+    [room?.players.map((p) => `${p.id}:${p.color ?? ''}`).join('|')],
+  );
+  /**
+   * Stable handler identities. Defined inline they changed on every render,
+   * which defeats the board's memo on its own; the ref keeps the identity
+   * fixed while always calling the current logic.
+   */
+  const handlers = useRef({ previewPlacement: (_: GameAction) => {}, chooseRobber: (_: number) => {} });
+  const onBoardAction = useCallback((action: GameAction) => handlers.current.previewPlacement(action), []);
+  const onBoardRobber = useCallback((hex: number) => handlers.current.chooseRobber(hex), []);
+  // Both are hoisted declarations further down, so this reads them fresh on
+  // every render while the identities the board sees never change.
+  handlers.current = { previewPlacement, chooseRobber };
+
   function previewPlacement(action: GameAction) {
     if (disabled || !g || !room || !me) return;
     if (!isBuildAction(action)) {
@@ -847,6 +888,20 @@ function App() {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
   }
+  /** Colour is a lobby change like readiness, so it goes through the same
+   *  single-command path and keeps this seat's ready state as it was. */
+  async function chooseColor(color: PlayerColor) {
+    const c = connection.current;
+    if (!c || disabled) return;
+    setBusy(true);
+    try {
+      await c.chooseColor(color, !!room?.players.find((p) => p.id === me)?.ready);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not change colour');
+    } finally {
+      if (connection.current === c) setBusy(c.awaitingConfirmation);
+    }
+  }
   async function addBot() {
     const c = connection.current;
     if (!c || disabled) return;
@@ -909,17 +964,18 @@ function App() {
           <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
             <Board
               art={BOARD_THEMES[preferences.boardTheme]}
-              board={g.board}
+              board={stableBoard ?? g.board}
               game={presentedGame ?? g}
-              glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}
+              glowHexes={reducedMotion ? NO_GLOW : feedback.event?.glowHexes}
               effectId={feedback.event?.id}
               me={me}
               mode={mode}
               disabled={disabled}
               selectedRobberHex={robberHex}
+              colors={seatColors}
               pendingBuild={placementReady ? placement?.action : null}
-              onAction={previewPlacement}
-              onRobber={chooseRobber}
+              onAction={onBoardAction}
+              onRobber={onBoardRobber}
             />
           </BoardViewport>
           <ReactionLayer flying={reactions.flying} />
@@ -1107,6 +1163,8 @@ function App() {
           onLeave={() => void leave()}
           onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
+          onConfigure={() => setPanel('configure')}
+          onChooseColor={(color) => void chooseColor(color)}
         />
       )}
       {g && (
@@ -1323,15 +1381,18 @@ function App() {
       )}
       {panel === 'settings' && (
         <Dialog side={!!g} tool="settings" title="Settings" compact onClose={() => setPanel(null)}>
-          <GameSettings
+          <PlayerSettings
             preferences={preferences}
             update={update}
-            room={room}
-            me={me}
-            busy={disabled}
-            save={saveSettings}
+            privacy={privacy.value}
+            savePrivacy={privacy.save}
             previewSound={() => feedback.sound.play('settlement')}
           />
+        </Dialog>
+      )}
+      {panel === 'configure' && (
+        <Dialog title="Room setup" compact onClose={() => setPanel(null)}>
+          <RoomConfiguration room={room} me={me} busy={disabled} save={saveSettings} />
         </Dialog>
       )}
       {panel === 'invite' && room && (

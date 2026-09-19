@@ -118,105 +118,7 @@
 .room-lobby .lobby-timer:hover {
   background: #45604b90;
 }
-.room-lobby .lobby-seats {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(12px, 2.5vw, 28px);
-  min-width: 0;
-}
-.room-lobby .lobby-player-line {
-  display: grid;
-  grid-template-columns: repeat(var(--room-player-count), minmax(0, 1fr));
-  gap: clamp(10px, 1.6vw, 20px);
-  width: min(100%, calc(var(--room-player-count) * 205px));
-  min-width: 0;
-}
-.room-lobby .lobby-seat {
-  position: relative;
-  min-width: 0;
-  min-height: 258px;
-  padding: 28px 12px 24px;
-  gap: 10px;
-  border: 0;
-  border-radius: 0;
-  clip-path: polygon(
-    0 var(--room-corner),
-    var(--room-corner) 0,
-    100% 0,
-    100% calc(100% - var(--room-corner)),
-    calc(100% - var(--room-corner)) 100%,
-    0 100%
-  );
-  background: linear-gradient(145deg, #52664d, #294b3d 45%, #18372f);
-  box-shadow:
-    inset 0 3px #dcc0818c,
-    inset 0 -4px #09291fd9;
-}
-.room-lobby .lobby-seat::before {
-  content: '';
-  position: absolute;
-  inset: 8px 7px;
-  pointer-events: none;
-  border-left: 1px solid #d4c28a33;
-  border-right: 1px solid #d4c28a20;
-}
-.room-lobby .lobby-seat.self {
-  background: linear-gradient(145deg, #738157, #365943 45%, #1b3d30);
-  box-shadow:
-    inset 0 3px #f4d889,
-    inset 0 -4px #143120;
-}
-.room-lobby .lobby-avatar .avatar-medallion {
-  width: clamp(82px, 9vw, 115px);
-  height: auto;
-  border: 2px solid #e3ca8aba;
-  border-radius: 10px;
-  box-shadow: 0 5px 10px #071d2955;
-}
-.room-lobby .lobby-seat > strong {
-  margin-top: 5px;
-  max-width: 100%;
-  font:
-    700 21px/1.25 Barlow,
-    sans-serif;
-  color: #fff0d0;
-}
-.room-lobby .ready-status {
-  margin-top: 0;
-  min-height: 22px;
-  font-size: 13px;
-  color: #c2cfbc;
-}
-.room-lobby .ready-status.ready {
-  color: #d7edb4;
-}
-.room-lobby .seat-offline .ready-status {
-  color: #f1a994;
-}
-.room-lobby .lobby-invite-tile,
-.room-lobby .lobby-invite-spacer {
-  flex: 0 0 64px;
-  width: 64px;
-  min-width: 44px;
-  height: 76px;
-}
-.room-lobby .lobby-invite-tile {
-  display: grid;
-  place-items: center;
-  padding: 10px;
-  border: 0;
-  border-radius: 0;
-  color: #f1daa0;
-  background: linear-gradient(145deg, #60704cbf, #1a3f33cc);
-  box-shadow:
-    inset 0 2px #dcc88578,
-    inset 0 -3px #092c24;
-  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
-}
-.room-lobby .lobby-invite-tile:hover {
-  background: linear-gradient(145deg, #8b9459, #396548);
-}
+
 .room-lobby .lobby-footer {
   width: min(1120px, 100%);
   min-width: 0;
@@ -363,50 +265,7 @@
   .room-lobby .lobby-timer {
     padding-inline: 9px;
   }
-  .room-lobby .lobby-seats {
-    gap: 9px;
-  }
-  .room-lobby .lobby-player-line {
-    gap: 9px;
-  }
-  .room-lobby .lobby-player-line:has(> :nth-child(3)) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .room-lobby .lobby-player-line > :nth-child(3):last-child {
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: calc(50% - 4.5px);
-    box-sizing: border-box;
-  }
-  .room-lobby .lobby-seat {
-    --room-corner: 10px;
-    min-height: 171px;
-    padding: 18px 7px 16px;
-    gap: 8px;
-  }
-  .room-lobby .lobby-avatar .avatar-medallion {
-    width: clamp(50px, 15vw, 82px);
-  }
-  .room-lobby .lobby-seat > strong {
-    margin-top: 3px;
-    font-size: 17px;
-  }
-  .room-lobby .ready-status {
-    font-size: 12px;
-    min-height: 19px;
-  }
-  .room-lobby .lobby-invite-tile,
-  .room-lobby .lobby-invite-spacer {
-    flex-basis: 44px;
-    width: 44px;
-    height: 58px;
-  }
-  .room-lobby .lobby-invite-tile {
-    padding: 7px;
-  }
-  .room-lobby .lobby-invite-tile svg {
-    width: 29px;
-  }
+
   .room-lobby .lobby-footer {
     flex-direction: column-reverse;
     align-items: center;
@@ -445,21 +304,7 @@
   .room-lobby .lobby-caption h1 {
     font-size: 25px;
   }
-  .room-lobby .lobby-seat {
-    min-height: 156px;
-    padding: 16px 9px;
-    gap: 6px;
-  }
-  .room-lobby .lobby-avatar .avatar-medallion {
-    width: 68px;
-  }
-  .room-lobby .lobby-seat > strong {
-    font-size: 18px;
-    margin-top: 0;
-  }
-  .room-lobby .ready-status {
-    min-height: 18px;
-  }
+
   .room-lobby .lobby-footer {
     flex-direction: row;
     align-items: flex-end;
@@ -474,75 +319,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ *
- * Filling a seat
- *
- * Inviting a friend and adding a bot were two tiles competing for the
- * same narrow row, which crowded the seats on a phone and made the
- * choice look like two unrelated features. They are one decision: who
- * takes this seat. One control, then the choice.
- * ------------------------------------------------------------------ */
-.lobby-seat-add {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: none;
-}
-.lobby-seat-choices {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  z-index: 5;
-  display: grid;
-  gap: 2px;
-  width: max-content;
-  padding: 6px;
-  border: 1px solid var(--game-trim);
-  border-radius: 12px;
-  background: var(--game-panel-fill);
-  box-shadow: var(--game-panel-shadow);
-  transform: translateX(-50%);
-  animation: lobby-seat-choices-in 0.16s ease-out;
-}
-@keyframes lobby-seat-choices-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 6px);
-  }
-}
-.lobby-seat-choices button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 14px 9px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--game-cream);
-  font: inherit;
-  font-size: 0.86rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.lobby-seat-choices button:hover:not(:disabled),
-.lobby-seat-choices button:focus-visible {
-  background: rgb(255 255 255 / 10%);
-  outline: none;
-}
-.lobby-seat-choices button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.lobby-seat-add.open .lobby-invite-tile {
-  border-style: solid;
-  transform: rotate(45deg);
-}
-.lobby-invite-tile {
-  transition:
-    transform 0.16s ease,
-    border-color 0.16s ease;
-}
-
 /* The settings chips wrapped onto a second row while keeping the divider
    that only makes sense between neighbours, leaving a rule floating at
    the start of the row with no gap above it. */
@@ -552,16 +328,5 @@
   }
   .lobby-room-options > button + button {
     border-left-color: transparent;
-  }
-  .lobby-seat-choices {
-    left: auto;
-    right: 0;
-    transform: none;
-  }
-  @keyframes lobby-seat-choices-in {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
   }
 }

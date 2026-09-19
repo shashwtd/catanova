@@ -17,9 +17,11 @@
  */
 
 import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../rules/src/index.js';
+import { CARD_NAMES } from '../../rules/src/game.js';
 import type { Resource } from '../../rules/src/index.js';
 import type { Board } from '../../rules/src/board.js';
-import type { GameAction, GameView, Hand } from '../../rules/src/game.js';
+import { roadSites } from '../../rules/src/game.js';
+import type { CardKind, GameAction, GameView, Hand } from '../../rules/src/game.js';
 import { choice, noul, JevUnavailable } from './jev.js';
 import type { JevClient, Question } from './jev.js';
 import {
@@ -38,6 +40,9 @@ import {
 } from './heuristics.js';
 import { ARCHETYPES, describe, initialPlan, planIsStale } from './plan.js';
 import type { Archetype, BotPlan, Focus, Threat } from './plan.js';
+import type { BotLevel } from '../../protocol/src/bots.js';
+import { PLAY_STYLES, STYLE_ARCHETYPE } from './style.js';
+import type { StandInStyle } from './style.js';
 
 /** How many options of each kind are ever shown to the model. Shortlists keep
  *  the state small and stop the few good moves being buried in the many legal
@@ -62,9 +67,142 @@ export type DecideContext = {
   meId: string;
   plan: BotPlan;
   jev: JevClient | null;
-  /** Difficulty. 'steady' plays the plan; 'sharp' also contests the leader. */
-  level?: 'steady' | 'sharp';
+  /**
+   * Difficulty. Both bots play the same rules with the same plan; the level
+   * decides how much attention they pay to whoever is winning. See `contests`.
+   */
+  level?: BotLevel;
+  /**
+   * Set only when this seat belongs to a player who dropped out and is being
+   * kept warm. It carries how that player was playing, so the stand-in
+   * continues their game rather than starting a different one in their chairs.
+   */
+  standIn?: StandInStyle;
 };
+
+/** What each card does, so that "play a development card" is a choice the bot
+ *  can actually weigh rather than a word. */
+const CARD_USE: Record<string, string> = {
+  knight: 'move the robber off my land or onto somebody else, and count toward largest army',
+  roadBuilding: 'two roads for free: reach a corner now, or extend the longest road',
+  yearOfPlenty: 'take any two resources from the bank, enough to finish a purchase this turn',
+  monopoly: 'take every card of one resource from every other player',
+};
+
+/** The cards in hand that could be played right now, counted by kind. */
+function playableKinds(ctx: DecideContext): Record<string, number> {
+  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
+  const out: Record<string, number> = {};
+  for (const id of ctx.view.legal.playableCards) {
+    const kind = mine.find((c) => c.id === id)?.kind;
+    if (kind) out[kind] = (out[kind] ?? 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * The cards that would actually do something if played.
+ *
+ * `legal.playableCards` means "the rules let you play this now", which is not
+ * the same as "this will work": Road Building is refused outright when there is
+ * nowhere to put a road, and Year of Plenty needs something left in the bank.
+ * Offering either of those as a move produced a rejected action, and offering a
+ * card that does nothing is bad play even when the rules allow it.
+ */
+function usableCards(ctx: DecideContext): string[] {
+  const { view, meId } = ctx;
+  const mine = view.players.find((p) => p.id === meId)?.cards ?? [];
+  const bankHas = RESOURCES.reduce((n, r) => n + view.bank[r], 0);
+  const roadRoom =
+    (view.players.find((p) => p.id === meId)?.pieces.roads ?? 0) < 15 && roadSites(view, meId).length > 0;
+  return view.legal.playableCards.filter((id) => {
+    const kind = mine.find((c) => c.id === id)?.kind;
+    if (kind === 'roadBuilding') return roadRoom;
+    if (kind === 'yearOfPlenty') return bankHas > 0;
+    return true;
+  });
+}
+
+/**
+ * The card to play when nobody is there to judge it.
+ *
+ * Knights first: they are never wasted, they move the robber and they build
+ * toward largest army. Then Road Building, which is two roads for nothing.
+ * Year of Plenty and Monopoly want a plan behind them, so they come last.
+ */
+const CARD_ORDER = ['knight', 'roadBuilding', 'yearOfPlenty', 'monopoly'];
+function bestCardToPlay(ctx: DecideContext, playable: readonly string[]): string | undefined {
+  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
+  const rank = (id: string) => {
+    const kind = mine.find((c) => c.id === id)?.kind ?? '';
+    const at = CARD_ORDER.indexOf(kind);
+    return at === -1 ? CARD_ORDER.length : at;
+  };
+  return [...playable].sort((a, b) => rank(a) - rank(b))[0];
+}
+
+/**
+ * A knight worth playing before the dice.
+ *
+ * If the robber is sitting on a hex this bot builds on, every turn it waits is
+ * a turn of its own production thrown away — and the knight is free. This is a
+ * fact about the board, so it is decided here rather than asked about.
+ */
+function knightBeforeRoll(ctx: DecideContext): string | null {
+  if (!contests(ctx.level, ctx.standIn).clearsItsOwnLand) return null;
+  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
+  const knight = ctx.view.legal.playableCards.find((id) => mine.find((c) => c.id === id)?.kind === 'knight');
+  if (!knight) return null;
+  const blocked = ctx.board.hexes[ctx.view.robber];
+  const onMine = blocked?.vertices.some((v) => ctx.view.buildings[v]?.player === ctx.meId);
+  return onMine ? knight : null;
+}
+
+/**
+ * What a level actually changes.
+ *
+ * A sharp bot contests the leader: its robber is drawn to the leader's tiles
+ * and prefers to rob the leader when it lands, and it starts treating a leader
+ * as a threat while they are still three points out, which pulls its plan
+ * towards blocking sooner. A steady bot plays its own game: the robber goes
+ * wherever the most production is, whoever owns it, and nobody counts as a
+ * threat until they are one point from winning.
+ *
+ * Both are arithmetic, decided here rather than asked about, so the difference
+ * holds even when the decision service is unreachable.
+ */
+function contests(level: BotLevel | undefined, standIn?: StandInStyle) {
+  // A stand-in that plays nothing like the person it replaced is worse for the
+  // table than the empty seat was, so a read of how they were playing overrides
+  // the level's own temperament on the one axis it speaks to.
+  const contesting = standIn ? standIn.contesting : level === 'sharp' || level === 'champ';
+  const champ = level === 'champ';
+  return {
+    /** How much more a robber tile is worth for belonging to the leader. */
+    leaderWeight: contesting ? 2 : 1,
+    /** How close the leader gets before the bot starts obstructing. */
+    threatWithin: champ ? 4 : contesting ? 3 : 1,
+    /** Whether a contested road or army counts as a threat on its own. */
+    mindsAwards: contesting,
+    /** Whether the robber goes for the leader rather than whoever is there. */
+    huntsLeader: contesting,
+    /** Turns a plan survives before it is thought through again. A champ is
+     *  asked to think often, which is what lets it answer a road being cut
+     *  off by going after something else instead of pushing at the block. */
+    planLife: champ ? 2 : 4,
+    /** How many corners and roads the model is shown. Longer lists play
+     *  better and cost more, which is the trade a champion is worth. */
+    shortlist: champ ? { corners: 16, roads: 12 } : { corners: LIMIT.corners, roads: LIMIT.roads },
+    /** Whether passing stays on the table while anything useful is affordable. */
+    spendsEveryTurn: champ,
+    /** Whether the state carries the award standings and the gap to the win.
+     *  Every number in it is on the other players' portraits already. */
+    readsTheTable: champ,
+    /** Whether a knight is spent before the dice to get the robber off its
+     *  own production rather than waiting for a turn it suits better. */
+    clearsItsOwnLand: champ,
+  };
+}
 
 const FOCUS_COST: Record<Focus, keyof typeof COSTS | null> = {
   settlement: 'settlement',
@@ -112,6 +250,9 @@ function summarise(ctx: DecideContext) {
   const me = view.players.find((p) => p.id === meId);
   const hand = handOf(view);
   const leader = leaderOf(view, meId);
+  const named = (id: string | null) => view.players.find((p) => p.id === id)?.name ?? 'nobody';
+  const best = (field: 'roadLength' | 'knights') =>
+    view.players.reduce((n, p) => Math.max(n, p[field] ?? 0), 0);
   return {
     me: {
       name: me?.name ?? 'bot',
@@ -122,6 +263,9 @@ function summarise(ctx: DecideContext) {
       settlements: me?.pieces.settlements ?? 0,
       cities: me?.pieces.cities ?? 0,
       roads: me?.pieces.roads ?? 0,
+      // Without this a bot was asked whether to play a development card
+      // without being told which ones it was holding, so it almost never did.
+      playable_cards: playableKinds(ctx),
     },
     opponents: view.players
       .filter((p) => p.id !== meId)
@@ -135,7 +279,29 @@ function summarise(ctx: DecideContext) {
       threat: plan.threat,
     },
     turn: view.turn,
+    // A stand-in is finishing somebody else's game, and the model is told so:
+    // its job is continuity, not a better idea. Everything here was worked out
+    // from what that player put on the board.
+    ...(ctx.standIn
+      ? {
+          playing_for: {
+            note: 'This seat belongs to a player who dropped out. Keep playing the way they were.',
+            their_style: PLAY_STYLES[ctx.standIn.style],
+          },
+        }
+      : {}),
     ...(plan.targetSite !== null ? { target_corner: cornerFacts(board, plan.targetSite) } : {}),
+    // Two points each, and the two things a game is most often won on late.
+    // This is the same standings table the portraits show every player.
+    ...(contests(ctx.level, ctx.standIn).readsTheTable
+      ? {
+          awards: {
+            longest_road: `${named(view.longestRoad)} holds it; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
+            largest_army: `${named(view.largestArmy)} holds it; most knights played is ${best('knights')}, mine is ${me?.knights ?? 0}`,
+          },
+          points_still_needed: (view.victoryPoints ?? 10) - (me?.points ?? 0),
+        }
+      : {}),
   };
 }
 
@@ -143,7 +309,9 @@ function summarise(ctx: DecideContext) {
 function planQuestions(ctx: DecideContext): Record<string, Question> {
   return {
     plan_strategy: choice(
-      'Which long game suits this position best?',
+      ctx.standIn
+        ? `Which long game suits this position best? This seat's owner was ${PLAY_STYLES[ctx.standIn.style].toLowerCase()}, and the aim is to finish the game they were playing rather than start a different one — so prefer ${STYLE_ARCHETYPE[ctx.standIn.style]} unless the board has made it impossible.`
+        : 'Which long game suits this position best?',
       ARCHETYPES as unknown as Record<string, string>,
     ),
     plan_focus: choice('What should the next few turns of resources be saved for?', {
@@ -182,9 +350,11 @@ function readPlan(
 /** Who is close enough to winning that the bot should start obstructing. */
 function threatOf(ctx: DecideContext): Threat {
   const { view, meId } = ctx;
+  const { threatWithin, mindsAwards } = contests(ctx.level, ctx.standIn);
   const leader = leaderOf(view, meId);
   const goal = view.victoryPoints ?? 10;
-  if (leader && leader.points >= goal - 2) return 'leader-close';
+  if (leader && leader.points >= goal - threatWithin) return 'leader-close';
+  if (!mindsAwards) return 'none';
   if (view.longestRoad && view.longestRoad !== meId) return 'road-contested';
   if (view.largestArmy && view.largestArmy !== meId) return 'army-contested';
   return 'none';
@@ -197,7 +367,12 @@ export async function decide(ctx: DecideContext): Promise<Decision> {
   const plan = ctx.plan ?? initialPlan(view.turn);
 
   // --- rungs the rules already decide -------------------------------------
-  if (view.phase === 'roll') return none(plan, { kind: 'roll' }, 'Rolling.');
+  if (view.phase === 'roll') {
+    const knight = knightBeforeRoll(ctx);
+    if (knight)
+      return none(plan, playCard(ctx, plan, knight), 'Knight first: the robber is on my own production.');
+    return none(plan, { kind: 'roll' }, 'Rolling.');
+  }
 
   if (view.phase === 'discard') {
     const count = Math.floor(handTotal(hand) / 2);
@@ -272,14 +447,15 @@ async function openingPlacement(ctx: DecideContext, plan: BotPlan): Promise<Deci
 
 async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const { board, view, meId, jev } = ctx;
-  const hexes = rankRobberHexes(board, view, meId, LIMIT.robberHexes);
+  const { leaderWeight, huntsLeader } = contests(ctx.level, ctx.standIn);
+  const hexes = rankRobberHexes(board, view, meId, LIMIT.robberHexes, leaderWeight);
   const first = hexes[0];
   if (first === undefined)
     return none(plan, { kind: 'robber', hex: view.robber }, 'Nowhere better to put the robber.');
   const pick = (hex: number) => {
     const victims = robberTargets(view, hex, meId);
     const leader = leaderOf(view, meId);
-    const victim = victims.find((v) => v === leader?.id) ?? victims[0];
+    const victim = (huntsLeader && victims.find((v) => v === leader?.id)) || victims[0];
     return { kind: 'robber', hex, ...(victim ? { victim } : {}) } as GameAction;
   };
   if (!jev || hexes.length === 1)
@@ -301,8 +477,15 @@ async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision>
       ];
     }),
   );
+  // The question differs with the level too, because the two bots are weighing
+  // genuinely different things and one prompt cannot stand for both.
   const ev = await jev.evaluate(summarise(ctx), {
-    hex: choice('Where should the robber go to hurt the player most likely to win?', criteria),
+    hex: choice(
+      huntsLeader
+        ? 'Where should the robber go to hurt the player most likely to win?'
+        : 'Where should the robber go to block the most production?',
+      criteria,
+    ),
   });
   const answer = ev.answers.hex;
   const chosen =
@@ -313,7 +496,9 @@ async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision>
     calls: 1,
     tokens: ev.inputTokens,
     costUsd: ev.costUsd,
-    explain: 'Robber onto the tile that costs the leader most.',
+    explain: huntsLeader
+      ? 'Robber onto the tile that costs the leader most.'
+      : 'Robber onto the busiest tile that is not mine.',
   };
 }
 
@@ -325,10 +510,11 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const hand = handOf(view);
   const can = affordable(hand);
 
-  const corners = rankCorners(board, legal.settlements, LIMIT.corners);
-  const cities = legal.cities.slice(0, LIMIT.corners);
-  const roads = rankRoads(board, legal.roads, plan.targetSite, LIMIT.roads);
-  const playable = legal.playableCards;
+  const { shortlist, planLife, spendsEveryTurn } = contests(ctx.level, ctx.standIn);
+  const corners = rankCorners(board, legal.settlements, shortlist.corners);
+  const cities = legal.cities.slice(0, shortlist.corners);
+  const roads = rankRoads(board, legal.roads, plan.targetSite, shortlist.roads);
+  const playable = usableCards(ctx);
 
   const moves: Record<string, string> = {};
   if (corners.length) moves.settlement = 'build a settlement on a new corner: one point and more production';
@@ -338,9 +524,20 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const trade = bankTrade(hand, legal.rates, plan.needs, view.bank);
   if (trade)
     moves.trade = `trade ${RESOURCE_NAMES[trade.give].toLowerCase()} to the bank for the ${RESOURCE_NAMES[trade.receive].toLowerCase()} the plan needs`;
-  if (playable.length) moves.playCard = 'play a development card from the hand';
+  const kinds = playableKinds(ctx);
+  if (playable.length)
+    moves.playCard = `play a development card: ${Object.keys(kinds)
+      .map((kind) => CARD_NAMES[kind as CardKind] ?? kind)
+      .join(' or ')}`;
+  // Passing while a point is sitting there affordable is how a bot loses a
+  // game it was winning. A champion goes further: if anything useful can be
+  // bought, the turn is not over.
   const scoring = (corners.length && can.includes('settlement')) || (cities.length && can.includes('city'));
-  if (!scoring) moves.endTurn = 'do nothing this turn and keep the resources';
+  const useful =
+    scoring ||
+    (spendsEveryTurn &&
+      ((roads.length && can.includes('road')) || (legal.canBuyCard && can.includes('developmentCard'))));
+  if (!useful) moves.endTurn = 'do nothing this turn and keep the resources';
 
   // Nothing worth asking about.
   if (!Object.keys(moves).length)
@@ -353,9 +550,13 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
 
   const targetTaken = plan.targetSite !== null && !!view.buildings[plan.targetSite];
   const threat = threatOf(ctx);
-  const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat });
+  const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat, everyFewTurns: planLife });
 
   const fallback = (): Decision => {
+    // A card held to the end of the game was worth nothing. With no decision
+    // service to ask, playing one beats passing on the turn, and the strongest
+    // of them is picked here rather than the first that came out of the deck.
+    const card = playable.length ? bestCardToPlay(ctx, playable) : undefined;
     const action: GameAction =
       cities.length && can.includes('city')
         ? { kind: 'city', vertex: cities[0]! }
@@ -367,7 +568,9 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
               ? { kind: 'bankTrade', give: trade.give, receive: trade.receive }
               : legal.canBuyCard
                 ? { kind: 'buyCard' }
-                : { kind: 'endTurn' };
+                : card
+                  ? playCard(ctx, plan, card)
+                  : { kind: 'endTurn' };
     return { ...none(plan, action, 'Playing the plan without the decision service.'), degraded: true };
   };
   if (!jev) return fallback();
@@ -414,11 +617,18 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
           which_card: choice(
             'If a card is played, which one?',
             Object.fromEntries(
-              playable.map((id) => [
-                id,
-                (view.players.find((p) => p.id === meId)?.cards ?? []).find((c) => c.id === id)?.kind ??
-                  'card',
-              ]),
+              playable.map((id) => {
+                const kind = (view.players.find((p) => p.id === meId)?.cards ?? []).find(
+                  (c) => c.id === id,
+                )?.kind;
+                return [
+                  id,
+                  {
+                    card: kind ? (CARD_NAMES[kind] ?? kind) : 'card',
+                    does: (kind && CARD_USE[kind]) ?? 'a one-off effect',
+                  },
+                ];
+              }),
             ),
           ),
         }
@@ -474,9 +684,21 @@ function playCard(ctx: DecideContext, plan: BotPlan, cardId: string): GameAction
   const kind = (me?.cards ?? []).find((c) => c.id === cardId)?.kind;
   const wanted = plan.needs.length ? plan.needs : (['ore', 'wheat'] as Resource[]);
   if (kind === 'yearOfPlenty') {
+    // The rules want exactly two, or whatever is left if the bank is down to
+    // one, and never a resource it has run out of.
+    const stock: Hand = { ...ctx.view.bank };
     const resources: Hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
-    resources[wanted[0] ?? 'ore'] += 1;
-    resources[wanted[1] ?? wanted[0] ?? 'wheat'] += 1;
+    let take = Math.min(
+      2,
+      RESOURCES.reduce((n, r) => n + stock[r], 0),
+    );
+    for (const r of [...wanted, ...RESOURCES]) {
+      if (!take) break;
+      if (stock[r] <= 0) continue;
+      stock[r] -= 1;
+      resources[r] += 1;
+      take -= 1;
+    }
     return { kind: 'playCard', cardId, resources };
   }
   if (kind === 'monopoly') return { kind: 'playCard', cardId, resource: wanted[0] ?? 'ore' };
@@ -495,7 +717,9 @@ function degradedMove(ctx: DecideContext, plan: BotPlan): Decision {
     );
   }
   if (view.phase === 'robber') {
-    const hex = rankRobberHexes(board, view, ctx.meId, 1)[0] ?? view.robber;
+    const hex =
+      rankRobberHexes(board, view, ctx.meId, 1, contests(ctx.level, ctx.standIn).leaderWeight)[0] ??
+      view.robber;
     const victim = robberTargets(view, hex, ctx.meId)[0];
     return none(plan, { kind: 'robber', hex, ...(victim ? { victim } : {}) }, 'Blocking the strongest tile.');
   }

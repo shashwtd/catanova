@@ -377,3 +377,121 @@
     gap: 10px;
   }
 }
+
+/*
+ * Tabs, and the room's own panel.
+ *
+ * The settings used to be one column with everything in it: two volumes, the
+ * board, and — if you happened to be the host, and happened to be in a lobby —
+ * four more controls that changed the game for everybody. Nothing on the page
+ * said which was which. They are now two panels behind two different icons,
+ * and the personal one is divided by subject, so each view is short enough to
+ * take in at a glance.
+ */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 22px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #e5d9ba;
+  box-shadow: inset 0 1px 3px #2a3c3420;
+}
+.settings-tab {
+  flex: 1;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: #5e7263;
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+.settings-tab:hover:not([aria-selected='true']) {
+  background: #efe5cb;
+}
+.settings-tab[aria-selected='true'] {
+  background: #fffbeb;
+  color: #2f5246;
+  box-shadow: 0 1px 3px #2a3c3426;
+}
+/* Each panel is its own subject, so nothing inside needs a divider to explain
+   that it belongs to a different one. */
+.settings-panel > * + * {
+  margin-top: 26px;
+}
+.settings-panel .settings-room {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+.settings-privacy .settings-caption {
+  max-width: 44ch;
+}
+/* The room panel opens on its own, so its first section has nothing above it
+   to be separated from. */
+.settings-configure .settings-room {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+.settings-owner-note {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  background: #e9dfc2;
+  color: #5b6f60;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/*
+ * Splitting the panel in two broke the grid it used to sit in.
+ *
+ * `.settings-menu` is an unconditional two-column grid, and the old single
+ * panel relied on it: audio in one column, board style in the other, and the
+ * room's own rules spanning both underneath. Both halves now have two children
+ * instead of four, so they landed side by side — a column of tabs next to a
+ * column of controls, and a note next to nothing.
+ *
+ * So each half opts out and lays itself out. The selectors are specific
+ * because this stylesheet is imported before the ones it is correcting, and a
+ * tie there goes the other way.
+ */
+.settings-menu:has(.settings-tabs) {
+  display: block;
+}
+/* One column, at every width. Two was only ever there to fit the host's
+   controls alongside a player's own, and they no longer share a panel: a tab
+   holding two sliders and a pair of swatches is short enough to read at a
+   glance, and stretching it across a 640px dialog to fill the space would be
+   the clutter this was meant to remove. */
+.settings-menu:has(.settings-tabs) .settings-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+@media (min-width: 701px) {
+  .game-dialog:has(.settings-tabs) {
+    width: 440px;
+  }
+}
+/* The room's rules open on their own now, so nothing sits beside them and the
+   divider that separated them from the personal settings has nothing to
+   divide. */
+.game-dialog:has(.settings-configure) .settings-menu.settings-configure {
+  display: block;
+}
+.game-dialog:has(.settings-configure) .settings-configure .settings-room {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  padding: 0;
+  border-left: 0;
+  border-top: 0;
+}

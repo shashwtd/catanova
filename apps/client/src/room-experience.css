@@ -251,79 +251,7 @@
   font-size: 14px;
   color: #e0d6b4;
 }
-.room-lobby .lobby-seats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
-}
-.room-lobby .lobby-seat {
-  padding: 28px 12px 23px;
-  min-height: 250px;
-  gap: 16px;
-  border-radius: 14px;
-  border: 1px solid #b9af8266;
-  background: linear-gradient(155deg, #2e4b50e8, #173140f2);
-  box-shadow:
-    0 10px 28px #10273150,
-    inset 0 1px #ddd4a922;
-}
-.room-lobby .lobby-seat.self {
-  border-color: #e1bc72b0;
-  background: linear-gradient(155deg, #425b53f0, #243a46f2);
-}
-.room-lobby .lobby-avatar .avatar-medallion {
-  width: clamp(72px, 9vw, 115px);
-  height: auto;
-  aspect-ratio: 1;
-}
-.room-lobby .lobby-seat > strong {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #f3e9d0;
-  font:
-    600 20px Barlow,
-    sans-serif;
-}
-.room-lobby .ready-status {
-  min-height: 20px;
-  color: #b7c7ba;
-  font-size: 13px;
-  gap: 5px;
-}
-.room-lobby .ready-status.ready {
-  color: #d8e7a2;
-}
-.room-lobby .host-mark {
-  right: -7px;
-  bottom: -3px;
-  top: auto;
-  background: none;
-  padding: 0;
-  color: #f2c563;
-  filter: drop-shadow(0 2px 2px #263038);
-}
-.room-lobby .offline-mark {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 0;
-  background: #c1403f0d;
-  color: #f8716488;
-  box-shadow: none;
-}
-.room-lobby .open-seat {
-  color: #efdfaa;
-  background: #17344066;
-  border-style: dashed;
-}
-.room-lobby .open-seat:hover {
-  background: #35534bca;
-  border-color: #dac690;
-}
+
 .lobby-timer {
   display: flex;
   align-items: center;
@@ -433,13 +361,6 @@
   .title-wordmark h1 {
     font-size: clamp(40px, 6.7vw, 68px);
   }
-  .room-lobby .lobby-seats {
-    gap: 12px;
-  }
-  .room-lobby .lobby-seat {
-    min-height: 218px;
-    padding: 23px 8px;
-  }
 }
 @media (max-width: 650px) {
   .title-screen {
@@ -494,24 +415,7 @@
   .lobby-caption h1 {
     font-size: 25px;
   }
-  .room-lobby .lobby-seats {
-    gap: 7px;
-  }
-  .room-lobby .lobby-seat {
-    min-height: 165px;
-    gap: 14px;
-    padding: 18px 4px;
-    border-radius: 9px;
-  }
-  .room-lobby .lobby-avatar .avatar-medallion {
-    width: clamp(42px, 14vw, 78px);
-  }
-  .room-lobby .lobby-seat > strong {
-    font-size: 14px;
-  }
-  .room-lobby .ready-status {
-    font-size: 11px;
-  }
+
   .room-lobby .lobby-footer {
     flex-direction: column-reverse;
     align-items: center;
@@ -541,13 +445,5 @@
   }
   .room-lobby .lobby-center {
     padding: 18px 0;
-  }
-  .room-lobby .lobby-seat {
-    min-height: 180px;
-    padding: 16px 8px;
-    gap: 10px;
-  }
-  .room-lobby .lobby-avatar .avatar-medallion {
-    width: 76px;
   }
 }

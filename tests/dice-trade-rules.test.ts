@@ -15,7 +15,7 @@ import type { Game, GameAction, Hand } from '../packages/rules/src/game.js';
 import { generateBoard } from '../packages/rules/src/board.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { parseRoomSettings } from '../packages/protocol/src/settings.js';
-import { GameSettings } from '../apps/client/src/GameSettings.js';
+import { PlayerSettings, RoomConfiguration } from '../apps/client/src/GameSettings.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { TradeSubmission } from '../apps/client/src/trade-submission.js';
@@ -252,26 +252,35 @@ test('lobby dice settings validate and game settings show only audio after start
     players: seats.map((p) => ({ ...p, connected: true })),
     settings: { turnTimerSeconds: 90, diceMode: 'balanced' },
   };
-  const settings = () =>
+  const setup = () =>
     renderToStaticMarkup(
-      createElement(GameSettings, {
-        preferences: DEFAULT_PREFERENCES,
-        update: () => {},
+      createElement(RoomConfiguration, {
         room,
         me: 'p0',
         busy: false,
         save: async () => {},
+      }),
+    );
+  const mine = () =>
+    renderToStaticMarkup(
+      createElement(PlayerSettings, {
+        preferences: DEFAULT_PREFERENCES,
+        update: () => {},
         previewSound: () => {},
       }),
     );
-  assert.match(settings(), /Balanced/);
-  assert.match(settings(), /Turn duration/);
+  assert.match(setup(), /Balanced/);
+  assert.match(setup(), /Turn duration/);
+  // The dice belong to the table, so they are nowhere in a player's own panel,
+  // before or after the game starts.
+  assert.ok(!mine().includes('Turn duration'));
+  assert.ok(!mine().includes('Balanced'));
+  assert.match(mine(), /Effects volume/);
+  assert.match(mine(), /Music volume/);
   room.game = gameView(
     createGame(seats, 82, () => 0.34, { diceMode: 'balanced' }),
     'p0',
   );
-  assert.ok(!settings().includes('Turn duration'));
-  assert.ok(!settings().includes('Balanced'));
-  assert.match(settings(), /Effects volume/);
-  assert.match(settings(), /Music volume/);
+  // Once play begins the host's own controls lock rather than disappearing.
+  assert.match(setup(), /<input\b[^>]*aria-label="Turn duration"[^>]*disabled=""/);
 });

@@ -255,8 +255,12 @@ export function BoardViewport({
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill={`url(#${patternId})`} />
-        <rect width="100%" height="100%" fill="#241d271a" />
+        <rect width="100%" height="100%" fill="#241d2714" />
       </svg>
+      {/* Lit rather than washed: see `table-light.css`. Both sit under the
+          board and neither is inside the camera, so panning repaints nothing. */}
+      <div className="table-light" aria-hidden="true" />
+      <div className="table-vignette" aria-hidden="true" />
       <div
         className="board-camera"
         style={{

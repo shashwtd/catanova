@@ -1,0 +1,145 @@
+/*
+ * The table, lit.
+ *
+ * The wood was a tiled photograph with one flat grey wash over it, which made
+ * it read as a repeating texture rather than a surface: no falloff, no warmth,
+ * the same brightness in the corners as under the island, and a visible seam
+ * wherever the tile came round again. So the board looked correct and the room
+ * around it looked like wallpaper.
+ *
+ * Three layers fix it, and all three are one paint each: a warm pool under the
+ * lights, a vignette that takes the corners down, and a contact shadow that
+ * puts the island on the table instead of above it. Nothing here animates
+ * except two bulbs breathing, nothing takes pointer events, and nothing is
+ * inside the camera, so panning and zooming the board does not repaint any
+ * of it.
+ */
+
+.board-viewport {
+  --lamp-warm: 243 205 140;
+}
+
+/* The pool of light. It stays with the room rather than the board: pan the
+   island and it moves under the lamp, which is what happens when you push a
+   board across a table. */
+.table-light {
+  /* Fixed to the window, not to the viewport, for the same reason the wood
+     itself is: the viewport is only the part of the table the board can be
+     dragged around in, and anything drawn to its edges outlines a rectangle
+     that is not really there. */
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 62% 46% at 50% 6%,
+      rgb(var(--lamp-warm) / 17%),
+      rgb(var(--lamp-warm) / 6%) 45%,
+      transparent 72%
+    ),
+    radial-gradient(ellipse 76% 62% at 50% 46%, rgb(var(--lamp-warm) / 8%), transparent 70%);
+}
+
+/* And the falloff. A real table is darker at its edges than under the lamp,
+   and this is also what stops the tile's repeat from reading: the corners it
+   repeats into are the darkest part of the frame. */
+.table-vignette {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 92% 86% at 50% 40%,
+    transparent 46%,
+    rgb(14 10 8 / 15%) 78%,
+    rgb(10 7 6 / 34%) 100%
+  );
+}
+
+/* The island had no shadow worth the name, so it floated. It gets a deeper one
+   rather than a new blurred layer underneath it: `.island-stage` already
+   carries a drop-shadow filter, and adding to that costs nothing, where a
+   second blurred element inside the camera would be re-rasterised on every
+   zoom. */
+.board-camera .island-stage {
+  filter: drop-shadow(0 10px 13px rgb(14 19 14 / 45%));
+}
+
+/* ------------------------------------------------------------------ *
+ * The lights themselves
+ *
+ * Not currently hung: `BoardViewport` does not render the string. Kept
+ * whole, and paired with the component, so putting it back is one line.
+ * ------------------------------------------------------------------ */
+.string-lights {
+  position: absolute;
+  top: 0;
+  left: -3%;
+  width: 106%;
+  /* Barely any height at all: a ripple in the top few pixels, well clear of
+     the island. The string is here to justify the light on the wood, not to
+     take up room the board could use. */
+  height: 46px;
+  z-index: 12;
+  pointer-events: none;
+}
+/* Only the cord is stretched. Its rendered height matches its viewBox height,
+   so a lantern's `top` in pixels is the number the curve gives. */
+.string-cord {
+  display: block;
+  width: 100%;
+  height: 20px;
+}
+.string-lantern {
+  position: absolute;
+  width: 17px;
+  height: 23px;
+  margin-left: -8.5px;
+  /* One filter on the lantern rather than a second element, so each is a
+     single composited layer and the halo follows it exactly. */
+  filter: drop-shadow(0 0 5px rgb(var(--lamp-warm) / 70%)) drop-shadow(0 0 14px rgb(var(--lamp-warm) / 38%));
+}
+.string-lantern svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.lantern-glass {
+  fill: #f7d18a;
+}
+.lantern-ribs {
+  stroke: #fff;
+  stroke-opacity: 0.4;
+  stroke-width: 1;
+}
+.string-lantern[data-breathing='true'] {
+  animation: lantern-breath 7.5s ease-in-out infinite;
+}
+@keyframes lantern-breath {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.84;
+  }
+}
+
+/* A phone gives the space back to the board. */
+@media (max-width: 700px) {
+  .string-lights {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .string-lantern[data-breathing='true'] {
+    animation: none;
+  }
+}

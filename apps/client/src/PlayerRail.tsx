@@ -1,11 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { GameIcon, Trophy, WifiOff } from './GameIcons.js';
+import { BotMark, GameIcon, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { PLAYER_COLORS } from './Board.js';
+import { seatColorMap } from './player-colors.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
 import { playerStandings } from './player-ranking.js';
@@ -65,7 +65,32 @@ export function PlayerRail({
   clockOffset?: number;
 }) {
   const ranked = playerStandings(game);
+  // Keyed by player, not by seat number: the game shuffles the order when it
+  // starts, so the rail's third portrait is not the room's third seat.
+  const colors = seatColorMap(room.players);
   const tied = ranked.filter((p) => p.leading).length > 1;
+  const rail = useRef<HTMLElement>(null);
+  /**
+   * Publish how tall the rail actually is.
+   *
+   * On a phone everything below it — the prompt, the tools, the top of the
+   * board — used to be placed against a constant, so a table of two left a
+   * band of empty wood where a third row of portraits would have been, and a
+   * table of four overflowed it. The rail is the only thing that knows.
+   */
+  useEffect(() => {
+    const node = rail.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const publish = () =>
+      document.documentElement.style.setProperty('--rail-height', `${Math.round(node.offsetHeight)}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty('--rail-height');
+    };
+  }, []);
   const [now, setNow] = useState(Date.now);
   const fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() });
   if (room.serverNow !== undefined && room.serverNow !== fallback.current.server)
@@ -85,7 +110,7 @@ export function PlayerRail({
     };
   }, [counting]);
   return (
-    <aside className="player-rail" aria-label="Players">
+    <aside className="player-rail" aria-label="Players" ref={rail}>
       {ranked.map(({ player: p, seatIndex: i, points, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
@@ -98,7 +123,7 @@ export function PlayerRail({
             data-player-profile={p.id}
             aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${active ? ', current turn' : ''}`}
             className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''} ${!seat?.connected ? 'offline' : ''} ${p.resigned ? 'has-resigned' : ''}`}
-            style={{ '--player-color': PLAYER_COLORS[i] } as CSSProperties}
+            style={{ '--player-color': colors[p.id] } as CSSProperties}
           >
             <div className="profile-portrait">
               <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
@@ -129,6 +154,7 @@ export function PlayerRail({
               )}
               <DisconnectStatus
                 resigned={p.resigned}
+                standIn={!!seat?.standIn && game.phase !== 'finished'}
                 deadline={!seat?.connected && game.phase !== 'finished' ? seat?.resignAt : undefined}
                 now={serverNow}
                 paused={room.paused}
@@ -139,11 +165,7 @@ export function PlayerRail({
                 <strong className="profile-name-banner" title={p.name}>
                   {p.name}
                 </strong>
-                {seat?.bot && (
-                  <span className="player-bot-tag" title="Played by Catanova" aria-label="Bot player">
-                    BOT
-                  </span>
-                )}
+                {(seat?.bot || seat?.standIn) && <BotMark level={seat.botLevel} size={16} />}
               </div>
               <div className="profile-details">
                 <div className="profile-stats">

@@ -1,22 +1,46 @@
 /**
- * Table talk: a reaction button and the animation it throws across the board.
+ * Table talk: a call button and the token it throws across the board.
  *
- * The artwork is Twemoji, one collection, so a laugh looks the same on a Pixel
- * as it does on an iPhone instead of inheriting whatever each platform ships.
- * The movement is ours: each reaction gets choreography matched to the feeling,
- * because a laugh that drifts politely upward is not a laugh. That work lives in
- * CSS keyframes (`reactions.css`), keyed off the `motion` in the shared table.
+ * The faces are ours, drawn as SVG in `ReactionArt.tsx` rather than taken from
+ * the emoji font, so a laugh is the same face on a Pixel as on an iPhone
+ * instead of whatever each platform happens to ship. The movement is ours too:
+ * each reaction gets choreography matched to the feeling, because a laugh that
+ * drifts politely upward is not a laugh. That work lives in CSS keyframes
+ * (`reactions.css`), keyed off the `motion` in the shared table.
  *
  * Nothing here touches game state. A reaction is chat, so a dropped one costs
  * nothing and it needs no confirmation, revision or receipt.
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { REACTIONS, REACTION_LIST } from '../../../packages/protocol/src/reactions.js';
+import {
+  REACTIONS,
+  REACTION_LIST,
+  REACTION_MIN_GAP_MS,
+  reactionAllowedAt,
+} from '../../../packages/protocol/src/reactions.js';
 import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
+import { ReactionFace } from './ReactionArt.js';
 import { Smile } from './GameIcons.js';
 
-export const reactionArt = (name: ReactionName) => `/reactions/${name}.svg`;
+/** Breathing room between the button and its tray, in both placements. */
+const GAP = 12;
+
+/**
+ * Which edges of the tray have more of the set beyond them.
+ *
+ * Separated out because the rule is easy to get subtly wrong and impossible to
+ * see when it is: a fade that stays on at the bottom of a list is indeed a
+ * gradient, and is also a lie about there being more.
+ *
+ * The two pixels of slack matter. Sub-pixel scroll heights leave a fraction of
+ * overflow behind, and while the tray is unfurling a face sits a few pixels
+ * below where it will settle, so the list is briefly taller than it stays.
+ */
+export function scrollEdges(scrollTop: number, scrollHeight: number, clientHeight: number) {
+  const room = scrollHeight - clientHeight;
+  return { above: scrollTop > 2, below: room > 2 && scrollTop < room - 2 };
+}
 
 /** One reaction in flight. */
 export type FlyingReaction = {
@@ -41,7 +65,7 @@ export function ReactionLayer({ flying }: { flying: FlyingReaction[] }) {
           className={`reaction-fly motion-${REACTIONS[item.reaction].motion}`}
           style={{ left: `${8 + item.lane * 84}%` }}
         >
-          <img src={reactionArt(item.reaction)} alt="" draggable={false} />
+          <ReactionFace name={item.reaction} />
           <small>{item.from}</small>
           <span className="reaction-announce">
             {item.from} reacted: {REACTIONS[item.reaction].label}
@@ -55,19 +79,88 @@ export function ReactionLayer({ flying }: { flying: FlyingReaction[] }) {
 /**
  * The button and its tray.
  *
- * On a laptop the whole set fits in a grid. On a phone it becomes a single
- * swipeable row, because a grid of fourteen would eat the board. Either way the
- * order is the same and the common feelings come first.
+ * The tray stays open after a reaction goes out, because reacting is rarely a
+ * single thing: a laugh is usually followed by a second laugh. It closes on
+ * Escape, on a click away, or on the button itself.
+ *
+ * On a laptop the whole set wraps into a few rows. On a phone it becomes one
+ * swipeable row, because a block of fourteen would cover the board, which is
+ * the thing being reacted to.
  */
 export function ReactionButton({
   onReact,
   disabled,
+  now = Date.now,
 }: {
   onReact: (reaction: ReactionName) => void;
   disabled?: boolean;
+  /** Injectable so the resting beat between reactions can be tested. */
+  now?: () => number;
 }) {
   const [open, setOpen] = useState(false);
+  /** The last reaction sent, kept only to flash the face that was pressed. */
+  const [sent, setSent] = useState<{ reaction: ReactionName; id: number } | null>(null);
+  /** True while the shared rate limit says the next reaction must wait. */
+  const [resting, setResting] = useState(false);
+  const history = useRef<number[]>([]);
   const root = useRef<HTMLDivElement>(null);
+  const tray = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  /**
+   * Where the tray goes.
+   *
+   * Beside the button and along the bottom is the better place: it uses the
+   * empty strip that is already there and never floats over the board. But
+   * that strip ends where the hand dock begins, and how much of it there is
+   * depends on the window. So it is measured rather than assumed, and when the
+   * room is not there the tray stacks against the button instead — upward on a
+   * desktop, downward on a phone, where the button is at the top.
+   */
+  const [place, setPlace] = useState<'stacked' | 'beside'>('stacked');
+  /**
+   * Whether there is more of the set above or below what is showing.
+   *
+   * The tray fades its own edge where there is more to reach, and stops the
+   * moment you arrive, so the fade is a fact about the list rather than
+   * decoration that goes on lying once you are at the end of it.
+   */
+  const [edges, setEdges] = useState({ above: false, below: false });
+
+  useEffect(() => {
+    if (!open) return;
+    const decide = () => {
+      const panel = tray.current,
+        anchor = root.current;
+      if (!panel || !anchor) return;
+      const from = anchor.getBoundingClientRect().right + GAP;
+      // The dock's own box runs the width of the screen; its table is where
+      // the bottom strip actually stops being empty.
+      const table = document.querySelector('.hand-dock .card-table');
+      const until = table ? table.getBoundingClientRect().left : window.innerWidth;
+      setPlace(until - from >= panel.offsetWidth ? 'beside' : 'stacked');
+    };
+    decide();
+    window.addEventListener('resize', decide);
+    return () => window.removeEventListener('resize', decide);
+  }, [open]);
+
+  useEffect(() => {
+    const node = scroller.current;
+    if (!open || !node) return;
+    const measure = () => setEdges(scrollEdges(node.scrollTop, node.scrollHeight, node.clientHeight));
+    measure();
+    node.addEventListener('scroll', measure, { passive: true });
+    // The faces arrive staggered, and a face part-way through arriving sits
+    // below where it will end up, so the list is briefly taller than it stays.
+    node.addEventListener('animationend', measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(node);
+    return () => {
+      node.removeEventListener('scroll', measure);
+      node.removeEventListener('animationend', measure);
+      observer?.disconnect();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -85,34 +178,63 @@ export function ReactionButton({
     };
   }, [open]);
 
+  // While resting, wake up once the gate is expected to reopen rather than
+  // polling: the shortest wait the limit can impose is the gap between calls.
+  useEffect(() => {
+    if (!resting) return;
+    const timer = setTimeout(
+      () => setResting(!reactionAllowedAt(history.current, now())),
+      REACTION_MIN_GAP_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [resting, sent, now]);
+
+  function send(reaction: ReactionName) {
+    const at = now();
+    if (!reactionAllowedAt(history.current, at)) {
+      setResting(true);
+      return;
+    }
+    history.current = [...history.current.slice(-8), at];
+    onReact(reaction);
+    setSent({ reaction, id: at });
+    setResting(!reactionAllowedAt(history.current, at));
+  }
+
   return (
     <div className={`reaction-control ${open ? 'open' : ''}`} ref={root}>
       {open && !disabled && (
-        <div className="reaction-tray" role="menu" aria-label="Send a reaction">
-          {REACTION_LIST.map((name, index) => (
-            <button
-              key={name}
-              type="button"
-              role="menuitem"
-              disabled={disabled}
-              className="reaction-choice"
-              // Staggered so the tray unfurls rather than appearing at once.
-              style={{ animationDelay: `${Math.min(index, 8) * 18}ms` }}
-              title={REACTIONS[name].label}
-              aria-label={REACTIONS[name].label}
-              onClick={() => {
-                onReact(name);
-                setOpen(false);
-              }}
-            >
-              <img src={reactionArt(name)} alt="" draggable={false} />
-            </button>
-          ))}
+        <div className="reaction-tray" ref={tray} data-place={place}>
+          <div
+            className="reaction-scroll"
+            role="menu"
+            aria-label="Send a reaction"
+            ref={scroller}
+            data-above={edges.above}
+            data-below={edges.below}
+          >
+            {REACTION_LIST.map((name, index) => (
+              <button
+                key={name}
+                type="button"
+                role="menuitem"
+                className={`reaction-choice ${sent?.reaction === name ? 'just-sent' : ''}`}
+                // Staggered so the tray unfurls rather than appearing at once.
+                style={{ animationDelay: `${Math.min(index, 8) * 18}ms` }}
+                title={REACTIONS[name].label}
+                aria-label={REACTIONS[name].label}
+                disabled={disabled || resting}
+                onClick={() => send(name)}
+              >
+                <ReactionFace name={name} />
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <button
         type="button"
-        className="reaction-toggle"
+        className="reaction-toggle icon-button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={open ? 'Close reactions' : 'Send a reaction'}

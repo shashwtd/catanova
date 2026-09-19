@@ -189,35 +189,6 @@
   border-radius: 5px;
 }
 
-/* Subtle seat ornament; no management chrome competing with the portrait. */
-.room-lobby .lobby-seat,
-.room-lobby .lobby-seat.self {
-  padding-top: 20px;
-  padding-bottom: 18px;
-}
-.room-lobby .lobby-seat::after {
-  pointer-events: none;
-  top: auto;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 56px;
-  height: 10px;
-  opacity: 0.65;
-}
-.room-lobby .lobby-avatar {
-  margin-inline: auto;
-}
-.room-lobby .lobby-seat > strong {
-  margin-top: 12px;
-}
-.room-lobby .lobby-seat .ready-status {
-  min-height: 23px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
 .room-lobby .lobby-back:not(:disabled):hover,
 .room-lobby .lobby-back:not(:disabled):focus-visible {
   background: #633d32;
@@ -650,15 +621,8 @@
   .match-outcome-mark {
     width: 34px;
   }
-  .room-lobby .lobby-seat {
-    padding-block: 14px;
-  }
 }
-@media (min-width: 1001px) {
-  .room-lobby .lobby-avatar .avatar-medallion {
-    width: clamp(120px, 11vw, 148px);
-  }
-}
+
 @media (max-width: 700px) {
   .settings-menu .settings-range {
     height: 40px;

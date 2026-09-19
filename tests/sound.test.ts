@@ -427,25 +427,56 @@ test('hidden tabs play only an explicitly requested attention cue after activati
 test('music disabled during a pending device resume returns the silent context to sleep', async (t) => {
   environment(t);
   sampleFetch(t);
-  let preferences = { ...DEFAULT_PREFERENCES };
+  let preferences = { ...DEFAULT_PREFERENCES, sound: false };
   const engine = new SoundEngine(() => preferences);
   t.after(() => engine.dispose());
+  preferences = { ...preferences, sound: true };
   await engine.unlock();
   const context = AudioContextDouble.instances[0]!;
   t.mock.timers.tick(1200);
   await flush();
   context.holdResume = true;
   preferences = { ...preferences, music: true };
-  engine.setScene('game');
+  for (let i = 0; i < 8; i++) await flush();
+  engine.refresh();
   for (let i = 0; i < 8; i++) await flush();
   assert.ok(context.finishResume);
-  preferences = { ...preferences, music: false };
+  // Nothing left wants the device: no music, no effects, and no game on screen.
+  preferences = { ...preferences, music: false, sound: false };
   engine.refresh();
   context.finishResume!();
   await flush();
   t.mock.timers.tick(0);
   await flush();
   assert.equal(context.sources.length, 0);
+  assert.equal(context.state, 'suspended');
+});
+
+test('a game keeps the device awake, because a phone cannot wake it again on its own', async (t) => {
+  const doc = environment(t);
+  sampleFetch(t);
+  const engine = new SoundEngine(() => DEFAULT_PREFERENCES);
+  t.after(() => engine.dispose());
+  await engine.unlock();
+  const context = AudioContextDouble.instances[0]!;
+  engine.setScene('game');
+  for (let i = 0; i < 8; i++) await flush();
+
+  // iOS only resumes a suspended context from inside a user gesture, and a
+  // die landing or a trade arriving is not one. Sleeping mid-game silenced
+  // every sound that followed, so while a game is on screen it stays awake.
+  t.mock.timers.tick(60_000);
+  await flush();
+  assert.equal(context.state, 'running', 'an idle game does not put the device to sleep');
+  engine.play('road');
+  await flush();
+  assert.ok(context.sources.length > 0, 'and a later cue still reaches the device');
+
+  // Leaving the tab still releases it immediately: that is where the power goes.
+  context.sources.forEach((source) => source.end());
+  doc.hidden = true;
+  engine.silence();
+  await flush();
   assert.equal(context.state, 'suspended');
 });
 
