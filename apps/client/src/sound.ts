@@ -256,12 +256,29 @@ export class SoundEngine {
       if (this.suspending === suspend) this.suspending = undefined;
     });
   }
+  /**
+   * On iOS, Web Audio obeys the hardware ringer switch unless the page says it
+   * is playing back rather than making interface noises — a phone on silent
+   * plays a video but not a Web Audio cue. Safari 16.4 and later expose the
+   * category; everywhere else this is simply absent.
+   */
+  private claimPlayback() {
+    const session = (navigator as { audioSession?: { type: string } }).audioSession;
+    if (session) {
+      try {
+        session.type = 'playback';
+      } catch {
+        /* A browser that refuses the category still plays through the ringer. */
+      }
+    }
+  }
   async unlock() {
     if (this.hidden() || typeof AudioContext === 'undefined') return;
     this.unlocked = true;
     if (!this.enabled() && !this.wantsMusic()) return;
     const generation = this.generation;
     try {
+      this.claimPlayback();
       this.context ??= new AudioContext({ latencyHint: 'interactive' });
       if (!this.master) {
         this.master = this.context.createGain();
@@ -269,6 +286,9 @@ export class SoundEngine {
         this.master.connect(this.context.destination);
       }
       const context = this.context;
+      // Resume before anything is awaited: this call is running inside the
+      // touch that triggered it, and iOS only honours a resume from there.
+      if (context.state !== 'running') void context.resume().catch(() => {});
       await this.wake(context);
       if (context !== this.context) return;
       if (generation !== this.generation || (!this.enabled() && !this.wantsMusic()) || this.hidden()) {
@@ -297,9 +317,28 @@ export class SoundEngine {
     if (this.wantsMusic()) void this.startMusic();
     else this.stopMusic();
     if (!this.enabled() && !this.wantsMusic()) this.suspend();
+    // Coming back to a visible game, or entering one, has to undo an earlier
+    // suspension; otherwise the first cue is spent waking the context up.
+    else if (this.context && this.context.state === 'suspended' && !this.hidden())
+      void this.wake(this.context);
   }
+  /**
+   * Suspending an idle context saves power, and on a phone it costs every
+   * sound that follows.
+   *
+   * iOS only lets a suspended context be resumed from inside a user gesture.
+   * Almost nothing in a game of Catan is: the dice land, production pays out
+   * and somebody builds because a message arrived, not because this player
+   * touched the screen. So a context parked after the first 1.2 seconds could
+   * never wake up again, and the game went silent on an iPhone after one tap.
+   *
+   * While a game is on screen the context therefore stays running. The menu
+   * still sleeps, and going to another tab still suspends immediately, which
+   * is where the power actually goes.
+   */
   private sleepWhenIdle(ms: number) {
     clearTimeout(this.idle);
+    if (this.scene === 'game' && !this.hidden()) return;
     this.idle = setTimeout(() => {
       if (!this.voices.size && !this.music) this.suspend();
     }, ms);

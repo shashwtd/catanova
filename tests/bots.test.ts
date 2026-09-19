@@ -216,6 +216,57 @@ test('a plan reads as a sentence and never invents one', () => {
   assert.ok(line.endsWith('.'));
 });
 
+test('steady and sharp are the same rules with different attention on the leader', async () => {
+  // A board where the leader sits on a modest tile and somebody else sits on
+  // the busiest one. The two levels should want different tiles.
+  const game = createGame(
+    [
+      { id: 'me', name: 'Me' },
+      { id: 'leader', name: 'Leader' },
+      { id: 'other', name: 'Other' },
+    ],
+    11,
+    Math.random,
+  );
+  const pips = (n: number | null) => (n === null ? 0 : 6 - Math.abs(7 - n));
+  const numbered = game.board.hexes.filter((h) => h.terrain !== 'desert' && h.number !== null);
+  const busiest = numbered.reduce((a, b) => (pips(b.number) > pips(a.number) ? b : a));
+  // A quieter tile that shares no corner with the busiest, so the two choices
+  // can never be the same hex.
+  const quiet = numbered.find(
+    (h) => h.id !== busiest.id && !h.vertices.some((v) => busiest.vertices.includes(v)),
+  )!;
+  game.buildings[busiest.vertices[0]!] = { player: 'other', kind: 'settlement' };
+  game.buildings[quiet.vertices[0]!] = { player: 'leader', kind: 'settlement' };
+  game.players[1]!.hand.wood = 3;
+  game.players[2]!.hand.wood = 3;
+  game.phase = 'robber';
+  game.active = 0;
+  game.robber = game.board.hexes.find((h) => h.terrain === 'desert')!.id;
+
+  const move = async (level: 'steady' | 'sharp') =>
+    (
+      await decide({
+        view: gameView(game, 'me'),
+        board: game.board,
+        meId: 'me',
+        plan: initialPlan(game.turn),
+        jev: null,
+        level,
+      })
+    ).action as { kind: string; hex: number; victim?: string };
+
+  const steady = await move('steady'),
+    sharp = await move('sharp');
+  assert.equal(steady.kind, 'robber');
+  assert.equal(sharp.kind, 'robber');
+  // Steady blocks the most production on the board; sharp follows the leader.
+  assert.equal(steady.hex, busiest.id, 'steady blocks the busiest tile, whoever owns it');
+  assert.equal(sharp.hex, quiet.id, 'sharp gives up production to hit the leader');
+  assert.equal(sharp.victim, 'leader');
+  assert.notEqual(steady.hex, sharp.hex, 'the two levels are not the same bot');
+});
+
 test('the decision service is TypeSafe only, and absent without a key', () => {
   assert.equal(route({} as NodeJS.ProcessEnv), null, 'no key means no decision service');
   assert.equal(

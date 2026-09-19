@@ -128,9 +128,22 @@ export const leaderOf = (view: GameView, meId: string): PlayerView | null => {
   return others.sort((a, b) => b.points - a.points)[0] ?? null;
 };
 
-/** Hexes worth putting the robber on, best first: block the most production
- *  belonging to whoever is ahead, and never block yourself. */
-export function rankRobberHexes(board: Board, view: GameView, meId: string, limit: number): number[] {
+/**
+ * Hexes worth putting the robber on, best first: block the most production and
+ * never block yourself.
+ *
+ * `leaderWeight` is what separates the two difficulties. At 1 the robber goes
+ * wherever the most production is, whoever owns it — a bot minding its own
+ * game. Above 1 the same tile is worth more for belonging to whoever is ahead,
+ * so the robber follows the leader around the board.
+ */
+export function rankRobberHexes(
+  board: Board,
+  view: GameView,
+  meId: string,
+  limit: number,
+  leaderWeight = 2,
+): number[] {
   const leader = leaderOf(view, meId);
   const value = (hexId: number) => {
     const hex = board.hexes[hexId];
@@ -141,7 +154,7 @@ export function rankRobberHexes(board: Board, view: GameView, meId: string, limi
       if (!building) continue;
       const weight = building.kind === 'city' ? 2 : 1;
       if (building.player === meId) score -= pips(hex.number) * weight * 3;
-      else if (leader && building.player === leader.id) score += pips(hex.number) * weight * 2;
+      else if (leader && building.player === leader.id) score += pips(hex.number) * weight * leaderWeight;
       else score += pips(hex.number) * weight;
     }
     return score;

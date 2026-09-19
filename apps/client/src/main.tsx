@@ -123,6 +123,7 @@ import './game-popover.css';
 import './hub-entry-refinement.css';
 import './landing-features.css';
 import './room-seats.css';
+import './mobile-shelf.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',

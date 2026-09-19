@@ -66,6 +66,28 @@ export function PlayerRail({
 }) {
   const ranked = playerStandings(game);
   const tied = ranked.filter((p) => p.leading).length > 1;
+  const rail = useRef<HTMLElement>(null);
+  /**
+   * Publish how tall the rail actually is.
+   *
+   * On a phone everything below it — the prompt, the tools, the top of the
+   * board — used to be placed against a constant, so a table of two left a
+   * band of empty wood where a third row of portraits would have been, and a
+   * table of four overflowed it. The rail is the only thing that knows.
+   */
+  useEffect(() => {
+    const node = rail.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const publish = () =>
+      document.documentElement.style.setProperty('--rail-height', `${Math.round(node.offsetHeight)}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty('--rail-height');
+    };
+  }, []);
   const [now, setNow] = useState(Date.now);
   const fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() });
   if (room.serverNow !== undefined && room.serverNow !== fallback.current.server)
@@ -85,7 +107,7 @@ export function PlayerRail({
     };
   }, [counting]);
   return (
-    <aside className="player-rail" aria-label="Players">
+    <aside className="player-rail" aria-label="Players" ref={rail}>
       {ranked.map(({ player: p, seatIndex: i, points, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,

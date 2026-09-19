@@ -171,43 +171,6 @@
   }
 }
 @media (max-width: 700px) and (orientation: portrait) {
-  .playing .hand-dock.hand-dock-separated {
-    left: max(64px, env(safe-area-inset-left));
-    right: 10px;
-    bottom: max(8px, env(safe-area-inset-bottom));
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 10px;
-  }
-  .playing .development-tray {
-    order: -1;
-    gap: 10px;
-  }
-  .playing .hand-dock-separated .card-table {
-    grid-column: 1;
-    grid-row: 1;
-    justify-self: end;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 10px;
-    height: auto;
-    min-height: 52px;
-    padding: 6px 8px;
-  }
-  .playing .hand-dock-separated .table-actions {
-    grid-column: 1;
-    grid-row: 2;
-    justify-self: end;
-    gap: 10px;
-  }
-  .playing .hand-dock-separated .resource-counters {
-    width: 100%;
-    min-width: 160px;
-    gap: 3px;
-  }
-  .playing .hand-dock-separated .hand-zone {
-    width: 100%;
-  }
   .playing .development-tray .development-slot,
   .playing .development-tray .development-card {
     width: 44px;
@@ -810,18 +773,6 @@
   .game-world.lobby,
   .entry-world {
     min-height: 0;
-  }
-}
-
-/* The dock's height depends on whether the player is holding development
-   cards, so a constant reserve was either overlapping the board by about
-   60px or leaving dead space. Reserve what is actually there. */
-@media (max-width: 700px) and (orientation: portrait) {
-  .playing {
-    --hud-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--dock-reserve, 132px));
-  }
-  .playing:has(.hand-dock .development-tray) {
-    --dock-reserve: 200px;
   }
 }
 

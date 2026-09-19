@@ -38,6 +38,7 @@ import {
 } from './heuristics.js';
 import { ARCHETYPES, describe, initialPlan, planIsStale } from './plan.js';
 import type { Archetype, BotPlan, Focus, Threat } from './plan.js';
+import type { BotLevel } from '../../protocol/src/bots.js';
 
 /** How many options of each kind are ever shown to the model. Shortlists keep
  *  the state small and stop the few good moves being buried in the many legal
@@ -62,9 +63,39 @@ export type DecideContext = {
   meId: string;
   plan: BotPlan;
   jev: JevClient | null;
-  /** Difficulty. 'steady' plays the plan; 'sharp' also contests the leader. */
-  level?: 'steady' | 'sharp';
+  /**
+   * Difficulty. Both bots play the same rules with the same plan; the level
+   * decides how much attention they pay to whoever is winning. See `contests`.
+   */
+  level?: BotLevel;
 };
+
+/**
+ * What a level actually changes.
+ *
+ * A sharp bot contests the leader: its robber is drawn to the leader's tiles
+ * and prefers to rob the leader when it lands, and it starts treating a leader
+ * as a threat while they are still three points out, which pulls its plan
+ * towards blocking sooner. A steady bot plays its own game: the robber goes
+ * wherever the most production is, whoever owns it, and nobody counts as a
+ * threat until they are one point from winning.
+ *
+ * Both are arithmetic, decided here rather than asked about, so the difference
+ * holds even when the decision service is unreachable.
+ */
+function contests(level: BotLevel | undefined) {
+  const sharp = level === 'sharp';
+  return {
+    /** How much more a robber tile is worth for belonging to the leader. */
+    leaderWeight: sharp ? 2 : 1,
+    /** How close the leader gets before the bot starts obstructing. */
+    threatWithin: sharp ? 3 : 1,
+    /** Whether a contested road or army counts as a threat on its own. */
+    mindsAwards: sharp,
+    /** Whether the robber goes for the leader rather than whoever is there. */
+    huntsLeader: sharp,
+  };
+}
 
 const FOCUS_COST: Record<Focus, keyof typeof COSTS | null> = {
   settlement: 'settlement',
@@ -182,9 +213,11 @@ function readPlan(
 /** Who is close enough to winning that the bot should start obstructing. */
 function threatOf(ctx: DecideContext): Threat {
   const { view, meId } = ctx;
+  const { threatWithin, mindsAwards } = contests(ctx.level);
   const leader = leaderOf(view, meId);
   const goal = view.victoryPoints ?? 10;
-  if (leader && leader.points >= goal - 2) return 'leader-close';
+  if (leader && leader.points >= goal - threatWithin) return 'leader-close';
+  if (!mindsAwards) return 'none';
   if (view.longestRoad && view.longestRoad !== meId) return 'road-contested';
   if (view.largestArmy && view.largestArmy !== meId) return 'army-contested';
   return 'none';
@@ -272,14 +305,15 @@ async function openingPlacement(ctx: DecideContext, plan: BotPlan): Promise<Deci
 
 async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const { board, view, meId, jev } = ctx;
-  const hexes = rankRobberHexes(board, view, meId, LIMIT.robberHexes);
+  const { leaderWeight, huntsLeader } = contests(ctx.level);
+  const hexes = rankRobberHexes(board, view, meId, LIMIT.robberHexes, leaderWeight);
   const first = hexes[0];
   if (first === undefined)
     return none(plan, { kind: 'robber', hex: view.robber }, 'Nowhere better to put the robber.');
   const pick = (hex: number) => {
     const victims = robberTargets(view, hex, meId);
     const leader = leaderOf(view, meId);
-    const victim = victims.find((v) => v === leader?.id) ?? victims[0];
+    const victim = (huntsLeader && victims.find((v) => v === leader?.id)) || victims[0];
     return { kind: 'robber', hex, ...(victim ? { victim } : {}) } as GameAction;
   };
   if (!jev || hexes.length === 1)
@@ -301,8 +335,15 @@ async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision>
       ];
     }),
   );
+  // The question differs with the level too, because the two bots are weighing
+  // genuinely different things and one prompt cannot stand for both.
   const ev = await jev.evaluate(summarise(ctx), {
-    hex: choice('Where should the robber go to hurt the player most likely to win?', criteria),
+    hex: choice(
+      huntsLeader
+        ? 'Where should the robber go to hurt the player most likely to win?'
+        : 'Where should the robber go to block the most production?',
+      criteria,
+    ),
   });
   const answer = ev.answers.hex;
   const chosen =
@@ -313,7 +354,9 @@ async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision>
     calls: 1,
     tokens: ev.inputTokens,
     costUsd: ev.costUsd,
-    explain: 'Robber onto the tile that costs the leader most.',
+    explain: huntsLeader
+      ? 'Robber onto the tile that costs the leader most.'
+      : 'Robber onto the busiest tile that is not mine.',
   };
 }
 
@@ -495,7 +538,7 @@ function degradedMove(ctx: DecideContext, plan: BotPlan): Decision {
     );
   }
   if (view.phase === 'robber') {
-    const hex = rankRobberHexes(board, view, ctx.meId, 1)[0] ?? view.robber;
+    const hex = rankRobberHexes(board, view, ctx.meId, 1, contests(ctx.level).leaderWeight)[0] ?? view.robber;
     const victim = robberTargets(view, hex, ctx.meId)[0];
     return none(plan, { kind: 'robber', hex, ...(victim ? { victim } : {}) }, 'Blocking the strongest tile.');
   }

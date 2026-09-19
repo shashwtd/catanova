@@ -100,10 +100,29 @@ using `sudoedit`, then recreate the `game` service with that env file and
 `deploy/single-vm/compose.yaml`. A plain container restart does not reload env
 values. Never commit the key or put it in a client-side environment variable.
 
+## Steady and sharp
+
+A host picks one of two levels when seating a bot. Both play the same rules with
+the same plan and the same questions; what differs is how much attention they
+pay to whoever is winning, and all of it is arithmetic in `contests()` in
+`packages/bot/decide.ts`, so the difference holds even with no decision service
+reachable.
+
+|                       | Steady                                                     | Sharp                                                                               |
+| --------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Robber tile           | wherever the most production is, whoever owns it           | the leader's tiles are worth double, so it will give up production to land on one   |
+| Robbed player         | whoever is on the tile                                     | the leader, when the leader is on it                                                |
+| Counts as a threat    | a leader one point from winning                            | a leader three points out, and a longest road or largest army held by somebody else |
+| Robber question asked | "Where should the robber go to block the most production?" | "Where should the robber go to hurt the player most likely to win?"                 |
+
+In practice a steady bot plays its own game and you mostly notice it when it
+takes a corner you wanted. A sharp bot follows you around the board once you
+start to lead, and it starts doing so well before you are close to winning.
+
 ## How a bot behaves at the table
 
-A bot is labelled `BOT` beside its name, in the lobby and on its portrait during
-play, so nobody wonders why a seat never chats.
+A bot is marked with a small machine beside its name, in the lobby and on its
+portrait during play, so nobody wonders why a seat never chats.
 
 It also pauses before every move. Without that it answered the instant the rules
 allowed, which is the single thing that made it read as software rather than an
