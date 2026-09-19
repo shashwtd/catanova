@@ -92,11 +92,11 @@ figure {
 }
 h1 {
   color: var(--ink-strong);
-  font-family: Cinzel, Georgia, serif;
-  font-weight: 600;
-  font-size: clamp(31px, 3.4vw, 42px);
-  line-height: 1.12;
-  letter-spacing: -0.025em;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(30px, 3.3vw, 40px);
+  line-height: 1.16;
+  letter-spacing: -0.012em;
   text-wrap: balance;
 }
 h2 {
@@ -112,6 +112,14 @@ h3 {
   font-weight: 600;
   line-height: 1.3;
   margin: 26px 0 8px;
+  scroll-margin-top: calc(var(--bar) + 20px);
+}
+h3 .guide-anchor {
+  margin-left: 9px;
+  font-size: 15px;
+}
+h3:hover .guide-anchor {
+  opacity: 1;
 }
 p,
 li,
@@ -261,6 +269,21 @@ code {
 .guide-nav-links a:hover > span {
   color: var(--link-hover);
 }
+.guide-nav-links ol {
+  list-style: none;
+  margin: 0 0 3px;
+  padding: 0 0 0 9px;
+  border-left: 1px solid var(--rule);
+}
+.guide-nav-links ol a {
+  grid-template-columns: 24px 1fr;
+  padding: 3px 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.guide-nav-links ol a:hover {
+  color: var(--link-hover);
+}
 .guide-nav-aside {
   display: grid;
   gap: 6px;
@@ -401,8 +424,7 @@ code {
 .guide-section {
   scroll-margin-top: calc(var(--bar) + 20px);
 }
-.guide-heading,
-.guide-seealso h2 {
+.guide-heading {
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -744,6 +766,71 @@ code {
 }
 .guide-draft-seats [data-seat='4'] {
   background: #eed28d;
+}
+
+/* --- Notes and references ------------------------------------------------ */
+.guide-ref {
+  font-size: 11.5px;
+  line-height: 0;
+  white-space: nowrap;
+}
+.guide-ref a {
+  padding: 0 1px;
+  text-decoration: none;
+}
+.guide-ref a:hover {
+  text-decoration: underline;
+}
+.guide-references {
+  counter-reset: note;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.guide-references li {
+  counter-increment: note;
+  display: grid;
+  grid-template-columns: 26px 14px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 15.5px;
+}
+.guide-references li::before {
+  content: counter(note) '.';
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+.guide-backref {
+  text-decoration: none;
+  font-size: 14px;
+}
+/* A note the reader jumped to marks itself, so it is obvious which one it is. */
+.guide-references li:target {
+  background: #f6ead0;
+  box-shadow: 0 0 0 5px #f6ead0;
+  border-radius: 2px;
+}
+.guide-colophon {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.guide-colophon code {
+  font-size: 11.5px;
+}
+.guide-colophon .guide-back-top {
+  margin-left: auto;
 }
 
 /* --- See also, call to action, footer ----------------------------------- */

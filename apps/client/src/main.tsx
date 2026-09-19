@@ -30,6 +30,7 @@ import { useAuth, entryLocation } from './auth.js';
 import { Avatar } from './Profile.js';
 import { Lobby, Invite } from './Lobby.js';
 import { EntryScreen } from './EntryScreen.js';
+import { TitleScenery } from './TitleScenery.js';
 import { GameLoader } from './GameLoader.js';
 import { takeEntryIntent } from './entry-intent.js';
 import { preloadGameAssets } from './game-assets.js';
@@ -981,7 +982,7 @@ function App() {
           <ReactionLayer flying={reactions.flying} />
         </div>
       )}
-      {!g && !room && !playerHome && !entering && <div className="title-scenery" aria-hidden="true" />}
+      {!g && !room && !playerHome && !entering && <TitleScenery />}
       {g && (
         <GameTools
           panel={panel}

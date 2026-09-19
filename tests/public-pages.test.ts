@@ -3,9 +3,24 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
+import {
+  TitleScenery,
+  TITLE_SLIDES,
+  SLIDE_HOLD_SECONDS,
+  SLIDE_FADE_SECONDS,
+  sceneryKeyframes,
+} from '../apps/client/src/TitleScenery.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
-import { GUIDE_FAQ, PUBLIC_PAGES, SOCIAL_CARD_ALT } from '../apps/client/src/PublicPages.js';
+import {
+  GUIDE_FAQ,
+  GUIDE_SECTIONS,
+  PUBLIC_PAGES,
+  SOCIAL_CARD_ALT,
+  subId,
+} from '../apps/client/src/PublicPages.js';
 import {
   COSTS,
   DEVELOPMENT_DECK,
@@ -78,14 +93,28 @@ test('the production entry is readable before JavaScript and only public pages e
   const navigable = [...guide.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
   assert.ok(navigable.length >= 12, `only ${navigable.length} anchors`);
   // The contents exist twice on purpose: a rail beside a wide window, and a
-  // disclosure after the opening on a phone. They must list the same sections,
-  // or one of the two is quietly out of date.
-  const contents = [...guide.matchAll(/<ol class="guide-nav-links">([\s\S]*?)<\/ol>/g)].map((list) =>
-    [...list[1]!.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!),
-  );
-  assert.equal(contents.length, 2, 'expected the rail and the phone disclosure');
-  assert.deepEqual(contents[0], contents[1]);
-  assert.ok(contents[0]!.length >= 12);
+  // disclosure after the opening on a phone. Every section and every subsection
+  // is linked from both, and every one of those links lands somewhere.
+  assert.equal((guide.match(/class="guide-nav-links"/g) ?? []).length, 2);
+  assert.ok(GUIDE_SECTIONS.length >= 12);
+  for (const [id, , subs] of GUIDE_SECTIONS) {
+    // Twice in the contents, once on the heading's own section link, and more
+    // wherever the prose cross-references it.
+    const links = (guide.match(new RegExp(`href="#${id}"`, 'g')) ?? []).length;
+    assert.ok(links >= 3, `${id} is linked ${links} times, expected both lists and its heading`);
+    assert.ok(guide.includes(`id="${id}"`), id);
+    for (const sub of subs) {
+      const anchor = subId(id, sub);
+      const subLinks = (guide.match(new RegExp(`href="#${anchor}"`, 'g')) ?? []).length;
+      assert.ok(subLinks >= 3, `${anchor} is linked ${subLinks} times`);
+      assert.ok(guide.includes(`id="${anchor}"`), anchor);
+    }
+  }
+  // Notes are linked both ways, so a reader can always get back to the sentence.
+  for (let n = 1; n <= 5; n += 1) {
+    assert.ok(guide.includes(`id="ref-${n}"`) && guide.includes(`href="#note-${n}"`), `note ${n} marker`);
+    assert.ok(guide.includes(`id="note-${n}"`) && guide.includes(`href="#ref-${n}"`), `note ${n} return`);
+  }
   // Numbers a reader came here to look up are generated from the rules rather
   // than typed out, so the page cannot quietly disagree with the game. If a
   // cost or the deck changes, this page changes with it.
@@ -221,4 +250,37 @@ test('discovery assets are real files with declared icon and social dimensions',
     offset += 2 + jpeg.readUInt16BE(offset + 2);
   }
   assert.deepEqual(dimensions, [1200, 630]);
+});
+
+test('the entry scenery crossfades every slide it is given, and rests on one', () => {
+  // With a single picture there is nothing to fade between, so no layers and no
+  // animation: the stylesheet's own background is the whole of it.
+  const one = renderToStaticMarkup(createElement(TitleScenery));
+  assert.ok(one.includes('class="title-scenery"'));
+  if (TITLE_SLIDES.length < 2) {
+    assert.ok(!one.includes('<style>'), 'one slide needs no keyframes');
+    assert.ok(!one.includes('<i'), 'one slide needs no layers');
+  }
+
+  // Each slide holds for its turn and no longer. The window a layer is opaque
+  // for is one nth of the cycle, which is why the keyframes are generated here
+  // rather than written out in CSS: a slide added to the list would otherwise
+  // leave every percentage in the stylesheet quietly wrong.
+  for (const count of [2, 3, 4, 7]) {
+    const cycle = count * SLIDE_HOLD_SECONDS;
+    const frames = sceneryKeyframes(count);
+    const stops = [...frames.matchAll(/([\d.]+)%\{opacity:(\d)\}/g)].map(
+      (m) => [Number(m[1]), Number(m[2])] as const,
+    );
+    const opaque = stops.filter(([, value]) => value === 1).map(([at]) => at);
+    assert.equal(opaque.length, 2, `${count} slides: expected one opaque window`);
+    const held = ((opaque[1]! - opaque[0]!) / 100) * cycle;
+    assert.ok(
+      Math.abs(held - (SLIDE_HOLD_SECONDS - SLIDE_FADE_SECONDS)) < 0.01,
+      `${count} slides: held opaque for ${held}s`,
+    );
+    // It starts and ends transparent, so layers stack without a seam.
+    assert.ok(frames.startsWith('@keyframes title-scenery-slide{0%{opacity:0}'));
+    assert.ok(frames.endsWith('100%{opacity:0}}'));
+  }
 });

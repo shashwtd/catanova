@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { EntryScreen } from './EntryScreen.js';
+import { TitleScenery } from './TitleScenery.js';
 import { BrandLogo } from './BrandLogo.js';
 import { ResourceIcon } from './Board.js';
 import { DevelopmentArt } from './DevelopmentCards.js';
@@ -241,7 +242,7 @@ export function PublicLanding() {
   } as ReturnType<typeof useAuth>;
   return (
     <main className="game-world entry-world" data-motion="reduced">
-      <div className="title-scenery" aria-hidden="true" />
+      <TitleScenery />
       <EntryScreen
         auth={auth}
         entry="home"
@@ -282,20 +283,26 @@ export function PublicLanding() {
  * rather than a paragraph. Somebody arriving from a search for "catan city
  * cost" should be able to stop reading after four seconds.
  */
-const sections = [
-  ['start', 'Your first game'],
-  ['resources', 'Resources and building costs'],
-  ['turn', 'Taking a turn'],
-  ['trading', 'Trading and ports'],
-  ['development', 'Development cards'],
-  ['winning', 'Reaching ten points'],
-  ['bots', 'Playing against bots'],
-  ['setup', 'Setting up a room'],
-  ['table', 'At the table'],
-  ['accounts', 'Your profile and seat'],
-  ['questions', 'Common questions'],
-  ['glossary', 'Glossary'],
+export const GUIDE_SECTIONS = [
+  ['start', 'Your first game', ['Getting everyone in', 'The opening placements']],
+  ['resources', 'Resources and building costs', ['What everything costs']],
+  ['turn', 'Taking a turn', ['Rolling a seven']],
+  ['trading', 'Trading and ports', ['Trading with a player', 'Trading with the bank']],
+  ['development', 'Development cards', []],
+  ['winning', 'Reaching ten points', ['The two awards']],
+  ['bots', 'Playing against bots', ['Which bot turned up', 'They think before they move']],
+  ['setup', 'Setting up a room', []],
+  ['table', 'At the table', ['Your colour is yours', 'Reactions']],
+  ['accounts', 'Your profile and seat', ['A profile that stays yours', 'If your connection drops']],
+  ['questions', 'Common questions', []],
+  ['glossary', 'Glossary', []],
+  ['see-also', 'See also', []],
+  ['references', 'Notes and references', []],
 ] as const;
+
+/** A subsection's anchor, built from its section so the two can never disagree. */
+export const subId = (section: string, title: string) =>
+  `${section}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 
 const terrainNames: Record<Resource, string> = {
   wood: 'Forest',
@@ -397,15 +404,56 @@ function GuideHeading({ id, index, children }: { id: string; index: number; chil
 function ContentsList() {
   return (
     <ol className="guide-nav-links">
-      {sections.map(([id, label], index) => (
+      {GUIDE_SECTIONS.map(([id, label, subs], index) => (
         <li key={id}>
           <a href={`#${id}`}>
             <span aria-hidden="true">{index + 1}</span>
             {label}
           </a>
+          {subs.length > 0 && (
+            <ol>
+              {subs.map((sub, subIndex) => (
+                <li key={sub}>
+                  <a href={`#${subId(id, sub)}`}>
+                    <span aria-hidden="true">{`${index + 1}.${subIndex + 1}`}</span>
+                    {sub}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          )}
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * A subsection heading that carries the anchor the contents point at.
+ *
+ * The id is derived from the title rather than typed beside it, so a heading
+ * somebody renames cannot quietly leave a dead entry in the contents.
+ */
+function Sub({ section, children }: { section: string; children: string }) {
+  const id = subId(section, children);
+  return (
+    <h3 id={id}>
+      {children}
+      <a className="guide-anchor" href={`#${id}`} aria-label={`Link to ${children}`}>
+        §
+      </a>
+    </h3>
+  );
+}
+
+/** A numbered note, linked both ways so a reader can get back to where they were. */
+function Ref({ n }: { n: number }) {
+  return (
+    <sup className="guide-ref">
+      <a id={`ref-${n}`} href={`#note-${n}`} aria-label={`Note ${n}`}>
+        [{n}]
+      </a>
+    </sup>
   );
 }
 
@@ -513,7 +561,7 @@ export function PublicGuide() {
               A game happens in a private room. There is no lobby browser and no matchmaking: somebody
               creates a room and passes the code or the link around.
             </p>
-            <h3>Getting everyone in</h3>
+            <Sub section="start">Getting everyone in</Sub>
             <ol className="guide-steps">
               <li>
                 <strong>Find your room.</strong> <em>Create room</em> opens your lobby. Choose{' '}
@@ -528,7 +576,7 @@ export function PublicGuide() {
                 <em>Start</em> once the table is full and connected.
               </li>
             </ol>
-            <h3>The opening placements</h3>
+            <Sub section="start">The opening placements</Sub>
             <p>
               Before the first roll, each player places a settlement and a road touching it. Everyone takes a
               first placement in seat order, then the order reverses for the second. Setup pieces are free.
@@ -556,6 +604,7 @@ export function PublicGuide() {
               <p>
                 The default map uses Catanova’s own fairness constraints to spread the resources across the
                 island and keep red number tokens off adjacent tiles. Every new room gets a new island.
+                <Ref n={1} />
               </p>
             </aside>
           </section>
@@ -600,7 +649,7 @@ export function PublicGuide() {
                 </table>
               </div>
             </figure>
-            <h3>What everything costs</h3>
+            <Sub section="resources">What everything costs</Sub>
             <p>
               Costs are paid to the bank. You can build in any order, as many times as you can afford, during
               your own action phase.
@@ -666,10 +715,10 @@ export function PublicGuide() {
               A playable development card can be used before you roll or during your action phase, but only
               one per turn. Finish its effect before doing anything else.
             </p>
-            <h3>Rolling a seven</h3>
+            <Sub section="turn">Rolling a seven</Sub>
             <p>
               No tile produces. Everyone holding <strong>more than seven resource cards</strong> discards
-              half, rounded down; development cards do not count towards the limit. Once the discards are in,
+              half, rounded down; development cards do not count towards the limit.<Ref n={2} /> Once the discards are in,
               the roller moves the robber to a different land tile and steals one random card from one
               eligible neighbouring opponent. That tile stops producing until the robber moves again.
             </p>
@@ -702,13 +751,13 @@ export function PublicGuide() {
             <p>
               Short one card for a city? Ask the table first; the bank is always there but it is expensive.
             </p>
-            <h3>Trading with a player</h3>
+            <Sub section="trading">Trading with a player</Sub>
             <p>
               On your turn, select <strong>Trade</strong>, then the cards you are giving and the cards you
               want. Choose <strong>Open to offers</strong> to let anyone propose a return instead. Both sides
               must give something, and every trade includes the player whose turn it is.
             </p>
-            <h3>Trading with the bank</h3>
+            <Sub section="trading">Trading with the bank</Sub>
             <p>
               A settlement or city on either corner a port touches unlocks that port for you. A road along
               the coast does not. The picture on the port is what you <em>pay</em>; you can take any other
@@ -854,7 +903,7 @@ export function PublicGuide() {
               <p>
                 Road Building requires a legal first road and uses a second whenever one is possible. Year of
                 Plenty takes a single card if that is all the bank has left, and cannot be played into an
-                empty bank. These are provisional readings; the{' '}
+                empty bank. These are provisional readings<Ref n={3} />; the{' '}
                 <a href={`${REPOSITORY_URL}/blob/main/docs/RULE_SOURCES.md`}>compatibility ledger</a> tracks
                 the source questions still open.
               </p>
@@ -921,7 +970,7 @@ export function PublicGuide() {
               </div>
             </figure>
             <p className="guide-caption">Roads score nothing by themselves. Only the award pays.</p>
-            <h3>The two awards</h3>
+            <Sub section="winning">The two awards</Sub>
             <p>
               <strong>Longest Road</strong> goes to the first continuous route of at least five roads.
               Opponents’ buildings break a route, and two branches off the same trunk do not simply add
@@ -930,7 +979,7 @@ export function PublicGuide() {
             </p>
             <p>
               Both sit on the player profiles all game. To take one, you have to beat the holder’s total
-              rather than match it, so a tie leaves an award where it is. The{' '}
+              rather than match it, so a tie leaves an award where it is.<Ref n={5} /> The{' '}
               <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md#10-longest-road`}>full road rules</a>{' '}
               cover what happens to a tie after a route is broken.
             </p>
@@ -943,14 +992,15 @@ export function PublicGuide() {
               Short a player? The host can sit a bot in any open seat, and one will also cover a seat whose
               player has dropped out of the game.
             </p>
-            <h3>You find out who turned up by playing them</h3>
+            <Sub section="bots">Which bot turned up</Sub>
             <p>
-              Three kinds of bot exist and the game never tells you which one took the seat. One plays a
+              You find out by playing them. Three kinds exist and the game never tells you which one took the
+              seat. One plays a
               steady game. One pays attention to whoever is in front. One plans every move around winning,
               chases both awards, and is genuinely hard to beat. Which turns up is the room’s draw, not a
               setting.
             </p>
-            <h3>They think before they move</h3>
+            <Sub section="bots">They think before they move</Sub>
             <p>
               A bot pauses before each move, longer over the decisions that matter and longest over the
               opening placement. Answering the instant the rules allow is the one thing that reads as
@@ -1026,6 +1076,7 @@ export function PublicGuide() {
                         shuffle the totals land close to their true frequencies and the same total twice
                         running is a little less likely. It does not change the odds of any single number,
                         only how often a long streak of them happens.
+                        <Ref n={4} />
                       </td>
                     </tr>
                   </tbody>
@@ -1046,14 +1097,14 @@ export function PublicGuide() {
               At the table
             </GuideHeading>
             <p>Two small things that make a game feel like a table rather than a screen.</p>
-            <h3>Your colour is yours</h3>
+            <Sub section="table">Your colour is yours</Sub>
             <p>
               Pick one of eight in the lobby, under your own card. Nobody can take a colour somebody else is
               holding, and it is worth choosing deliberately: the pieces on the island carry no names, so
               colour is the only thing that says a road is yours. Your portrait wears it all game, and the
               cloth behind your name lightens when it is your turn.
             </p>
-            <h3>Reactions</h3>
+            <Sub section="table">Reactions</Sub>
             <p>
               Twelve faces, drawn for this game rather than borrowed from your phone’s emoji font, so
               everyone at the table sees the same expression. Tap one and it flies across the board with your
@@ -1065,13 +1116,13 @@ export function PublicGuide() {
             <GuideHeading id="accounts" index={10}>
               Your profile and seat
             </GuideHeading>
-            <h3>A profile that stays yours</h3>
+            <Sub section="accounts">A profile that stays yours</Sub>
             <p>
               Google sign-in keeps your profile and enables friends. Guest profiles expire after seven days
               of inactivity, and a guest can link a Google account later to keep their username. They cannot
               add friends while still guests.
             </p>
-            <h3>If your connection drops</h3>
+            <Sub section="accounts">If your connection drops</Sub>
             <p>
               Let the game reconnect on its own, or come back with the same account and invite before your
               countdown runs out. The connection panel shows ping and sync status. Keep your guest session
@@ -1173,8 +1224,10 @@ export function PublicGuide() {
               ))}
             </dl>
           </section>
-          <section className="guide-section guide-seealso" aria-labelledby="see-also">
-            <h2 id="see-also">See also</h2>
+          <section id="see-also" className="guide-section guide-seealso">
+            <GuideHeading id="see-also" index={13}>
+              See also
+            </GuideHeading>
             <ul>
               <li>
                 <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>The rulebook</a>, which carries every
@@ -1193,6 +1246,55 @@ export function PublicGuide() {
                 page.
               </li>
             </ul>
+          </section>
+          <section id="references" className="guide-section">
+            <GuideHeading id="references" index={14}>
+              Notes and references
+            </GuideHeading>
+            <p className="guide-caption">
+              The places where this page describes a decision Catanova made, rather than a rule everybody
+              already knows.
+            </p>
+            <ol className="guide-references">
+              {(
+                [
+                  [
+                    'The island generator, and the constraints it places on numbers and terrain.',
+                    'RULEBOOK.md',
+                    'Rulebook, board setup',
+                  ],
+                  [
+                    'The hand limit, and what counts towards it on a seven.',
+                    'RULEBOOK.md',
+                    'Rulebook, the robber',
+                  ],
+                  [
+                    'Where the published rules leave a case open, the reading Catanova took and why.',
+                    'RULE_SOURCES.md',
+                    'Compatibility ledger',
+                  ],
+                  [
+                    'How the balanced deal is built, and what it does and does not change.',
+                    'RULEBOOK.md',
+                    'Rulebook, dice',
+                  ],
+                  [
+                    'Ties, and what happens to an award once a route is broken.',
+                    'RULEBOOK.md',
+                    'Rulebook, longest road',
+                  ],
+                ] as const
+              ).map(([text, file, label], index) => (
+                <li id={`note-${index + 1}`} key={label + index}>
+                  <a className="guide-backref" href={`#ref-${index + 1}`} aria-label="Back to the text">
+                    ↑
+                  </a>
+                  <span>
+                    {text} <a href={`${REPOSITORY_URL}/blob/main/docs/${file}`}>{label}</a>.
+                  </span>
+                </li>
+              ))}
+            </ol>
           </section>
           <aside className="guide-ready">
             <div>
@@ -1214,9 +1316,17 @@ export function PublicGuide() {
               <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>the rulebook</a>, and the code that
               enforces them is <a href={REPOSITORY_URL}>on GitHub</a>. Catanova is open source.
             </p>
-            <a className="guide-back-top" href="#guide-content">
-              Back to top
-            </a>
+            <p className="guide-colophon">
+              <span>
+                Ruleset <code>{RULESET}</code>
+              </span>
+              <span>
+                Costs, deck and piece counts on this page are generated from the rules the server runs
+              </span>
+              <a className="guide-back-top" href="#guide-content">
+                Back to top
+              </a>
+            </p>
           </footer>
         </main>
       </div>
