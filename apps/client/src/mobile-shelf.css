@@ -87,95 +87,69 @@
     inset: calc(var(--rail-block) + 96px) var(--hud-right) var(--hud-bottom) var(--hud-left);
   }
 
-  /* --- the shelf -------------------------------------------------------- */
+  /* --- the bottom: a table, and the dice beside it ----------------------- */
 
+  /* Two objects, not one. The table holds what you own and what you can spend
+     it on; the dice are their own tile next to it. Putting the roll inside the
+     same panel as the resource counters made one undifferentiated block out of
+     two things that have nothing to do with each other. */
   .playing .hand-dock.hand-dock-separated {
     left: var(--hud-left);
     right: var(--hud-right);
     bottom: max(8px, env(safe-area-inset-bottom, 0px));
     display: grid;
-    /* holding · buy · trade · the gap · the roll */
+    /* buy · trade · where the dice land · the dice tile */
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     max-width: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+  /* This wrapper exists to group the buttons on a wide screen; here the dock
+     places its children itself, so it steps out of the way. */
+  .playing .hand-dock-separated .table-actions {
+    display: contents;
+  }
+
+  /* The table. */
+  .playing .hand-dock-separated .card-table {
+    grid-column: 1 / 4;
+    grid-row: 2;
+    /* Wide-screen rules pin this to the right of its space; here it is the
+       table itself and runs the width it is given. */
+    justify-self: stretch;
+    align-self: stretch;
+    justify-content: center;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+    width: auto;
+    max-width: none;
+    height: auto;
+    min-width: 0;
     padding: var(--shelf-pad);
     border: 1px solid #c8a87845;
-    border-radius: 14px;
+    border-radius: 13px;
     background: linear-gradient(#2c2620f2, #211c17f7);
     box-shadow:
       inset 0 1px #f3deb330,
       inset 0 -3px #1a1410,
       0 4px 14px #0d0b0955;
   }
-  /* The two wrappers exist to group things on a wide screen. On a phone the
-     shelf places their children itself, so they step out of the way. */
-  .playing .hand-dock-separated .card-table,
-  .playing .hand-dock-separated .table-actions {
-    display: contents;
-  }
-  .playing .hand-dock-separated .purchase-control {
-    grid-column: 1;
-  }
-  .playing .hand-dock-separated .utility-actions {
-    grid-column: 2;
-  }
-  /* The dice land in the space beside the two small actions, which is the
-     only part of the shelf that would otherwise be empty. */
-  .playing .hand-dock-separated [data-dice-dock] {
-    grid-column: 3;
-    justify-self: center;
+  .playing .hand-dock-separated .card-table::before {
+    content: none;
   }
   .playing .hand-dock-separated .hand-zone {
-    grid-column: 1 / 4;
-    justify-self: stretch;
-    width: auto;
+    width: 100%;
     height: auto;
     min-width: 0;
     justify-content: space-between;
     align-items: center;
     gap: 2px;
-  }
-  /* One primary action, down the right-hand side of the whole shelf, where a
-     thumb already is. Spanning both rows is also what stops the top row
-     leaving a button-shaped hole above it. */
-  .playing .hand-dock-separated .turn-action {
-    grid-column: 4;
-    grid-row: 1 / -1;
-    align-self: center;
-    justify-self: center;
-  }
-  /* Two rows, or three while cards are in hand. Naming the rows explicitly is
-     what keeps an absent tray from leaving its gap behind. */
-  .playing .hand-dock-separated :is(.purchase-control, .utility-actions, [data-dice-dock]) {
-    grid-row: 1;
-  }
-  .playing .hand-dock-separated .hand-zone {
-    grid-row: 2;
-  }
-  .playing .hand-dock-separated .development-tray {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    justify-content: center;
-    margin: 0;
-  }
-  .playing
-    .hand-dock-separated:has(.development-tray)
-    :is(.purchase-control, .utility-actions, [data-dice-dock]) {
-    grid-row: 2;
-  }
-  .playing .hand-dock-separated:has(.development-tray) .hand-zone {
-    grid-row: 3;
-  }
-  /* With cards in hand the tray owns the top row, so the action spans the two
-     rows below it rather than the whole shelf. */
-  .playing .hand-dock-separated:has(.development-tray) .turn-action {
-    grid-row: 2 / -1;
-  }
-  /* The panel is drawn by the shelf now; the inner slab was the pale block
-     that made five small numbers the heaviest thing on the screen. */
-  .playing .hand-dock-separated .card-table::before {
-    content: none;
   }
   .playing .hand-dock-separated .resource-hand.resource-counters {
     width: 100%;
@@ -189,11 +163,40 @@
     min-width: 0;
     justify-content: center;
   }
+  /* Cards in hand belong with the rest of what you are holding, so they sit
+     inside the table rather than starting a row of their own. */
+  .playing .hand-dock-separated .development-tray {
+    justify-content: center;
+    margin: 0;
+  }
 
-  /* An empty dice cradle should not hold a column open. */
+  /* What you can do, on the line above the table. */
+  .playing .hand-dock-separated .purchase-control {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .playing .hand-dock-separated .utility-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  /* The dice: their own tile down the right, clear of the table, with the
+     throw landing directly above the button that threw it. */
+  .playing .hand-dock-separated [data-dice-dock] {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: center;
+  }
+  .playing .hand-dock-separated .turn-action {
+    grid-column: 4;
+    grid-row: 2;
+    align-self: center;
+    justify-self: center;
+  }
+
+  /* An empty cradle should not hold its row open before the first roll. */
   .playing .hand-dock-separated [data-dice-dock]:not(:has(*)) {
-    width: 0;
-    min-width: 0;
+    height: 0;
   }
 }
 
