@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { GameIcon, Trophy, WifiOff } from './GameIcons.js';
+import { Bot, GameIcon, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -140,8 +140,8 @@ export function PlayerRail({
                   {p.name}
                 </strong>
                 {seat?.bot && (
-                  <span className="player-bot-tag" title="Played by Catanova" aria-label="Bot player">
-                    BOT
+                  <span className="player-bot-tag" title="Played by Catanova" role="img" aria-label="Bot">
+                    <Bot size={17} />
                   </span>
                 )}
               </div>

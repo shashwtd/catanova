@@ -1,0 +1,329 @@
+/*
+ * The places at the table.
+ *
+ * This file owns the seat card outright. The previous one was described by six
+ * stylesheets in a row, each overriding the last with a different background,
+ * padding and portrait size, so nobody could say what the card was supposed to
+ * look like and every fix added a seventh voice. One component, one owner, and
+ * the cascade argument ends.
+ *
+ * A Catan table seats four whether or not four people have arrived, so four
+ * places are always drawn. An empty one is a place you can fill, offering both
+ * answers where you can see them, rather than a small button hiding a menu.
+ */
+
+.room-lobby .seat-row {
+  display: grid;
+  grid-template-columns: repeat(var(--places, 2), minmax(0, 1fr));
+  gap: clamp(9px, 1.5vw, 18px);
+  /* Cards keep their size as the room fills rather than stretching to the
+     width of the screen, so two players do not sit behind two enormous
+     plaques. */
+  width: min(100%, calc(var(--places, 2) * 218px));
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.room-lobby .seat-place {
+  display: flex;
+  min-width: 0;
+}
+
+.room-lobby .seat-card {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-width: 0;
+  min-height: 236px;
+  padding: 20px 12px 18px;
+  border: 1px solid var(--game-trim);
+  border-radius: 16px;
+  background: var(--game-panel-fill);
+  box-shadow: var(--game-panel-shadow);
+}
+/* Your own place carries the gold rim the rest of the interface uses for
+   "this one is yours", so you find yourself without reading four names. */
+.room-lobby .seat-card.is-you {
+  border-color: #eccd8ba6;
+  box-shadow:
+    inset 0 1px #ffeec080,
+    0 5px 0 #17251f8c,
+    0 14px 32px #11241e40;
+}
+.room-lobby .seat-card.is-offline {
+  filter: saturate(0.55);
+}
+
+/* --- the occupant -------------------------------------------------------- */
+
+.room-lobby .seat-portrait {
+  position: relative;
+  width: clamp(70px, 8.4vw, 102px);
+  aspect-ratio: 1;
+  padding: 4px;
+  border-radius: 15px;
+  background: linear-gradient(150deg, #bda878, #44543d 32%, #273c31 70%, #c0aa7c);
+  box-shadow:
+    0 6px 16px #0b1a1455,
+    inset 0 0 0 1px #17241f;
+}
+.room-lobby .seat-portrait .avatar-medallion,
+.room-lobby .seat-portrait .avatar-medallion svg,
+.room-lobby .seat-portrait .avatar-medallion img {
+  width: 100%;
+  height: 100%;
+  border-radius: 11px;
+}
+
+/* Host and "edit yours" are marks on the portrait, not words floating over the
+   card: a bare `Edit` hovering in a corner explained nothing about what it
+   would edit. */
+.room-lobby .seat-badge {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 1px solid #23180766;
+  border-radius: 999px;
+  background: linear-gradient(#f6d78e, #d9ae56);
+  color: #3a2a10;
+  box-shadow: 0 2px 5px #0a130e80;
+}
+.room-lobby .seat-badge.is-host {
+  left: -8px;
+  bottom: -5px;
+}
+.room-lobby .seat-badge.is-edit {
+  right: -8px;
+  bottom: -5px;
+  background: linear-gradient(#5d7360, #35493c);
+  color: var(--game-gold);
+  cursor: pointer;
+}
+.room-lobby .seat-badge.is-edit:hover {
+  background: linear-gradient(#6f8871, #405648);
+}
+
+.room-lobby .seat-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+.room-lobby .seat-name strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--game-cream);
+  font:
+    600 clamp(15px, 1.35vw, 19px)/1.2 Barlow,
+    sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-lobby .seat-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  color: var(--game-muted);
+  font-size: 13px;
+}
+.room-lobby .seat-status.is-ready {
+  color: #d3e7a6;
+}
+.room-lobby .seat-card.is-offline .seat-status {
+  color: #f0a893;
+}
+
+/* Removing someone is available without hunting for it and without shouting:
+   present at rest, lit on approach. */
+.room-lobby .seat-remove {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #ffffff1a;
+  border-radius: 9px;
+  background: #0000002e;
+  color: var(--game-muted);
+  opacity: 0.55;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.room-lobby .seat-card:hover .seat-remove,
+.room-lobby .seat-remove:focus-visible {
+  opacity: 1;
+}
+.room-lobby .seat-remove:hover:not(:disabled) {
+  background: #7e4030;
+  color: #ffe3d2;
+}
+.room-lobby .seat-remove:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.room-lobby .offline-mark {
+  position: absolute;
+  inset: 4px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #1a0f0b82;
+  color: #f7a08e;
+}
+
+/* --- an empty place ------------------------------------------------------ */
+
+.room-lobby .seat-card.seat-open {
+  gap: 9px;
+  border-style: dashed;
+  border-color: #d8bc8347;
+  background: linear-gradient(165deg, #ffffff0a, #00000016);
+  box-shadow: none;
+}
+.room-lobby .seat-open-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px dashed #d8bc8359;
+  border-radius: 999px;
+  color: var(--game-gold);
+}
+.room-lobby .seat-open-title {
+  color: var(--game-muted);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+}
+.room-lobby .seat-open-actions {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  max-width: 178px;
+  margin-top: 2px;
+}
+.room-lobby .seat-bot-levels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.room-lobby .seat-fill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--game-trim);
+  border-radius: 9px;
+  background: #ffffff10;
+  color: var(--game-cream);
+  font:
+    600 13px Barlow,
+    sans-serif;
+}
+.room-lobby .seat-fill:hover:not(:disabled) {
+  background: #ffffff1f;
+  border-color: #e5c17e80;
+}
+.room-lobby .seat-fill.is-bot {
+  gap: 4px;
+  padding-inline: 4px;
+  font-size: 12px;
+}
+.room-lobby .seat-fill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --- phones -------------------------------------------------------------- */
+
+/* Two by two: four places across a phone would leave each one narrower than the
+   name it has to hold. */
+@media (max-width: 700px) {
+  .room-lobby .seat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    width: min(100%, 420px);
+  }
+  /* An odd place left alone on the last row sits centred rather than hugging
+     the left edge with a hole beside it. */
+  .room-lobby .seat-row > .seat-place:nth-child(odd):last-child {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: calc(50% - 4.5px);
+  }
+  .room-lobby .seat-card {
+    min-height: 178px;
+    gap: 8px;
+    padding: 15px 9px 13px;
+    border-radius: 13px;
+  }
+  .room-lobby .seat-portrait {
+    width: clamp(62px, 21vw, 92px);
+  }
+  .room-lobby .seat-badge {
+    width: 23px;
+    height: 23px;
+  }
+  .room-lobby .seat-name strong {
+    font-size: 15px;
+  }
+  .room-lobby .seat-status {
+    min-height: 18px;
+    font-size: 12px;
+  }
+  .room-lobby .seat-open-mark {
+    width: 34px;
+    height: 34px;
+  }
+  .room-lobby .seat-open-title {
+    font-size: 12px;
+  }
+  .room-lobby .seat-fill {
+    min-height: 32px;
+    font-size: 12px;
+  }
+}
+
+/* A phone held sideways has height to spare nowhere; keep all four in one row
+   and take it out of the card instead. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .room-lobby .seat-row {
+    grid-template-columns: repeat(var(--places, 2), minmax(0, 1fr));
+  }
+  .room-lobby .seat-row > .seat-place:nth-child(odd):last-child {
+    grid-column: auto;
+    width: auto;
+  }
+  .room-lobby .seat-card {
+    min-height: 0;
+    gap: 7px;
+    padding: 12px 8px;
+  }
+  .room-lobby .seat-portrait {
+    width: clamp(48px, 7vw, 66px);
+  }
+  .room-lobby .seat-open-mark {
+    display: none;
+  }
+}

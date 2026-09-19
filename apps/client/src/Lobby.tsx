@@ -8,6 +8,7 @@ import {
   Crown,
   DoorOpen,
   Link,
+  Pencil,
   Plus,
   Play,
   Settings2,
@@ -15,10 +16,13 @@ import {
   Users,
   Trophy,
   WifiOff,
+  LightClose,
 } from './GameIcons.js';
 import { useEffect, useRef, useState, useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
+import { BOT_LEVEL_LABEL, BOT_LEVELS, isBotLevel } from '../../../packages/protocol/src/bots.js';
+import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { Avatar } from './Profile.js';
@@ -159,6 +163,66 @@ function RoomSheet({
   );
 }
 
+/** A Catan table seats four. Empty places are drawn, not hidden. */
+const SEATS = 4;
+
+/**
+ * An empty place.
+ *
+ * Filling a seat used to be a small tile that opened a menu, which hid the
+ * only two answers behind two taps and made the row read as three cards and a
+ * button. The place itself now offers both, so the choice is visible from
+ * across the room and costs one press.
+ */
+function OpenSeat({
+  host,
+  busy,
+  onInvite,
+  onAddBot,
+}: {
+  host: boolean;
+  busy: boolean;
+  onInvite: () => void;
+  onAddBot?: (level: BotLevel) => void;
+}) {
+  return (
+    <div className="seat-card seat-open">
+      <span className="seat-open-mark" aria-hidden="true">
+        <Plus size={26} />
+      </span>
+      <span className="seat-open-title">Open seat</span>
+      <div className="seat-open-actions">
+        <button type="button" className="seat-fill" onClick={onInvite}>
+          <Users size={16} />
+          Invite a friend
+        </button>
+        {host && onAddBot && (
+          <div className="seat-bot-levels" role="group" aria-label="Add a bot">
+            {BOT_LEVELS.map((level) => (
+              <button
+                key={level}
+                type="button"
+                className="seat-fill is-bot"
+                disabled={busy}
+                aria-label={`Add a ${BOT_LEVEL_LABEL[level].toLowerCase()} bot`}
+                title={
+                  level === 'sharp'
+                    ? 'Plays its own plan and works to slow the leader down'
+                    : 'Plays its own plan'
+                }
+                onClick={() => onAddBot(level)}
+              >
+                <Bot size={16} />
+                {BOT_LEVEL_LABEL[level]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Lobby({
   room,
   me,
@@ -185,20 +249,10 @@ export function Lobby({
   onEdit: () => void;
   onSettings: () => void;
   onFriends?: () => void;
-  onAddBot?: () => void;
+  onAddBot?: (level: BotLevel) => void;
   onKick?: (playerId: string) => Promise<void>;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [seatMenu, setSeatMenu] = useState(false);
-  const seatMenuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!seatMenu) return;
-    const away = (event: PointerEvent) => {
-      if (!seatMenuRef.current?.contains(event.target as Node)) setSeatMenu(false);
-    };
-    document.addEventListener('pointerdown', away);
-    return () => document.removeEventListener('pointerdown', away);
-  }, [seatMenu]);
   const [removing, setRemoving] = useState<string | null>(null);
   const [removalBusy, setRemovalBusy] = useState(false);
   const [removalError, setRemovalError] = useState('');
@@ -207,6 +261,12 @@ export function Lobby({
     host = room.players[0]?.id === me;
   const canStart =
     room.players.length >= 2 && room.players.every((p, i) => p.connected && (i === 0 || p.ready));
+  // Everyone here, then one place to fill. Four permanent slots would make a
+  // game of two look short-handed, and the old alternative — a tile a quarter
+  // the size of a seat, off at the end of the row — did not read as a seat at
+  // all. One more place, the same size as the rest, and it goes when full.
+  const places: (RoomState['players'][number] | null)[] =
+    room.players.length < SEATS ? [...room.players, null] : [...room.players];
   return (
     <section className="lobby-screen room-lobby" aria-label="Room lobby">
       <header className="lobby-heading">
@@ -262,117 +322,87 @@ export function Lobby({
             </button>
           </div>
         </div>
-        <div className={`lobby-seats ${room.players.length === 4 ? 'lobby-full' : ''}`}>
-          {room.players.length < 4 && <span className="lobby-invite-spacer" aria-hidden="true" />}
-          <div
-            className="lobby-player-line"
-            style={{ '--room-player-count': room.players.length } as CSSProperties}
-          >
-            {room.players.map((p, i) => (
-              <article
-                className={`lobby-seat ${p.id === me ? 'self' : ''} ${!p.connected ? 'seat-offline' : ''}`}
-                key={p.id}
-              >
-                {p.id === me && (
-                  <button
-                    type="button"
-                    className="lobby-seat-edit"
-                    onClick={onEdit}
-                    aria-label="Your profile"
-                    title="Edit profile"
-                  >
-                    Edit
-                  </button>
-                )}
-                <div className="lobby-avatar">
-                  <Avatar profile={p.profile ?? defaultProfile(p.name)} />
-                  {i === 0 && <Crown className="host-mark" size={34} />}
-                  {!p.connected && (
-                    <span className="offline-mark" title="Disconnected">
-                      <WifiOff size={30} />
-                    </span>
+        <ol
+          className="seat-row"
+          aria-label="Seats at this table"
+          style={{ '--places': places.length } as CSSProperties}
+        >
+          {places.map((p, i) => (
+            <li className="seat-place" key={p?.id ?? `open-${i}`}>
+              {p ? (
+                <article
+                  className={`seat-card ${p.id === me ? 'is-you' : ''} ${!p.connected ? 'is-offline' : ''}`}
+                >
+                  {host && p.id !== me && onKick && (
+                    <button
+                      type="button"
+                      className="seat-remove"
+                      disabled={busy || !connected}
+                      aria-label={`Remove ${p.name}`}
+                      title={`Remove ${p.name}`}
+                      onClick={() => {
+                        setRemovalError('');
+                        setRemoving(p.id);
+                      }}
+                    >
+                      <LightClose size={15} />
+                    </button>
                   )}
-                </div>
-                <strong title={p.name}>{p.name}</strong>
-                {p.bot && (
-                  <span className="player-bot-tag" title="Played by Catanova" aria-label="Bot player">
-                    BOT
+                  <div className="seat-portrait">
+                    <Avatar profile={p.profile ?? defaultProfile(p.name)} />
+                    {i === 0 && (
+                      <span className="seat-badge is-host" role="img" aria-label="Host" title="Host">
+                        <Crown size={16} />
+                      </span>
+                    )}
+                    {p.id === me && (
+                      <button
+                        type="button"
+                        className="seat-badge is-edit"
+                        onClick={onEdit}
+                        aria-label="Edit your profile"
+                        title="Edit your profile"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                    {!p.connected && (
+                      <span className="offline-mark" title="Disconnected">
+                        <WifiOff size={28} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="seat-name">
+                    <strong title={p.name}>{p.name}</strong>
+                    {p.bot && (
+                      <span className="player-bot-tag" role="img" aria-label="Bot" title="Played by Catanova">
+                        <Bot size={17} />
+                      </span>
+                    )}
+                  </div>
+                  <span className={`seat-status ${p.ready && p.connected && !p.bot ? 'is-ready' : ''}`}>
+                    {!p.connected ? (
+                      'Disconnected'
+                    ) : i === 0 ? (
+                      'Host'
+                    ) : p.bot ? (
+                      `${BOT_LEVEL_LABEL[isBotLevel(p.botLevel) ? p.botLevel : 'steady']} bot`
+                    ) : p.ready ? (
+                      <>
+                        <Check size={15} />
+                        Ready
+                      </>
+                    ) : (
+                      'Not ready'
+                    )}
                   </span>
-                )}
-                <span className={`ready-status ${p.ready ? 'ready' : ''}`}>
-                  {!p.connected ? (
-                    'Disconnected'
-                  ) : i === 0 ? (
-                    'Host'
-                  ) : p.ready ? (
-                    <>
-                      <Check size={16} />
-                      Ready
-                    </>
-                  ) : (
-                    'Not ready'
-                  )}
-                </span>
-                {host && p.id !== me && onKick && (
-                  <button
-                    type="button"
-                    className="lobby-remove-player"
-                    disabled={busy || !connected}
-                    aria-label={`Remove ${p.name}`}
-                    onClick={() => {
-                      setRemovalError('');
-                      setRemoving(p.id);
-                    }}
-                  >
-                    <DoorOpen size={17} /> Remove{p.bot ? ' bot' : ''}
-                  </button>
-                )}
-              </article>
-            ))}
-          </div>
-          {room.players.length < 4 && (
-            <div className={`lobby-seat-add ${seatMenu ? 'open' : ''}`} ref={seatMenuRef}>
-              {seatMenu && (
-                <div className="lobby-seat-choices" role="menu" aria-label="Fill this seat">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setSeatMenu(false);
-                      onInvite();
-                    }}
-                  >
-                    <Plus size={18} />
-                    Invite a friend
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    disabled={busy || !connected}
-                    onClick={() => {
-                      setSeatMenu(false);
-                      onAddBot?.();
-                    }}
-                  >
-                    <Bot size={18} />
-                    Add a bot
-                  </button>
-                </div>
+                </article>
+              ) : (
+                <OpenSeat host={!!host} busy={busy || !connected} onInvite={onInvite} onAddBot={onAddBot} />
               )}
-              <button
-                type="button"
-                className="lobby-invite-tile"
-                aria-label="Fill this seat"
-                title="Invite a friend or add a bot"
-                aria-haspopup={host && onAddBot ? 'menu' : undefined}
-                aria-expanded={host && onAddBot ? seatMenu : undefined}
-                onClick={() => (host && onAddBot ? setSeatMenu((was) => !was) : onInvite())}
-              >
-                <Plus size={32} />
-              </button>
-            </div>
-          )}
-        </div>
+            </li>
+          ))}
+        </ol>
       </div>
       {removalTarget && onKick && (
         <RoomSheet

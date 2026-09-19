@@ -75,6 +75,7 @@ import '@fontsource/barlow/latin-600.css';
 import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
+import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { emptyHand } from '../../../packages/rules/src/game.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { Board, ResourceIcon } from './Board.js';
@@ -121,6 +122,7 @@ import './match-followups.css';
 import './game-popover.css';
 import './hub-entry-refinement.css';
 import './landing-features.css';
+import './room-seats.css';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -847,12 +849,12 @@ function App() {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
   }
-  async function addBot() {
+  async function addBot(level: BotLevel = 'steady') {
     const c = connection.current;
     if (!c || disabled) return;
     setBusy(true);
     try {
-      await c.addBot();
+      await c.addBot(level);
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Could not add a bot');
     } finally {

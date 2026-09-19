@@ -81,73 +81,76 @@ export function GameTools({
           <History />
           {panel !== 'journal' && <span className="tool-label">Move history</span>}
         </button>
-        {/* Reactions live beside the other game tools rather than as a new
-            floating control: this column already has free room on both
-            layouts, and it inherits the phone sizing the others use. */}
-        {reactions}
       </nav>
       <nav className="side-controls room-controls" aria-label="Room tools" data-panel-align="bottom">
-        <div
-          className="game-tools-menu"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape' && open && !panel) {
-              e.preventDefault();
-              closeMenu();
-            }
-          }}
-        >
-          <button
-            ref={trigger}
-            type="button"
-            className="icon-button game-menu-trigger"
-            aria-label={open ? 'Close game menu' : 'Game menu'}
-            aria-expanded={open}
-            aria-controls={id}
-            onClick={() => {
-              if (open) {
+        {/* Reactions sit beside the menu rather than in the column above,
+            where a lone smiling face had nothing to belong to. Both are things
+            you do to the room rather than to the board, and the lane has the
+            width for two. */}
+        <div className="tool-lane">
+          <div
+            className="game-tools-menu"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && open && !panel) {
+                e.preventDefault();
                 closeMenu();
-                onClosePanel?.();
-              } else {
-                clearTimeout(timeout.current);
-                setClosing(false);
-                setOpen(true);
               }
             }}
           >
-            <span className="t-icon-swap" data-state={open ? 'b' : 'a'}>
-              <span className="t-icon" data-icon="a">
-                <GameIcon name="menu" />
+            <button
+              ref={trigger}
+              type="button"
+              className="icon-button game-menu-trigger"
+              aria-label={open ? 'Close game menu' : 'Game menu'}
+              aria-expanded={open}
+              aria-controls={id}
+              onClick={() => {
+                if (open) {
+                  closeMenu();
+                  onClosePanel?.();
+                } else {
+                  clearTimeout(timeout.current);
+                  setClosing(false);
+                  setOpen(true);
+                }
+              }}
+            >
+              <span className="t-icon-swap" data-state={open ? 'b' : 'a'}>
+                <span className="t-icon" data-icon="a">
+                  <GameIcon name="menu" />
+                </span>
+                <span className="t-icon" data-icon="b">
+                  <X />
+                </span>
               </span>
-              <span className="t-icon" data-icon="b">
-                <X />
-              </span>
-            </span>
-            <span className="tool-label">{open ? 'Close menu' : 'Menu'}</span>
-          </button>
-          <div
-            id={id}
-            className={`game-tools-popover t-dropdown ${open ? 'is-open' : closing ? 'is-closing' : ''}`}
-            data-origin="bottom-left"
-            inert={!open}
-            aria-hidden={!open}
-          >
-            {entries.map((entry, i) => (
-              <button
-                key={entry.key}
-                data-game-tool={entry.key}
-                aria-label={entry.label}
-                aria-pressed={panel === entry.key}
-                aria-expanded={panel === entry.key}
-                aria-haspopup="dialog"
-                disabled={entry.key === 'leave' && busy}
-                style={{ '--tool-order': entries.length - i - 1 } as CSSProperties}
-                onClick={entry.action}
-              >
-                {entry.icon}
-                {panel !== entry.key && <span className="tool-label">{entry.label}</span>}
-              </button>
-            ))}
+              <span className="tool-label">{open ? 'Close menu' : 'Menu'}</span>
+            </button>
+            <div
+              id={id}
+              className={`game-tools-popover t-dropdown ${open ? 'is-open' : closing ? 'is-closing' : ''}`}
+              data-origin="bottom-left"
+              inert={!open}
+              aria-hidden={!open}
+            >
+              {entries.map((entry, i) => (
+                <button
+                  key={entry.key}
+                  data-game-tool={entry.key}
+                  aria-label={entry.label}
+                  aria-pressed={panel === entry.key}
+                  aria-expanded={panel === entry.key}
+                  aria-haspopup="dialog"
+                  disabled={entry.key === 'leave' && busy}
+                  style={{ '--tool-order': entries.length - i - 1 } as CSSProperties}
+                  onClick={entry.action}
+                >
+                  {entry.icon}
+                  {panel !== entry.key && <span className="tool-label">{entry.label}</span>}
+                </button>
+              ))}
+            </div>
           </div>
+          {reactions}
         </div>
         <button
           className="icon-button fullscreen-control"

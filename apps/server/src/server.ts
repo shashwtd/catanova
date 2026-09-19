@@ -12,9 +12,8 @@ import { createServer } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseClientMessage, PROTOCOL_VERSION } from '../../../packages/protocol/src/index.js';
 import {
-  REACTION_BURST,
-  REACTION_MIN_GAP_MS,
   REACTION_WINDOW_MS,
+  reactionAllowedAt,
 } from '../../../packages/protocol/src/reactions.js';
 import type { RoomState, ServerMessage } from '../../../packages/protocol/src/index.js';
 import { ProtocolError, Store } from './store.js';
@@ -346,7 +345,9 @@ export async function startServer(
     for (const [ws, seat] of sessions) if (seat.room_id === roomId) send(ws, message);
   }
   /** Reactions are chat, not moves, so they are rate limited here rather than
-   *  receipted in the store. A burst is fine; a stream is not. */
+   *  receipted in the store. A burst is fine; a stream is not. The picker
+   *  applies the same shared rule, so a player sees the control rest for a beat
+   *  instead of sending calls that are dropped on arrival. */
   const reactionRate = new Map<string, number[]>();
   let nextReactionSweep = 0;
   function reactionAllowed(seatId: string) {
@@ -357,9 +358,10 @@ export async function startServer(
       nextReactionSweep = at + REACTION_WINDOW_MS;
     }
     const recent = (reactionRate.get(seatId) ?? []).filter((t) => at - t < REACTION_WINDOW_MS);
-    const last = recent[recent.length - 1];
-    if (last !== undefined && at - last < REACTION_MIN_GAP_MS) return false;
-    if (recent.length >= REACTION_BURST) return false;
+    if (!reactionAllowedAt(recent, at)) {
+      reactionRate.set(seatId, recent);
+      return false;
+    }
     recent.push(at);
     reactionRate.set(seatId, recent);
     return true;

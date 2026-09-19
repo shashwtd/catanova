@@ -64,6 +64,8 @@ Resources are bright icon-and-number counters on a compact wooden shelf, with no
 
 Interface icons use a small compressed painted atlas through [GameIcons.tsx](../apps/client/src/GameIcons.tsx), with lightweight vectors for controls that need precise directional or player-colored feedback. Rules uses a book; connection uses Wi-Fi arcs with a slashed offline variant; fullscreen has distinct enter and exit shapes. Turn-grouped history reuses action and resource icons. Cinzel supplies titles; Barlow supplies controls and number tokens.
 
+Reaction faces are drawn as SVG in [ReactionArt.tsx](../apps/client/src/ReactionArt.tsx) and are original artwork, not emoji. Emoji are rendered by the reader's own device, so the same character is a different face on every platform and none of them share this island's palette; drawing them here keeps one expression everywhere and adds nothing to download. Every face is built the same way — a wax disc, a soft highlight, and brows, eyes and a mouth in one ink — so fourteen feelings read as one set.
+
 Font notices ship with the browser distribution: [Cinzel](../apps/client/public/licenses/cinzel.txt) and [Barlow](../apps/client/public/licenses/barlow.txt). Both fonts retain their SIL Open Font License 1.1.
 
 Google sign-in uses Google's official unmodified mark and locally served Google Sans. The external repository link uses GitHub's official Invertocat. These are third-party provider assets, excluded from claims about original MIT-licensed Catanova artwork. Their sources, usage terms and the Google Sans OFL notice are recorded in [provider marks](PROVIDER_MARKS.md).

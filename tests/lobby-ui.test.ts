@@ -27,7 +27,13 @@ function lobby(): RoomState {
     })),
   };
 }
-function renderLobby(room: RoomState, me: string, busy = false, connected = true) {
+function renderLobby(
+  room: RoomState,
+  me: string,
+  busy = false,
+  connected = true,
+  extra: Record<string, unknown> = {},
+) {
   return renderToStaticMarkup(
     createElement(Lobby, {
       room,
@@ -41,6 +47,7 @@ function renderLobby(room: RoomState, me: string, busy = false, connected = true
       onEdit: () => {},
       onSettings: () => {},
       onKick: async () => {},
+      ...extra,
     }),
   );
 }
@@ -76,7 +83,7 @@ test('nonhosts can ready or unready and cannot start the room', () => {
   assert.ok(ready.includes('aria-pressed="true"'));
 });
 
-test('room gathering shows actual players with small invitations instead of four mandatory-looking slots', () => {
+test('room gathering shows actual players and one open place, never four mandatory-looking slots', () => {
   for (const count of [1, 2, 3, 4]) {
     const room = lobby();
     room.players = Array.from({ length: count }, (_, i) => ({
@@ -88,11 +95,10 @@ test('room gathering shows actual players with small invitations instead of four
     }));
     const html = renderLobby(room, 'p0');
     assert.equal([...html.matchAll(/<article\b/g)].length, count);
-    // One control fills a seat, and it disappears once the room is full.
-    assert.equal(
-      buttons(html).filter((button) => button.includes('aria-label="Fill this seat"')).length,
-      count < 4 ? 1 : 0,
-    );
+    // Exactly one place is open, at the same size as a seat, and it goes once
+    // the room is full.
+    assert.equal([...html.matchAll(/class="seat-card seat-open"/g)].length, count < 4 ? 1 : 0);
+    assert.equal([...html.matchAll(/>Open seat</g)].length, count < 4 ? 1 : 0);
     assert.ok(html.includes('10 points'));
     assert.ok(!html.includes('Your crew') && !html.includes('open-seat'));
     assert.ok(!html.includes(`${count}/4`));
@@ -101,13 +107,43 @@ test('room gathering shows actual players with small invitations instead of four
   }
 });
 
+test('an open place offers both answers where you can see them, and both are host-only for bots', () => {
+  const room = lobby();
+  room.players = [room.players[0]!];
+  const withBots = { onAddBot: () => {} };
+  const asHost = renderLobby(room, 'p0', false, true, withBots);
+  // Inviting is one press from the place itself rather than two through a menu.
+  assert.ok(asHost.includes('Invite a friend'));
+  assert.ok(!asHost.includes('aria-haspopup="menu"'), 'no hidden menu stands between them');
+  // Both levels the protocol supports are offered, so the choice is not
+  // silently made for you.
+  assert.ok(asHost.includes('aria-label="Add a steady bot"'));
+  assert.ok(asHost.includes('aria-label="Add a sharp bot"'));
+
+  const asGuest = renderLobby(room, 'pX', false, true, withBots);
+  assert.ok(asGuest.includes('Invite a friend'));
+  assert.ok(!asGuest.includes('Add a steady bot'), 'only a host seats a bot');
+});
+
+test('a bot is marked with a machine beside its name, not the word BOT', () => {
+  const room = lobby();
+  room.players[1] = { ...room.players[1]!, bot: true, botLevel: 'sharp', name: 'Anchor' };
+  const html = renderLobby(room, 'p0');
+  assert.ok(!/>\s*BOT\s*</.test(html), 'the word is gone');
+  assert.ok(html.includes('class="player-bot-tag"'));
+  assert.match(html, /player-bot-tag[^>]*aria-label="Bot"/);
+  // And the seat says how it plays, which is more use than a bot reporting
+  // that it is ready, which it always is.
+  assert.ok(html.includes('Sharp bot'));
+});
+
 test('room options name the turn timer explicitly and long player names remain accessible', () => {
   const room = lobby();
   room.players[1]!.name = 'Alexandria of the Northern Isles';
   let html = renderLobby(room, 'p0');
   assert.match(html, /aria-label="Turn timer: 90 seconds\. Game settings"/);
   assert.match(html, /title="Alexandria of the Northern Isles"/);
-  assert.match(html, /aria-label="Your profile"/);
+  assert.match(html, /aria-label="Edit your profile"/);
   room.settings = { turnTimerSeconds: null };
   html = renderLobby(room, 'p1');
   assert.match(html, /aria-label="Turn timer off\. Game settings"/);

@@ -346,25 +346,7 @@
 .room-lobby .lobby-heading .icon-button:hover:not(:disabled) {
   background: #385344;
 }
-.room-lobby .lobby-seat-edit {
-  position: absolute;
-  z-index: 1;
-  top: 4px;
-  right: 4px;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--game-gold);
-  box-shadow: none;
-}
-.room-lobby .lobby-seat-edit:hover {
-  background: #dfc58a18;
-}
+
 .room-lobby .lobby-caption {
   text-shadow:
     0 2px 10px #16271b,
@@ -379,27 +361,7 @@
   border-radius: 8px;
   background: #20382fea;
 }
-.room-lobby .lobby-seat,
-.room-lobby .lobby-seat.self {
-  clip-path: none;
-  border: 1px solid var(--game-trim);
-  border-radius: var(--game-radius);
-  background: var(--game-panel-fill);
-  box-shadow: var(--game-panel-shadow);
-}
-.room-lobby .lobby-seat.self {
-  border-color: #e3c37d;
-}
-.room-lobby .lobby-seat::before {
-  border: 1px solid #bda46e35;
-  border-radius: 6px;
-}
-.room-lobby .lobby-invite-tile {
-  clip-path: none;
-  border: 1px solid var(--game-trim);
-  border-radius: 10px;
-  background: var(--game-panel-fill);
-}
+
 /* The bot tile sits beside the invite tile and reads as the quieter of the two:
    inviting a friend is the main action, filling a seat is the fallback. */
 .room-lobby .lobby-bot-tile {
@@ -791,46 +753,7 @@
 .room-lobby .lobby-back:hover:not(:disabled) {
   background: #92563f;
 }
-.room-lobby .lobby-seat-edit {
-  width: auto;
-  min-width: 44px;
-  right: 10px;
-  padding: 0 6px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.room-lobby .lobby-seat,
-.room-lobby .lobby-seat.self {
-  padding-top: 44px;
-  background-image: url('/art/ui/lobby-crest.svg'), var(--game-panel-fill);
-  background-repeat: no-repeat;
-  background-position:
-    bottom 13px center,
-    center;
-  background-size:
-    95px 30px,
-    auto;
-  padding-bottom: 42px;
-}
-.room-lobby .lobby-avatar {
-  padding: 5px;
-  border: 1px solid #e1c48199;
-  border-radius: 15px;
-  background: linear-gradient(145deg, #b29c63, #3f503b 30%, #253c31 70%, #baa471);
-  box-shadow:
-    0 6px 16px #0b20194d,
-    inset 0 0 0 2px #162d29;
-}
-.room-lobby .lobby-avatar .avatar-medallion {
-  width: clamp(115px, 11vw, 145px);
-  border: 1px solid #f1d798b3;
-}
-.room-lobby .host-mark {
-  width: 36px;
-  height: 36px;
-  right: -10px;
-  bottom: -9px;
-}
+
 .room-lobby .lobby-start-controls {
   display: flex;
   align-items: stretch;
@@ -860,23 +783,6 @@
   min-width: 195px;
 }
 @media (max-width: 650px) {
-  .room-lobby .lobby-avatar .avatar-medallion {
-    width: clamp(58px, 16vw, 88px);
-  }
-  .room-lobby .lobby-seat,
-  .room-lobby .lobby-seat.self {
-    padding: 42px 7px 32px;
-    background-size:
-      68px 22px,
-      auto;
-    background-position:
-      bottom 6px center,
-      center;
-  }
-  .room-lobby .host-mark {
-    width: 30px;
-    height: 30px;
-  }
   .room-lobby .lobby-start-controls {
     width: 100%;
     justify-content: center;
@@ -891,28 +797,7 @@
     padding-inline: 12px;
   }
 }
-@media (max-height: 550px) and (orientation: landscape) {
-  .room-lobby .lobby-avatar .avatar-medallion {
-    width: 68px;
-  }
-}
 
-.lobby-remove-player {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 6px 12px;
-  color: #ffe1ca;
-  background: #703f32;
-  border: 1px solid #d69b775c;
-  border-radius: 7px;
-  font: 600 15px Barlow, sans-serif;
-  cursor: pointer;
-}
-.lobby-remove-player:hover:not(:disabled) { background: #88503e; }
-.lobby-remove-player:disabled { opacity: .5; cursor: default; }
 .spectator-banner {
   position: absolute;
   z-index: 15;
@@ -928,28 +813,46 @@
   color: #f9eacb;
   border: 1px solid #d7b97955;
   border-radius: 10px;
-  font: 600 16px Barlow, sans-serif;
+  font:
+    600 16px Barlow,
+    sans-serif;
 }
 @media (max-width: 600px) {
-  .spectator-banner { gap: 8px; padding: 8px; font-size: 13px; }
+  .spectator-banner {
+    gap: 8px;
+    padding: 8px;
+    font-size: 13px;
+  }
 }
-.spectator-dice { position: relative; flex: 0 0 68px; width: 68px; height: 32px; pointer-events: none; }
+.spectator-dice {
+  position: relative;
+  flex: 0 0 68px;
+  width: 68px;
+  height: 32px;
+  pointer-events: none;
+}
 
-/* A bot is labelled wherever its name appears, so nobody wonders why a seat
-   plays instantly or never chats. Small, quiet, and never mistaken for a rank. */
+/* A bot is marked wherever its name appears, so nobody wonders why a seat
+   plays instantly or never chats. A small machine against the name reads at a
+   glance; the word BOT shouting in capitals competed with the name it belongs
+   to, and a box around it made a badge out of a footnote. */
 .player-bot-tag {
+  display: inline-grid;
+  place-items: center;
   align-self: center;
   flex: none;
-  padding: 1px 6px;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  line-height: 1.5;
-  opacity: 0.72;
-  text-transform: uppercase;
+  color: var(--game-muted, #c3c4ae);
 }
-.lobby-seat .player-bot-tag {
-  margin-top: 2px;
+/* Drawn heavier than an interface icon: at this size the usual hairline
+   disappears, and without a box behind it the mark has to hold itself up. */
+.player-bot-tag .game-icon {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.4;
+}
+/* The name plaque stretches to fill its row, which would push the mark to the
+   far edge with the name nowhere near it. Where there is a mark, the plaque
+   takes only the width of the name. */
+.playing .profile-name-row:has(.player-bot-tag) .profile-name-banner {
+  flex: 0 1 auto;
 }

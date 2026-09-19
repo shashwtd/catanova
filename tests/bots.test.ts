@@ -148,11 +148,13 @@ test('only the host sees the control that seats a bot', () => {
   const asHost = renderToStaticMarkup(createElement(Lobby, { ...props, me: 'host' }));
   const asGuest = renderToStaticMarkup(createElement(Lobby, { ...props, me: 'guest' }));
 
-  // Both see one control for filling a seat, because that is one decision.
-  for (const html of [asHost, asGuest]) assert.ok(html.includes('aria-label="Fill this seat"'));
-  // Only the host is offered the choice; for anyone else it invites directly.
-  assert.ok(asHost.includes('aria-haspopup="menu"'), 'the host chooses friend or bot');
-  assert.ok(!asGuest.includes('aria-haspopup="menu"'), 'a guest just invites');
+  // Both see the open place and can invite from it.
+  for (const html of [asHost, asGuest]) assert.ok(html.includes('Invite a friend'));
+  // Only the host is offered a bot, and is offered both levels rather than
+  // being given one by default.
+  assert.ok(asHost.includes('aria-label="Add a steady bot"'), 'the host seats a bot');
+  assert.ok(asHost.includes('aria-label="Add a sharp bot"'), 'and picks how hard it plays');
+  assert.ok(!asGuest.includes('Add a steady bot'), 'a guest just invites');
 });
 
 test('every move a bot makes is legal, through a whole offline game', async () => {

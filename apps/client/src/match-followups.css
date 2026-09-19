@@ -28,6 +28,13 @@
   left: max(12px, env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+/* Menu and reactions share one lane. Both act on the room rather than the
+   board, and pairing them keeps the reaction button from floating alone. */
+.playing .side-controls.room-controls .tool-lane {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
