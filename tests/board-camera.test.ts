@@ -229,12 +229,7 @@ test('the table is lit from somewhere, and none of the lighting can be clicked',
   const html = renderToStaticMarkup(
     createElement(BoardViewport, { seed: 7, children: createElement('div', null, 'island') }),
   );
-  // Eleven lanterns, and no two neighbours the same colour: a string of one
-  // hue reads as a light fitting, not as a room.
-  const shades = [...html.matchAll(/--bulb:([^;"]+)/g)].map((m) => m[1]!.trim());
-  assert.equal(shades.length, 11);
-  for (const [index, shade] of shades.entries())
-    assert.notEqual(shade, shades[index + 1], `two ${shade} lanterns in a row`);
+  assert.equal((html.match(/class="string-lantern"/g) ?? []).length, 11);
   // Every lantern sits on the cord rather than near it: one function places
   // both, so a change to the wave can never leave one hanging in mid air.
   for (const style of html.matchAll(/left:([\d.]+)%;top:([\d.]+)px/g))
@@ -254,6 +249,7 @@ test('the table is lit from somewhere, and none of the lighting can be clicked',
     )
       turns++;
   assert.ok(turns >= 4, `the cord only changes direction ${turns} times`);
+  assert.ok(CORD_HEIGHT <= 24, `the cord box is ${CORD_HEIGHT}px tall`);
 
   // The lighting is scenery: it must never take a click meant for a corner.
   const css = readFileSync('apps/client/src/table-light.css', 'utf8');
@@ -268,6 +264,11 @@ test('the table is lit from somewhere, and none of the lighting can be clicked',
     const block = css.slice(css.indexOf(`${selector} {`));
     assert.match(block.slice(0, block.indexOf('}')), /position: fixed/);
   }
+  // It is a ripple, not a swag: the whole string stays out of the way of the
+  // board, which is the thing anybody is actually looking at.
+  const lights = css.slice(css.indexOf('.string-lights {'));
+  const height = Number(lights.slice(0, lights.indexOf('}')).match(/height: (\d+)px/)![1]);
+  assert.ok(height <= 56, `the string occupies ${height}px`);
   // A phone gives the space back to the board.
   const phone = css.slice(css.indexOf('@media (max-width: 700px)'));
   assert.match(phone.slice(0, phone.indexOf('}\n}')), /\.string-lights \{\s*display: none/);

@@ -78,27 +78,28 @@
   top: 0;
   left: -3%;
   width: 106%;
-  height: 84px;
-  /* Above the island: a string hung over a table hangs in front of it. */
+  /* Barely any height at all: a ripple in the top few pixels, well clear of
+     the island. The string is here to justify the light on the wood, not to
+     take up room the board could use. */
+  height: 46px;
   z-index: 12;
   pointer-events: none;
 }
 /* Only the cord is stretched. Its rendered height matches its viewBox height,
-   so a lantern's `top` in pixels is the same number the curve gives. */
+   so a lantern's `top` in pixels is the number the curve gives. */
 .string-cord {
   display: block;
   width: 100%;
-  height: 40px;
+  height: 20px;
 }
 .string-lantern {
   position: absolute;
-  width: 24px;
-  height: 32px;
-  margin-left: -12px;
-  /* The halo is a filter on the lantern rather than another element, so each
-     one is a single composited layer and its glow is its own colour. */
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--bulb), transparent 22%))
-    drop-shadow(0 0 18px color-mix(in srgb, var(--bulb), transparent 50%));
+  width: 17px;
+  height: 23px;
+  margin-left: -8.5px;
+  /* One filter on the lantern rather than a second element, so each is a
+     single composited layer and the halo follows it exactly. */
+  filter: drop-shadow(0 0 5px rgb(var(--lamp-warm) / 70%)) drop-shadow(0 0 14px rgb(var(--lamp-warm) / 38%));
 }
 .string-lantern svg {
   display: block;
@@ -107,15 +108,12 @@
   overflow: visible;
 }
 .lantern-glass {
-  fill: var(--bulb);
-  fill-opacity: 0.96;
+  fill: #f7d18a;
 }
-/* Petals, in the lantern's own colour lightened, so the moulding reads without
-   drawing a cage of white lines over it. */
 .lantern-ribs {
   stroke: #fff;
-  stroke-opacity: 0.42;
-  stroke-width: 0.9;
+  stroke-opacity: 0.4;
+  stroke-width: 1;
 }
 .string-lantern[data-breathing='true'] {
   animation: lantern-breath 7.5s ease-in-out infinite;
@@ -130,9 +128,7 @@
   }
 }
 
-/* A phone has no height to give away. The string goes entirely: on a small
-   screen the board wants every pixel between the portraits and the dock, and
-   a decoration that costs a row of hexes is not worth having. */
+/* A phone gives the space back to the board. */
 @media (max-width: 700px) {
   .string-lights {
     display: none;
