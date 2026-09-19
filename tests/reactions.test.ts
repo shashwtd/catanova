@@ -115,3 +115,30 @@ test('the rate limit allows a burst and then rests, by one shared rule', () => {
   assert.ok(!reactionAllowedAt(burst, last + REACTION_MIN_GAP_MS), 'a stream is refused');
   assert.ok(reactionAllowedAt(burst, 10_000 + 6000), 'and allowed again once the window has rolled');
 });
+
+test('a reaction face fills its button, and no icon rule quietly shrinks it', () => {
+  const reactions = readFileSync('apps/client/src/reactions.css', 'utf8');
+  // On a phone the tray is one column as wide as the button it hangs from, and
+  // the face is the whole of that: no padding, no border, nothing spent on a
+  // frame that could come off the drawing.
+  const phone = reactions.slice(reactions.indexOf('@media (max-width: 700px)'));
+  const tray = phone.slice(phone.indexOf('.reaction-tray {'));
+  assert.match(tray.slice(0, tray.indexOf('}')), /padding: 0;/);
+  const choice = phone.slice(phone.indexOf('.reaction-choice {'));
+  assert.match(choice.slice(0, choice.indexOf('}')), /padding: 0;/);
+
+  // The rail shrinks every icon on a small screen. A face is not an icon on a
+  // button, it is the whole of one, and that rule was quietly taking each face
+  // down to 17px inside a 44px pill — which looked exactly like padding.
+  const base = readFileSync('apps/client/src/style.css', 'utf8');
+  for (const rule of base.matchAll(/\.side-controls([^{]*)svg([^{]*)\{([^}]*)\}/g)) {
+    if (!/width/.test(rule[3]!)) continue;
+    const selector = rule[1]! + rule[2]!;
+    // Either it says it means icons on buttons — a face's button is a
+    // `.reaction-choice`, never an `.icon-button` — or it says so explicitly.
+    assert.ok(
+      /\.icon-button/.test(selector) || /:not\(\.reaction-face\)/.test(selector),
+      `".side-controls${selector}svg" sizes reaction faces too`,
+    );
+  }
+});

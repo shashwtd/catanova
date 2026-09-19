@@ -3181,7 +3181,11 @@ svg.game-icon {
     height: 31px;
     padding: 6px;
   }
-  .side-controls svg {
+  /* Every icon in the side rail comes down to 17px on a small screen. A
+     reaction face is not an icon on a button, though — it is the whole of one,
+     and this rule was quietly shrinking each one to 17px inside a 44px pill,
+     which is what actually made the tray look padded. */
+  .side-controls svg:not(.reaction-face) {
     width: 17px;
     height: 17px;
   }
