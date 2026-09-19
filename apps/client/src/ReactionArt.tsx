@@ -171,7 +171,7 @@ const REACTION_FACES: Record<ReactionName, React.ReactElement> = {
     </Face>
   ),
   /* A decision so bad it deserves the full costume. */
-  clown: (
+  wink: (
     <Face wax="#f0e3d6" rim="#a08577">
       <path d="M6.2 13.2a3.4 3.4 0 0 1 4.6-4.4" fill="#e2753a" stroke="none" />
       <path d="M25.8 13.2a3.4 3.4 0 0 0-4.6-4.4" fill="#e2753a" stroke="none" />
@@ -187,7 +187,7 @@ const REACTION_FACES: Record<ReactionName, React.ReactElement> = {
     </Face>
   ),
   /* The roll of the game, and everybody heard about it. */
-  hype: (
+  nice: (
     <Face wax="#ef8c3c" rim="#9c4a12">
       <path d="M8.4 11.2c1.5-1.9 4.1-1.9 5.6 0" strokeWidth="1.8" />
       <path d="M23.6 11.2c-1.5-1.9-4.1-1.9-5.6 0" strokeWidth="1.8" />

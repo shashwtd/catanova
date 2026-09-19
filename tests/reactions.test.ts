@@ -150,3 +150,32 @@ test('a reaction face fills its button, and no icon rule quietly shrinks it', ()
     );
   }
 });
+
+test('reaction updates remain safe for tabs opened before deployment', () => {
+  const previous = [
+    'laugh',
+    'angry',
+    'evil',
+    'smug',
+    'sad',
+    'shock',
+    'nice',
+    'suspicious',
+    'eyeroll',
+    'pleading',
+    'nervous',
+    'bored',
+    'wink',
+    'dead',
+  ];
+  for (const reaction of previous) {
+    const message = parseClientMessage(JSON.stringify({ type: 'react', reaction }));
+    assert.equal(message.type, 'react');
+    if (message.type !== 'react') throw new Error('Expected reaction');
+    assert.ok(isReaction(message.reaction));
+    assert.ok(previous.includes(message.reaction), 'old clients must recognize every broadcast ID');
+  }
+  assert.ok(REACTION_LIST.every((name) => previous.includes(name)));
+  assert.equal(REACTIONS.wink.label, 'Clown move');
+  assert.equal(REACTIONS.nice.label, 'Hyped');
+});

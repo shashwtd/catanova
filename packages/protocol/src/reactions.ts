@@ -20,6 +20,7 @@
  * row, a face, and a keyframe.
  */
 
+// Keep wire IDs stable across deployments: wink and nice now use clown and hype art.
 export const REACTIONS = {
   laugh: { label: 'Dying laughing', motion: 'giggle' },
   angry: { label: 'Furious', motion: 'rage' },
@@ -31,8 +32,8 @@ export const REACTIONS = {
   dead: { label: 'Completely cooked', motion: 'sink' },
   suspicious: { label: 'Suspicious', motion: 'squint' },
   pleading: { label: 'Please trade', motion: 'beg' },
-  clown: { label: 'Clown move', motion: 'honk' },
-  hype: { label: 'Hyped', motion: 'cheer' },
+  wink: { label: 'Clown move', motion: 'honk' },
+  nice: { label: 'Hyped', motion: 'cheer' },
 } as const;
 
 export type ReactionName = keyof typeof REACTIONS;
