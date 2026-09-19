@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createElement, isValidElement } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
 import { QuickRules } from '../apps/client/src/QuickRules.js';
 import { ConnectionPanel } from '../apps/client/src/ConnectionPanel.js';
 import { initialMetrics } from '../apps/client/src/connection.js';
@@ -105,4 +106,54 @@ test('connection refresh remains the original sync action, is disabled offline, 
   );
   assert.match(recovery, /role="alert"/);
   assert.ok(text(recovery).includes('Your displayed pieces are retained'));
+});
+
+/** WCAG relative luminance, so "readable" is a number rather than an opinion. */
+function luminance(hex: string) {
+  const channels = [1, 3, 5].map((at) => {
+    const value = parseInt(hex.slice(at, at + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!;
+}
+const contrast = (a: string, b: string) => {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light! + 0.05) / (dark! + 0.05);
+};
+
+test('the connection panel is written in the ink of the surface it actually opens on', () => {
+  const dialogs = readFileSync('apps/client/src/game-dialogs.css', 'utf8');
+  const polish = readFileSync('apps/client/src/interface-polish.css', 'utf8');
+  // The panel opens on the parchment side panel. Its lightest stop is the
+  // hardest thing to be legible against, so that is what everything is
+  // measured on.
+  const surface = dialogs.match(/--dialog-fill:[^;]*?(#[0-9a-f]{6})/i)![1]!;
+  assert.ok(luminance(surface) > 0.6, `${surface} is not a light surface`);
+
+  // This panel used to be a dark blue-green card, and when it became a
+  // parchment one its colours stayed behind: pale sage on cream, a dialog you
+  // could open and read nothing from. Every colour it names has to work here.
+  const block = polish.slice(polish.indexOf('.playing .game-side-panel .connection-detail {'));
+  const scoped = block.slice(0, block.indexOf('\n@media'));
+  const inks = [...scoped.matchAll(/(?:^|\n)\s*(?:color|fill|stroke): (#[0-9a-f]{6});/gi)].map((m) => m[1]!);
+  assert.ok(inks.length >= 6, `only found ${inks.length} colours to check`);
+  for (const ink of inks)
+    assert.ok(
+      contrast(ink, surface) >= 4.5,
+      `${ink} is ${contrast(ink, surface).toFixed(2)}:1 on ${surface}`,
+    );
+
+  // And the rules have to point at a class the markup carries. The reason this
+  // broke silently is that the ones meant to keep the panel dark were scoped
+  // to `.utility-panel`, which `UtilityPanel` has not rendered for some time.
+  const html = renderToStaticMarkup(
+    createElement(ConnectionPanel, {
+      status: 'connected',
+      metrics: initialMetrics(),
+      onRefresh() {},
+    } as never),
+  );
+  assert.ok(html.includes('connection-detail'));
+  for (const selector of [...scoped.matchAll(/^\.[^{\n]+/gm)].map((m) => m[0]!))
+    assert.match(selector, /\.game-side-panel/, `"${selector.trim()}" is not scoped to the real panel`);
 });
