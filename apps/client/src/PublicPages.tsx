@@ -1111,6 +1111,22 @@ export function PublicGuide() {
               name under it. A short burst is fine; after that the button rests for a moment, which is the
               difference between a table and a chat room.
             </p>
+            <figure className="guide-figure guide-plate">
+              <img
+                src="/art/optimized/guide-game-view.116377196968.webp"
+                alt="A game underway: a hex island of forest, hills, pasture, fields, mountains and one desert ringed by harbours, roads and settlements in four colours, and four player cards down the right."
+                width="1672"
+                height="941"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption>
+                A table of four, partway through. The island sits in the middle and every player keeps a card
+                down one side carrying their points, what they are holding, and any award they have taken.
+                Each tile shows the number that makes it produce, with a dot underneath for every dice
+                combination that rolls it.
+              </figcaption>
+            </figure>
           </section>
           <section id="accounts" className="guide-section">
             <GuideHeading id="accounts" index={10}>

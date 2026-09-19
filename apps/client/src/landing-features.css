@@ -13,21 +13,22 @@
 /* Each slide is a layer over the stylesheet's own first image, so the opening
    frame is already right and the wrap at the end of the cycle is invisible.
    The keyframes come from `TitleScenery.tsx`, which knows how many there are. */
-.entry-world .title-scenery i {
+.entry-world .title-scenery img {
   position: absolute;
   inset: 0;
-  background-position: center;
-  background-size: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   opacity: 0;
   animation: title-scenery-slide var(--scenery-cycle, 28s) linear infinite both;
 }
-[data-motion='reduced'] .entry-world .title-scenery i,
-.entry-world[data-motion='reduced'] .title-scenery i {
+[data-motion='reduced'] .entry-world .title-scenery img,
+.entry-world[data-motion='reduced'] .title-scenery img {
   animation: none;
   opacity: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  .entry-world .title-scenery i {
+  .entry-world .title-scenery img {
     animation: none;
     opacity: 0;
   }

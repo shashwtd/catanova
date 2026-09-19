@@ -252,6 +252,29 @@ test('discovery assets are real files with declared icon and social dimensions',
   assert.deepEqual(dimensions, [1200, 630]);
 });
 
+test('every slide is a real, content-hashed file the art manifest knows about', async () => {
+  // A background that 404s shows nothing and reports nothing: the layer simply
+  // stays empty and the crossfade goes to blank. These URLs carry a hash of the
+  // file, so a re-export moves them, and nothing else would catch that.
+  const manifest = JSON.parse(await readFile('docs/art/runtime-art.json', 'utf8')) as {
+    images: { url: string; bytes: number }[];
+  };
+  const byUrl = new Map(manifest.images.map((image) => [image.url, image]));
+  let total = 0;
+  for (const slide of TITLE_SLIDES) {
+    const image = byUrl.get(slide.src);
+    assert.ok(image, `${slide.src} is not in the art manifest`);
+    const file = await readFile(join('apps/client/public', slide.src));
+    assert.equal(file.length, image!.bytes, slide.src);
+    assert.equal(file.subarray(8, 12).toString(), 'WEBP', slide.src);
+    assert.ok(slide.alt.length > 20, `${slide.src} needs a real description`);
+    total += file.length;
+  }
+  // The entry screen is the first thing anybody loads. Slides after the first
+  // are fetched at low priority, but they are still bytes on somebody's phone.
+  assert.ok(total < 1_200_000, `the slideshow weighs ${Math.round(total / 1024)}KB`);
+});
+
 test('the entry scenery crossfades every slide it is given, and rests on one', () => {
   // With a single picture there is nothing to fade between, so no layers and no
   // animation: the stylesheet's own background is the whole of it.

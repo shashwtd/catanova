@@ -733,6 +733,23 @@ code {
   border-radius: 4px;
   background: var(--surface);
 }
+/* A plate is the picture itself, edge to edge, with the caption under the rule. */
+.guide-plate {
+  padding: 0;
+  overflow: hidden;
+}
+.guide-plate img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1672 / 941;
+}
+.guide-plate figcaption {
+  margin: 0;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--rule);
+  text-align: left;
+}
 .guide-figure figcaption {
   margin-top: 12px;
   color: var(--muted);

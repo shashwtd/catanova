@@ -127,6 +127,54 @@
       "quality": 88,
       "originalBytes": 2414627,
       "bytes": 305772
+    },
+    {
+      "source": "assets/source-art/title-board.png",
+      "legacyUrl": "/art/title-board.png",
+      "url": "/art/optimized/title-board.a80caa7a5cac.webp",
+      "sha256": "a80caa7a5cac33472a5cb2ff1a762052b284d651f34963714e38682557c2c66e",
+      "sourceSha256": "3bffe7b4c317128efbec927e0451872afa951e2723f59a430e9165baee299c08",
+      "width": 1672,
+      "height": 941,
+      "quality": 82,
+      "originalBytes": 2802902,
+      "bytes": 312686
+    },
+    {
+      "source": "assets/source-art/title-harbour.png",
+      "legacyUrl": "/art/title-harbour.png",
+      "url": "/art/optimized/title-harbour.67cc2ec379af.webp",
+      "sha256": "67cc2ec379af0a4026dcbb0b275a97061be03a4c65033f67a797dbc492a54d17",
+      "sourceSha256": "abc6e931aca25a21bae7d7dbd3bc8a5a4a519efca5f4f158a22191572e93e293",
+      "width": 1672,
+      "height": 941,
+      "quality": 82,
+      "originalBytes": 2626970,
+      "bytes": 294714
+    },
+    {
+      "source": "assets/source-art/title-table-dusk.png",
+      "legacyUrl": "/art/title-table-dusk.png",
+      "url": "/art/optimized/title-table-dusk.e18276f97f37.webp",
+      "sha256": "e18276f97f37cd9cee766b3707c8a3008d0720d9d319dd95d533ba2ffeb2b687",
+      "sourceSha256": "8cdb162fe7a6ff08aa4c1a58360be2c72f765487cc3159c07b0c8ae21cebc968",
+      "width": 1672,
+      "height": 941,
+      "quality": 82,
+      "originalBytes": 2135056,
+      "bytes": 172774
+    },
+    {
+      "source": "assets/source-art/guide-game-view.png",
+      "legacyUrl": "/art/guide-game-view.png",
+      "url": "/art/optimized/guide-game-view.116377196968.webp",
+      "sha256": "116377196968b026079a034dbebec9290eea03c687d076fc444ec10b933c7c99",
+      "sourceSha256": "48e8750b1e4277d06b8a8c55a2ac8bcd707f5a54500dcf526b05217ddf3e8f04",
+      "width": 1672,
+      "height": 941,
+      "quality": 82,
+      "originalBytes": 2621968,
+      "bytes": 261384
     }
   ]
 }
