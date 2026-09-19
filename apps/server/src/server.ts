@@ -746,6 +746,7 @@ export async function startServer(
               message.profile,
               message.kickPlayerId,
               message.addBot,
+              message.color,
             );
             if (message.kickPlayerId) {
               const removed = activeSeats.get(message.kickPlayerId);

@@ -401,3 +401,71 @@
 .room-lobby .lobby-preferences:active {
   transform: translateY(1px);
 }
+
+/* ------------------------------------------------------------------ *
+ * Colour
+ *
+ * The pieces on the island carry no names, so colour is the only thing
+ * that says a road is yours. Handing it out by seat order meant nobody
+ * had a reason to look at it before the game began, and then had to work
+ * it out mid-turn. Every card now wears its colour as a frame, and your
+ * own card carries the whole palette underneath.
+ * ------------------------------------------------------------------ */
+.room-lobby .seat-card .seat-portrait {
+  background:
+    linear-gradient(150deg, #bda878, #44543d 32%, #273c31 70%, #c0aa7c) padding-box,
+    linear-gradient(var(--seat-color, #bda878), var(--seat-color, #bda878)) border-box;
+  border: 3px solid transparent;
+  box-shadow:
+    0 6px 16px #0b1a1455,
+    inset 0 0 0 1px #17241f;
+}
+.room-lobby .seat-colors {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  width: 100%;
+  max-width: 152px;
+  margin: 2px auto 0;
+}
+.room-lobby .seat-color {
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid #ffffff2e;
+  border-radius: 999px;
+  background: var(--swatch);
+  cursor: pointer;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
+}
+.room-lobby .seat-color:hover:not(:disabled) {
+  transform: scale(1.14);
+}
+/* Yours: a ring rather than a tick, because the swatch is the thing being
+   confirmed and a mark on top of it hides the colour. */
+.room-lobby .seat-color[aria-checked='true'] {
+  border-color: #fff4d6;
+  box-shadow:
+    0 0 0 2px #1d2b23,
+    0 0 0 4px var(--swatch);
+  cursor: default;
+}
+/* Somebody else has it. Still shown, so the table's arrangement reads at a
+   glance, but drained and unpressable. */
+.room-lobby .seat-color[data-held='true'] {
+  opacity: 0.28;
+  filter: grayscale(0.7);
+  cursor: not-allowed;
+}
+.room-lobby .seat-color:focus-visible {
+  outline: 2px solid #f0d79a;
+  outline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .room-lobby .seat-colors {
+    max-width: 128px;
+    gap: 5px;
+  }
+}

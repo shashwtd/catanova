@@ -5,7 +5,7 @@ import type { GameView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { PLAYER_COLORS } from './Board.js';
+import { seatHexColors } from './player-colors.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
 import { playerStandings } from './player-ranking.js';
@@ -65,6 +65,8 @@ export function PlayerRail({
   clockOffset?: number;
 }) {
   const ranked = playerStandings(game);
+  // Seat order, so a colour a player chose reaches their portrait too.
+  const colors = seatHexColors(room.players);
   const tied = ranked.filter((p) => p.leading).length > 1;
   const rail = useRef<HTMLElement>(null);
   /**
@@ -120,7 +122,7 @@ export function PlayerRail({
             data-player-profile={p.id}
             aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${active ? ', current turn' : ''}`}
             className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''} ${!seat?.connected ? 'offline' : ''} ${p.resigned ? 'has-resigned' : ''}`}
-            style={{ '--player-color': PLAYER_COLORS[i] } as CSSProperties}
+            style={{ '--player-color': colors[i] } as CSSProperties}
           >
             <div className="profile-portrait">
               <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />

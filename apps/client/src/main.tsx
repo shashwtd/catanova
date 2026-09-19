@@ -38,6 +38,8 @@ import { RoomInviteNotice, visibleRoomInvitations } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
+import { seatHexColors } from './player-colors.js';
+import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
 import { useAccountPrivacy } from './usePrivacy.js';
 import {
   showPlayerHome,
@@ -375,6 +377,13 @@ function App() {
    * render once for the whole game.
    */
   const stableBoard = useMemo(() => g?.board, [g?.board.seed]);
+  /** Seat colours change only when somebody picks one, so they are derived from
+   *  the seats' own colours rather than rebuilt on every render — `Board` is
+   *  memoised and a fresh array each time would defeat it. */
+  const seatColors = useMemo(
+    () => seatHexColors(room?.players),
+    [room?.players.map((p) => `${p.id}:${p.color ?? ''}`).join('|')],
+  );
   /**
    * Stable handler identities. Defined inline they changed on every render,
    * which defeats the board's memo on its own; the ref keeps the identity
@@ -877,6 +886,20 @@ function App() {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
   }
+  /** Colour is a lobby change like readiness, so it goes through the same
+   *  single-command path and keeps this seat's ready state as it was. */
+  async function chooseColor(color: PlayerColor) {
+    const c = connection.current;
+    if (!c || disabled) return;
+    setBusy(true);
+    try {
+      await c.chooseColor(color, !!room?.players.find((p) => p.id === me)?.ready);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not change colour');
+    } finally {
+      if (connection.current === c) setBusy(c.awaitingConfirmation);
+    }
+  }
   async function addBot() {
     const c = connection.current;
     if (!c || disabled) return;
@@ -947,6 +970,7 @@ function App() {
               mode={mode}
               disabled={disabled}
               selectedRobberHex={robberHex}
+              colors={seatColors}
               pendingBuild={placementReady ? placement?.action : null}
               onAction={onBoardAction}
               onRobber={onBoardRobber}
@@ -1138,6 +1162,7 @@ function App() {
           onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
           onConfigure={() => setPanel('configure')}
+          onChooseColor={(color) => void chooseColor(color)}
         />
       )}
       {g && (

@@ -22,6 +22,13 @@ import {
 import { useEffect, useRef, useState, useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
+import {
+  PLAYER_COLORS,
+  PLAYER_COLOR_LABEL,
+  PLAYER_COLOR_LIST,
+} from '../../../packages/protocol/src/colors.js';
+import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
+import { seatHexColors } from './player-colors.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { Avatar } from './Profile.js';
@@ -214,6 +221,50 @@ function OpenSeat({
   );
 }
 
+/**
+ * Pick your colour.
+ *
+ * Colour is the only label the pieces on the island carry, so being told
+ * yours — rather than being handed the third one because you joined third —
+ * is the difference between recognising your own roads and counting seats.
+ * A colour somebody else holds is still drawn, greyed and unpressable, so the
+ * table's whole arrangement is visible from one card.
+ */
+function ColorChoice({
+  mine,
+  taken,
+  busy,
+  onChoose,
+}: {
+  mine: PlayerColor;
+  taken: ReadonlySet<PlayerColor>;
+  busy: boolean;
+  onChoose: (color: PlayerColor) => void;
+}) {
+  return (
+    <div className="seat-colors" role="radiogroup" aria-label="Your colour">
+      {PLAYER_COLOR_LIST.map((color) => {
+        const held = taken.has(color) && color !== mine;
+        return (
+          <button
+            key={color}
+            type="button"
+            role="radio"
+            className="seat-color"
+            style={{ '--swatch': PLAYER_COLORS[color] } as CSSProperties}
+            aria-checked={color === mine}
+            aria-label={held ? `${PLAYER_COLOR_LABEL[color]}, taken` : PLAYER_COLOR_LABEL[color]}
+            title={held ? `${PLAYER_COLOR_LABEL[color]} · taken` : PLAYER_COLOR_LABEL[color]}
+            data-held={held}
+            disabled={busy || held || color === mine}
+            onClick={() => onChoose(color)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function Lobby({
   room,
   me,
@@ -229,6 +280,7 @@ export function Lobby({
   onFriends,
   onAddBot,
   onKick,
+  onChooseColor,
 }: {
   room: RoomState;
   me?: string;
@@ -244,6 +296,7 @@ export function Lobby({
   onFriends?: () => void;
   onAddBot?: () => void;
   onKick?: (playerId: string) => Promise<void>;
+  onChooseColor?: (color: PlayerColor) => void;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -260,6 +313,10 @@ export function Lobby({
   // all. One more place, the same size as the rest, and it goes when full.
   const places: (RoomState['players'][number] | null)[] =
     room.players.length < SEATS ? [...room.players, null] : [...room.players];
+  // Resolved the same way the board resolves them, so the swatch on a card and
+  // the roads on the island are never two different answers.
+  const colors = seatHexColors(room.players);
+  const held = new Set(room.players.map((p) => p.color).filter((c): c is PlayerColor => !!c));
   return (
     <section className="lobby-screen room-lobby" aria-label="Room lobby">
       <header className="lobby-heading">
@@ -336,6 +393,7 @@ export function Lobby({
               {p ? (
                 <article
                   className={`seat-card ${p.id === me ? 'is-you' : ''} ${!p.connected ? 'is-offline' : ''}`}
+                  style={{ '--seat-color': colors[i] } as CSSProperties}
                 >
                   {host && p.id !== me && onKick && (
                     <button
@@ -375,6 +433,14 @@ export function Lobby({
                     <strong title={p.name}>{p.name}</strong>
                     {p.bot && <BotMark level={p.botLevel} />}
                   </div>
+                  {p.id === me && onChooseColor && (
+                    <ColorChoice
+                      mine={(p.color ?? PLAYER_COLOR_LIST.find((c) => PLAYER_COLORS[c] === colors[i]))!}
+                      taken={held}
+                      busy={busy || !connected}
+                      onChoose={onChooseColor}
+                    />
+                  )}
                   <span className={`seat-status ${p.ready && p.connected && !p.bot ? 'is-ready' : ''}`}>
                     {!p.connected ? (
                       'Disconnected'

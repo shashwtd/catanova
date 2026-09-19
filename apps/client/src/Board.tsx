@@ -5,6 +5,7 @@ import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
 import { Terrain, type TerrainArt } from './Terrain.js';
+import { DEFAULT_SEAT_HEX } from './player-colors.js';
 import { DICE_READABLE_MS } from './DiceThrow.js';
 import type { BuildAction } from './placement.js';
 import {
@@ -23,7 +24,10 @@ import {
   WORLD,
 } from './scene.js';
 
-export const PLAYER_COLORS = ['#ef7756', '#54b3dc', '#b08be4', '#f2ce56'] as const;
+/** The seat colours a board falls back to when nothing tells it otherwise —
+ *  a preview, or the first frame before the room arrives. A real table passes
+ *  its own through `colors`, because seats can choose. */
+export { DEFAULT_SEAT_HEX as PLAYER_COLORS } from './player-colors.js';
 // Visible immediately, underneath the artwork, even when a texture is still downloading.
 const TERRAIN_BASE = {
   wood: '#57815a',
@@ -300,6 +304,7 @@ export const Board = memo(function Board({
   effectId,
   pendingBuild = null,
   selectedRobberHex = null,
+  colors = DEFAULT_SEAT_HEX,
   art,
 }: {
   board: Island;
@@ -313,6 +318,8 @@ export const Board = memo(function Board({
   effectId?: string;
   pendingBuild?: BuildAction | null;
   selectedRobberHex?: number | null;
+  /** One colour per seat, in seat order. */
+  colors?: readonly string[];
   art?: TerrainArt;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
@@ -325,7 +332,7 @@ export const Board = memo(function Board({
     [board.seed],
   );
   const color = (id: string) =>
-    PLAYER_COLORS[game?.players.findIndex((p) => p.id === id) ?? 0] ?? PLAYER_COLORS[0];
+    colors[game?.players.findIndex((p) => p.id === id) ?? 0] ?? colors[0] ?? DEFAULT_SEAT_HEX[0]!;
   const ownTurn = !!game && game.players[game.active]?.id === me && !game.winner;
   const interactive = ownTurn && !disabled;
   const setupSettlement = game?.phase === 'setupSettlement',

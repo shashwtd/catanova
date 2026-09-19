@@ -7,6 +7,8 @@ import {
 } from '../../../packages/protocol/src/room-reference.js';
 import { botName, randomBotLevel } from '../../../packages/protocol/src/bots.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
+import { availableColors, isPlayerColor } from '../../../packages/protocol/src/colors.js';
+import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
@@ -205,6 +207,7 @@ export class Store {
       ['ready', 'INTEGER NOT NULL DEFAULT 0'],
       ['bot', 'INTEGER NOT NULL DEFAULT 0'],
       ['bot_level', 'TEXT'],
+      ['color', 'TEXT'],
     ])
       if (!columns.includes(name)) this.db.exec('ALTER TABLE seats ADD COLUMN ' + name + ' ' + type);
     this.db.exec(
@@ -380,7 +383,7 @@ export class Store {
     const players = (
       this.db
         .prepare(
-          'SELECT id, name, profile, ready, departed, bot, bot_level FROM seats WHERE room_id = ? ORDER BY rowid',
+          'SELECT id, name, profile, ready, departed, bot, bot_level, color FROM seats WHERE room_id = ? ORDER BY rowid',
         )
         .all(roomId) as {
         id: string;
@@ -390,6 +393,7 @@ export class Store {
         departed: number;
         bot: number;
         bot_level: string | null;
+        color: string | null;
       }[]
     ).filter((p) => (game ? game.players.some((player) => player.id === p.id) : !p.departed));
     const presence = this.presence(roomId);
@@ -404,6 +408,7 @@ export class Store {
         profile: p.profile ? (JSON.parse(p.profile) as Profile) : defaultProfile(p.name),
         ready: !!p.ready,
         ...(p.bot ? { bot: true, botLevel: (p.bot_level as string | null) ?? 'steady' } : {}),
+        ...(isPlayerColor(p.color) ? { color: p.color } : {}),
         ...presence?.seats[p.id],
       })),
       ...(presence?.pausedAt !== undefined ? { paused: true } : {}),
@@ -722,10 +727,17 @@ export class Store {
     input?: Profile,
     kickPlayerId?: string,
     addBot?: true,
+    color?: PlayerColor,
   ) {
     const profile = input ? parseProfile(input) : undefined;
     const payloadHash = hash(
-      JSON.stringify({ expectedRevision, ready, profile, ...(kickPlayerId ? { kickPlayerId } : {}) }),
+      JSON.stringify({
+        expectedRevision,
+        ready,
+        profile,
+        ...(kickPlayerId ? { kickPlayerId } : {}),
+        ...(color ? { color } : {}),
+      }),
     );
     return this.transaction(() => {
       this.rejectSettingsReceipt(seat, commandId);
@@ -792,6 +804,13 @@ export class Store {
           // can ever resolve to a bot's seat.
           .run(id, seat.room_id, hash(randomUUID()), name, null, JSON.stringify(botProfile), level);
         this.botSeats.add(id);
+      }
+      if (color) {
+        // First come, first served, and checked here rather than in the browser:
+        // two clients can press two swatches in the same instant.
+        if (!availableColors(room.players, seat.id).includes(color))
+          throw new ProtocolError('COLOR_TAKEN', 'Another player already has that colour');
+        this.db.prepare('UPDATE seats SET color = ? WHERE id = ?').run(color, seat.id);
       }
       if (profile) {
         this.db

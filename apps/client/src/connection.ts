@@ -8,6 +8,7 @@ import type {
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
 import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
+import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { snapshotProblem } from './state.js';
 
@@ -369,6 +370,11 @@ export class Connection {
    *  a dropped one costs nothing and it never queues behind a move. */
   react(reaction: ReactionName) {
     this.send({ type: 'react', reaction });
+  }
+  /** Ask to play in a colour. The server settles ties; two people can press
+   *  the same swatch in the same instant. */
+  chooseColor(color: PlayerColor, ready: boolean) {
+    return this.submit({ type: 'lobby', ready, color });
   }
   /** Ask for a bot. Which one turns up is the server's draw, not ours. */
   addBot() {
