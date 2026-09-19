@@ -85,7 +85,7 @@ export function LandingFeatures({ onPlay }: { onPlay: () => void }) {
             <br />A new way to win.
           </h2>
           <p>
-            Collect resources, connect your settlements, and grow them into cities. Chase the longest road—or
+            Collect resources, connect your settlements, and grow them into cities. Chase the longest road, or
             keep a surprise in your hand.
           </p>
           <a className="feature-link" href="/guide/">

@@ -8,7 +8,7 @@ export type GameStatus = {
   icon: GameIconName;
   favicon: 'dice' | 'robber' | null;
 };
-export const HOME_TITLE = 'Catanova — Build. Trade. Settle.';
+export const HOME_TITLE = 'Catanova: play a Catan-style game with friends';
 
 /** A tab and a small on-board prompt describe the same authoritative phase. */
 export function gameStatus(game: GameView, me?: string, room?: RoomState): GameStatus {
