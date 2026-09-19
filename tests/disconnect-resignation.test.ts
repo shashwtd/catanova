@@ -77,6 +77,11 @@ test('a dropped seat is covered by a bot, not resigned, and is handed straight b
     assert.equal(store.expireRoom(roomId), true);
     assert.deepEqual(store.standInIds(roomId), [seats[1]!.id]);
     assert.equal(presenceOf(store, seats[1]!).standIn, true);
+    assert.equal(
+      store.db.prepare('SELECT next_deadline FROM room_presence WHERE room_id=?').get(roomId)!.next_deadline,
+      null,
+      'covered seats do not repeatedly wake the expiry scheduler',
+    );
     // The seat is covered, not surrendered: they keep their pieces, their hand
     // and their place in the order, however long they are away.
     const held = store.loadGame(roomId)!;
@@ -859,5 +864,36 @@ test('legacy long-running paused saves receive one migration grace and end hones
   } finally {
     store.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a late style response cannot overwrite a newer stand-in takeover', () => {
+  let now = 1000000;
+  const store = new Store(':memory:', { now: () => now, trackPresence: true });
+  try {
+    const { roomId, seats } = room(store);
+    const seat = seats[1]!;
+    store.setConnected(seat, false);
+    now += STANDIN_AFTER_MS;
+    store.expireRoom(roomId);
+    const oldSince = store.botSeatsIn(roomId)[0]!.standIn!.since;
+    store.setConnected(seat, true);
+    now++;
+    store.setConnected(seat, false);
+    now += STANDIN_AFTER_MS;
+    store.expireRoom(roomId);
+    const newSince = store.botSeatsIn(roomId)[0]!.standIn!.since;
+    assert.notEqual(oldSince, newSince);
+    store.saveStandInStyle(roomId, seat.id, { style: 'soldier', contesting: false }, oldSince);
+    assert.equal(store.botSeatsIn(roomId)[0]!.standIn!.style, null);
+    store.saveStandInStyle(roomId, seat.id, { style: 'soldier', contesting: false }, newSince);
+    assert.deepEqual(store.botSeatsIn(roomId)[0]!.standIn!.style, { style: 'soldier', contesting: false });
+    for (const player of seats) store.setConnected(player, false);
+    assert.ok(
+      store.db.prepare('SELECT next_deadline FROM room_presence WHERE room_id=?').get(roomId)!.next_deadline,
+      'an empty table still gets an abandonment deadline',
+    );
+  } finally {
+    store.close();
   }
 });

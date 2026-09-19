@@ -321,7 +321,7 @@ export function Lobby({
   onLeave,
   onEdit,
   onSettings,
-  onConfigure,
+  onConfigure = onSettings,
   onFriends,
   onAddBot,
   onKick,
@@ -337,7 +337,7 @@ export function Lobby({
   onLeave: () => void;
   onEdit: () => void;
   onSettings: () => void;
-  onConfigure: () => void;
+  onConfigure?: () => void;
   onFriends?: () => void;
   onAddBot?: () => void;
   onKick?: (playerId: string) => Promise<void>;

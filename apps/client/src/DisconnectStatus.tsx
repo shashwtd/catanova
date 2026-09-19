@@ -32,7 +32,7 @@ export function DisconnectStatus({
     return (
       <span
         className="profile-absence is-standin"
-        title="A bot is playing this seat until they reconnect. Their pieces and cards are untouched."
+        title="A bot is playing this seat until they reconnect. They resume this seat’s current position on return."
       >
         <Bot size={13} />
         <span>Bot playing</span>
@@ -46,7 +46,6 @@ export function DisconnectStatus({
       <span className="profile-absence" title="A bot takes this seat shortly, and hands it back on return">
         <Clock3 size={13} />
         <span>Away</span>
-        <b aria-label={`Away for ${remaining} seconds`}>{time}</b>
       </span>
     );
   return (

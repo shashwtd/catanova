@@ -93,7 +93,7 @@ export class BotDriver {
   private readonly plans = new Map<string, BotPlan>();
   /** Seats currently held for an absent player, so a plan built for a handover
    *  is dropped when the seat goes back to its owner. */
-  private readonly standInPlans = new Set<string>();
+  private readonly standInPlans = new Map<string, number>();
   private readonly usage = new Map<string, BotUsage>();
   private readonly busy = new Set<string>();
   private readonly readyAt = new Map<string, number>();
@@ -170,7 +170,10 @@ export class BotDriver {
     // A seat that has gone back to its owner and been dropped again starts
     // from a clean plan: the one the last stand-in was following belonged to a
     // position several turns old.
-    if (!seat.standIn && this.standInPlans.delete(seat.id)) this.plans.delete(seat.id);
+    if (this.standInPlans.get(seat.id) !== seat.standIn?.since) {
+      this.plans.delete(seat.id);
+      this.standInPlans.delete(seat.id);
+    }
     const waiting = this.pending.get(roomId);
     if (waiting && waiting.revision === state.revision && waiting.seat.id === seat.id) {
       if (waiting.readyAt > now) return;
@@ -197,7 +200,7 @@ export class BotDriver {
       ...(style ? { standIn: style } : {}),
     });
     this.plans.set(seat.id, decision.plan);
-    if (seat.standIn) this.standInPlans.add(seat.id);
+    if (seat.standIn) this.standInPlans.set(seat.id, seat.standIn.since);
     addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, decision);
     // Wait before committing, including the very first bot move. Keep the
     // decision so scheduler ticks during the pause never spend more API tokens.
@@ -300,7 +303,7 @@ export class BotDriver {
       return undefined;
     }
     if (!profiled) return undefined;
-    this.dependencies.store.saveStandInStyle(roomId, seat.id, profiled.style);
+    this.dependencies.store.saveStandInStyle(roomId, seat.id, profiled.style, seat.standIn!.since);
     addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, {
       ...profiled,
       degraded: !!profiled.style.inferred,

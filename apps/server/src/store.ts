@@ -765,6 +765,7 @@ export class Store {
         profile,
         ...(kickPlayerId ? { kickPlayerId } : {}),
         ...(color ? { color } : {}),
+        ...(addBot ? { addBot: true } : {}),
       }),
     );
     return this.transaction(() => {
@@ -922,10 +923,12 @@ export class Store {
   }
   /** Remember how the absent player was playing. Written once per handover by
    *  the driver, which is where the decision service lives. */
-  saveStandInStyle(roomId: string, playerId: string, style: StandInStyle): void {
+  saveStandInStyle(roomId: string, playerId: string, style: StandInStyle, since?: number): void {
     this.db
-      .prepare('UPDATE seat_standins SET style = ? WHERE room_id = ? AND player_id = ?')
-      .run(JSON.stringify(style), roomId, playerId);
+      .prepare(
+        'UPDATE seat_standins SET style = ? WHERE room_id = ? AND player_id = ? AND (? IS NULL OR since = ?)',
+      )
+      .run(JSON.stringify(style), roomId, playerId, since ?? null, since ?? null);
   }
   /** Remember that this account was here. Called on the presence heartbeat, so
    *  it is written often and read rarely. */
@@ -1056,13 +1059,13 @@ export class Store {
     // is finally abandoned. A seat a bot already holds has only the second one
     // left, so the room stops coming up due every tick.
     const standing = new Set(this.standInIds(roomId));
-    const deadlines = Object.entries(state.seats).map(([id, seat]) =>
-      // A paused room has nobody to stand in for, and a seat already held has
-      // only the long deadline left, so neither is woken early.
-      state.pausedAt !== undefined || standing.has(id)
-        ? seat.resignAt
-        : Math.min(seat.resignAt, seat.disconnectedAt + STANDIN_AFTER_MS),
-    );
+    const deadlines = Object.entries(state.seats).flatMap(([id, seat]) => {
+      if (state.pausedAt !== undefined) return [seat.resignAt];
+      // Covered seats have no expiry while humans remain. An expired resignation
+      // deadline here would otherwise wake this room on every scheduler tick.
+      if (standing.has(id)) return [];
+      return [Math.min(seat.resignAt, seat.disconnectedAt + STANDIN_AFTER_MS)];
+    });
     this.db
       .prepare(
         'INSERT INTO room_presence(room_id,state,next_deadline) VALUES(?,?,?) ON CONFLICT(room_id) DO UPDATE SET state=excluded.state,next_deadline=excluded.next_deadline',

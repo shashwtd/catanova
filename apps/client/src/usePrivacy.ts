@@ -7,13 +7,21 @@
  * a server without accounts, has nobody to share with, so the hook reports
  * that there is nothing here to set and the switch stays inert.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { accountApi } from './account-api.js';
 import type { AccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 
-export function useAccountPrivacy(accessToken: () => Promise<string | undefined>, enabled: boolean) {
+export function useAccountPrivacy(
+  accessToken: () => Promise<string | undefined>,
+  enabled: boolean,
+  accountId?: string,
+) {
+  const owner = enabled ? accountId : undefined;
+  const currentOwner = useRef(owner);
+  currentOwner.current = owner;
   const [value, setValue] = useState<AccountPrivacy | null>(null);
   useEffect(() => {
+    setValue(null);
     if (!enabled) {
       setValue(null);
       return;
@@ -33,7 +41,7 @@ export function useAccountPrivacy(accessToken: () => Promise<string | undefined>
       controller.abort();
     };
     // `accessToken` is a stable callback from useAuth; re-reading on every render would loop.
-  }, [enabled]);
+  }, [enabled, accountId]);
   const save = useCallback(
     async (next: AccountPrivacy) => {
       // Show the new position at once and put the old one back if the save fails,
@@ -41,13 +49,16 @@ export function useAccountPrivacy(accessToken: () => Promise<string | undefined>
       const previous = value;
       setValue(next);
       try {
-        setValue(await accountApi.savePrivacy(await accessToken(), next));
+        const token = await accessToken();
+        if (currentOwner.current !== owner) return;
+        const saved = await accountApi.savePrivacy(token, next);
+        if (currentOwner.current === owner) setValue(saved);
       } catch (error) {
-        setValue(previous);
+        if (currentOwner.current === owner) setValue(previous);
         throw error;
       }
     },
-    [accessToken, value],
+    [accessToken, value, owner],
   );
   return { value, save: enabled ? save : undefined };
 }

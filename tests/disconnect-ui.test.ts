@@ -18,10 +18,10 @@ test('an empty chair says which of the three things it is, and never resigns fro
     renderToStaticMarkup(createElement(DisconnectStatus, props));
   // Away, with the table still playing: a bot is about to take the seat, and
   // nothing about that is a punishment to count down to.
-  assert.match(render({ deadline: 181000, now: 1000 }), /Away.*3:00/);
+  assert.match(render({ deadline: 181000, now: 1000 }), />Away</);
   assert.ok(!render({ deadline: 181000, now: 1000 }).includes('resign'));
   const expired = render({ deadline: 181000, now: 190000 });
-  assert.ok(expired.includes('0:00') && !expired.includes('>Resigned<'));
+  assert.ok(!expired.includes('0:00') && !expired.includes('>Resigned<'));
   assert.equal(render({ now: 1000 }), '', 'clearing a deadline on reconnect removes the countdown');
   // Covered: who is playing, not how long is left.
   const covered = render({ standIn: true, now: 1000 });

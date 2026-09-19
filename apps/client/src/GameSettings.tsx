@@ -460,3 +460,21 @@ export function RoomConfiguration({
     </div>
   );
 }
+
+/** Compatibility entry for the tracked preview; production uses separate panels. */
+export function GameSettings(props: {
+  preferences: Preferences;
+  update: (patch: Partial<Preferences>) => void;
+  previewSound: () => void;
+  room: RoomState | null;
+  me?: string;
+  busy: boolean;
+  save: (settings: RoomSettings) => Promise<void>;
+}) {
+  return (
+    <>
+      <PlayerSettings {...props} />
+      {props.room && !props.room.game && <RoomConfiguration {...props} />}
+    </>
+  );
+}

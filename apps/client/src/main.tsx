@@ -301,6 +301,7 @@ function App() {
   const privacy = useAccountPrivacy(
     auth.accessToken,
     auth.config?.mode === 'authenticated' && !!auth.account && !auth.account.isGuest,
+    auth.account?.id,
   );
   const playerGames = usePlayerGames(
     auth.account?.id,

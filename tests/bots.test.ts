@@ -576,3 +576,17 @@ test('the driver holds its first move, cancels stale plans and commits one actio
     store.db.close();
   }
 });
+
+test('add-bot retries are idempotent and cannot reuse a readiness command receipt', () => {
+  const store = new Store(':memory:');
+  try {
+    const host = store.enter('create', newSession('A').token, 'A');
+    const revision = store.snapshot(host.room_id).revision;
+    store.lobby(host, 'one-bot', revision, false, undefined, undefined, true);
+    store.lobby(host, 'one-bot', revision, false, undefined, undefined, true);
+    assert.equal(store.snapshot(host.room_id).players.length, 2);
+    assert.throws(() => store.lobby(host, 'one-bot', revision, false), /reused|different/i);
+  } finally {
+    store.close();
+  }
+});
