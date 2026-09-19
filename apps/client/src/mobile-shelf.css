@@ -100,7 +100,8 @@
     display: grid;
     /* buy · trade · where the dice land · the dice tile */
     grid-template-columns: auto auto minmax(0, 1fr) auto;
-    align-items: center;
+    /* Everything down here shares one baseline. */
+    align-items: end;
     gap: 8px;
     max-width: none;
     padding: 0;
@@ -121,7 +122,7 @@
     /* Wide-screen rules pin this to the right of its space; here it is the
        table itself and runs the width it is given. */
     justify-self: stretch;
-    align-self: stretch;
+    align-self: end;
     justify-content: center;
     display: flex;
     flex-direction: column;
@@ -131,7 +132,9 @@
     max-width: none;
     height: auto;
     min-width: 0;
-    padding: var(--shelf-pad);
+    /* Only as tall as what it holds. It used to stretch to match the dice
+       beside it, which put twenty empty pixels around a row of five numbers. */
+    padding: 7px var(--shelf-pad);
     border: 1px solid #c8a87845;
     border-radius: 13px;
     background: linear-gradient(#2c2620f2, #211c17f7);
@@ -182,15 +185,19 @@
 
   /* The dice: their own tile down the right, clear of the table, with the
      throw landing directly above the button that threw it. */
+  /* The throw lands in the one part of the row that is otherwise empty. */
   .playing .hand-dock-separated [data-dice-dock] {
-    grid-column: 4;
+    grid-column: 3;
     grid-row: 1;
     justify-self: center;
+    align-self: center;
   }
+  /* The one action is the tallest thing down here, and it stands on the same
+     line as the table rather than forcing the table's row to its own height. */
   .playing .hand-dock-separated .turn-action {
     grid-column: 4;
-    grid-row: 2;
-    align-self: center;
+    grid-row: 1 / -1;
+    align-self: end;
     justify-self: center;
   }
 

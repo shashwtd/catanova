@@ -23,6 +23,22 @@ import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
 import { ReactionFace } from './ReactionArt.js';
 import { Smile } from './GameIcons.js';
 
+/**
+ * Which edges of the tray have more of the set beyond them.
+ *
+ * Separated out because the rule is easy to get subtly wrong and impossible to
+ * see when it is: a fade that stays on at the bottom of a list is indeed a
+ * gradient, and is also a lie about there being more.
+ *
+ * The two pixels of slack matter. Sub-pixel scroll heights leave a fraction of
+ * overflow behind, and while the tray is unfurling a face sits a few pixels
+ * below where it will settle, so the list is briefly taller than it stays.
+ */
+export function scrollEdges(scrollTop: number, scrollHeight: number, clientHeight: number) {
+  const room = scrollHeight - clientHeight;
+  return { above: scrollTop > 2, below: room > 2 && scrollTop < room - 2 };
+}
+
 /** One reaction in flight. */
 export type FlyingReaction = {
   id: number;
@@ -85,6 +101,33 @@ export function ReactionButton({
   const [resting, setResting] = useState(false);
   const history = useRef<number[]>([]);
   const root = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  /**
+   * Whether there is more of the set above or below what is showing.
+   *
+   * The tray fades its own edge where there is more to reach, and stops the
+   * moment you arrive, so the fade is a fact about the list rather than
+   * decoration that goes on lying once you are at the end of it.
+   */
+  const [edges, setEdges] = useState({ above: false, below: false });
+
+  useEffect(() => {
+    const node = scroller.current;
+    if (!open || !node) return;
+    const measure = () => setEdges(scrollEdges(node.scrollTop, node.scrollHeight, node.clientHeight));
+    measure();
+    node.addEventListener('scroll', measure, { passive: true });
+    // The faces arrive staggered, and a face part-way through arriving sits
+    // below where it will end up, so the list is briefly taller than it stays.
+    node.addEventListener('animationend', measure);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(node);
+    return () => {
+      node.removeEventListener('scroll', measure);
+      node.removeEventListener('animationend', measure);
+      observer?.disconnect();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -128,23 +171,32 @@ export function ReactionButton({
   return (
     <div className={`reaction-control ${open ? 'open' : ''}`} ref={root}>
       {open && !disabled && (
-        <div className="reaction-tray" role="menu" aria-label="Send a reaction">
-          {REACTION_LIST.map((name, index) => (
-            <button
-              key={name}
-              type="button"
-              role="menuitem"
-              className={`reaction-choice ${sent?.reaction === name ? 'just-sent' : ''}`}
-              // Staggered so the tray unfurls rather than appearing at once.
-              style={{ animationDelay: `${Math.min(index, 8) * 18}ms` }}
-              title={REACTIONS[name].label}
-              aria-label={REACTIONS[name].label}
-              disabled={disabled || resting}
-              onClick={() => send(name)}
-            >
-              <ReactionFace name={name} />
-            </button>
-          ))}
+        <div className="reaction-tray">
+          <div
+            className="reaction-scroll"
+            role="menu"
+            aria-label="Send a reaction"
+            ref={scroller}
+            data-above={edges.above}
+            data-below={edges.below}
+          >
+            {REACTION_LIST.map((name, index) => (
+              <button
+                key={name}
+                type="button"
+                role="menuitem"
+                className={`reaction-choice ${sent?.reaction === name ? 'just-sent' : ''}`}
+                // Staggered so the tray unfurls rather than appearing at once.
+                style={{ animationDelay: `${Math.min(index, 8) * 18}ms` }}
+                title={REACTIONS[name].label}
+                aria-label={REACTIONS[name].label}
+                disabled={disabled || resting}
+                onClick={() => send(name)}
+              >
+                <ReactionFace name={name} />
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <button

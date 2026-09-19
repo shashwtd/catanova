@@ -439,9 +439,6 @@
   bottom: calc(100% + 10px);
   left: 0;
   z-index: 30;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
   width: max-content;
   max-width: min(84vw, 380px);
   padding: 8px;
@@ -449,6 +446,52 @@
   border-radius: 14px;
   background: var(--game-panel-fill);
   box-shadow: var(--game-panel-shadow);
+}
+.reaction-scroll {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+/*
+ * The edge fade.
+ *
+ * Where the set runs past the end of the tray, the last row dissolves instead
+ * of being cut off, which is the only honest way to say there is more without
+ * putting a word or an arrow on it. Both fades are lengths rather than
+ * separate gradients so they can be animated: they grow in when there is more
+ * that way and shrink to nothing the moment you arrive, so the tray never
+ * claims there is more to see when there is not.
+ */
+@property --fade-above {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-below {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+.reaction-scroll {
+  --fade-above: 0px;
+  --fade-below: 0px;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-above),
+    #000 calc(100% - var(--fade-below)),
+    transparent 100%
+  );
+  transition:
+    --fade-above 0.22s ease,
+    --fade-below 0.22s ease;
+}
+.reaction-scroll[data-above='true'] {
+  --fade-above: 26px;
+}
+.reaction-scroll[data-below='true'] {
+  --fade-below: 34px;
 }
 
 .reaction-choice {
@@ -500,20 +543,26 @@
 
 /* On a phone the tray becomes one swipeable row: a grid of fourteen would
    cover the board, which is the thing you are reacting to. */
+/* On a phone the tray is a narrow column of faces that runs downward. A single
+   sideways row hid most of the set behind a gesture nobody expects, and a grid
+   the width of the screen would cover the board it is reacting to. */
 @media (max-width: 700px) {
-  .reaction-tray {
-    display: flex;
-    max-width: calc(100vw - 2 * max(12px, env(safe-area-inset-left)) - 58px);
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
+  .reaction-scroll {
+    grid-template-columns: repeat(5, 44px);
+    gap: 5px;
+    max-height: min(52vh, 320px);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scroll-snap-type: y proximity;
     -webkit-overflow-scrolling: touch;
   }
-  .reaction-tray::-webkit-scrollbar {
+  .reaction-scroll::-webkit-scrollbar {
     display: none;
   }
+  .reaction-scroll {
+    scrollbar-width: none;
+  }
   .reaction-choice {
-    flex: none;
     scroll-snap-align: center;
   }
   .reaction-fly {
@@ -528,6 +577,9 @@
   .reaction-choice.just-sent .reaction-face {
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
+  }
+  .reaction-scroll {
+    transition: none;
   }
   .reaction-fly {
     animation: reaction-quiet 2s linear forwards;

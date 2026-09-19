@@ -12,7 +12,7 @@ import {
   REACTION_MIN_GAP_MS,
   reactionAllowedAt,
 } from '../packages/protocol/src/reactions.js';
-import { ReactionButton, ReactionLayer } from '../apps/client/src/Reactions.js';
+import { ReactionButton, ReactionLayer, scrollEdges } from '../apps/client/src/Reactions.js';
 import { ReactionFace } from '../apps/client/src/ReactionArt.js';
 
 test('a reaction is chat, not a move: validated, unnamed ones refused', () => {
@@ -84,6 +84,21 @@ test('reactions in flight name their sender and never swallow a click', () => {
   const css = readFileSync('apps/client/src/reactions.css', 'utf8');
   const layer = css.slice(css.indexOf('.reaction-layer {'));
   assert.ok(layer.slice(0, layer.indexOf('}')).includes('pointer-events: none'));
+});
+
+test('the tray fades an edge only where there is more of the set beyond it', () => {
+  // Everything fits: no fade at all. A gradient here would say there is more
+  // to scroll to when there is not, which is the one thing it must never do.
+  assert.deepEqual(scrollEdges(0, 142, 142), { above: false, below: false });
+  // A face still sliding into place leaves a couple of pixels of overflow.
+  assert.deepEqual(scrollEdges(0, 144, 142), { above: false, below: false });
+
+  // Clipped: fade below, and nothing above until you have actually moved.
+  assert.deepEqual(scrollEdges(0, 300, 142), { above: false, below: true });
+  assert.deepEqual(scrollEdges(70, 300, 142), { above: true, below: true });
+  // Arrived: the lower fade goes, exactly at the end rather than near it.
+  assert.deepEqual(scrollEdges(158, 300, 142), { above: true, below: false });
+  assert.deepEqual(scrollEdges(157.5, 300, 142), { above: true, below: false });
 });
 
 test('the rate limit allows a burst and then rests, by one shared rule', () => {
