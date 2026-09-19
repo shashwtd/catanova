@@ -4,6 +4,7 @@ import { useGameInteractionGuards } from './useGameInteractionGuards.js';
 import { BoardGesture, constrainCamera, fitBoard, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
 import { MATERIAL_GUTTER, MATERIAL_QUADRANTS, WORLD } from './scene.js';
+import { StringLights } from './StringLights.js';
 
 export function BoardViewport({
   seed,
@@ -255,8 +256,12 @@ export function BoardViewport({
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill={`url(#${patternId})`} />
-        <rect width="100%" height="100%" fill="#241d271a" />
+        <rect width="100%" height="100%" fill="#241d2714" />
       </svg>
+      {/* Lit rather than washed: see `table-light.css`. Both sit under the
+          board and neither is inside the camera, so panning repaints nothing. */}
+      <div className="table-light" aria-hidden="true" />
+      <div className="table-vignette" aria-hidden="true" />
       <div
         className="board-camera"
         style={{
@@ -268,6 +273,7 @@ export function BoardViewport({
       >
         {children}
       </div>
+      <StringLights />
     </div>
   );
 }

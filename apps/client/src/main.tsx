@@ -126,6 +126,7 @@ import './hub-entry-refinement.css';
 import './landing-features.css';
 import './room-seats.css';
 import './mobile-shelf.css';
+import './table-light.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];

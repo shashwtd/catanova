@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
 import {
   BoardGesture,
@@ -221,4 +222,40 @@ test('new-match curtain has two opposing cloud shapes and a bounded reduced-moti
   assert.match(loading, /Preparing the island/);
   assert.match(loading, /Captain/);
   assert.match(loading, /Game art loaded/);
+});
+
+test('the table is lit from somewhere, and none of the lighting can be clicked', () => {
+  const html = renderToStaticMarkup(
+    createElement(BoardViewport, { seed: 7, children: createElement('div', null, 'island') }),
+  );
+  // Five bulbs. A garland of twenty reads as bunting and competes with the
+  // board; a few good ones read as a room.
+  const bulbs = html.match(/class="string-bulb"/g) ?? [];
+  assert.equal(bulbs.length, 5);
+  // Every bulb sits on the cord rather than near it: the same parabola draws
+  // both, so a change to the sag can never leave one floating.
+  const cord = html.match(/d="M0 (\d+) Q600 (\d+) 1200 \d+"/)!;
+  const top = Number(cord[1]),
+    depth = (Number(cord[2]) - top) / 2;
+  for (const style of html.matchAll(/left:([\d.]+)%;top:([\d.]+)px/g)) {
+    const t = Number(style[1]) / 100;
+    assert.ok(
+      Math.abs(Number(style[2]) - (top + depth * (1 - (2 * t - 1) ** 2))) < 0.5,
+      `bulb at ${style[1]}% hangs off the wire`,
+    );
+  }
+  // The lighting is scenery: it must never take a click meant for a corner.
+  const css = readFileSync('apps/client/src/table-light.css', 'utf8');
+  for (const selector of ['.table-light', '.table-vignette', '.string-lights']) {
+    assert.ok(html.includes(selector.slice(1)), selector);
+    const block = css.slice(css.indexOf(`${selector} {`));
+    assert.ok(block.slice(0, block.indexOf('}')).includes('pointer-events: none'), selector);
+  }
+  // Fixed to the window like the wood itself: anything drawn to the viewport's
+  // own edges outlines a rectangle that is not really there.
+  for (const selector of ['.table-light', '.table-vignette']) {
+    const block = css.slice(css.indexOf(`${selector} {`));
+    assert.match(block.slice(0, block.indexOf('}')), /position: fixed/);
+  }
+  assert.match(css, /prefers-reduced-motion[\s\S]*animation: none/);
 });

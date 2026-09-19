@@ -1,0 +1,153 @@
+/*
+ * The table, lit.
+ *
+ * The wood was a tiled photograph with one flat grey wash over it, which made
+ * it read as a repeating texture rather than a surface: no falloff, no warmth,
+ * the same brightness in the corners as under the island, and a visible seam
+ * wherever the tile came round again. So the board looked correct and the room
+ * around it looked like wallpaper.
+ *
+ * Three layers fix it, and all three are one paint each: a warm pool under the
+ * lights, a vignette that takes the corners down, and a contact shadow that
+ * puts the island on the table instead of above it. Nothing here animates
+ * except two bulbs breathing, nothing takes pointer events, and nothing is
+ * inside the camera, so panning and zooming the board does not repaint any
+ * of it.
+ */
+
+.board-viewport {
+  --lamp-warm: 243 205 140;
+}
+
+/* The pool of light the bulbs are responsible for. It stays with the room
+   rather than the board: pan the island and it moves under the lamp, which is
+   what happens when you push a board across a table. */
+.table-light {
+  /* Fixed to the window, not to the viewport, for the same reason the wood
+     itself is: the viewport is only the part of the table the board can be
+     dragged around in, and anything drawn to its edges outlines a rectangle
+     that is not really there. */
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 62% 46% at 50% 6%,
+      rgb(var(--lamp-warm) / 17%),
+      rgb(var(--lamp-warm) / 6%) 45%,
+      transparent 72%
+    ),
+    radial-gradient(ellipse 76% 62% at 50% 46%, rgb(var(--lamp-warm) / 8%), transparent 70%);
+}
+
+/* And the falloff. A real table is darker at its edges than under the lamp,
+   and this is also what stops the tile's repeat from reading: the corners it
+   repeats into are the darkest part of the frame. */
+.table-vignette {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 92% 86% at 50% 40%,
+    transparent 46%,
+    rgb(14 10 8 / 15%) 78%,
+    rgb(10 7 6 / 34%) 100%
+  );
+}
+
+/* The island had no shadow worth the name, so it floated. It gets a deeper one
+   rather than a new blurred layer underneath it: `.island-stage` already
+   carries a drop-shadow filter, and adding to that costs nothing, where a
+   second blurred element inside the camera would be re-rasterised on every
+   zoom. */
+.board-camera .island-stage {
+  filter: drop-shadow(0 10px 13px rgb(14 19 14 / 45%));
+}
+
+/* ------------------------------------------------------------------ *
+ * The lights themselves
+ * ------------------------------------------------------------------ */
+.string-lights {
+  position: absolute;
+  top: 0;
+  left: -4%;
+  width: 108%;
+  height: 110px;
+  /* Above the island: a lamp strung over a table hangs in front of it. */
+  z-index: 12;
+  pointer-events: none;
+}
+.string-cord {
+  display: block;
+  width: 100%;
+  height: 110px;
+}
+.string-bulb {
+  position: absolute;
+  width: 34px;
+  height: 56px;
+  margin-left: -17px;
+  /* The glow is a filter on the bulb rather than another element, so a bulb is
+     one composited layer and the halo follows it exactly. */
+  filter: drop-shadow(0 0 10px rgb(var(--lamp-warm) / 62%)) drop-shadow(0 0 30px rgb(var(--lamp-warm) / 32%));
+}
+.string-bulb svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.bulb-glass {
+  fill: #f7d18a;
+  fill-opacity: 0.94;
+}
+.bulb-filament {
+  stroke: #fffaf0;
+}
+/* Two of the five, out of step, so the row never pulses together the way a
+   string of fairy lights on a timer does. */
+.string-bulb[data-breathing='true'] {
+  animation: bulb-breath 7.5s ease-in-out infinite;
+}
+@keyframes bulb-breath {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.82;
+  }
+}
+
+/* A phone has no height to give away, so the wire hangs shallower and the
+   bulbs come in. Below a very short viewport they go entirely: a game of
+   Catan on a landscape phone needs every pixel for the island. */
+@media (max-width: 700px) {
+  .string-lights {
+    height: 82px;
+  }
+  .string-cord {
+    height: 82px;
+  }
+  .string-bulb {
+    transform: scale(0.72);
+    transform-origin: top center;
+  }
+}
+@media (max-height: 460px) {
+  .string-lights {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .string-bulb[data-breathing='true'] {
+    animation: none;
+  }
+}
