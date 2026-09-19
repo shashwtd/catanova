@@ -11,6 +11,11 @@ import { parseProfile } from '../../../packages/protocol/src/profile.js';
 import { createServer } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseClientMessage, PROTOCOL_VERSION } from '../../../packages/protocol/src/index.js';
+import {
+  REACTION_BURST,
+  REACTION_MIN_GAP_MS,
+  REACTION_WINDOW_MS,
+} from '../../../packages/protocol/src/reactions.js';
 import type { RoomState, ServerMessage } from '../../../packages/protocol/src/index.js';
 import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
@@ -154,7 +159,7 @@ export async function startServer(
           const account = await accounts.save(token, await body());
           result = account;
         } else if (request.method === 'GET' && url.pathname === '/api/friends')
-          result = accountPresence.friends(await accounts.friends(token), now());
+          result = accountPresence.friends(await accounts.friends(token), now(), watchableRoom);
         else if (request.method === 'GET' && url.pathname === '/api/account/room-invites')
           result = await roomInvites!.list(token);
         else if (request.method === 'POST' && url.pathname === '/api/account/room-invites')
@@ -170,6 +175,7 @@ export async function startServer(
           result = accountPresence.friends(
             await accounts.friendAction(token, value.action, value.other),
             now(),
+            watchableRoom,
           );
         } else {
           response.writeHead(404).end();
@@ -319,6 +325,9 @@ export async function startServer(
     }
     ws.send(JSON.stringify(message));
   }
+  /** A friend's in-progress room, for the Watch button. Only rooms with a code
+   *  are offered, since that is what the client can act on. */
+  const watchableRoom = (userId: string) => store.watchableRoomOf(userId);
   function snapshot(roomId: string, viewer: string): RoomState {
     const state = store.snapshot(roomId, viewer);
     return {
@@ -329,6 +338,25 @@ export async function startServer(
         connected: !!p.bot || activeSeats.get(p.id)?.readyState === WebSocket.OPEN,
       })),
     };
+  }
+  /** Send one message to every socket in a room, players and watchers alike. */
+  function toRoom(roomId: string, message: ServerMessage) {
+    if (closing) return;
+    for (const [ws, watchedRoom] of spectators) if (watchedRoom === roomId) send(ws, message);
+    for (const [ws, seat] of sessions) if (seat.room_id === roomId) send(ws, message);
+  }
+  /** Reactions are chat, not moves, so they are rate limited here rather than
+   *  receipted in the store. A burst is fine; a stream is not. */
+  const reactionRate = new Map<string, number[]>();
+  function reactionAllowed(seatId: string) {
+    const at = now();
+    const recent = (reactionRate.get(seatId) ?? []).filter((t) => at - t < REACTION_WINDOW_MS);
+    const last = recent[recent.length - 1];
+    if (last !== undefined && at - last < REACTION_MIN_GAP_MS) return false;
+    if (recent.length >= REACTION_BURST) return false;
+    recent.push(at);
+    reactionRate.set(seatId, recent);
+    return true;
   }
   function broadcast(roomId: string) {
     if (closing) return;
@@ -668,6 +696,17 @@ export async function startServer(
                   'Save your account profile before updating the lobby',
                 );
             }
+          }
+          if (message.type === 'react') {
+            if (reactionAllowed(seat.id))
+              toRoom(seat.room_id, {
+                type: 'reaction',
+                playerId: seat.id,
+                name: seat.name,
+                reaction: message.reaction,
+                at: now(),
+              });
+            return;
           }
           if (message.type === 'lobby') {
             launches.cancel(seat.room_id);

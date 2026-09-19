@@ -473,3 +473,95 @@
     width: 200px;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Filling a seat
+ *
+ * Inviting a friend and adding a bot were two tiles competing for the
+ * same narrow row, which crowded the seats on a phone and made the
+ * choice look like two unrelated features. They are one decision: who
+ * takes this seat. One control, then the choice.
+ * ------------------------------------------------------------------ */
+.lobby-seat-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.lobby-seat-choices {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  padding: 6px;
+  border: 1px solid var(--game-trim);
+  border-radius: 12px;
+  background: var(--game-panel-fill);
+  box-shadow: var(--game-panel-shadow);
+  transform: translateX(-50%);
+  animation: lobby-seat-choices-in 0.16s ease-out;
+}
+@keyframes lobby-seat-choices-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+.lobby-seat-choices button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--game-cream);
+  font: inherit;
+  font-size: 0.86rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lobby-seat-choices button:hover:not(:disabled),
+.lobby-seat-choices button:focus-visible {
+  background: rgb(255 255 255 / 10%);
+  outline: none;
+}
+.lobby-seat-choices button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.lobby-seat-add.open .lobby-invite-tile {
+  border-style: solid;
+  transform: rotate(45deg);
+}
+.lobby-invite-tile {
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease;
+}
+
+/* The settings chips wrapped onto a second row while keeping the divider
+   that only makes sense between neighbours, leaving a rule floating at
+   the start of the row with no gap above it. */
+@media (max-width: 650px) {
+  .lobby-room-options {
+    row-gap: 6px;
+  }
+  .lobby-room-options > button + button {
+    border-left-color: transparent;
+  }
+  .lobby-seat-choices {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  @keyframes lobby-seat-choices-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+}

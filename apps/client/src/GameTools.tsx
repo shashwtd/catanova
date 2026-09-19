@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
@@ -19,6 +20,7 @@ export function GameTools({
   fullscreen,
   onFullscreen,
   onLeave,
+  reactions,
   busy = false,
 }: {
   panel?: string | null;
@@ -27,6 +29,8 @@ export function GameTools({
   fullscreen: boolean;
   onFullscreen: () => void;
   onLeave: () => void;
+  /** Rendered into the tool column; supplied by the game screen. */
+  reactions?: ReactNode;
   busy?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -77,6 +81,10 @@ export function GameTools({
           <History />
           {panel !== 'journal' && <span className="tool-label">Move history</span>}
         </button>
+        {/* Reactions live beside the other game tools rather than as a new
+            floating control: this column already has free room on both
+            layouts, and it inherits the phone sizing the others use. */}
+        {reactions}
       </nav>
       <nav className="side-controls room-controls" aria-label="Room tools" data-panel-align="bottom">
         <div

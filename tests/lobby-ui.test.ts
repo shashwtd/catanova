@@ -88,9 +88,10 @@ test('room gathering shows actual players with small invitations instead of four
     }));
     const html = renderLobby(room, 'p0');
     assert.equal([...html.matchAll(/<article\b/g)].length, count);
+    // One control fills a seat, and it disappears once the room is full.
     assert.equal(
-      buttons(html).filter((button) => button.includes('aria-label="Invite player"')).length,
-      Math.min(2, 4 - count),
+      buttons(html).filter((button) => button.includes('aria-label="Fill this seat"')).length,
+      count < 4 ? 1 : 0,
     );
     assert.ok(html.includes('10 points'));
     assert.ok(!html.includes('Your crew') && !html.includes('open-seat'));

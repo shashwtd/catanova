@@ -14,6 +14,7 @@ export function FriendsDrawer({
   invites,
   onOpenRoom,
   roomEntryBlocked,
+  onWatch,
   excludedRoomIds = [],
 }: {
   auth: ReturnType<typeof useAuth>;
@@ -22,6 +23,8 @@ export function FriendsDrawer({
   invites?: RoomInvitesController;
   onOpenRoom?: (roomId: string) => void;
   roomEntryBlocked?: string;
+  /** Watch a friend's game. Absent while you are seated in a room of your own. */
+  onWatch?: (reference: string) => void;
   excludedRoomIds?: readonly (string | null | undefined)[];
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
@@ -117,7 +120,7 @@ export function FriendsDrawer({
           />
         ) : (
           <>
-            <FriendsPanel auth={auth} />
+            <FriendsPanel auth={auth} onWatch={onWatch} />
           </>
         )}
       </div>

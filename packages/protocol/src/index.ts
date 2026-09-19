@@ -9,8 +9,12 @@ import { parseProfile } from './profile.js';
 import type { Profile } from './profile.js';
 import { parseRoomSettings } from './settings.js';
 import type { RoomSettings, TurnClock } from './settings.js';
+import { isReaction } from './reactions.js';
+import type { ReactionName } from './reactions.js';
 import { isBotLevel } from './bots.js';
 import type { BotLevel } from './bots.js';
+export { REACTIONS, REACTION_LIST, isReaction } from './reactions.js';
+export type { ReactionName } from './reactions.js';
 export { BOT_LEVELS, BOT_LEVEL_LABEL, BOT_NAMES, botName, isBotLevel } from './bots.js';
 export type { BotLevel } from './bots.js';
 import { parseGameAction } from '../../rules/src/game.js';
@@ -103,6 +107,7 @@ export type ClientMessage =
     }
   | { type: 'settings'; commandId: string; expectedRevision: number; settings: RoomSettings }
   | { type: 'launchReady'; id: string; success: boolean }
+  | { type: 'react'; reaction: ReactionName }
   | { type: 'sync' }
   | { type: 'history'; before?: number }
   | { type: 'statistics' }
@@ -121,6 +126,7 @@ export type ServerMessage =
   | { type: 'history'; entries: HistoryEntry[]; before?: number; hasMore: boolean }
   | { type: 'statistics'; statistics: GameStatistics }
   | { type: 'pong'; nonce: string; revision?: number; serverNow?: number }
+  | { type: 'reaction'; playerId: string; name: string; reaction: ReactionName; at: number }
   | { type: 'error'; code: string; message: string; commandId?: string };
 
 /** Bounds and a strict operation whitelist keep untrusted messages out of the store. */
@@ -188,6 +194,12 @@ export function parseClientMessage(input: string): ClientMessage {
     return v.type === 'action'
       ? { type: 'action', ...base, action: parseGameAction(v.action) }
       : { type: v.type, ...base };
+  }
+  // A reaction changes no game state, so it carries no command id and no
+  // revision: it is chat, not a move, and a dropped one costs nothing.
+  if (v.type === 'react') {
+    if (!isReaction(v.reaction)) throw new Error('Unknown reaction');
+    return { type: 'react', reaction: v.reaction };
   }
   if (v.type === 'launchReady') {
     if (typeof v.id !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(v.id) || typeof v.success !== 'boolean')

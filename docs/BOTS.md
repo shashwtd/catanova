@@ -100,6 +100,20 @@ using `sudoedit`, then recreate the `game` service with that env file and
 `deploy/single-vm/compose.yaml`. A plain container restart does not reload env
 values. Never commit the key or put it in a client-side environment variable.
 
+## How a bot behaves at the table
+
+A bot is labelled `BOT` beside its name, in the lobby and on its portrait during
+play, so nobody wonders why a seat never chats.
+
+It also pauses before every move. Without that it answered the instant the rules
+allowed, which is the single thing that made it read as software rather than an
+opponent. The pause is matched to the decision: under a second to roll, a beat
+or two to build, longest over the opening placement, which is the longest
+decision in a real game too. Occasionally it takes noticeably longer, the way a
+distracted player does. Time already spent deciding counts towards the pause, so
+a slow model call is absorbed rather than added on top, and a bot never bursts
+several moves out at once.
+
 ## Operational notes
 
 - A bot seat has no socket and is treated as permanently present, so it is never

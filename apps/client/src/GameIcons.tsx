@@ -27,6 +27,8 @@ const CONTROL_PATHS = {
   'next-turn': 'M5 20v-7a5 5 0 0 1 5-5h10 m-5-5 5 5-5 5',
   play: 'm7 3 14 9-14 9V3',
   bot: 'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
+  smile: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18 M9 10v.5 M15 10v.5 M8 14a5 5 0 0 0 8 0',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
 export const GAME_ICON_NAMES = [
@@ -72,6 +74,8 @@ export function GameIcon({ name, size = 24, className = '', ...props }: IconProp
 }
 const icon = (name: GameIconName) => (props: IconProps) => <GameIcon name={name} {...props} />;
 export const Bot = icon('bot'),
+  Eye = icon('eye'),
+  Smile = icon('smile'),
   Dices = icon('dice'),
   ArrowRight = icon('next'),
   ArrowLeftRight = icon('trade'),

@@ -29,9 +29,38 @@ import { gameView } from '../../../packages/rules/src/game.js';
 import type { Game } from '../../../packages/rules/src/game.js';
 import type { Store } from './store.js';
 
-const TICK_MS = 700;
-/** A ceiling per wake-up, so one busy room cannot hold the loop. */
-const MOVES_PER_TICK = 4;
+/** How often the scheduler looks for work. Small, because each room decides for
+ *  itself when it is ready to move again. */
+const TICK_MS = 250;
+
+/**
+ * How long a bot appears to think before each kind of move.
+ *
+ * Without this a bot answers the instant the rules allow, which is the single
+ * thing that makes it read as a machine: real players pause, and they pause
+ * longer over decisions that matter. The ranges below are deliberately uneven,
+ * and the time already spent deciding counts towards them, so a slow model call
+ * does not stack on top of the pause.
+ */
+const THINK_MS: Record<string, [number, number]> = {
+  roll: [450, 900],
+  endTurn: [700, 1400],
+  discard: [900, 1800],
+  bankTrade: [800, 1600],
+  buyCard: [700, 1400],
+  playCard: [1100, 2100],
+  road: [900, 1900],
+  settlement: [1300, 2600],
+  city: [1300, 2600],
+  robber: [1400, 2800],
+};
+const THINK_DEFAULT: [number, number] = [800, 1600];
+/** The opening is the longest decision in a real game, so it reads wrong if it
+ *  is quick. */
+const OPENING_MS: [number, number] = [1900, 3600];
+/** Occasionally a player is simply distracted. Rare enough not to annoy. */
+const DISTRACTED_CHANCE = 0.06;
+const DISTRACTED_MS: [number, number] = [900, 2200];
 
 export type BotSeat = { id: string; name: string; level: BotLevel };
 
@@ -40,6 +69,8 @@ export type BotDriverDependencies = {
   changed: (roomId: string) => void;
   jev?: JevClient | null;
   now?: () => number;
+  /** Injectable so tests can make think time deterministic. */
+  random?: () => number;
   log?: (event: string, detail: Record<string, unknown>) => void;
 };
 
@@ -52,11 +83,16 @@ export class BotDriver {
   private readonly plans = new Map<string, BotPlan>();
   private readonly usage = new Map<string, BotUsage>();
   private readonly busy = new Set<string>();
+  /** When each room's bot is next willing to move, so pauses read as thinking
+   *  rather than as lag. */
+  private readonly readyAt = new Map<string, number>();
+  private readonly random: () => number;
   private timer: NodeJS.Timeout | null = null;
   private readonly jev: JevClient | null;
 
   constructor(private readonly dependencies: BotDriverDependencies) {
     this.jev = dependencies.jev === undefined ? createJevClient() : dependencies.jev;
+    this.random = dependencies.random ?? Math.random;
   }
 
   /** Whether a decision service is configured. Without one the bots still play,
@@ -97,14 +133,22 @@ export class BotDriver {
 
   private async playRoom(roomId: string): Promise<void> {
     const { store } = this.dependencies;
-    for (let step = 0; step < MOVES_PER_TICK; step++) {
+    const now = this.dependencies.now?.() ?? Date.now();
+    // One move per visit, and only once this room's bot has "thought" long
+    // enough. Bursting several moves at once is what made them read as machines.
+    if ((this.readyAt.get(roomId) ?? 0) > now) return;
+    {
       const game = store.loadGame(roomId);
-      if (!game || game.phase === 'finished') return;
+      if (!game || game.phase === 'finished') {
+        this.readyAt.delete(roomId);
+        return;
+      }
       // A paused room has nobody watching; bots wait rather than play it out.
       if (store.snapshot(roomId).paused) return;
 
       const seat = this.owedBy(roomId, game);
       if (!seat) return;
+      const startedAt = this.dependencies.now?.() ?? Date.now();
 
       const revision = store.snapshot(roomId).revision;
       const view = gameView(game, seat.id);
@@ -139,6 +183,8 @@ export class BotDriver {
           'bot',
         );
       } catch (error) {
+        // Even a refused move costs a beat, so a loop cannot spin.
+        this.readyAt.set(roomId, (this.dependencies.now?.() ?? Date.now()) + 1000);
         this.dependencies.log?.('bot_move_rejected', {
           roomId,
           seat: seat.name,
@@ -156,8 +202,28 @@ export class BotDriver {
         plan: describe(decision.plan, game.board),
         ...(decision.degraded ? { degraded: true } : {}),
       });
+      this.readyAt.set(
+        roomId,
+        (this.dependencies.now?.() ?? Date.now()) +
+          this.thinkTime(game.phase, decision.action.kind, startedAt),
+      );
       this.dependencies.changed(roomId);
     }
+  }
+
+  /**
+   * The pause before a move reaches the table, measured from when this bot
+   * started deciding. Time already spent deciding counts towards it, so the
+   * model's own latency is absorbed rather than added.
+   */
+  private thinkTime(phase: string, kind: string, startedAt: number): number {
+    const pick = ([low, high]: [number, number]) => low + this.random() * (high - low);
+    const base =
+      phase === 'setupSettlement' || phase === 'setupRoad' ? OPENING_MS : (THINK_MS[kind] ?? THINK_DEFAULT);
+    let target = pick(base);
+    if (this.random() < DISTRACTED_CHANCE) target += pick(DISTRACTED_MS);
+    const spent = (this.dependencies.now?.() ?? Date.now()) - startedAt;
+    return Math.max(120, Math.round(target - spent));
   }
 
   /** The bot that owes a move: whoever must discard first, otherwise the active

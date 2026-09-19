@@ -147,8 +147,12 @@ test('only the host sees the control that seats a bot', () => {
   };
   const asHost = renderToStaticMarkup(createElement(Lobby, { ...props, me: 'host' }));
   const asGuest = renderToStaticMarkup(createElement(Lobby, { ...props, me: 'guest' }));
-  assert.ok(asHost.includes('Add bot player'), 'the host is offered a bot');
-  assert.ok(!asGuest.includes('Add bot player'), 'a guest is not');
+
+  // Both see one control for filling a seat, because that is one decision.
+  for (const html of [asHost, asGuest]) assert.ok(html.includes('aria-label="Fill this seat"'));
+  // Only the host is offered the choice; for anyone else it invites directly.
+  assert.ok(asHost.includes('aria-haspopup="menu"'), 'the host chooses friend or bot');
+  assert.ok(!asGuest.includes('aria-haspopup="menu"'), 'a guest just invites');
 });
 
 test('every move a bot makes is legal, through a whole offline game', async () => {
@@ -264,4 +268,53 @@ test('a request matches the TypeSafe wire shape and its answers are normalised',
   assert.ok(Math.abs((result.answers.pick as { confidence: number }).confidence - 0.6) < 1e-9);
   assert.equal((result.answers.sure as { probability: number }).probability, 0.9);
   assert.ok(Math.abs(result.costUsd - 0.042) < 1e-9, 'cost is computed from input tokens');
+});
+
+test('a bot pauses before each move, longer over the decisions that matter', async () => {
+  // Think time is what stops a bot reading as a machine, so it is asserted
+  // rather than left to feel. A fixed random makes the ranges deterministic.
+  const { BotDriver } = await import('../apps/server/src/bots.js');
+  const store = new Store(':memory:', { trackPresence: true });
+  try {
+    const host = store.enter('create', newSession('A').token, 'A');
+    store.lobby(host, 'bot', store.snapshot(host.room_id).revision, false, undefined, undefined, 'steady');
+    store.setConnected(host, true);
+    store.lobby(host, 'ready', store.snapshot(host.room_id).revision, true);
+    store.action(host, 'start', store.snapshot(host.room_id).revision, { kind: 'start' });
+
+    let clock = 0;
+    const driver = new BotDriver({
+      store,
+      changed: () => {},
+      jev: null,
+      now: () => clock,
+      random: () => 0.5,
+    });
+
+    // Midpoint of every range, with no time already spent deciding.
+    const think = (phase: string, kind: string) =>
+      (driver as unknown as { thinkTime(p: string, k: string, s: number): number }).thinkTime(phase, kind, 0);
+
+    assert.ok(think('actions', 'roll') >= 400, 'even a roll is not instant');
+    assert.ok(
+      think('actions', 'settlement') > think('actions', 'roll'),
+      'building is considered for longer than rolling',
+    );
+    assert.ok(
+      think('setupSettlement', 'settlement') > think('actions', 'settlement'),
+      'the opening is the longest decision in the game',
+    );
+
+    // Time already spent deciding counts towards the pause, so a slow model
+    // call is absorbed rather than added on top.
+    const spent2s = (driver as unknown as { thinkTime(p: string, k: string, s: number): number }).thinkTime(
+      'actions',
+      'settlement',
+      -2000,
+    );
+    assert.ok(spent2s < think('actions', 'settlement'), 'a slow decision shortens the remaining pause');
+    assert.ok(spent2s >= 120, 'but never to nothing');
+  } finally {
+    store.db.close();
+  }
 });

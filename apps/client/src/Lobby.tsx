@@ -189,6 +189,16 @@ export function Lobby({
   onKick?: (playerId: string) => Promise<void>;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [seatMenu, setSeatMenu] = useState(false);
+  const seatMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!seatMenu) return;
+    const away = (event: PointerEvent) => {
+      if (!seatMenuRef.current?.contains(event.target as Node)) setSeatMenu(false);
+    };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [seatMenu]);
   const [removing, setRemoving] = useState<string | null>(null);
   const [removalBusy, setRemovalBusy] = useState(false);
   const [removalError, setRemovalError] = useState('');
@@ -253,19 +263,7 @@ export function Lobby({
           </div>
         </div>
         <div className={`lobby-seats ${room.players.length === 4 ? 'lobby-full' : ''}`}>
-          {room.players.length < 3 ? (
-            <button
-              type="button"
-              className="lobby-invite-tile"
-              aria-label="Invite player"
-              title="Invite player"
-              onClick={onInvite}
-            >
-              <Plus size={32} />
-            </button>
-          ) : room.players.length < 4 ? (
-            <span className="lobby-invite-spacer" aria-hidden="true" />
-          ) : null}
+          {room.players.length < 4 && <span className="lobby-invite-spacer" aria-hidden="true" />}
           <div
             className="lobby-player-line"
             style={{ '--room-player-count': room.players.length } as CSSProperties}
@@ -296,6 +294,11 @@ export function Lobby({
                   )}
                 </div>
                 <strong title={p.name}>{p.name}</strong>
+                {p.bot && (
+                  <span className="player-bot-tag" title="Played by Catanova" aria-label="Bot player">
+                    BOT
+                  </span>
+                )}
                 <span className={`ready-status ${p.ready ? 'ready' : ''}`}>
                   {!p.connected ? (
                     'Disconnected'
@@ -328,28 +331,46 @@ export function Lobby({
             ))}
           </div>
           {room.players.length < 4 && (
-            <button
-              type="button"
-              className="lobby-invite-tile"
-              aria-label="Invite player"
-              title="Invite player"
-              onClick={onInvite}
-            >
-              <Plus size={32} />
-            </button>
-          )}
-          {host && onAddBot && room.players.length < 4 && (
-            <button
-              type="button"
-              className="lobby-invite-tile lobby-bot-tile"
-              aria-label="Add bot player"
-              title="Add a bot to this seat"
-              disabled={busy || !connected}
-              onClick={onAddBot}
-            >
-              <Bot size={30} />
-              <span className="lobby-bot-tile-label">Add bot</span>
-            </button>
+            <div className={`lobby-seat-add ${seatMenu ? 'open' : ''}`} ref={seatMenuRef}>
+              {seatMenu && (
+                <div className="lobby-seat-choices" role="menu" aria-label="Fill this seat">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setSeatMenu(false);
+                      onInvite();
+                    }}
+                  >
+                    <Plus size={18} />
+                    Invite a friend
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={busy || !connected}
+                    onClick={() => {
+                      setSeatMenu(false);
+                      onAddBot?.();
+                    }}
+                  >
+                    <Bot size={18} />
+                    Add a bot
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                className="lobby-invite-tile"
+                aria-label="Fill this seat"
+                title="Invite a friend or add a bot"
+                aria-haspopup={host && onAddBot ? 'menu' : undefined}
+                aria-expanded={host && onAddBot ? seatMenu : undefined}
+                onClick={() => (host && onAddBot ? setSeatMenu((was) => !was) : onInvite())}
+              >
+                <Plus size={32} />
+              </button>
+            </div>
           )}
         </div>
       </div>

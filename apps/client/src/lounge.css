@@ -934,3 +934,22 @@
   .spectator-banner { gap: 8px; padding: 8px; font-size: 13px; }
 }
 .spectator-dice { position: relative; flex: 0 0 68px; width: 68px; height: 32px; pointer-events: none; }
+
+/* A bot is labelled wherever its name appears, so nobody wonders why a seat
+   plays instantly or never chats. Small, quiet, and never mistaken for a rank. */
+.player-bot-tag {
+  align-self: center;
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.5;
+  opacity: 0.72;
+  text-transform: uppercase;
+}
+.lobby-seat .player-bot-tag {
+  margin-top: 2px;
+}

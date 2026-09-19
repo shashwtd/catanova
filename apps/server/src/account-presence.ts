@@ -19,12 +19,19 @@ export class AccountPresence {
   online(userId: string, now: number) {
     return (this.deadlines.get(userId) ?? 0) > now;
   }
-  friends(state: FriendsState, now: number): FriendPresenceState {
+  /** `watchable` is supplied by the caller, which owns the store; presence
+   *  itself deliberately keeps no room data. */
+  friends(
+    state: FriendsState,
+    now: number,
+    watchable?: (userId: string) => { roomId: string; roomCode?: string } | null,
+  ): FriendPresenceState {
     return {
-      friends: state.friends.map((friend) => ({
-        ...friend,
-        online: !friend.isGuest && this.online(friend.id, now),
-      })),
+      friends: state.friends.map((friend) => {
+        const online = !friend.isGuest && this.online(friend.id, now);
+        const room = online ? watchable?.(friend.id) : null;
+        return { ...friend, online, ...(room ? { watchable: room } : {}) };
+      }),
       incoming: state.incoming,
       outgoing: state.outgoing,
     };
