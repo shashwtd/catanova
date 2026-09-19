@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { EntryScreen } from './EntryScreen.js';
 import { BrandLogo } from './BrandLogo.js';
 import { ResourceIcon } from './Board.js';
@@ -6,7 +7,14 @@ import { GameIcon } from './GameIcons.js';
 import type { GameIconName } from './GameIcons.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
-import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
+import {
+  COSTS,
+  DEVELOPMENT_DECK,
+  RESOURCES,
+  RESOURCE_NAMES,
+  RULESET,
+  SUPPLY,
+} from '../../../packages/rules/src/index.js';
 import type { useAuth } from './auth.js';
 
 export const SITE_URL = 'https://catanova.io';
@@ -265,19 +273,28 @@ export function PublicLanding() {
   );
 }
 
+/**
+ * The guide is a reference article, not a sales page.
+ *
+ * It is laid out the way somebody reading about a game expects: a contents
+ * rail that stays put, an infobox of the numbers you came to look up, section
+ * headings that rule off the page, and tables wherever the answer is a value
+ * rather than a paragraph. Somebody arriving from a search for "catan city
+ * cost" should be able to stop reading after four seconds.
+ */
 const sections = [
-  ['start', 'Your first game', 'invite'],
-  ['resources', 'Resources & costs', 'settlement'],
-  ['turn', 'Taking a turn', 'dice'],
-  ['trading', 'Trading & ports', 'trade'],
-  ['development', 'Development cards', 'development'],
-  ['winning', 'Reaching ten', 'trophy'],
-  ['bots', 'Playing against bots', 'bot'],
-  ['setup', 'Setting up a room', 'configure'],
-  ['table', 'At the table', 'smile'],
-  ['accounts', 'Your profile & seat', 'profile'],
-  ['questions', 'Common questions', 'info'],
-  ['glossary', 'Words you will see', 'help'],
+  ['start', 'Your first game'],
+  ['resources', 'Resources and building costs'],
+  ['turn', 'Taking a turn'],
+  ['trading', 'Trading and ports'],
+  ['development', 'Development cards'],
+  ['winning', 'Reaching ten points'],
+  ['bots', 'Playing against bots'],
+  ['setup', 'Setting up a room'],
+  ['table', 'At the table'],
+  ['accounts', 'Your profile and seat'],
+  ['questions', 'Common questions'],
+  ['glossary', 'Glossary'],
 ] as const;
 
 const terrainNames: Record<Resource, string> = {
@@ -287,6 +304,42 @@ const terrainNames: Record<Resource, string> = {
   wheat: 'Fields',
   ore: 'Mountains',
 };
+
+/** Build names, costs and blurbs in one place: the costs table, the resource table and the glossary all read from it. */
+const BUILDS = [
+  {
+    kind: 'road',
+    name: 'Road',
+    plural: 'Roads',
+    icon: 'road' as GameIconName,
+    benefit:
+      'Extends your route by one edge. It must touch your own road or building, and it cannot pass through an opponent’s settlement or city.',
+  },
+  {
+    kind: 'settlement',
+    name: 'Settlement',
+    plural: 'Settlements',
+    icon: 'settlement' as GameIconName,
+    benefit:
+      'Worth one point. Collects one resource from each neighbouring tile that produces. After setup it must touch one of your roads.',
+  },
+  {
+    kind: 'city',
+    name: 'City upgrade',
+    plural: 'Cities',
+    icon: 'city' as GameIconName,
+    benefit:
+      'Worth two points in total, replacing the settlement’s point. Collects two resources instead of one. The settlement piece returns to your supply.',
+  },
+  {
+    kind: 'developmentCard',
+    name: 'Development card',
+    plural: 'Development cards',
+    icon: 'development' as GameIconName,
+    benefit:
+      'Draws a hidden card from the deck. You may buy more than one in a turn while you can pay and cards remain.',
+  },
+] as const satisfies readonly { kind: keyof typeof COSTS; [key: string]: unknown }[];
 
 function GuideResource({ resource, count }: { resource: Resource; count: number }) {
   return (
@@ -301,536 +354,610 @@ function GuideResource({ resource, count }: { resource: Resource; count: number 
   );
 }
 
-function GuideHeading({ number, icon, children }: { number: string; icon: GameIconName; children: string }) {
+function Cost({ kind }: { kind: keyof typeof COSTS }) {
   return (
-    <div className="guide-section-heading">
-      <span className="guide-section-number" aria-hidden="true">
-        {number}
-      </span>
-      <h2>{children}</h2>
-      <GameIcon name={icon} size={34} />
+    <span className="guide-cost-list">
+      {RESOURCES.filter((resource) => COSTS[kind][resource]).map((resource) => (
+        <GuideResource key={resource} resource={resource} count={COSTS[kind][resource]} />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * A section heading with its number and its own permanent link.
+ *
+ * The number is the same one the contents rail shows, so "§4" in one place and
+ * "4 Trading and ports" in the other are obviously the same section.
+ */
+function GuideHeading({ id, index, children }: { id: string; index: number; children: string }) {
+  return (
+    <div className="guide-heading">
+      <h2>
+        <span className="guide-heading-index" aria-hidden="true">
+          {index}
+        </span>
+        {children}
+      </h2>
+      <a className="guide-anchor" href={`#${id}`} aria-label={`Link to section ${index}, ${children}`}>
+        §
+      </a>
+    </div>
+  );
+}
+
+/**
+ * The contents, rendered twice.
+ *
+ * A wide window gets the rail beside the article; a phone gets the same list
+ * as a closed disclosure after the opening paragraph, which is where somebody
+ * scrolling a reference actually wants it. Only one is in the page at a time,
+ * so nothing is announced twice.
+ */
+function ContentsList() {
+  return (
+    <ol className="guide-nav-links">
+      {sections.map(([id, label], index) => (
+        <li key={id}>
+          <a href={`#${id}`}>
+            <span aria-hidden="true">{index + 1}</span>
+            {label}
+          </a>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="guide-info-row">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
     </div>
   );
 }
 
 /** An illustrated public reference, rendered as HTML with no client bundle or sign-in requirement. */
 export function PublicGuide() {
+  const deckTotal = Object.values(DEVELOPMENT_DECK).reduce((sum, count) => sum + count, 0);
   return (
     <>
       <a className="guide-skip" href="#guide-content">
         Skip to guide
       </a>
-      <header className="guide-header">
+      <header className="guide-bar">
         <a className="guide-brand" href="/" aria-label="Catanova home">
           <BrandLogo />
         </a>
+        <p className="guide-bar-title" aria-hidden="true">
+          Player guide
+        </p>
         <a className="guide-play" href="/">
-          Play with friends <GameIcon name="next" size={22} />
+          Play with friends <GameIcon name="next" size={20} />
         </a>
       </header>
-      <div className="guide-hero">
-        <div className="guide-hero-copy">
-          <p className="guide-eyebrow">The player guide</p>
-          <h1>
-            How to play
-            <br />
-            Catanova
-          </h1>
-          <p>Build roads, grow settlements into cities, and be first to ten points on your own turn.</p>
-          <div className="guide-hero-links">
-            <a className="guide-start-link" href="#start">
-              Start here <GameIcon name="next" size={20} />
-            </a>
-            <a href="#resources">Just need the costs?</a>
-          </div>
-        </div>
-        <div className="guide-hero-facts" aria-label="Game at a glance">
-          <span>
-            <GameIcon name="invite" size={23} />
-            2–4 friends
-          </span>
-          <span>
-            <GameIcon name="trophy" size={23} />
-            10 points to win
-          </span>
-          <span>
-            <GameIcon name="lock" size={23} />
-            Private rooms
-          </span>
-        </div>
-      </div>
       <div className="guide-layout">
-        <nav className="guide-nav" aria-label="On this page">
-          <strong>In this guide</strong>
-          <div className="guide-nav-links">
-            {sections.map(([id, label, icon]) => (
-              <a key={id} href={`#${id}`}>
-                <GameIcon name={icon} size={23} />
-                {label}
-              </a>
-            ))}
+        <nav className="guide-nav" aria-label="Contents">
+          <strong>Contents</strong>
+          <ContentsList />
+          <div className="guide-nav-aside">
+            <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>Full rulebook</a>
+            <a href={REPOSITORY_URL}>Source on GitHub</a>
           </div>
-          <a className="guide-full-rules" href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>
-            <GameIcon name="help" size={23} />
-            Full rulebook
-          </a>
         </nav>
         <main id="guide-content" className="guide-content">
+          <p className="guide-breadcrumb">
+            <a href="/">Catanova</a>
+            <span aria-hidden="true">›</span>
+            Player guide
+          </p>
+          <h1>How to play Catanova</h1>
+          <p className="guide-subtitle">
+            An island trading and building game for two to four players, in a browser
+          </p>
+          <aside className="guide-infobox" aria-label="Catanova at a glance">
+            <p className="guide-infobox-title">Catanova</p>
+            <figure className="guide-infobox-figure">
+              <img
+                src="/art/optimized/title-landscape.05db8101ac33.webp"
+                alt="A painted island coast of forests, fields and hills under a bright sky."
+                width="640"
+                height="360"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption>The island is drawn fresh for every room.</figcaption>
+            </figure>
+            <dl>
+              <InfoRow label="Players">2–4</InfoRow>
+              <InfoRow label="Playing time">30–60 minutes</InfoRow>
+              <InfoRow label="Goal">
+                10 victory points <span className="guide-info-note">(host may set 8–15)</span>
+              </InfoRow>
+              <InfoRow label="Dice">Two six-sided</InfoRow>
+              <InfoRow label="Resources">
+                {RESOURCES.length} kinds, {SUPPLY.resourcesPerType} cards each
+              </InfoRow>
+              <InfoRow label="Development deck">{deckTotal} cards</InfoRow>
+              <InfoRow label="Pieces per player">
+                {SUPPLY.roads} roads, {SUPPLY.settlements} settlements, {SUPPLY.cities} cities
+              </InfoRow>
+              <InfoRow label="Runs on">Any modern browser</InfoRow>
+              <InfoRow label="Price">Free, open source</InfoRow>
+              <InfoRow label="Ruleset">
+                <code>{RULESET}</code>
+              </InfoRow>
+            </dl>
+          </aside>
+          <p className="guide-lead">
+            <strong>Catanova</strong> is a free, browser-based island game for two to four friends. Each
+            player settles a shared island, collects the resources their settlements produce, trades for what
+            the dice did not give them, and builds towards ten victory points. A game takes about an hour.
+            This page covers the whole of it: the opening placements, what everything costs, how a turn runs,
+            and the handful of things this version does its own way.
+          </p>
+          <p className="guide-hatnote">
+            In a hurry? Jump to <a href="#resources">building costs</a>, the{' '}
+            <a href="#turn">order of a turn</a>, or the <a href="#glossary">glossary</a>.
+          </p>
+          <details className="guide-toc">
+            <summary>Contents</summary>
+            <ContentsList />
+          </details>
           <section id="start" className="guide-section">
-            <GuideHeading number="01" icon="invite">
+            <GuideHeading id="start" index={1}>
               Your first game
             </GuideHeading>
-            <p className="guide-section-intro">Create or join a room, then start together.</p>
-            <ol className="guide-start-steps">
+            <p>
+              A game happens in a private room. There is no lobby browser and no matchmaking: somebody
+              creates a room and passes the code or the link around.
+            </p>
+            <h3>Getting everyone in</h3>
+            <ol className="guide-steps">
               <li>
-                <span className="guide-step-index" aria-hidden="true">
-                  1
-                </span>
-                <h3>Find your room</h3>
-                <p>
-                  <strong>Create room</strong> opens your lobby. Choose <strong>Join room</strong> for a
-                  friend’s code, or open their invite link.
-                </p>
+                <strong>Find your room.</strong> <em>Create room</em> opens your lobby. Choose{' '}
+                <em>Join room</em> for a friend’s code, or open their invite link.
               </li>
               <li>
-                <span className="guide-step-index" aria-hidden="true">
-                  2
-                </span>
-                <h3>Choose your profile</h3>
-                <p>
-                  Continue with Google or as a guest. Pick a username and portrait, then share the room link
-                  with your friends.
-                </p>
+                <strong>Choose your profile.</strong> Continue with Google or as a guest, pick a username and
+                portrait, then share the room link.
               </li>
               <li>
-                <span className="guide-step-index" aria-hidden="true">
-                  3
-                </span>
-                <h3>Ready, then start</h3>
-                <p>
-                  The other players select <strong>Ready</strong>. The host selects <strong>Start</strong>{' '}
-                  once everyone is connected and ready.
-                </p>
+                <strong>Ready, then start.</strong> Everyone else selects <em>Ready</em>. The host selects{' '}
+                <em>Start</em> once the table is full and connected.
               </li>
             </ol>
-            <div className="guide-setup">
-              <div>
-                <h3>Your first two settlements</h3>
-                <p>
-                  Place a settlement and a road touching it. Everyone takes a first placement, then the order
-                  reverses for the second.
-                </p>
-                <p>
-                  Your <strong>second settlement</strong> gives you one resource from each neighboring
-                  productive tile. Setup pieces are free.
-                </p>
-              </div>
+            <h3>The opening placements</h3>
+            <p>
+              Before the first roll, each player places a settlement and a road touching it. Everyone takes a
+              first placement in seat order, then the order reverses for the second. Setup pieces are free.
+            </p>
+            <p>
+              Your <strong>second settlement</strong> pays immediately: you collect one resource from each
+              neighbouring tile that produces. Placing last in the first round means placing first in the
+              second, which is what keeps the opening fair.
+            </p>
+            <figure className="guide-figure guide-draft">
               <div
-                className="guide-draft"
                 aria-label="Four-player setup order: one, two, three, four, four, three, two, one"
+                className="guide-draft-seats"
               >
-                <span className="guide-small-label">Four-player setup</span>
-                <div aria-hidden="true">
-                  {[1, 2, 3, 4, 4, 3, 2, 1].map((seat, index) => (
-                    <span key={index} data-seat={seat}>
-                      {seat}
-                    </span>
-                  ))}
-                </div>
-                <small>Clockwise, then reverse.</small>
+                {[1, 2, 3, 4, 4, 3, 2, 1].map((seat, index) => (
+                  <span key={index} data-seat={seat} aria-hidden="true">
+                    {seat}
+                  </span>
+                ))}
               </div>
-            </div>
-            <details className="guide-note">
-              <summary>Balanced islands</summary>
+              <figcaption>Four-player placement order: clockwise, then back again.</figcaption>
+            </figure>
+            <aside className="guide-note">
+              <strong>Balanced islands</strong>
               <p>
-                The default balanced map uses Catanova’s custom fairness constraints to spread resources
-                across the island and avoid adjacent red-number tokens. Each new room gets a new island.
+                The default map uses Catanova’s own fairness constraints to spread the resources across the
+                island and keep red number tokens off adjacent tiles. Every new room gets a new island.
               </p>
-            </details>
+            </aside>
           </section>
           <section id="resources" className="guide-section">
-            <GuideHeading number="02" icon="settlement">
-              Resources & building costs
+            <GuideHeading id="resources" index={2}>
+              Resources and building costs
             </GuideHeading>
-            <p className="guide-section-intro">
-              Five resources pay for everything you build. Learn the pictures and you’ll know your hand at a
-              glance.
+            <p>
+              Five resources pay for everything. A tile produces when its number is rolled, for every player
+              with a settlement or city on one of its corners, whoever rolled it. The desert produces
+              nothing.
             </p>
-            <div className="guide-resources" aria-label="The five resources">
-              {RESOURCES.map((resource) => (
-                <div key={resource} data-resource={resource}>
-                  <span aria-hidden="true">
-                    <ResourceIcon resource={resource} />
-                  </span>
-                  <strong>{RESOURCE_NAMES[resource]}</strong>
-                  <small>{terrainNames[resource]}</small>
-                </div>
-              ))}
-            </div>
-            <p className="guide-caption">
-              A tile produces when its number is rolled. The desert produces nothing.
-            </p>
-            <div className="guide-builds" aria-label="Building costs">
-              {(
-                [
-                  [
-                    'road',
-                    'Road',
-                    'road',
-                    'Extend your route by one edge. Connect to your own road or building; you cannot build through an opponent’s building.',
-                  ],
-                  [
-                    'settlement',
-                    'Settlement',
-                    'settlement',
-                    'Worth 1 point. Collects 1 resource from each neighboring tile that produces. After setup, it must touch one of your roads.',
-                  ],
-                  [
-                    'city',
-                    'City upgrade',
-                    'city',
-                    'Worth 2 points total. Replace your own settlement and collect 2 resources instead of 1. The settlement piece returns to your supply.',
-                  ],
-                  [
-                    'developmentCard',
-                    'Development card',
-                    'development',
-                    'Draw a hidden card from the deck. You can buy more than one if you can pay and cards remain.',
-                  ],
-                ] as const
-              ).map(([kind, name, icon, benefit]) => (
-                <article className="guide-build" key={kind}>
-                  <div className="guide-build-heading">
-                    <GameIcon name={icon} size={42} />
-                    <h3>{name}</h3>
-                  </div>
-                  <span className="guide-small-label">Cost · pay the bank</span>
-                  <div className="guide-costs">
-                    {RESOURCES.filter((resource) => COSTS[kind][resource]).map((resource) => (
-                      <GuideResource key={resource} resource={resource} count={COSTS[kind][resource]} />
+            <figure className="guide-table-figure">
+              <figcaption>The five resources and where they come from</figcaption>
+              <div className="guide-table-scroll">
+                <table className="guide-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Resource</th>
+                      <th scope="col">Terrain</th>
+                      <th scope="col">Pays for</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {RESOURCES.map((resource) => (
+                      <tr key={resource}>
+                        <th scope="row">
+                          <span className="guide-row-icon" aria-hidden="true">
+                            <ResourceIcon resource={resource} />
+                          </span>
+                          {RESOURCE_NAMES[resource]}
+                        </th>
+                        <td>{terrainNames[resource]}</td>
+                        <td>
+                          {BUILDS.filter((build) => COSTS[build.kind][resource])
+                            .map((build) => build.plural.toLowerCase())
+                            .join(', ')}
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                  <p>{benefit}</p>
-                </article>
-              ))}
-            </div>
-            <aside className="guide-tip">
-              <GameIcon name="settlement" size={34} />
-              <div>
-                <strong>Leave room to grow.</strong>
-                <p>
-                  Keep at least one empty corner between any two settlements or cities, including your own.
-                  Preview a legal build site, then confirm the placement.
-                </p>
+                  </tbody>
+                </table>
               </div>
+            </figure>
+            <h3>What everything costs</h3>
+            <p>
+              Costs are paid to the bank. You can build in any order, as many times as you can afford, during
+              your own action phase.
+            </p>
+            <figure className="guide-table-figure">
+              <figcaption>Building costs</figcaption>
+              <div className="guide-table-scroll">
+                <table className="guide-table guide-table-costs">
+                  <thead>
+                    <tr>
+                      <th scope="col">Build</th>
+                      <th scope="col">Cost</th>
+                      <th scope="col">What it gives you</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {BUILDS.map((build) => (
+                      <tr key={build.kind}>
+                        <th scope="row">
+                          <span className="guide-row-icon" aria-hidden="true">
+                            <GameIcon name={build.icon} size={26} />
+                          </span>
+                          {build.name}
+                        </th>
+                        <td>
+                          <Cost kind={build.kind} />
+                        </td>
+                        <td>{build.benefit}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </figure>
+            <aside className="guide-note">
+              <strong>Leave room to grow</strong>
+              <p>
+                Every settlement and city needs at least one empty corner between it and the next one,
+                including your own. Preview a legal site before you confirm the placement.
+              </p>
             </aside>
           </section>
           <section id="turn" className="guide-section">
-            <GuideHeading number="03" icon="dice">
-              A turn, in three steps
+            <GuideHeading id="turn" index={3}>
+              Taking a turn
             </GuideHeading>
-            <ol className="guide-turn-steps">
+            <p>A turn is three steps, and only the middle one is open-ended.</p>
+            <ol className="guide-steps guide-steps-turn">
               <li>
-                <GameIcon name="dice" size={38} />
-                <h3>Roll & collect</h3>
-                <p>
-                  Matching tiles pay every neighboring player, whoever rolled. Settlements collect one; cities
-                  collect two.
-                </p>
+                <strong>Roll and collect.</strong> The matching tiles pay every player who touches them, not
+                only you. Settlements collect one card; cities collect two.
               </li>
               <li>
-                <GameIcon name="trade" size={38} />
-                <h3>Trade & build</h3>
-                <p>
-                  Make trades and purchases in any order. Keep going while you have legal moves and resources
-                  to spend.
-                </p>
+                <strong>Trade and build.</strong> Trade and buy in any order, for as long as you have legal
+                moves and the resources to make them.
               </li>
               <li>
-                <GameIcon name="next" size={38} />
-                <h3>End your turn</h3>
-                <p>
-                  Pass to the next player. Their portrait shows the next required action, such as rolling or
-                  moving the robber.
-                </p>
+                <strong>End your turn.</strong> Play passes on. The next player’s portrait shows what they
+                owe the table, such as a roll or a robber move.
               </li>
             </ol>
             <p>
-              A playable development card can be used before rolling, or during your action phase. Finish its
-              effect before taking another action.
+              A playable development card can be used before you roll or during your action phase, but only
+              one per turn. Finish its effect before doing anything else.
             </p>
-            <div className="guide-robber">
-              <GameIcon name="robber" size={54} />
-              <div>
-                <h3>Rolled a 7?</h3>
-                <p>
-                  No resources are produced. Everyone with <strong>more than seven resource cards</strong>{' '}
-                  discards half, rounded down. Development cards do not count.
-                </p>
-                <p>
-                  After all discards, move the robber to a different land tile and steal one random resource
-                  from one eligible neighboring opponent. That tile stops producing until the robber moves
-                  again.
-                </p>
-              </div>
-            </div>
-            <details className="guide-note">
+            <h3>Rolling a seven</h3>
+            <p>
+              No tile produces. Everyone holding <strong>more than seven resource cards</strong> discards
+              half, rounded down; development cards do not count towards the limit. Once the discards are in,
+              the roller moves the robber to a different land tile and steals one random card from one
+              eligible neighbouring opponent. That tile stops producing until the robber moves again.
+            </p>
+            <p className="guide-hatnote">
+              A Knight moves the robber the same way without anybody discarding. See{' '}
+              <a href="#development">§5, Development cards</a>.
+            </p>
+            <details className="guide-detail">
               <summary>What if the bank runs short?</summary>
               <p>
-                If several players need a resource and the bank cannot pay everyone, nobody receives that
-                resource from the roll. If only one player is entitled to it, they receive what remains, up to
-                their entitlement. Other resources still produce normally.
+                If several players are owed a resource the bank cannot cover, nobody receives that resource
+                from the roll. If only one player is entitled to it, they receive what remains, up to their
+                entitlement. The other resources still produce normally.
               </p>
             </details>
-            <details className="guide-note">
-              <summary>Optional turn timer</summary>
+            <details className="guide-detail">
+              <summary>The optional turn timer</summary>
               <p>
-                The host can leave it off or choose 40, 65, 90, 115 or 140 seconds before the game. Expiry
-                completes required actions using the server’s rule-valid defaults and ends the turn. It does
-                not buy pieces or accept trades for you. Setup placements are untimed; required discards have
-                their own countdowns.
+                The host can leave it off or choose 40, 65, 90, 115 or 140 seconds. When a turn expires the
+                server completes whatever the rules require, using valid defaults, and ends the turn. It does
+                not buy pieces or accept trades on your behalf. Setup placements are untimed, and a required
+                discard has its own countdown.
               </p>
             </details>
           </section>
           <section id="trading" className="guide-section">
-            <GuideHeading number="04" icon="trade">
-              Trading & ports
+            <GuideHeading id="trading" index={4}>
+              Trading and ports
             </GuideHeading>
-            <p className="guide-section-intro">Need one last resource? Ask a friend, or use the bank.</p>
-            <div className="guide-player-trade">
-              <GameIcon name="trade" size={42} />
-              <div>
-                <h3>Trade with a player</h3>
-                <p>
-                  On your turn, select <strong>Trade</strong>. Click the cards you give and the cards you
-                  want. Choose <strong>? Open to offers</strong> to let friends propose a return. Both sides
-                  must give something, and every trade includes the active player.
-                </p>
+            <p>
+              Short one card for a city? Ask the table first; the bank is always there but it is expensive.
+            </p>
+            <h3>Trading with a player</h3>
+            <p>
+              On your turn, select <strong>Trade</strong>, then the cards you are giving and the cards you
+              want. Choose <strong>Open to offers</strong> to let anyone propose a return instead. Both sides
+              must give something, and every trade includes the player whose turn it is.
+            </p>
+            <h3>Trading with the bank</h3>
+            <p>
+              A settlement or city on either corner a port touches unlocks that port for you. A road along
+              the coast does not. The picture on the port is what you <em>pay</em>; you can take any other
+              resource the bank still has.
+            </p>
+            <figure className="guide-table-figure">
+              <figcaption>Exchange rates</figcaption>
+              <div className="guide-table-scroll">
+                <table className="guide-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Where</th>
+                      <th scope="col">Rate</th>
+                      <th scope="col">Example</th>
+                      <th scope="col">Requirement</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">The bank</th>
+                      <td className="guide-ratio">4:1</td>
+                      <td>
+                        <span className="guide-trade-example">
+                          <GuideResource resource="brick" count={4} />
+                          <span className="guide-exchange" aria-label="for">
+                            <GameIcon name="next" size={16} />
+                          </span>
+                          <GuideResource resource="wheat" count={1} />
+                        </span>
+                      </td>
+                      <td>None. Always available on your turn.</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">General port</th>
+                      <td className="guide-ratio">3:1</td>
+                      <td>
+                        <span className="guide-trade-example">
+                          <GuideResource resource="sheep" count={3} />
+                          <span className="guide-exchange" aria-label="for">
+                            <GameIcon name="next" size={16} />
+                          </span>
+                          <GuideResource resource="ore" count={1} />
+                        </span>
+                      </td>
+                      <td>Build on the port. Any one resource, three of a kind.</td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Resource port</th>
+                      <td className="guide-ratio">2:1</td>
+                      <td>
+                        <span className="guide-trade-example">
+                          <GuideResource resource="wood" count={2} />
+                          <span className="guide-exchange" aria-label="for">
+                            <GameIcon name="next" size={16} />
+                          </span>
+                          <GuideResource resource="brick" count={1} />
+                        </span>
+                      </td>
+                      <td>Build on the port. Only the resource it names.</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <div className="guide-port-rates">
-              <article>
-                <GameIcon name="cards" size={35} />
-                <h3>The bank</h3>
-                <strong className="guide-ratio">
-                  4<span>:1</span>
-                </strong>
-                <p>Always available on your turn.</p>
-                <div className="guide-trade-example">
-                  <GuideResource resource="brick" count={4} />
-                  <span className="guide-exchange" role="img" aria-label="for">
-                    <GameIcon name="next" size={18} />
-                  </span>
-                  <GuideResource resource="wheat" count={1} />
-                </div>
-              </article>
-              <article>
-                <GameIcon name="boat" size={35} />
-                <h3>A general port</h3>
-                <strong className="guide-ratio">
-                  3<span>:1</span>
-                </strong>
-                <p>Three cards of any one resource.</p>
-                <div className="guide-trade-example">
-                  <GuideResource resource="sheep" count={3} />
-                  <span className="guide-exchange" role="img" aria-label="for">
-                    <GameIcon name="next" size={18} />
-                  </span>
-                  <GuideResource resource="ore" count={1} />
-                </div>
-              </article>
-              <article>
-                <GameIcon name="boat" size={35} />
-                <h3>A resource port</h3>
-                <strong className="guide-ratio">
-                  2<span>:1</span>
-                </strong>
-                <p>Two of the port’s named resource.</p>
-                <div className="guide-trade-example">
-                  <GuideResource resource="wood" count={2} />
-                  <span className="guide-exchange" role="img" aria-label="for">
-                    <GameIcon name="next" size={18} />
-                  </span>
-                  <GuideResource resource="brick" count={1} />
-                </div>
-                <small>Example: a Timber port</small>
-              </article>
-            </div>
-            <aside className="guide-tip">
-              <GameIcon name="boat" size={36} />
-              <div>
-                <strong>Follow the ship’s two bridges.</strong>
-                <p>
-                  A settlement or city at either connected coastal corner unlocks the port. A road alone does
-                  not. The port’s picture is what you <em>pay</em>; take any different resource available in
-                  the bank.
-                </p>
-              </div>
-            </aside>
+            </figure>
             <p className="guide-caption">
-              The question-mark ports are general 3:1 ports. There are four of these and one 2:1 port for each
-              resource.
+              The island carries four general ports, marked with a question mark, and one 2:1 port for each of
+              the five resources.
             </p>
           </section>
           <section id="development" className="guide-section">
-            <GuideHeading number="05" icon="development">
+            <GuideHeading id="development" index={5}>
               Development cards
             </GuideHeading>
-            <p className="guide-section-intro">
-              Select a held development card to read its effect, then play it. No dragging required.
+            <p>
+              Development cards are bought face down from a shuffled deck of {deckTotal}. Select one in your
+              hand to read what it does, then play it. Nothing needs dragging.
             </p>
-            <div className="guide-card-timing">
-              <GameIcon name="timer" size={29} />
+            <aside className="guide-note">
+              <strong>One action card per turn</strong>
               <p>
-                <strong>One action card per turn.</strong> Bought it this turn? Wait until your next. Hidden
-                Victory Point cards count immediately.
+                A card bought this turn waits until your next one. Hidden Victory Point cards are the
+                exception: they count the moment you buy them, and are never played as an action.
               </p>
-            </div>
-            <ul className="guide-development-cards">
-              {(
-                [
-                  [
-                    'knight',
-                    'Knight',
-                    'Move the robber and steal from an eligible neighbor. Nobody discards. Played Knights count toward Largest Army.',
-                  ],
-                  [
-                    'roadBuilding',
-                    'Road Building',
-                    'Place two legal roads without paying their resource costs, subject to your remaining pieces and available sites.',
-                  ],
-                  [
-                    'yearOfPlenty',
-                    'Year of Plenty',
-                    'Choose two available resource cards from the bank. They can be the same resource or two different ones.',
-                  ],
-                  [
-                    'monopoly',
-                    'Monopoly',
-                    'Choose one resource. Every opponent gives you all the cards they hold of that type.',
-                  ],
-                  [
-                    'victoryPoint',
-                    'Victory Point',
-                    'One hidden point, including on the turn you buy it. It counts toward your total; you do not need to play it as an action.',
-                  ],
-                ] as const
-              ).map(([kind, name, description]) => (
-                <li key={kind} data-card={kind}>
-                  <div className="guide-development-art">
-                    <DevelopmentArt kind={kind} />
-                  </div>
-                  <div>
-                    <h3>{name}</h3>
-                    <p>{description}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <details className="guide-note">
+            </aside>
+            <figure className="guide-table-figure">
+              <figcaption>The deck, card by card</figcaption>
+              <div className="guide-table-scroll">
+                <table className="guide-table guide-table-cards">
+                  <thead>
+                    <tr>
+                      <th scope="col">Card</th>
+                      <th scope="col">In deck</th>
+                      <th scope="col">Effect</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(
+                      [
+                        [
+                          'knight',
+                          'Knight',
+                          'Move the robber and steal from an eligible neighbour. Nobody discards. Played Knights count towards Largest Army.',
+                        ],
+                        [
+                          'roadBuilding',
+                          'Road Building',
+                          'Place two legal roads without paying for them, subject to your remaining pieces and the sites available.',
+                        ],
+                        [
+                          'yearOfPlenty',
+                          'Year of Plenty',
+                          'Take two resource cards from the bank. They can be the same resource or two different ones.',
+                        ],
+                        [
+                          'monopoly',
+                          'Monopoly',
+                          'Name one resource. Every opponent hands you every card they hold of that type.',
+                        ],
+                        [
+                          'victoryPoint',
+                          'Victory Point',
+                          'One hidden point, counted from the moment you buy it. It is never played as an action.',
+                        ],
+                      ] as const
+                    ).map(([kind, name, description]) => (
+                      <tr key={kind}>
+                        <th scope="row">
+                          <span className="guide-card-art" aria-hidden="true">
+                            <DevelopmentArt kind={kind} />
+                          </span>
+                          {name}
+                        </th>
+                        <td className="guide-numeric">{DEVELOPMENT_DECK[kind]}</td>
+                        <td>{description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </figure>
+            <details className="guide-detail">
               <summary>Rare card cases in this playtest</summary>
               <p>
-                Road Building requires a legal first road and uses a second whenever possible. Year of Plenty
-                takes one card if it is the only card left in the bank, and cannot be played into an empty
-                bank. These are provisional interpretations; the{' '}
+                Road Building requires a legal first road and uses a second whenever one is possible. Year of
+                Plenty takes a single card if that is all the bank has left, and cannot be played into an
+                empty bank. These are provisional readings; the{' '}
                 <a href={`${REPOSITORY_URL}/blob/main/docs/RULE_SOURCES.md`}>compatibility ledger</a> tracks
-                the remaining source questions.
+                the source questions still open.
               </p>
             </details>
           </section>
           <section id="winning" className="guide-section">
-            <GuideHeading number="06" icon="trophy">
-              How to win
+            <GuideHeading id="winning" index={6}>
+              Reaching ten points
             </GuideHeading>
-            <div className="guide-win-goal">
-              <span aria-hidden="true">10</span>
-              <div>
-                <h3>Win on your own turn.</h3>
-                <p>
-                  Reach ten points <strong>on your own turn</strong> to win immediately. If you reach ten on
-                  someone else’s turn, wait until your turn and still have enough then.
-                </p>
-              </div>
-              <GameIcon name="trophy" size={60} />
-            </div>
-            <div className="guide-scoring" aria-label="Victory point values">
-              {(
-                [
-                  ['settlement', 'Settlement', '1'],
-                  ['city', 'City', '2'],
-                  ['development', 'Hidden point card', '1'],
-                  ['road', 'Longest Road', '2'],
-                  ['shield', 'Largest Army', '2'],
-                ] as const
-              ).map(([icon, name, points]) => (
-                <div key={name}>
-                  <GameIcon name={icon} size={34} />
-                  <strong>{points}</strong>
-                  <span>{name}</span>
-                </div>
-              ))}
-            </div>
-            <p className="guide-caption">
-              A city is worth two points <em>total</em>, replacing the settlement’s point. Roads do not score
-              points by themselves.
-            </p>
-            <div className="guide-awards">
-              <article>
-                <GameIcon name="road" size={40} />
-                <div>
-                  <h3>Longest Road</h3>
-                  <p>
-                    The first continuous route of at least <strong>five roads</strong> earns it. Opponents’
-                    buildings can break a route; separate branches do not simply add together.
-                  </p>
-                </div>
-              </article>
-              <article>
-                <GameIcon name="shield" size={40} />
-                <div>
-                  <h3>Largest Army</h3>
-                  <p>
-                    The first player to play <strong>three Knights</strong> earns it. Knights still in your
-                    hand do not count.
-                  </p>
-                </div>
-              </article>
-            </div>
             <p>
-              Both awards appear on player profiles. To take one, exceed the holder’s qualifying total. Ties
-              normally leave an award where it is; the{' '}
+              Ten points wins, and you must reach them <strong>on your own turn</strong>. If a trade or an
+              award pushes you to ten while somebody else is playing, nothing happens until your turn comes
+              round and you still have them.
+            </p>
+            <figure className="guide-table-figure">
+              <figcaption>Where victory points come from</figcaption>
+              <div className="guide-table-scroll">
+                <table className="guide-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Source</th>
+                      <th scope="col">Points</th>
+                      <th scope="col">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(
+                      [
+                        ['settlement', 'Settlement', 1, 'Up to five of them, and the first two are free.'],
+                        [
+                          'city',
+                          'City',
+                          2,
+                          'Two points in total, not two on top of the settlement it replaces.',
+                        ],
+                        [
+                          'road',
+                          'Longest Road',
+                          2,
+                          'Five or more connected roads. Held by one player at a time.',
+                        ],
+                        ['shield', 'Largest Army', 2, 'Three or more Knights played. Held by one player.'],
+                        [
+                          'development',
+                          'Victory Point card',
+                          1,
+                          'Hidden from everyone else until the game ends.',
+                        ],
+                      ] as const
+                    ).map(([icon, name, points, note]) => (
+                      <tr key={name}>
+                        <th scope="row">
+                          <span className="guide-row-icon" aria-hidden="true">
+                            <GameIcon name={icon} size={26} />
+                          </span>
+                          {name}
+                        </th>
+                        <td className="guide-numeric guide-points">{points}</td>
+                        <td>{note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </figure>
+            <p className="guide-caption">Roads score nothing by themselves. Only the award pays.</p>
+            <h3>The two awards</h3>
+            <p>
+              <strong>Longest Road</strong> goes to the first continuous route of at least five roads.
+              Opponents’ buildings break a route, and two branches off the same trunk do not simply add
+              together. <strong>Largest Army</strong> goes to the first player to play three Knights; Knights
+              still in hand do not count.
+            </p>
+            <p>
+              Both sit on the player profiles all game. To take one, you have to beat the holder’s total
+              rather than match it, so a tie leaves an award where it is. The{' '}
               <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md#10-longest-road`}>full road rules</a>{' '}
-              cover ties after a route is broken.
+              cover what happens to a tie after a route is broken.
             </p>
           </section>
           <section id="bots" className="guide-section">
-            <GuideHeading number="07" icon="bot">
+            <GuideHeading id="bots" index={7}>
               Playing against bots
             </GuideHeading>
-            <p className="guide-section-intro">Short a player? The host can sit a bot in any open seat.</p>
-            <div className="guide-account-notes">
-              <article>
-                <GameIcon name="bot" size={30} />
-                <h3>You find out who turned up by playing them</h3>
-                <p>
-                  Three kinds of bot exist and the game never tells you which one took the seat. One plays a
-                  steady game. One pays attention to whoever is in front. One plans every move around winning,
-                  chases both awards, and is genuinely hard to beat. Which turns up is the room’s draw, not a
-                  setting.
-                </p>
-              </article>
-              <article>
-                <GameIcon name="timer" size={30} />
-                <h3>They think before they move</h3>
-                <p>
-                  A bot pauses before each move, longer over decisions that matter and longest over the
-                  opening placement, because answering the instant the rules allow is the one thing that reads
-                  as software rather than as an opponent.
-                </p>
-              </article>
-            </div>
-            <div className="guide-note-block">
-              <h3>They are not cheating</h3>
+            <p>
+              Short a player? The host can sit a bot in any open seat, and one will also cover a seat whose
+              player has dropped out of the game.
+            </p>
+            <h3>You find out who turned up by playing them</h3>
+            <p>
+              Three kinds of bot exist and the game never tells you which one took the seat. One plays a
+              steady game. One pays attention to whoever is in front. One plans every move around winning,
+              chases both awards, and is genuinely hard to beat. Which turns up is the room’s draw, not a
+              setting.
+            </p>
+            <h3>They think before they move</h3>
+            <p>
+              A bot pauses before each move, longer over the decisions that matter and longest over the
+              opening placement. Answering the instant the rules allow is the one thing that reads as
+              software rather than as an opponent.
+            </p>
+            <aside className="guide-note guide-note-wide">
+              <strong>They are not cheating</strong>
               <p>
                 A bot is handed exactly the view of the table your browser is handed: no opponent’s hand, no
                 looking through the development deck, no adjusted dice, and no shared plans between two bots
@@ -838,151 +965,150 @@ export function PublicGuide() {
                 everything it does goes through the same rules your moves do. A bot that beats you beat you
                 with what was in front of both of you.
               </p>
-            </div>
+            </aside>
           </section>
           <section id="setup" className="guide-section">
-            <GuideHeading number="08" icon="configure">
+            <GuideHeading id="setup" index={8}>
               Setting up a room
             </GuideHeading>
-            <p className="guide-section-intro">
-              Three settings belong to the table. The host sets them before the game starts; everyone else can
-              read them.
+            <p>
+              Three settings belong to the table rather than to a player. The host sets them before the game
+              starts; everyone else can read them.
             </p>
-            <ul className="guide-settings">
-              <li>
-                <GameIcon name="trophy" size={26} />
-                <div>
-                  <h3>Points to win</h3>
-                  <p>
-                    Ten by default, and anywhere from eight to fifteen. Eight is a short game; fifteen is a
-                    long evening.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <GameIcon name="timer" size={26} />
-                <div>
-                  <h3>Turn timer</h3>
-                  <p>
-                    Off by default. Switched on, a turn lasts 40, 65, 90, 115 or 140 seconds, and the game
-                    plays a sensible move for anyone who runs out.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <GameIcon name="dice" size={26} />
-                <div>
-                  <h3>Natural or balanced dice</h3>
-                  <p>
-                    Natural is two ordinary dice: every roll independent, seven the most common total.
-                    Balanced deals from a shuffled deck of all thirty-six combinations instead, so across a
-                    shuffle the totals land close to their true frequencies, and the same total twice in a row
-                    is made a little less likely. It does not change the odds of any single number, only how
-                    often a long streak of them happens.
-                  </p>
-                </div>
-              </li>
-            </ul>
-            <div className="guide-note-block">
-              <h3>Changing them later</h3>
+            <figure className="guide-table-figure">
+              <figcaption>Room settings</figcaption>
+              <div className="guide-table-scroll">
+                <table className="guide-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Setting</th>
+                      <th scope="col">Default</th>
+                      <th scope="col">What it changes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row">
+                        <span className="guide-row-icon" aria-hidden="true">
+                          <GameIcon name="trophy" size={24} />
+                        </span>
+                        Points to win
+                      </th>
+                      <td className="guide-numeric">10</td>
+                      <td>
+                        Anywhere from 8 to 15. Eight is a short game; fifteen is a long evening.
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">
+                        <span className="guide-row-icon" aria-hidden="true">
+                          <GameIcon name="timer" size={24} />
+                        </span>
+                        Turn timer
+                      </th>
+                      <td>Off</td>
+                      <td>
+                        Switched on, a turn lasts 40, 65, 90, 115 or 140 seconds, and the game plays a
+                        sensible move for anyone who runs out.
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">
+                        <span className="guide-row-icon" aria-hidden="true">
+                          <GameIcon name="dice" size={24} />
+                        </span>
+                        Natural or balanced dice
+                      </th>
+                      <td>Natural</td>
+                      <td>
+                        Natural is two ordinary dice: every roll independent, seven the most common total.
+                        Balanced deals from a shuffled deck of all thirty-six combinations, so across a
+                        shuffle the totals land close to their true frequencies and the same total twice
+                        running is a little less likely. It does not change the odds of any single number,
+                        only how often a long streak of them happens.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </figure>
+            <aside className="guide-note">
+              <strong>Changing them later</strong>
               <p>
                 Settings lock when the game starts, and changing one before that clears everyone’s Ready, so
-                nobody starts a game under rules they did not see. The room code and invite link sit in the
+                nobody begins a game under rules they did not see. The room code and invite link sit in the
                 lobby footer and stay the same all evening.
               </p>
-            </div>
+            </aside>
           </section>
           <section id="table" className="guide-section">
-            <GuideHeading number="09" icon="smile">
+            <GuideHeading id="table" index={9}>
               At the table
             </GuideHeading>
-            <p className="guide-section-intro">
-              Two small things that make a game feel like a table rather than a screen.
+            <p>Two small things that make a game feel like a table rather than a screen.</p>
+            <h3>Your colour is yours</h3>
+            <p>
+              Pick one of eight in the lobby, under your own card. Nobody can take a colour somebody else is
+              holding, and it is worth choosing deliberately: the pieces on the island carry no names, so
+              colour is the only thing that says a road is yours. Your portrait wears it all game, and the
+              cloth behind your name lightens when it is your turn.
             </p>
-            <div className="guide-account-notes">
-              <article>
-                <GameIcon name="edit" size={30} />
-                <h3>Your colour is yours</h3>
-                <p>
-                  Pick one of eight in the lobby, under your own card. Nobody can take a colour somebody else
-                  is holding, and it is worth choosing deliberately: the pieces on the island carry no names,
-                  so colour is the only thing that says a road is yours. Your portrait wears it all game, and
-                  the cloth behind your name lightens when it is your turn.
-                </p>
-              </article>
-              <article>
-                <GameIcon name="smile" size={30} />
-                <h3>Reactions</h3>
-                <p>
-                  Twelve faces, drawn for this game rather than borrowed from your phone’s emoji font, so
-                  everyone at the table sees the same expression. Tap one and it flies across the board with
-                  your name under it. A short burst is fine; after that the button rests for a moment, which
-                  is the difference between a table and a chat room.
-                </p>
-              </article>
-            </div>
+            <h3>Reactions</h3>
+            <p>
+              Twelve faces, drawn for this game rather than borrowed from your phone’s emoji font, so
+              everyone at the table sees the same expression. Tap one and it flies across the board with your
+              name under it. A short burst is fine; after that the button rests for a moment, which is the
+              difference between a table and a chat room.
+            </p>
           </section>
           <section id="accounts" className="guide-section">
-            <GuideHeading number="10" icon="profile">
-              Your profile & seat
+            <GuideHeading id="accounts" index={10}>
+              Your profile and seat
             </GuideHeading>
-            <div className="guide-account-notes">
-              <article>
-                <GameIcon name="profile" size={38} />
-                <h3>A profile that stays yours</h3>
-                <p>
-                  Google sign-in keeps your profile and enables friends. Guests expire after seven days of
-                  inactivity. Guests can link Google to keep their username. They cannot add friends while
-                  still guests.
-                </p>
-              </article>
-              <article>
-                <GameIcon name="connection" size={38} />
-                <h3>Connection dropped?</h3>
-                <p>
-                  Let the game reconnect, or return with the same account and invite before your reconnect
-                  countdown ends. The connection panel shows ping and sync status. Keep your guest session and
-                  browser storage while playing.
-                </p>
-              </article>
-            </div>
-            <details className="guide-note" open>
-              <summary>What an empty chair looks like</summary>
+            <h3>A profile that stays yours</h3>
+            <p>
+              Google sign-in keeps your profile and enables friends. Guest profiles expire after seven days
+              of inactivity, and a guest can link a Google account later to keep their username. They cannot
+              add friends while still guests.
+            </p>
+            <h3>If your connection drops</h3>
+            <p>
+              Let the game reconnect on its own, or come back with the same account and invite before your
+              countdown runs out. The connection panel shows ping and sync status. Keep your guest session
+              and browser storage while a game is running.
+            </p>
+            <aside className="guide-note guide-note-wide">
+              <strong>What an empty chair looks like</strong>
               <p>
                 A seat whose player has dropped shows <strong>Away</strong> and a countdown. After about half
-                a minute the card says <strong>Bot playing</strong> instead, and a machine mark appears beside
-                the name: that seat is being covered, not forfeited. Both marks clear the moment they
+                a minute the card says <strong>Bot playing</strong> instead, and a machine mark appears
+                beside the name: that seat is being covered, not forfeited. Both marks clear the moment they
                 reconnect.
               </p>
               <p>
-                Leaving on purpose is a different thing and says <strong>Resigned</strong>. If{' '}
-                <em>everyone</em> disconnects the game pauses rather than playing itself out.
+                Leaving on purpose is a different thing, and says <strong>Resigned</strong>. If{' '}
+                <em>everyone</em> disconnects, the game pauses rather than playing itself out.
               </p>
-            </details>
+            </aside>
           </section>
           <section id="questions" className="guide-section">
-            <GuideHeading number="11" icon="info">
+            <GuideHeading id="questions" index={11}>
               Common questions
             </GuideHeading>
-            {GUIDE_FAQ.map((entry) => (
-              <details className="guide-note" key={entry.question} open>
-                <summary>{entry.question}</summary>
-                <p>{entry.answer}</p>
-              </details>
-            ))}
-            <p className="guide-note-source">
-              Catanova is open source. The rules this page describes are the ones in{' '}
-              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>the rulebook</a>, and the code that
-              enforces them is <a href={REPOSITORY_URL}>on GitHub</a>.
-            </p>
+            <dl className="guide-faq">
+              {GUIDE_FAQ.map((entry) => (
+                <div key={entry.question}>
+                  <dt>{entry.question}</dt>
+                  <dd>{entry.answer}</dd>
+                </div>
+              ))}
+            </dl>
           </section>
           <section id="glossary" className="guide-section">
-            <GuideHeading number="12" icon="help">
-              Words you will see
+            <GuideHeading id="glossary" index={12}>
+              Glossary
             </GuideHeading>
-            <p className="guide-section-intro">
-              Everything this page and the game call things, in one place.
-            </p>
+            <p>Everything this page and the game call things, in one place.</p>
             <dl className="guide-glossary">
               {(
                 [
@@ -1047,29 +1173,50 @@ export function PublicGuide() {
               ))}
             </dl>
           </section>
-          <div className="guide-ready">
+          <section className="guide-section guide-seealso" aria-labelledby="see-also">
+            <h2 id="see-also">See also</h2>
+            <ul>
+              <li>
+                <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>The rulebook</a>, which carries every
+                rule as the code enforces it, including the edge cases this page leaves out.
+              </li>
+              <li>
+                <a href={`${REPOSITORY_URL}/blob/main/docs/RULE_SOURCES.md`}>The compatibility ledger</a>, for
+                the places Catanova had to choose a reading, and why.
+              </li>
+              <li>
+                <a href={`${REPOSITORY_URL}/blob/main/docs/PLAYTEST.md`}>Playtest limitations</a>, for what is
+                not finished yet.
+              </li>
+              <li>
+                <a href={REPOSITORY_URL}>The source on GitHub</a>: the server, the rules package and this
+                page.
+              </li>
+            </ul>
+          </section>
+          <aside className="guide-ready">
             <div>
-              <h2>Ready to play?</h2>
-              <p>Create a room or join a friend’s invitation.</p>
+              <strong>Ready to play?</strong>
+              <p>Create a room, or join a friend’s invitation.</p>
             </div>
             <a className="guide-play" href="/">
-              Play with friends <GameIcon name="next" size={22} />
+              Play with friends <GameIcon name="next" size={20} />
             </a>
-          </div>
+          </aside>
           <footer className="guide-footer">
-            <div>
-              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>Full rulebook</a>
-              <a href={`${REPOSITORY_URL}/blob/main/docs/PLAYTEST.md`}>Playtest limitations</a>
-              <a href={REPOSITORY_URL}>Open on GitHub</a>
-              <a className="guide-back-top" href="#guide-content">
-                Back to top <GameIcon name="next" size={18} />
-              </a>
-            </div>
             <p>
               Catanova is an independent, unofficial project, unaffiliated with CATAN’s owners. CATAN is a
-              trademark of its respective owners. This guide covers the current playtest; development is
+              trademark of its respective owners. This guide describes the current playtest; development is
               ongoing.
             </p>
+            <p>
+              The rules here are the ones in{' '}
+              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>the rulebook</a>, and the code that
+              enforces them is <a href={REPOSITORY_URL}>on GitHub</a>. Catanova is open source.
+            </p>
+            <a className="guide-back-top" href="#guide-content">
+              Back to top
+            </a>
           </footer>
         </main>
       </div>

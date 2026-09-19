@@ -6,6 +6,14 @@ import { tmpdir } from 'node:os';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
 import { GUIDE_FAQ, PUBLIC_PAGES, SOCIAL_CARD_ALT } from '../apps/client/src/PublicPages.js';
+import {
+  COSTS,
+  DEVELOPMENT_DECK,
+  RESOURCES,
+  RESOURCE_NAMES,
+  RULESET,
+  SUPPLY,
+} from '../packages/rules/src/index.js';
 
 test('the production entry is readable before JavaScript and only public pages enter discovery files', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'catanova-public-'));
@@ -69,6 +77,37 @@ test('the production entry is readable before JavaScript and only public pages e
   // A reference page is only useful if its own contents list works.
   const navigable = [...guide.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
   assert.ok(navigable.length >= 12, `only ${navigable.length} anchors`);
+  // The contents exist twice on purpose: a rail beside a wide window, and a
+  // disclosure after the opening on a phone. They must list the same sections,
+  // or one of the two is quietly out of date.
+  const contents = [...guide.matchAll(/<ol class="guide-nav-links">([\s\S]*?)<\/ol>/g)].map((list) =>
+    [...list[1]!.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!),
+  );
+  assert.equal(contents.length, 2, 'expected the rail and the phone disclosure');
+  assert.deepEqual(contents[0], contents[1]);
+  assert.ok(contents[0]!.length >= 12);
+  // Numbers a reader came here to look up are generated from the rules rather
+  // than typed out, so the page cannot quietly disagree with the game. If a
+  // cost or the deck changes, this page changes with it.
+  for (const [kind, name] of [
+    ['road', 'Road'],
+    ['settlement', 'Settlement'],
+    ['city', 'City upgrade'],
+    ['developmentCard', 'Development card'],
+  ] as const) {
+    assert.ok(guide.includes(`>${name}</th>`) || guide.includes(`${name}</th>`), name);
+    for (const resource of RESOURCES) {
+      const amount = COSTS[kind][resource];
+      if (amount) assert.ok(guide.includes(`${amount} ${RESOURCE_NAMES[resource]}`), `${name} ${resource}`);
+    }
+  }
+  const deck = Object.values(DEVELOPMENT_DECK).reduce((sum, count) => sum + count, 0);
+  assert.ok(guide.includes(`shuffled deck of ${deck}`), 'the deck size is stated');
+  assert.ok(
+    guide.includes(`${SUPPLY.roads} roads, ${SUPPLY.settlements} settlements, ${SUPPLY.cities} cities`),
+    'the infobox lists the real piece counts',
+  );
+  assert.ok(guide.includes(RULESET), 'the infobox names the ruleset the server runs');
   assert.ok(guide.includes('id="questions"') && guide.includes('Can phones and computers play together?'));
   assert.ok(guide.includes('not an official CATAN game'));
   assert.ok(guide.includes('There is no public matchmaking'));
