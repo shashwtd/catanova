@@ -4,7 +4,6 @@ import { useGameInteractionGuards } from './useGameInteractionGuards.js';
 import { BoardGesture, constrainCamera, fitBoard, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
 import { MATERIAL_GUTTER, MATERIAL_QUADRANTS, WORLD } from './scene.js';
-import { StringLights } from './StringLights.js';
 
 export function BoardViewport({
   seed,
@@ -273,7 +272,6 @@ export function BoardViewport({
       >
         {children}
       </div>
-      <StringLights />
     </div>
   );
 }

@@ -1,6 +1,12 @@
 /**
  * A string of small lanterns along the very top of the table.
  *
+ * NOT CURRENTLY HUNG. `BoardViewport` does not render it, so the board ships
+ * without it; the warm pool and falloff in `table-light.css` stay, because
+ * those are what make the wood read as a lit surface rather than a texture.
+ * Putting it back is one line in `BoardViewport`, and the tests below keep it
+ * from rotting in the meantime.
+ *
  * It exists to give the warm pool below it a source: the wood was evenly lit
  * everywhere, which is the one thing a real table never is. So it stays out of
  * the way — a shallow ripple in the top few pixels, well above the island —

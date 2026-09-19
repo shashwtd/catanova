@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
-import { CORD_HEIGHT, cordY } from '../apps/client/src/StringLights.js';
+import { CORD_HEIGHT, StringLights, cordY } from '../apps/client/src/StringLights.js';
 import {
   BoardGesture,
   constrainCamera,
@@ -225,22 +225,41 @@ test('new-match curtain has two opposing cloud shapes and a bounded reduced-moti
   assert.match(loading, /Game art loaded/);
 });
 
-test('the table is lit from somewhere, and none of the lighting can be clicked', () => {
+test('the table is lit, the board is not, and none of the lighting can be clicked', () => {
   const html = renderToStaticMarkup(
     createElement(BoardViewport, { seed: 7, children: createElement('div', null, 'island') }),
   );
+  const css = readFileSync('apps/client/src/table-light.css', 'utf8');
+  // The lighting is scenery: it must never take a click meant for a corner.
+  for (const selector of ['.table-light', '.table-vignette']) {
+    assert.ok(html.includes(selector.slice(1)), selector);
+    const block = css.slice(css.indexOf(`${selector} {`));
+    const body = block.slice(0, block.indexOf('}'));
+    assert.ok(body.includes('pointer-events: none'), selector);
+    // Fixed to the window like the wood itself: anything drawn to the
+    // viewport's own edges outlines a rectangle that is not really there.
+    assert.match(body, /position: fixed/);
+  }
+  // The string of lights is kept but not hung, so the board ships without it.
+  assert.ok(!html.includes('string-lights'), 'no string is hung above the board');
+});
+
+test('the string of lights still hangs together, for whenever it goes back up', () => {
+  const html = renderToStaticMarkup(createElement(StringLights, null));
   assert.equal((html.match(/class="string-lantern"/g) ?? []).length, 11);
   // Every lantern sits on the cord rather than near it: one function places
-  // both, so a change to the wave can never leave one hanging in mid air.
+  // both, so a change to the ripple can never leave one hanging in mid air.
   for (const style of html.matchAll(/left:([\d.]+)%;top:([\d.]+)px/g))
     assert.ok(
       Math.abs(Number(style[2]) - cordY(Number(style[1]) / 100)) < 0.01,
       `a lantern at ${style[1]}% hangs off the wire`,
     );
-  // And the cord waves rather than sagging once, staying near the top.
+  // A ripple, not a swag: it has to stay out of the way of the board, which is
+  // the thing anybody is actually looking at.
   const cord = html.match(/ d="M0 ([\d.]+)([^"]*)"/)![0];
   const heights = [...cord.matchAll(/[ML]\d+ ([\d.]+)/g)].map((m) => Number(m[1]));
   assert.ok(Math.max(...heights) <= CORD_HEIGHT, 'the cord stays inside its own box');
+  assert.ok(CORD_HEIGHT <= 24, `the cord box is ${CORD_HEIGHT}px tall`);
   let turns = 0;
   for (let i = 1; i < heights.length - 1; i++)
     if (
@@ -249,28 +268,11 @@ test('the table is lit from somewhere, and none of the lighting can be clicked',
     )
       turns++;
   assert.ok(turns >= 4, `the cord only changes direction ${turns} times`);
-  assert.ok(CORD_HEIGHT <= 24, `the cord box is ${CORD_HEIGHT}px tall`);
 
-  // The lighting is scenery: it must never take a click meant for a corner.
   const css = readFileSync('apps/client/src/table-light.css', 'utf8');
-  for (const selector of ['.table-light', '.table-vignette', '.string-lights']) {
-    assert.ok(html.includes(selector.slice(1)), selector);
-    const block = css.slice(css.indexOf(`${selector} {`));
-    assert.ok(block.slice(0, block.indexOf('}')).includes('pointer-events: none'), selector);
-  }
-  // Fixed to the window like the wood itself: anything drawn to the viewport's
-  // own edges outlines a rectangle that is not really there.
-  for (const selector of ['.table-light', '.table-vignette']) {
-    const block = css.slice(css.indexOf(`${selector} {`));
-    assert.match(block.slice(0, block.indexOf('}')), /position: fixed/);
-  }
-  // It is a ripple, not a swag: the whole string stays out of the way of the
-  // board, which is the thing anybody is actually looking at.
   const lights = css.slice(css.indexOf('.string-lights {'));
-  const height = Number(lights.slice(0, lights.indexOf('}')).match(/height: (\d+)px/)![1]);
-  assert.ok(height <= 56, `the string occupies ${height}px`);
-  // A phone gives the space back to the board.
-  const phone = css.slice(css.indexOf('@media (max-width: 700px)'));
-  assert.match(phone.slice(0, phone.indexOf('}\n}')), /\.string-lights \{\s*display: none/);
+  const body = lights.slice(0, lights.indexOf('}'));
+  assert.ok(body.includes('pointer-events: none'));
+  assert.ok(Number(body.match(/height: (\d+)px/)![1]) <= 56, 'the string stays a small thing');
   assert.match(css, /prefers-reduced-motion[\s\S]*animation: none/);
 });
