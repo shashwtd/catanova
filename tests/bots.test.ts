@@ -318,3 +318,62 @@ test('a bot pauses before each move, longer over the decisions that matter', asy
     store.db.close();
   }
 });
+
+test('the driver holds its first move, cancels stale plans and commits one action per think period', async () => {
+  const { BotDriver } = await import('../apps/server/src/bots.js');
+  const store = new Store(':memory:', { trackPresence: true });
+  try {
+    const host = store.enter('create', newSession('A').token, 'A');
+    store.lobby(host, 'bot', store.snapshot(host.room_id).revision, false, undefined, undefined, 'steady');
+    store.setConnected(host, true);
+    store.action(host, 'start', store.snapshot(host.room_id).revision, { kind: 'start' });
+    // Advance any human opening moves until a bot must place its first house.
+    for (let i = 0; i < 2; i++) {
+      const g = store.loadGame(host.room_id)!;
+      if (g.players[g.active]!.id !== host.id) break;
+      store.action(
+        host,
+        `human-${i}`,
+        store.snapshot(host.room_id).revision,
+        g.phase === 'setupSettlement'
+          ? { kind: 'settlement', vertex: gameView(g, host.id).legal.settlements[0]! }
+          : { kind: 'road', edge: gameView(g, host.id).legal.roads[0]! },
+      );
+    }
+    let clock = 0,
+      broadcasts = 0;
+    const driver = new BotDriver({
+      store,
+      changed: () => {
+        broadcasts++;
+      },
+      jev: null,
+      now: () => clock,
+      random: () => 0.5,
+    });
+    const revision = () => store.snapshot(host.room_id).revision;
+    const initial = revision();
+    await driver.tick();
+    assert.equal(revision(), initial, 'the first move must not commit instantly');
+    clock = 2700;
+    await driver.tick();
+    assert.equal(revision(), initial);
+    // The only human disconnecting invalidates the queued move.
+    store.setConnected(host, false);
+    clock = 6000;
+    await driver.tick();
+    assert.equal(broadcasts, 0);
+    store.setConnected(host, true);
+    const resumed = revision();
+    await driver.tick();
+    assert.equal(revision(), resumed, 'resuming schedules a fresh decision');
+    clock += 2750;
+    await driver.tick();
+    assert.equal(revision(), resumed + 1);
+    assert.equal(broadcasts, 1);
+    await driver.tick();
+    assert.equal(revision(), resumed + 1, 'the next action also waits');
+  } finally {
+    store.db.close();
+  }
+});

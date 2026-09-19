@@ -283,3 +283,19 @@ test('presence entries are bounded and never outlive a verified identity deadlin
   presence.touch('expired', now, now - 1);
   assert.equal(presence.online('expired', now), false);
 });
+
+test('only online accepted friends expose watch links to unfinished matches', async (t) => {
+  const f = await fixture(t);
+  const roomId = await f.room(['Builder', 'Trader']);
+  const list = async () => await (await f.request('/api/friends', 'Captain')).json();
+  assert.equal((await list()).friends[0].watchable, undefined, 'offline rooms remain private');
+  await f.request('/api/account/presence', 'Builder', 'POST');
+  await f.request('/api/account/presence', 'Trader', 'POST');
+  const friends = await list();
+  assert.deepEqual(friends.friends[0].watchable, { roomId, roomCode: f.server.store.roomCode(roomId) });
+  assert.equal(friends.incoming[0].watchable, undefined, 'pending requests cannot reveal rooms');
+  const game = f.server.store.loadGame(roomId)!;
+  game.phase = 'finished';
+  f.server.store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(game), roomId);
+  assert.equal((await list()).friends[0].watchable, undefined, 'finished games are not offered');
+});

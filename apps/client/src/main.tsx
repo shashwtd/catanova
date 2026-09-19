@@ -938,11 +938,10 @@ function App() {
           reactions={
             !room?.spectating && (
               <ReactionButton
-                disabled={g.phase === 'finished'}
+                disabled={!connected || !!player?.resigned || g.phase === 'finished'}
                 onReact={(reaction) => {
                   connection.current?.react(reaction);
-                  // Show your own immediately rather than waiting for the echo.
-                  reactions.add(reaction, player?.name ?? 'You');
+                  // The server echoes accepted reactions to every player, including us.
                   feedback.sound.play('hover');
                 }}
               />

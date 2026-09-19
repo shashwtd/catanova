@@ -83,9 +83,17 @@ export class BotDriver {
   private readonly plans = new Map<string, BotPlan>();
   private readonly usage = new Map<string, BotUsage>();
   private readonly busy = new Set<string>();
-  /** When each room's bot is next willing to move, so pauses read as thinking
-   *  rather than as lag. */
   private readonly readyAt = new Map<string, number>();
+  private readonly pending = new Map<
+    string,
+    {
+      revision: number;
+      readyAt: number;
+      game: Game;
+      seat: BotSeat;
+      decision: Awaited<ReturnType<typeof decide>>;
+    }
+  >();
   private readonly random: () => number;
   private timer: NodeJS.Timeout | null = null;
   private readonly jev: JevClient | null;
@@ -110,6 +118,7 @@ export class BotDriver {
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.pending.clear();
   }
 
   usageFor(roomId: string): BotUsage {
@@ -118,7 +127,10 @@ export class BotDriver {
 
   /** One pass over every room that currently owes a bot move. */
   async tick(): Promise<void> {
-    for (const roomId of this.dependencies.store.botRooms()) {
+    const rooms = this.dependencies.store.botRooms();
+    for (const roomId of this.pending.keys()) if (!rooms.includes(roomId)) this.pending.delete(roomId);
+    for (const roomId of this.readyAt.keys()) if (!rooms.includes(roomId)) this.readyAt.delete(roomId);
+    for (const roomId of rooms) {
       if (this.busy.has(roomId)) continue;
       this.busy.add(roomId);
       try {
@@ -134,81 +146,92 @@ export class BotDriver {
   private async playRoom(roomId: string): Promise<void> {
     const { store } = this.dependencies;
     const now = this.dependencies.now?.() ?? Date.now();
-    // One move per visit, and only once this room's bot has "thought" long
-    // enough. Bursting several moves at once is what made them read as machines.
+    const game = store.loadGame(roomId);
+    const state = store.snapshot(roomId);
+    const seat = game && this.owedBy(roomId, game);
+    if (!game || game.phase === 'finished' || state.paused || !seat) {
+      this.pending.delete(roomId);
+      this.readyAt.delete(roomId);
+      return;
+    }
+    const waiting = this.pending.get(roomId);
+    if (waiting && waiting.revision === state.revision && waiting.seat.id === seat.id) {
+      if (waiting.readyAt > now) return;
+      this.pending.delete(roomId);
+      this.commit(roomId, waiting);
+      return;
+    }
+    // A player action, disconnect or timeout invalidates any queued decision.
+    this.pending.delete(roomId);
     if ((this.readyAt.get(roomId) ?? 0) > now) return;
-    {
-      const game = store.loadGame(roomId);
-      if (!game || game.phase === 'finished') {
-        this.readyAt.delete(roomId);
-        return;
-      }
-      // A paused room has nobody watching; bots wait rather than play it out.
-      if (store.snapshot(roomId).paused) return;
+    const startedAt = now;
+    const decision = await decide({
+      view: gameView(game, seat.id),
+      board: game.board,
+      meId: seat.id,
+      plan: this.plans.get(seat.id) ?? initialPlan(game.turn),
+      jev: this.jev,
+      level: seat.level,
+    });
+    this.plans.set(seat.id, decision.plan);
+    addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, decision);
+    // Wait before committing, including the very first bot move. Keep the
+    // decision so scheduler ticks during the pause never spend more API tokens.
+    this.pending.set(roomId, {
+      revision: state.revision,
+      game,
+      seat,
+      decision,
+      readyAt:
+        (this.dependencies.now?.() ?? Date.now()) +
+        this.thinkTime(game.phase, decision.action.kind, startedAt),
+    });
+  }
 
-      const seat = this.owedBy(roomId, game);
-      if (!seat) return;
-      const startedAt = this.dependencies.now?.() ?? Date.now();
-
-      const revision = store.snapshot(roomId).revision;
-      const view = gameView(game, seat.id);
-      const plan = this.plans.get(seat.id) ?? initialPlan(game.turn);
-
-      const decision = await decide({
-        view,
-        board: game.board,
-        meId: seat.id,
-        plan,
-        jev: this.jev,
-        level: seat.level,
-      });
-      this.plans.set(seat.id, decision.plan);
-      addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, decision);
-
-      // Derived from the position, so a replay after a crash is a duplicate
-      // rather than a second move.
-      const commandId =
-        'bot-' +
-        createHash('sha256')
-          .update(JSON.stringify({ roomId, seat: seat.id, revision, turn: game.turn, phase: game.phase }))
-          .digest('hex')
-          .slice(0, 48);
-
-      try {
-        store.action(
-          { id: seat.id, room_id: roomId, name: seat.name },
-          commandId,
-          revision,
-          decision.action,
-          'bot',
-        );
-      } catch (error) {
-        // Even a refused move costs a beat, so a loop cannot spin.
-        this.readyAt.set(roomId, (this.dependencies.now?.() ?? Date.now()) + 1000);
-        this.dependencies.log?.('bot_move_rejected', {
-          roomId,
-          seat: seat.name,
-          action: decision.action.kind,
-          error: (error as Error).message,
-        });
-        return;
-      }
-      this.dependencies.log?.('bot_move', {
+  private commit(
+    roomId: string,
+    move: {
+      revision: number;
+      game: Game;
+      seat: BotSeat;
+      decision: Awaited<ReturnType<typeof decide>>;
+    },
+  ) {
+    const { revision, game, seat, decision } = move;
+    const commandId =
+      'bot-' +
+      createHash('sha256')
+        .update(JSON.stringify({ roomId, seat: seat.id, revision, turn: game.turn, phase: game.phase }))
+        .digest('hex')
+        .slice(0, 48);
+    try {
+      this.dependencies.store.action(
+        { id: seat.id, room_id: roomId, name: seat.name },
+        commandId,
+        revision,
+        decision.action,
+        'bot',
+      );
+    } catch (error) {
+      this.readyAt.set(roomId, (this.dependencies.now?.() ?? Date.now()) + 1000);
+      this.dependencies.log?.('bot_move_rejected', {
         roomId,
         seat: seat.name,
         action: decision.action.kind,
-        calls: decision.calls,
-        tokens: decision.tokens,
-        plan: describe(decision.plan, game.board),
-        ...(decision.degraded ? { degraded: true } : {}),
+        error: (error as Error).message,
       });
-      this.readyAt.set(
-        roomId,
-        (this.dependencies.now?.() ?? Date.now()) +
-          this.thinkTime(game.phase, decision.action.kind, startedAt),
-      );
-      this.dependencies.changed(roomId);
+      return;
     }
+    this.dependencies.log?.('bot_move', {
+      roomId,
+      seat: seat.name,
+      action: decision.action.kind,
+      calls: decision.calls,
+      tokens: decision.tokens,
+      plan: describe(decision.plan, game.board),
+      ...(decision.degraded ? { degraded: true } : {}),
+    });
+    this.dependencies.changed(roomId);
   }
 
   /**

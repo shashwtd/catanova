@@ -87,13 +87,14 @@ export function ReactionButton({
 
   return (
     <div className={`reaction-control ${open ? 'open' : ''}`} ref={root}>
-      {open && (
+      {open && !disabled && (
         <div className="reaction-tray" role="menu" aria-label="Send a reaction">
           {REACTION_LIST.map((name, index) => (
             <button
               key={name}
               type="button"
               role="menuitem"
+              disabled={disabled}
               className="reaction-choice"
               // Staggered so the tray unfurls rather than appearing at once.
               style={{ animationDelay: `${Math.min(index, 8) * 18}ms` }}

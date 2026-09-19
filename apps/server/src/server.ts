@@ -348,8 +348,14 @@ export async function startServer(
   /** Reactions are chat, not moves, so they are rate limited here rather than
    *  receipted in the store. A burst is fine; a stream is not. */
   const reactionRate = new Map<string, number[]>();
+  let nextReactionSweep = 0;
   function reactionAllowed(seatId: string) {
     const at = now();
+    if (at >= nextReactionSweep) {
+      for (const [id, times] of reactionRate)
+        if ((times.at(-1) ?? 0) <= at - REACTION_WINDOW_MS) reactionRate.delete(id);
+      nextReactionSweep = at + REACTION_WINDOW_MS;
+    }
     const recent = (reactionRate.get(seatId) ?? []).filter((t) => at - t < REACTION_WINDOW_MS);
     const last = recent[recent.length - 1];
     if (last !== undefined && at - last < REACTION_MIN_GAP_MS) return false;
