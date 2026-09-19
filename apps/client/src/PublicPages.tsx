@@ -272,8 +272,12 @@ const sections = [
   ['trading', 'Trading & ports', 'trade'],
   ['development', 'Development cards', 'development'],
   ['winning', 'Reaching ten', 'trophy'],
+  ['bots', 'Playing against bots', 'bot'],
+  ['setup', 'Setting up a room', 'configure'],
+  ['table', 'At the table', 'smile'],
   ['accounts', 'Your profile & seat', 'profile'],
-  ['questions', 'Before you play', 'help'],
+  ['questions', 'Common questions', 'info'],
+  ['glossary', 'Words you will see', 'help'],
 ] as const;
 
 const terrainNames: Record<Resource, string> = {
@@ -799,8 +803,127 @@ export function PublicGuide() {
               cover ties after a route is broken.
             </p>
           </section>
+          <section id="bots" className="guide-section">
+            <GuideHeading number="07" icon="bot">
+              Playing against bots
+            </GuideHeading>
+            <p className="guide-section-intro">Short a player? The host can sit a bot in any open seat.</p>
+            <div className="guide-account-notes">
+              <article>
+                <GameIcon name="bot" size={30} />
+                <h3>You find out who turned up by playing them</h3>
+                <p>
+                  Three kinds of bot exist and the game never tells you which one took the seat. One plays a
+                  steady game. One pays attention to whoever is in front. One plans every move around winning,
+                  chases both awards, and is genuinely hard to beat. Which turns up is the room’s draw, not a
+                  setting.
+                </p>
+              </article>
+              <article>
+                <GameIcon name="timer" size={30} />
+                <h3>They think before they move</h3>
+                <p>
+                  A bot pauses before each move, longer over decisions that matter and longest over the
+                  opening placement, because answering the instant the rules allow is the one thing that reads
+                  as software rather than as an opponent.
+                </p>
+              </article>
+            </div>
+            <div className="guide-note-block">
+              <h3>They are not cheating</h3>
+              <p>
+                A bot is handed exactly the view of the table your browser is handed: no opponent’s hand, no
+                looking through the development deck, no adjusted dice, and no shared plans between two bots
+                at the same table. Everything a bot knows is on the board or on the player cards, and
+                everything it does goes through the same rules your moves do. A bot that beats you beat you
+                with what was in front of both of you.
+              </p>
+            </div>
+          </section>
+          <section id="setup" className="guide-section">
+            <GuideHeading number="08" icon="configure">
+              Setting up a room
+            </GuideHeading>
+            <p className="guide-section-intro">
+              Three settings belong to the table. The host sets them before the game starts; everyone else can
+              read them.
+            </p>
+            <ul className="guide-settings">
+              <li>
+                <GameIcon name="trophy" size={26} />
+                <div>
+                  <h3>Points to win</h3>
+                  <p>
+                    Ten by default, and anywhere from eight to fifteen. Eight is a short game; fifteen is a
+                    long evening.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <GameIcon name="timer" size={26} />
+                <div>
+                  <h3>Turn timer</h3>
+                  <p>
+                    Off by default. Switched on, a turn lasts 40, 65, 90, 115 or 140 seconds, and the game
+                    plays a sensible move for anyone who runs out.
+                  </p>
+                </div>
+              </li>
+              <li>
+                <GameIcon name="dice" size={26} />
+                <div>
+                  <h3>Natural or balanced dice</h3>
+                  <p>
+                    Natural is two ordinary dice: every roll independent, seven the most common total.
+                    Balanced deals from a shuffled deck of all thirty-six combinations instead, so across a
+                    shuffle the totals land close to their true frequencies, and the same total twice in a row
+                    is made a little less likely. It does not change the odds of any single number, only how
+                    often a long streak of them happens.
+                  </p>
+                </div>
+              </li>
+            </ul>
+            <div className="guide-note-block">
+              <h3>Changing them later</h3>
+              <p>
+                Settings lock when the game starts, and changing one before that clears everyone’s Ready, so
+                nobody starts a game under rules they did not see. The room code and invite link sit in the
+                lobby footer and stay the same all evening.
+              </p>
+            </div>
+          </section>
+          <section id="table" className="guide-section">
+            <GuideHeading number="09" icon="smile">
+              At the table
+            </GuideHeading>
+            <p className="guide-section-intro">
+              Two small things that make a game feel like a table rather than a screen.
+            </p>
+            <div className="guide-account-notes">
+              <article>
+                <GameIcon name="edit" size={30} />
+                <h3>Your colour is yours</h3>
+                <p>
+                  Pick one of eight in the lobby, under your own card. Nobody can take a colour somebody else
+                  is holding, and it is worth choosing deliberately: the pieces on the island carry no names,
+                  so colour is the only thing that says a road is yours. Your portrait wears it all game, and
+                  the cloth behind your name lightens when it is your turn.
+                </p>
+              </article>
+              <article>
+                <GameIcon name="smile" size={30} />
+                <h3>Reactions</h3>
+                <p>
+                  Twelve faces, drawn for this game rather than borrowed from your phone’s emoji font, so
+                  everyone at the table sees the same expression. Tap one and it flies across the board with
+                  your name under it. A short burst is fine; after that the button rests for a moment, which
+                  is the difference between a table and a chat room.
+                </p>
+              </article>
+            </div>
+          </section>
           <section id="accounts" className="guide-section">
-            <GuideHeading number="07" icon="profile">
+            <GuideHeading number="10" icon="profile">
               Your profile & seat
             </GuideHeading>
             <div className="guide-account-notes">
@@ -824,22 +947,22 @@ export function PublicGuide() {
               </article>
             </div>
             <details className="guide-note" open>
-              <summary>If someone loses connection</summary>
+              <summary>What an empty chair looks like</summary>
               <p>
-                Nothing is lost and nobody waits. After about <strong>half a minute</strong>, a bot picks up
-                the empty seat and plays its turns, keeping every settlement, road and card exactly where it
-                was. The seat goes straight back the moment that player reconnects.
+                A seat whose player has dropped shows <strong>Away</strong> and a countdown. After about half
+                a minute the card says <strong>Bot playing</strong> instead, and a machine mark appears beside
+                the name: that seat is being covered, not forfeited. Both marks clear the moment they
+                reconnect.
               </p>
               <p>
-                Leaving the game on purpose is different: that is a resignation, their pieces stay on the
-                island and their resources go back to the bank. If <em>everyone</em> disconnects the game
-                pauses rather than playing itself out, and closes without a winner if nobody comes back.
+                Leaving on purpose is a different thing and says <strong>Resigned</strong>. If{' '}
+                <em>everyone</em> disconnects the game pauses rather than playing itself out.
               </p>
             </details>
           </section>
           <section id="questions" className="guide-section">
-            <GuideHeading number="08" icon="help">
-              Before you play
+            <GuideHeading number="11" icon="info">
+              Common questions
             </GuideHeading>
             {GUIDE_FAQ.map((entry) => (
               <details className="guide-note" key={entry.question} open>
@@ -852,6 +975,77 @@ export function PublicGuide() {
               <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>the rulebook</a>, and the code that
               enforces them is <a href={REPOSITORY_URL}>on GitHub</a>.
             </p>
+          </section>
+          <section id="glossary" className="guide-section">
+            <GuideHeading number="12" icon="help">
+              Words you will see
+            </GuideHeading>
+            <p className="guide-section-intro">
+              Everything this page and the game call things, in one place.
+            </p>
+            <dl className="guide-glossary">
+              {(
+                [
+                  ['Bank', 'The shared supply everything is bought from and traded with at 4:1.'],
+                  [
+                    'Bot',
+                    'A seat played by the server rather than a person. Added by the host, or covering somebody who dropped.',
+                  ],
+                  [
+                    'City',
+                    'An upgraded settlement. Two points, and it collects two of a resource instead of one.',
+                  ],
+                  [
+                    'Development card',
+                    'A hidden card bought from the deck: a Knight, one of three one-off effects, or a hidden point.',
+                  ],
+                  [
+                    'Hand limit',
+                    'Seven. Roll a seven holding more and you discard half, rounded down. Development cards do not count.',
+                  ],
+                  [
+                    'Harbour',
+                    'A port on the coast. Build on either corner it touches to trade at 3:1 or 2:1.',
+                  ],
+                  ['Host', 'Whoever created the room. Sets the rules, adds bots, starts the game.'],
+                  [
+                    'Largest Army',
+                    'Two points, to the first player to play three Knights, then to anyone who passes them.',
+                  ],
+                  [
+                    'Longest Road',
+                    'Two points, to the first continuous route of five or more roads, then to anyone who passes it.',
+                  ],
+                  [
+                    'Pips',
+                    'The dots under a number. Five dots means five of the thirty-six dice combinations make it, so it pays often.',
+                  ],
+                  ['Production', 'What a tile pays out when its number is rolled.'],
+                  ['Resource', 'Timber, clay, sheep, hay or rock. The five things everything is built from.'],
+                  [
+                    'Robber',
+                    'The piece that stops a tile producing and steals a card. Moved on a seven or by a Knight.',
+                  ],
+                  [
+                    'Room code',
+                    'Four characters that let a friend join your lobby. The invite link does the same.',
+                  ],
+                  [
+                    'Setup',
+                    'The opening. Each player places a settlement and a road in order, then again in reverse, and the second settlement pays out.',
+                  ],
+                  [
+                    'Victory point',
+                    'What you are counting to ten. Settlements, cities, the two awards and hidden point cards all give them.',
+                  ],
+                ] as const
+              ).map(([term, meaning]) => (
+                <div key={term}>
+                  <dt>{term}</dt>
+                  <dd>{meaning}</dd>
+                </div>
+              ))}
+            </dl>
           </section>
           <div className="guide-ready">
             <div>

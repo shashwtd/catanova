@@ -50,8 +50,25 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.ok(guide.includes('How to play') && guide.includes('City upgrade'));
   assert.ok(guide.includes('3 Rock') && guide.includes('2 Hay'));
   assert.ok(guide.includes('cannot add friends while still guests'));
-  assert.ok(guide.includes('If someone loses connection') && guide.includes('half a minute'));
+  // A dropped connection is covered, not punished, and the guide says so twice
+  // over on purpose: once as the marks a player will actually see on the card,
+  // and once as the plain answer in the questions. Neither repeats the other.
+  assert.ok(guide.includes('What an empty chair looks like'));
+  assert.ok(guide.includes('Bot playing') && guide.includes('Resigned'));
+  assert.ok(guide.includes('half a minute'));
   assert.ok(!guide.includes('auto-resign'), 'a dropped connection is covered, not punished');
+  // Every feature the game has should be findable here. These are the ones
+  // that shipped without a word on this page until they were added.
+  for (const [anchor, phrase] of [
+    ['id="bots"', 'They are not cheating'],
+    ['id="setup"', 'Natural or balanced dice'],
+    ['id="table"', 'Reactions'],
+    ['id="glossary"', 'Largest Army'],
+  ] as const)
+    assert.ok(guide.includes(anchor) && guide.includes(phrase), anchor);
+  // A reference page is only useful if its own contents list works.
+  const navigable = [...guide.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
+  assert.ok(navigable.length >= 12, `only ${navigable.length} anchors`);
   assert.ok(guide.includes('id="questions"') && guide.includes('Can phones and computers play together?'));
   assert.ok(guide.includes('not an official CATAN game'));
   assert.ok(guide.includes('There is no public matchmaking'));
