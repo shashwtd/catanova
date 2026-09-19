@@ -450,3 +450,48 @@
   font-size: 14px;
   line-height: 1.45;
 }
+
+/*
+ * Splitting the panel in two broke the grid it used to sit in.
+ *
+ * `.settings-menu` is an unconditional two-column grid, and the old single
+ * panel relied on it: audio in one column, board style in the other, and the
+ * room's own rules spanning both underneath. Both halves now have two children
+ * instead of four, so they landed side by side — a column of tabs next to a
+ * column of controls, and a note next to nothing.
+ *
+ * So each half opts out and lays itself out. The selectors are specific
+ * because this stylesheet is imported before the ones it is correcting, and a
+ * tie there goes the other way.
+ */
+.settings-menu:has(.settings-tabs) {
+  display: block;
+}
+/* One column, at every width. Two was only ever there to fit the host's
+   controls alongside a player's own, and they no longer share a panel: a tab
+   holding two sliders and a pair of swatches is short enough to read at a
+   glance, and stretching it across a 640px dialog to fill the space would be
+   the clutter this was meant to remove. */
+.settings-menu:has(.settings-tabs) .settings-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+@media (min-width: 701px) {
+  .game-dialog:has(.settings-tabs) {
+    width: 440px;
+  }
+}
+/* The room's rules open on their own now, so nothing sits beside them and the
+   divider that separated them from the personal settings has nothing to
+   divide. */
+.game-dialog:has(.settings-configure) .settings-menu.settings-configure {
+  display: block;
+}
+.game-dialog:has(.settings-configure) .settings-configure .settings-room {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  padding: 0;
+  border-left: 0;
+  border-top: 0;
+}
