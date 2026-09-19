@@ -75,7 +75,6 @@ import '@fontsource/barlow/latin-600.css';
 import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
-import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { emptyHand } from '../../../packages/rules/src/game.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { Board, ResourceIcon } from './Board.js';
@@ -850,12 +849,12 @@ function App() {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
   }
-  async function addBot(level: BotLevel = 'steady') {
+  async function addBot() {
     const c = connection.current;
     if (!c || disabled) return;
     setBusy(true);
     try {
-      await c.addBot(level);
+      await c.addBot();
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Could not add a bot');
     } finally {

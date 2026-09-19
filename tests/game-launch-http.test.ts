@@ -276,7 +276,7 @@ test('preloaded bot rooms start after human readiness without waiting for bots',
     false,
     undefined,
     undefined,
-    'steady',
+    true,
   );
   await f.b.command({ type: 'lobby', ready: true });
   const start = await f.start();

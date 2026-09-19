@@ -23,6 +23,9 @@ import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
 import { ReactionFace } from './ReactionArt.js';
 import { Smile } from './GameIcons.js';
 
+/** Breathing room between the button and its tray, in both placements. */
+const GAP = 12;
+
 /**
  * Which edges of the tray have more of the set beyond them.
  *
@@ -101,7 +104,19 @@ export function ReactionButton({
   const [resting, setResting] = useState(false);
   const history = useRef<number[]>([]);
   const root = useRef<HTMLDivElement>(null);
+  const tray = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  /**
+   * Where the tray goes.
+   *
+   * Beside the button and along the bottom is the better place: it uses the
+   * empty strip that is already there and never floats over the board. But
+   * that strip ends where the hand dock begins, and how much of it there is
+   * depends on the window. So it is measured rather than assumed, and when the
+   * room is not there the tray stacks against the button instead — upward on a
+   * desktop, downward on a phone, where the button is at the top.
+   */
+  const [place, setPlace] = useState<'stacked' | 'beside'>('stacked');
   /**
    * Whether there is more of the set above or below what is showing.
    *
@@ -110,6 +125,24 @@ export function ReactionButton({
    * decoration that goes on lying once you are at the end of it.
    */
   const [edges, setEdges] = useState({ above: false, below: false });
+
+  useEffect(() => {
+    if (!open) return;
+    const decide = () => {
+      const panel = tray.current,
+        anchor = root.current;
+      if (!panel || !anchor) return;
+      const from = anchor.getBoundingClientRect().right + GAP;
+      // The dock's own box runs the width of the screen; its table is where
+      // the bottom strip actually stops being empty.
+      const table = document.querySelector('.hand-dock .card-table');
+      const until = table ? table.getBoundingClientRect().left : window.innerWidth;
+      setPlace(until - from >= panel.offsetWidth ? 'beside' : 'stacked');
+    };
+    decide();
+    window.addEventListener('resize', decide);
+    return () => window.removeEventListener('resize', decide);
+  }, [open]);
 
   useEffect(() => {
     const node = scroller.current;
@@ -171,7 +204,7 @@ export function ReactionButton({
   return (
     <div className={`reaction-control ${open ? 'open' : ''}`} ref={root}>
       {open && !disabled && (
-        <div className="reaction-tray">
+        <div className="reaction-tray" ref={tray} data-place={place}>
           <div
             className="reaction-scroll"
             role="menu"

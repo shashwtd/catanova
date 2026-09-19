@@ -429,14 +429,17 @@
   flex: none;
 }
 .reaction-control.open .reaction-toggle {
-  transform: rotate(10deg) scale(1.05);
+  transform: scale(1.04);
 }
 
 /* The control lives in the bottom lane on every layout, so the tray always
    opens upward. Hanging it below the button put it under the fold. */
+/* Default: straight up from the button. `beside` is measured, not guessed —
+   see `place` in Reactions.tsx — and runs along the empty strip at the bottom
+   of the screen rather than floating over the board. */
 .reaction-tray {
   position: absolute;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 12px);
   left: 0;
   z-index: 30;
   width: max-content;
@@ -446,6 +449,10 @@
   border-radius: 14px;
   background: var(--game-panel-fill);
   box-shadow: var(--game-panel-shadow);
+}
+.reaction-tray[data-place='beside'] {
+  bottom: 0;
+  left: calc(100% + 12px);
 }
 .reaction-scroll {
   display: grid;
@@ -549,14 +556,36 @@
    the board it is reacting to. A desktop has the opposite shape, and keeps the
    grid above. */
 @media (max-width: 700px) {
+  /* As wide as the button it hangs from, and no wider: a column of faces, not
+     a panel. The faces take the width the padding used to. */
+  .reaction-tray {
+    width: var(--game-tool-edge, 44px);
+    /* No border and barely any padding: at this width every pixel spent on the
+       frame comes straight off the faces, which are the point. The edge is
+       drawn as an inset ring instead. */
+    padding: 2px;
+    border: 0;
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 0 1px var(--game-trim),
+      var(--game-panel-shadow);
+  }
   .reaction-scroll {
-    grid-template-columns: 44px;
-    gap: 5px;
+    grid-template-columns: 1fr;
+    gap: 3px;
     max-height: min(58vh, 420px);
     overflow-y: auto;
     overscroll-behavior-y: contain;
     scroll-snap-type: y proximity;
     -webkit-overflow-scrolling: touch;
+  }
+  .reaction-choice {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    padding: 0;
+    border-radius: 999px;
   }
   .reaction-scroll::-webkit-scrollbar {
     display: none;

@@ -100,29 +100,49 @@ using `sudoedit`, then recreate the `game` service with that env file and
 `deploy/single-vm/compose.yaml`. A plain container restart does not reload env
 values. Never commit the key or put it in a client-side environment variable.
 
-## Steady and sharp
+## Who sits down
 
-A host picks one of two levels when seating a bot. Both play the same rules with
-the same plan and the same questions; what differs is how much attention they
-pay to whoever is winning, and all of it is arithmetic in `contests()` in
-`packages/bot/decide.ts`, so the difference holds even with no decision service
-reachable.
+There are three of them, and the host does not choose. Filling a seat draws one
+at random on the server, so you find out who you have by playing them — the same
+way you would with a stranger. Each is marked by its own machine beside its
+name, so once you know the three you know who you are up against.
 
-|                       | Steady                                                     | Sharp                                                                               |
-| --------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Robber tile           | wherever the most production is, whoever owns it           | the leader's tiles are worth double, so it will give up production to land on one   |
-| Robbed player         | whoever is on the tile                                     | the leader, when the leader is on it                                                |
-| Counts as a threat    | a leader one point from winning                            | a leader three points out, and a longest road or largest army held by somebody else |
-| Robber question asked | "Where should the robber go to block the most production?" | "Where should the robber go to hurt the player most likely to win?"                 |
+They differ only in how much attention they pay to the rest of the table. All of
+it is arithmetic in `contests()` in `packages/bot/decide.ts`, so the differences
+hold even with no decision service reachable.
 
-In practice a steady bot plays its own game and you mostly notice it when it
-takes a corner you wanted. A sharp bot follows you around the board once you
-start to lead, and it starts doing so well before you are close to winning.
+|                                | Steady                                           | Sharp                                                 | Champion                                                 |
+| ------------------------------ | ------------------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
+| Robber tile                    | wherever the most production is, whoever owns it | the leader's tiles count double                       | the leader's tiles count double                          |
+| Robbed player                  | whoever is on the tile                           | the leader, when they are on it                       | the leader, when they are on it                          |
+| Counts as a threat             | a leader one point from winning                  | a leader three points out, or an award held elsewhere | a leader **four** points out, or an award held elsewhere |
+| Rethinks its plan              | every four turns                                 | every four turns                                      | every **two** turns                                      |
+| Options weighed each move      | 12 corners, 8 roads                              | 12 corners, 8 roads                                   | **16 corners, 12 roads**                                 |
+| Will end a turn it could spend | yes                                              | yes                                                   | **no, while anything useful is affordable**              |
+| Knows the award standings      | no                                               | no                                                    | **yes**                                                  |
+
+A steady bot plays its own game and you mostly notice it when it takes a corner
+you wanted. A sharp bot follows you round the board once you start to lead. A
+champion plays to win: it is told where longest road and largest army stand and
+how many points it still needs, it rethinks its plan twice as often — which is
+what lets it answer a road being cut off by going after something else rather
+than pushing at the block — and it never sits on resources it could spend.
+
+### It is not cheating
+
+Every bot is handed the same filtered view of the game the browser is handed:
+`gameView(game, seatId)`. No opponent's hand, no peeking at the development
+deck, no adjusted dice, and no shared plans between bots at the same table. A
+champion's advantage is entirely in what it does with public information — the
+standings already on the portraits, the numbers already on the board, and the
+length of its own shortlist. A champion that beats you beat you with what was on
+the table.
 
 ## How a bot behaves at the table
 
 A bot is marked with a small machine beside its name, in the lobby and on its
-portrait during play, so nobody wonders why a seat never chats.
+portrait during play, so nobody wonders why a seat never chats — and the machine
+says which of the three it is.
 
 It also pauses before every move. Without that it answered the instant the rules
 allowed, which is the single thing that made it read as software rather than an

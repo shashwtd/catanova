@@ -7,7 +7,6 @@ import type {
 } from '../../../packages/protocol/src/index.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
-import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { snapshotProblem } from './state.js';
@@ -371,8 +370,9 @@ export class Connection {
   react(reaction: ReactionName) {
     this.send({ type: 'react', reaction });
   }
-  addBot(level: BotLevel = 'steady') {
-    return this.submit({ type: 'lobby', ready: false, addBot: level });
+  /** Ask for a bot. Which one turns up is the server's draw, not ours. */
+  addBot() {
+    return this.submit({ type: 'lobby', ready: false, addBot: true });
   }
   settings(settings: RoomSettings) {
     return this.submit({ type: 'settings', settings });

@@ -40,7 +40,13 @@ test('closed tools are inert and linked to an accessible trigger, with fullscree
   assert.match(html, /aria-label="How to play"/);
   assert.match(html, /inert=""/);
   assert.match(html, /aria-controls="([^"]+)"/);
-  assert.match(html, /<\/div><\/div><button class="icon-button fullscreen-control"/);
+  // Fullscreen sits with the other things you set once, above move history,
+  // rather than inside the menu or down with the room controls.
+  assert.match(
+    html,
+    /<nav class="side-controls game-controls"[^>]*><button class="icon-button fullscreen-control"/,
+  );
+  assert.ok(html.indexOf('fullscreen-control') < html.indexOf('aria-label="Move history"'));
 });
 
 test('painted game symbols stay intact while utility controls use contextual SVG paths', () => {

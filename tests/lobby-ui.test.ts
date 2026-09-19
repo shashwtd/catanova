@@ -8,6 +8,7 @@ import { Invite, Lobby } from '../apps/client/src/Lobby.js';
 import { GameSettings } from '../apps/client/src/GameSettings.js';
 import { ProfileEditor } from '../apps/client/src/Profile.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
+import { BOT_LEVELS, BOT_LEVEL_LABEL } from '../packages/protocol/src/bots.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { createGame, gameView } from '../packages/rules/src/game.js';
@@ -115,26 +116,35 @@ test('an open place offers both answers where you can see them, and both are hos
   // Inviting is one press from the place itself rather than two through a menu.
   assert.ok(asHost.includes('Invite a friend'));
   assert.ok(!asHost.includes('aria-haspopup="menu"'), 'no hidden menu stands between them');
-  // Both levels the protocol supports are offered, so the choice is not
-  // silently made for you.
-  assert.ok(asHost.includes('aria-label="Add a steady bot"'));
-  assert.ok(asHost.includes('aria-label="Add a sharp bot"'));
+  // Seating a bot is one action. Which of the three sits down is the room's
+  // draw, so there is nothing here to choose.
+  assert.ok(asHost.includes('Add a bot'));
+  for (const level of BOT_LEVELS) assert.ok(!asHost.includes(`Add a ${level}`));
 
   const asGuest = renderLobby(room, 'pX', false, true, withBots);
   assert.ok(asGuest.includes('Invite a friend'));
-  assert.ok(!asGuest.includes('Add a steady bot'), 'only a host seats a bot');
+  assert.ok(!asGuest.includes('Add a bot'), 'only a host seats a bot');
 });
 
-test('a bot is marked with a machine beside its name, not the word BOT', () => {
-  const room = lobby();
-  room.players[1] = { ...room.players[1]!, bot: true, botLevel: 'sharp', name: 'Anchor' };
-  const html = renderLobby(room, 'p0');
-  assert.ok(!/>\s*BOT\s*</.test(html), 'the word is gone');
-  assert.ok(html.includes('class="player-bot-tag"'));
-  assert.match(html, /player-bot-tag[^>]*aria-label="Bot"/);
-  // And the seat says how it plays, which is more use than a bot reporting
-  // that it is ready, which it always is.
-  assert.ok(html.includes('Sharp bot'));
+test('each bot level is marked by its own machine, never the word BOT', () => {
+  const marks = new Set<string>();
+  for (const level of BOT_LEVELS) {
+    const room = lobby();
+    room.players[1] = { ...room.players[1]!, bot: true, botLevel: level, name: 'Anchor' };
+    const html = renderLobby(room, 'p0');
+    assert.ok(!/>\s*BOT\s*</.test(html), 'the word is gone');
+    assert.match(html, new RegExp(`player-bot-tag[^>]*data-level="${level}"`));
+    assert.match(html, new RegExp(`aria-label="${BOT_LEVEL_LABEL[level]} bot"`));
+    // The seat says how it plays, which is more use than a bot reporting that
+    // it is ready, which it always is.
+    assert.ok(html.includes(`${BOT_LEVEL_LABEL[level]} bot`));
+    // Three levels, three drawings: a shared shape with nothing to tell them
+    // apart would make the mark decoration rather than information.
+    const drawing = /<svg[^>]*>\s*<path d="([^"]+)"/.exec(html.slice(html.indexOf('player-bot-tag')));
+    assert.ok(drawing, `no artwork for ${level}`);
+    marks.add(drawing[1]!);
+  }
+  assert.equal(marks.size, BOT_LEVELS.length, 'every level looks different');
 });
 
 test('room options name the turn timer explicitly and long player names remain accessible', () => {

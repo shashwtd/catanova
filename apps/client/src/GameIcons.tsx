@@ -1,4 +1,5 @@
 import type { SVGProps } from 'react';
+import { BOT_LEVEL_LABEL, isBotLevel } from '../../../packages/protocol/src/bots.js';
 import { PAINTED_ICONS, ICON_ATLAS, ICON_ATLAS_WIDTH, ICON_ATLAS_HEIGHT } from './painted-icons.js';
 // Everyday controls use crisp, contextual ink; game pieces keep their painted artwork.
 const CONTROL_PATHS = {
@@ -26,7 +27,14 @@ const CONTROL_PATHS = {
   exchange: 'M4 8h15 m-4-4 4 4-4 4 M20 16H5 m4-4-4 4 4 4',
   'next-turn': 'M5 20v-7a5 5 0 0 1 5-5h10 m-5-5 5 5-5 5',
   play: 'm7 3 14 9-14 9V3',
+  // Three machines from one drawing. The head, the ears and the aerial stay put
+  // so they read as the same kind of thing; only the face and what is on top
+  // change, which is enough to tell three players apart at portrait size.
   bot: 'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
+  'bot-sharp':
+    'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M8.4 11.4 10.8 13 M15.6 11.4 13.2 13 M2 11v4 M22 11v4',
+  'bot-champ':
+    'M8.4 4 10.3 6 12 3.1 13.7 6 15.6 4 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
   smile: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18 M9 10v.5 M15 10v.5 M8 14a5 5 0 0 0 8 0',
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
 } as const;
@@ -74,6 +82,8 @@ export function GameIcon({ name, size = 24, className = '', ...props }: IconProp
 }
 const icon = (name: GameIconName) => (props: IconProps) => <GameIcon name={name} {...props} />;
 export const Bot = icon('bot'),
+  BotSharp = icon('bot-sharp'),
+  BotChamp = icon('bot-champ'),
   Eye = icon('eye'),
   Smile = icon('smile'),
   Dices = icon('dice'),
@@ -127,3 +137,22 @@ export const JoinRoom = icon('join'),
   Exchange = icon('exchange'),
   LightClose = icon('light-close'),
   LightCheck = icon('light-check');
+
+/**
+ * The mark beside a bot's name.
+ *
+ * Which machine it is says who you are playing: the three share a head and an
+ * aerial so they read as the same kind of thing, and differ in the face and
+ * what sits on top. The colour follows, quietly — a champion is worth noticing
+ * across the table.
+ */
+export function BotMark({ level, size = 17 }: { level?: string; size?: number }) {
+  const known = isBotLevel(level) ? level : 'steady';
+  const Mark = known === 'champ' ? BotChamp : known === 'sharp' ? BotSharp : Bot;
+  const label = `${BOT_LEVEL_LABEL[known]} bot`;
+  return (
+    <span className="player-bot-tag" data-level={known} role="img" aria-label={label} title={label}>
+      <Mark size={size} />
+    </span>
+  );
+}

@@ -1,6 +1,7 @@
 import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
 import {
   Bot,
+  BotMark,
   Check,
   Clock3,
   Dices,
@@ -21,8 +22,7 @@ import {
 import { useEffect, useRef, useState, useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
-import { BOT_LEVEL_LABEL, BOT_LEVELS, isBotLevel } from '../../../packages/protocol/src/bots.js';
-import type { BotLevel } from '../../../packages/protocol/src/bots.js';
+import { BOT_LEVEL_LABEL, isBotLevel } from '../../../packages/protocol/src/bots.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { Avatar } from './Profile.js';
@@ -183,7 +183,7 @@ function OpenSeat({
   host: boolean;
   busy: boolean;
   onInvite: () => void;
-  onAddBot?: (level: BotLevel) => void;
+  onAddBot?: () => void;
 }) {
   return (
     <div className="seat-card seat-open">
@@ -197,26 +197,18 @@ function OpenSeat({
           Invite a friend
         </button>
         {host && onAddBot && (
-          <div className="seat-bot-levels" role="group" aria-label="Add a bot">
-            {BOT_LEVELS.map((level) => (
-              <button
-                key={level}
-                type="button"
-                className="seat-fill is-bot"
-                disabled={busy}
-                aria-label={`Add a ${BOT_LEVEL_LABEL[level].toLowerCase()} bot`}
-                title={
-                  level === 'sharp'
-                    ? 'Plays its own plan and works to slow the leader down'
-                    : 'Plays its own plan'
-                }
-                onClick={() => onAddBot(level)}
-              >
-                <Bot size={16} />
-                {BOT_LEVEL_LABEL[level]}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            className="seat-fill is-bot"
+            disabled={busy}
+            // Which of the three sits down is the room's draw, not a setting,
+            // so this is one action and you meet them at the table.
+            title="Which one turns up is the luck of the draw"
+            onClick={() => onAddBot()}
+          >
+            <Bot size={16} />
+            Add a bot
+          </button>
         )}
       </div>
     </div>
@@ -249,7 +241,7 @@ export function Lobby({
   onEdit: () => void;
   onSettings: () => void;
   onFriends?: () => void;
-  onAddBot?: (level: BotLevel) => void;
+  onAddBot?: () => void;
   onKick?: (playerId: string) => Promise<void>;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -374,11 +366,7 @@ export function Lobby({
                   </div>
                   <div className="seat-name">
                     <strong title={p.name}>{p.name}</strong>
-                    {p.bot && (
-                      <span className="player-bot-tag" role="img" aria-label="Bot" title="Played by Catanova">
-                        <Bot size={17} />
-                      </span>
-                    )}
+                    {p.bot && <BotMark level={p.botLevel} />}
                   </div>
                   <span className={`seat-status ${p.ready && p.connected && !p.bot ? 'is-ready' : ''}`}>
                     {!p.connected ? (

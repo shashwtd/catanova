@@ -850,6 +850,14 @@
   height: 17px;
   stroke-width: 2.4;
 }
+/* Three machines, three temperatures. Quiet enough not to compete with the
+   name, distinct enough to tell who you have drawn from across the table. */
+.player-bot-tag[data-level='sharp'] {
+  color: #d99671;
+}
+.player-bot-tag[data-level='champ'] {
+  color: var(--game-gold, #efd28d);
+}
 /* The name plaque stretches to fill its row, which would push the mark to the
    far edge with the name nowhere near it. Where there is a mark, the plaque
    takes only the width of the name. */

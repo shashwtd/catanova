@@ -69,6 +69,16 @@ export function GameTools({
   return (
     <>
       <nav className="side-controls game-controls" aria-label="Current game tools" data-panel-align="top">
+        {/* Fullscreen belongs with the things you set once and leave, not with
+            the room controls you reach for mid-turn. */}
+        <button
+          className="icon-button fullscreen-control"
+          onClick={onFullscreen}
+          aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          {fullscreen ? <Minimize /> : <Maximize />}
+        </button>
         <button
           className="icon-button"
           aria-label="Move history"
@@ -152,14 +162,6 @@ export function GameTools({
           </div>
           {reactions}
         </div>
-        <button
-          className="icon-button fullscreen-control"
-          onClick={onFullscreen}
-          aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        >
-          {fullscreen ? <Minimize /> : <Maximize />}
-        </button>
       </nav>
     </>
   );

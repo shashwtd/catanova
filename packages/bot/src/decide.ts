@@ -84,16 +84,29 @@ export type DecideContext = {
  * holds even when the decision service is unreachable.
  */
 function contests(level: BotLevel | undefined) {
-  const sharp = level === 'sharp';
+  const contesting = level === 'sharp' || level === 'champ';
+  const champ = level === 'champ';
   return {
     /** How much more a robber tile is worth for belonging to the leader. */
-    leaderWeight: sharp ? 2 : 1,
+    leaderWeight: contesting ? 2 : 1,
     /** How close the leader gets before the bot starts obstructing. */
-    threatWithin: sharp ? 3 : 1,
+    threatWithin: champ ? 4 : contesting ? 3 : 1,
     /** Whether a contested road or army counts as a threat on its own. */
-    mindsAwards: sharp,
+    mindsAwards: contesting,
     /** Whether the robber goes for the leader rather than whoever is there. */
-    huntsLeader: sharp,
+    huntsLeader: contesting,
+    /** Turns a plan survives before it is thought through again. A champ is
+     *  asked to think often, which is what lets it answer a road being cut
+     *  off by going after something else instead of pushing at the block. */
+    planLife: champ ? 2 : 4,
+    /** How many corners and roads the model is shown. Longer lists play
+     *  better and cost more, which is the trade a champion is worth. */
+    shortlist: champ ? { corners: 16, roads: 12 } : { corners: LIMIT.corners, roads: LIMIT.roads },
+    /** Whether passing stays on the table while anything useful is affordable. */
+    spendsEveryTurn: champ,
+    /** Whether the state carries the award standings and the gap to the win.
+     *  Every number in it is on the other players' portraits already. */
+    readsTheTable: champ,
   };
 }
 
@@ -143,6 +156,9 @@ function summarise(ctx: DecideContext) {
   const me = view.players.find((p) => p.id === meId);
   const hand = handOf(view);
   const leader = leaderOf(view, meId);
+  const named = (id: string | null) => view.players.find((p) => p.id === id)?.name ?? 'nobody';
+  const best = (field: 'roadLength' | 'knights') =>
+    view.players.reduce((n, p) => Math.max(n, p[field] ?? 0), 0);
   return {
     me: {
       name: me?.name ?? 'bot',
@@ -167,6 +183,17 @@ function summarise(ctx: DecideContext) {
     },
     turn: view.turn,
     ...(plan.targetSite !== null ? { target_corner: cornerFacts(board, plan.targetSite) } : {}),
+    // Two points each, and the two things a game is most often won on late.
+    // This is the same standings table the portraits show every player.
+    ...(contests(ctx.level).readsTheTable
+      ? {
+          awards: {
+            longest_road: `${named(view.longestRoad)} holds it; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
+            largest_army: `${named(view.largestArmy)} holds it; most knights played is ${best('knights')}, mine is ${me?.knights ?? 0}`,
+          },
+          points_still_needed: (view.victoryPoints ?? 10) - (me?.points ?? 0),
+        }
+      : {}),
   };
 }
 
@@ -368,9 +395,10 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const hand = handOf(view);
   const can = affordable(hand);
 
-  const corners = rankCorners(board, legal.settlements, LIMIT.corners);
-  const cities = legal.cities.slice(0, LIMIT.corners);
-  const roads = rankRoads(board, legal.roads, plan.targetSite, LIMIT.roads);
+  const { shortlist, planLife, spendsEveryTurn } = contests(ctx.level);
+  const corners = rankCorners(board, legal.settlements, shortlist.corners);
+  const cities = legal.cities.slice(0, shortlist.corners);
+  const roads = rankRoads(board, legal.roads, plan.targetSite, shortlist.roads);
   const playable = legal.playableCards;
 
   const moves: Record<string, string> = {};
@@ -382,8 +410,15 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   if (trade)
     moves.trade = `trade ${RESOURCE_NAMES[trade.give].toLowerCase()} to the bank for the ${RESOURCE_NAMES[trade.receive].toLowerCase()} the plan needs`;
   if (playable.length) moves.playCard = 'play a development card from the hand';
+  // Passing while a point is sitting there affordable is how a bot loses a
+  // game it was winning. A champion goes further: if anything useful can be
+  // bought, the turn is not over.
   const scoring = (corners.length && can.includes('settlement')) || (cities.length && can.includes('city'));
-  if (!scoring) moves.endTurn = 'do nothing this turn and keep the resources';
+  const useful =
+    scoring ||
+    (spendsEveryTurn &&
+      ((roads.length && can.includes('road')) || (legal.canBuyCard && can.includes('developmentCard'))));
+  if (!useful) moves.endTurn = 'do nothing this turn and keep the resources';
 
   // Nothing worth asking about.
   if (!Object.keys(moves).length)
@@ -396,7 +431,7 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
 
   const targetTaken = plan.targetSite !== null && !!view.buildings[plan.targetSite];
   const threat = threatOf(ctx);
-  const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat });
+  const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat, everyFewTurns: planLife });
 
   const fallback = (): Decision => {
     const action: GameAction =

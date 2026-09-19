@@ -5,7 +5,7 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
 } from '../../../packages/protocol/src/room-reference.js';
-import { botName } from '../../../packages/protocol/src/bots.js';
+import { botName, randomBotLevel } from '../../../packages/protocol/src/bots.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
@@ -66,6 +66,11 @@ export class Store {
   private readonly trackPresence: boolean;
   private readonly records: PlayerRecords;
   private connectedSeats = new Set<string>();
+  /** Which bot turns up when a seat is filled. Drawn from the store's own
+   *  random source, so a test can fix it and a client can never choose it. */
+  private botLevel(): BotLevel {
+    return randomBotLevel(this.random);
+  }
   /** Bot seats never hold a socket, so they are treated as permanently present.
    *  They are kept separate from `connectedSeats` because a room with only bots
    *  left in it must still pause rather than play on with nobody watching. */
@@ -689,7 +694,7 @@ export class Store {
     ready: boolean,
     input?: Profile,
     kickPlayerId?: string,
-    addBot?: BotLevel,
+    addBot?: true,
   ) {
     const profile = input ? parseProfile(input) : undefined;
     const payloadHash = hash(
@@ -745,6 +750,9 @@ export class Store {
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
         if (room.players.length >= 4) throw new ProtocolError('INVALID_PLAYER', 'The room already has four seats');
+        // Drawn here, not asked for: the host fills a seat and finds out who
+        // sat down by playing them.
+        const level = this.botLevel();
         const name = botName(room.players.map((p) => p.name));
         const botProfile = { ...defaultProfile(name), avatar: room.players.length % 12 };
         const id = randomUUID();
@@ -754,7 +762,7 @@ export class Store {
           )
           // The token hash is random and never shared, so no client handshake
           // can ever resolve to a bot's seat.
-          .run(id, seat.room_id, hash(randomUUID()), name, null, JSON.stringify(botProfile), addBot);
+          .run(id, seat.room_id, hash(randomUUID()), name, null, JSON.stringify(botProfile), level);
         this.botSeats.add(id);
       }
       if (profile) {
