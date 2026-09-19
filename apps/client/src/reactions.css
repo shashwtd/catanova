@@ -543,14 +543,16 @@
 
 /* On a phone the tray becomes one swipeable row: a grid of fourteen would
    cover the board, which is the thing you are reacting to. */
-/* On a phone the tray is a narrow column of faces that runs downward. A single
-   sideways row hid most of the set behind a gesture nobody expects, and a grid
-   the width of the screen would cover the board it is reacting to. */
+/* On a phone the tray is one column of faces running down the screen. A phone
+   has height and no width to spare: a sideways row hid most of the set behind
+   a gesture nobody expects, and a grid wide enough to be worth having covers
+   the board it is reacting to. A desktop has the opposite shape, and keeps the
+   grid above. */
 @media (max-width: 700px) {
   .reaction-scroll {
-    grid-template-columns: repeat(5, 44px);
+    grid-template-columns: 44px;
     gap: 5px;
-    max-height: min(52vh, 320px);
+    max-height: min(58vh, 420px);
     overflow-y: auto;
     overscroll-behavior-y: contain;
     scroll-snap-type: y proximity;

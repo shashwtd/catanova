@@ -100,7 +100,11 @@
     display: grid;
     /* buy · trade · where the dice land · the dice tile */
     grid-template-columns: auto auto minmax(0, 1fr) auto;
-    /* Everything down here shares one baseline. */
+    /* Declared, not implied: `grid-row: 1 / -1` below counts explicit lines,
+       and with none declared it silently collapsed to the first row, which
+       left the one action stranded above the table with a hole beneath it. */
+    grid-template-rows: auto auto;
+    /* Everything down here stands on the same line. */
     align-items: end;
     gap: 8px;
     max-width: none;
@@ -199,6 +203,19 @@
     grid-row: 1 / -1;
     align-self: end;
     justify-self: center;
+  }
+
+  /* Trade and the turn action carry their words here as they do everywhere
+     else. A narrow-screen rule drops them below 480px, which left the phone
+     with two unlabelled shapes where the desktop has two labelled buttons. */
+  .playing .hand-dock-separated :is(.trade-action, .turn-action) > span {
+    display: block;
+    font-size: 9px;
+    line-height: 1.15;
+  }
+  .playing .hand-dock-separated :is(.trade-action, .turn-action) .game-icon {
+    width: 26px;
+    height: 26px;
   }
 
   /* An empty cradle should not hold its row open before the first roll. */
