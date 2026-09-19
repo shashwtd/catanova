@@ -77,7 +77,9 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
     !((game.discards[me ?? ''] ?? 0) > 0)
   ) {
     const seat = room?.players.find((p) => p.id === active?.id);
-    if (seat && !seat.connected && seat.resignAt !== undefined) {
+    // Only while the seat is genuinely empty. Once a bot has picked it up the
+    // turn is being played, so telling the table to wait would be wrong.
+    if (seat && !seat.connected && !seat.standIn && seat.resignAt !== undefined) {
       prompt = `Waiting for ${name} to reconnect`;
       icon = 'connection';
       favicon = null;

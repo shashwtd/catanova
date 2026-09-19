@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { Store, RECONNECT_GRACE_MS } from '../apps/server/src/store.js';
+import { Store, RECONNECT_GRACE_MS, STANDIN_AFTER_MS } from '../apps/server/src/store.js';
 import type { Seat } from '../apps/server/src/store.js';
 import { newSession, Connection } from '../apps/client/src/connection.js';
 import {
@@ -55,36 +55,58 @@ function conserved(game: Game) {
   for (const r of RESOURCES)
     assert.equal(game.bank[r] + game.players.reduce((n, p) => n + p.hand[r], 0), 19, r);
 }
-test('disconnect grace is server timed, reconnect cancels it, repeated disconnect gets a fresh deadline', () => {
+test('a dropped seat is covered by a bot, not resigned, and is handed straight back', () => {
   let now = 1000000;
   const store = new Store(':memory:', { now: () => now, trackPresence: true });
   try {
     const { roomId, seats } = room(store);
     store.setConnected(seats[1]!, false);
     assert.equal(presenceOf(store, seats[1]!).resignAt, now + RECONNECT_GRACE_MS);
-    now += RECONNECT_GRACE_MS - 1;
+    // Short enough not to strand the table, long enough that a reload is not a
+    // handover.
+    now += STANDIN_AFTER_MS - 1;
     assert.equal(store.expireRoom(roomId), false);
+    assert.deepEqual(store.standInIds(roomId), []);
     store.setConnected(seats[1]!, true);
     assert.equal(presenceOf(store, seats[1]!).resignAt, undefined);
     now += RECONNECT_GRACE_MS;
     assert.equal(store.expireRoom(roomId), false);
+
     store.setConnected(seats[1]!, false);
-    assert.equal(presenceOf(store, seats[1]!).resignAt, now + RECONNECT_GRACE_MS);
-    now += RECONNECT_GRACE_MS;
+    now += STANDIN_AFTER_MS;
     assert.equal(store.expireRoom(roomId), true);
-    assert.equal(store.loadGame(roomId)!.players[1]!.resigned, true);
+    assert.deepEqual(store.standInIds(roomId), [seats[1]!.id]);
+    assert.equal(presenceOf(store, seats[1]!).standIn, true);
+    // The seat is covered, not surrendered: they keep their pieces, their hand
+    // and their place in the order, however long they are away.
+    const held = store.loadGame(roomId)!;
+    assert.equal(held.players[1]!.resigned, undefined);
+    now += RECONNECT_GRACE_MS * 10;
+    assert.equal(store.expireRoom(roomId), false, 'nobody resigns while the table is still playing');
+    assert.equal(store.loadGame(roomId)!.players[1]!.resigned, undefined);
+    assert.deepEqual(store.loadGame(roomId)!.buildings, held.buildings);
+
+    // Coming back takes the seat straight back, with no waiting and no penalty.
     store.setConnected(seats[1]!, true);
-    assert.equal(store.snapshot(roomId, seats[1]!.id).game!.players[1]!.resigned, true);
-    assert.throws(
-      () => store.action(seats[1]!, 'return-too-late', store.snapshot(roomId).revision, { kind: 'roll' }),
-      /resigned/,
+    assert.deepEqual(store.standInIds(roomId), []);
+    assert.equal(presenceOf(store, seats[1]!).standIn, undefined);
+    assert.equal(store.snapshot(roomId, seats[1]!.id).game!.players[1]!.resigned, undefined);
+    // Both halves of the handover are in the match's own record.
+    const lines = store.history(roomId).entries.flatMap((e) => e.lines);
+    assert.ok(
+      lines.some((line) => /A bot is playing their seat/.test(line)),
+      lines.join(' | '),
+    );
+    assert.ok(
+      lines.some((line) => /took their seat back/.test(line)),
+      lines.join(' | '),
     );
   } finally {
     store.close();
   }
 });
 
-test('batch resignations are atomic, retry safe, preserve pieces and release a two-player winner by resignation', () => {
+test('a batch of dropped seats is covered atomically, retry safe, with every hand and piece intact', () => {
   let now = 1000000;
   const store = new Store(':memory:', { now: () => now, trackPresence: true });
   try {
@@ -92,29 +114,38 @@ test('batch resignations are atomic, retry safe, preserve pieces and release a t
     for (const seat of seats.slice(1)) store.setConnected(seat, false);
     const before = store.loadGame(roomId)!,
       revision = store.snapshot(roomId).revision;
-    now += RECONNECT_GRACE_MS;
+    now += STANDIN_AFTER_MS;
     store.db.exec(
-      "CREATE TEMP TRIGGER fail_resign BEFORE INSERT ON game_events WHEN NEW.action LIKE '%resign%' BEGIN SELECT RAISE(ABORT,'Simulated storage failure'); END",
+      "CREATE TEMP TRIGGER fail_standin BEFORE INSERT ON game_events WHEN NEW.action LIKE '%standIn%' BEGIN SELECT RAISE(ABORT,'Simulated storage failure'); END",
     );
     assert.throws(() => store.expireRoom(roomId), /Simulated storage failure/);
+    // Nothing half-applied: no bot holds a seat the log does not mention.
     assert.deepEqual(store.loadGame(roomId), before);
+    assert.deepEqual(store.standInIds(roomId), []);
     assert.equal(store.snapshot(roomId).revision, revision);
-    assert.ok(presenceOf(store, seats[1]!).resignAt);
-    store.db.exec('DROP TRIGGER fail_resign');
+    store.db.exec('DROP TRIGGER fail_standin');
     assert.equal(store.expireRoom(roomId), true);
     const after = store.loadGame(roomId)!;
-    assert.equal(after.phase, 'finished');
-    assert.equal(after.winner, seats[0]!.id);
-    assert.equal(after.finishReason, 'resignation');
-    assert.equal(after.players.filter((p) => p.resigned).length, 3);
+    // The game carries on with one person and three covered seats, rather than
+    // ending on the spot and handing them a win nobody played for.
+    assert.notEqual(after.phase, 'finished');
+    assert.equal(after.winner, null);
+    assert.equal(after.players.filter((p) => p.resigned).length, 0);
+    assert.deepEqual(
+      store.standInIds(roomId).sort(),
+      seats
+        .slice(1)
+        .map((s) => s.id)
+        .sort(),
+    );
     assert.deepEqual(after.roads, before.roads);
     assert.deepEqual(after.buildings, before.buildings);
-    for (const p of after.players.slice(1)) assert.equal(total(p.hand), 0);
+    // A covered seat keeps its cards; only a resignation returns them.
+    for (const [i, p] of after.players.entries()) assert.equal(total(p.hand), total(before.players[i]!.hand));
     conserved(after);
     assert.equal(store.snapshot(roomId).revision, revision + 1);
     assert.equal(store.expireRoom(roomId), false);
-    assert.equal(store.history(roomId).entries.filter((e) => e.kind === 'resign').length, 1);
-    assert.equal(store.clock(roomId), undefined);
+    assert.equal(store.history(roomId).entries.filter((e) => e.kind === 'standIn').length, 1);
   } finally {
     store.close();
   }
@@ -171,10 +202,19 @@ test('a return before the deadline gives a fresh turn clock without renewing any
     now += 30000;
     store.setConnected(seats[0]!, true);
     assert.equal(presenceOf(store, seats[1]!).resignAt, deadline);
+    // Somebody is at the table again, so the other two seats are covered rather
+    // than surrendered, however long their deadline has been running.
     now = deadline!;
     store.expireRoom(roomId);
-    assert.equal(store.loadGame(roomId)!.winner, seats[0]!.id);
-    assert.equal(store.loadGame(roomId)!.finishReason, 'resignation');
+    assert.equal(store.loadGame(roomId)!.winner, null);
+    assert.deepEqual(
+      store.standInIds(roomId).sort(),
+      seats
+        .slice(1)
+        .map((s) => s.id)
+        .sort(),
+    );
+    assert.equal(store.loadGame(roomId)!.players.filter((p) => p.resigned).length, 0);
   } finally {
     store.close();
   }
@@ -259,11 +299,14 @@ test('failed presence writes retry without another move in an untimed room, then
     );
     assert.equal(store.snapshot(roomId).revision, revision);
     assert.equal(presenceOf(store, seats[1]!).resignAt, now + RECONNECT_GRACE_MS);
+    // The recovered absence is due again at the short deadline, when a bot
+    // picks the seat up; the other two seats are still being played by people.
     assert.deepEqual(store.dueRooms(), []);
-    now += RECONNECT_GRACE_MS;
+    now += STANDIN_AFTER_MS;
     assert.deepEqual(store.dueRooms(), [roomId]);
     assert.equal(store.expireRoom(roomId), true);
-    assert.equal(store.loadGame(roomId)!.players.find((p) => p.id === seats[1]!.id)!.resigned, true);
+    assert.deepEqual(store.standInIds(roomId), [seats[1]!.id]);
+    assert.equal(store.loadGame(roomId)!.players.find((p) => p.id === seats[1]!.id)!.resigned, undefined);
   } finally {
     store.close();
   }
@@ -356,9 +399,9 @@ test('a setup departure skips its unfinished and future slots while all existing
       vertex: gameView(game, seats[0]!.id).legal.settlements[0]!,
     });
     const placed = structuredClone(store.loadGame(roomId)!.buildings);
-    store.setConnected(seats[0]!, false);
-    now += RECONNECT_GRACE_MS;
-    store.expireRoom(roomId);
+    // Leaving outright, which is still a resignation; a dropped connection is
+    // covered by a bot instead and never reaches here.
+    store.leave(seats[0]!, 'setup-departure', store.snapshot(roomId).revision);
     assert.equal(activePlayer(store.loadGame(roomId)!).id, seats[1]!.id);
     finishSetup(store, roomId);
     const after = store.loadGame(roomId)!;
@@ -545,7 +588,7 @@ test('lobby disconnects never create a resignation deadline', () => {
   }
 });
 
-test('real disconnected sockets publish a deadline and the scheduler broadcasts a resignation win exactly once', async (t) => {
+test('a real dropped socket hands the seat to a bot over the wire, and gets it back on return', async (t) => {
   let now = Date.now();
   const server = await startServer({ port: 0, databasePath: ':memory:', auth: null, now: () => now });
   const clients: Connection[] = [];
@@ -572,14 +615,30 @@ test('real disconnected sockets publish a deadline and the scheduler broadcasts 
   await until(() => a.state?.players[1]?.ready === true);
   await a.action({ kind: 'start' });
   await until(() => !!b.state?.game);
+  const roomId = a.session.roomId!;
+  const friendSession = b.session;
   b.stop();
   await until(() => a.state?.players[1]?.connected === false && !!a.state?.players[1]?.resignAt);
   assert.equal(a.state!.players[1]!.resignAt, now + RECONNECT_GRACE_MS);
-  now += RECONNECT_GRACE_MS;
-  await until(() => a.state?.game?.phase === 'finished');
-  assert.equal(a.state!.game!.winner, a.playerId);
-  assert.equal(a.state!.game!.finishReason, 'resignation');
-  assert.equal(server.store.history(a.session.roomId!).entries.filter((e) => e.kind === 'resign').length, 1);
+  // The host is still here, so the empty seat is covered rather than forfeited.
+  now += STANDIN_AFTER_MS;
+  await until(() => a.state?.players[1]?.standIn === true);
+  assert.notEqual(a.state!.game!.phase, 'finished');
+  assert.equal(a.state!.game!.players[1]!.resigned, undefined);
+  assert.equal(server.store.history(roomId).entries.filter((e) => e.kind === 'standIn').length, 1);
+  assert.equal(server.store.history(roomId).entries.filter((e) => e.kind === 'resign').length, 0);
+
+  // And waiting does not turn it into one, however long the old grace was.
+  now += RECONNECT_GRACE_MS * 2;
+  await new Promise((r) => setTimeout(r, 200));
+  assert.notEqual(a.state!.game!.phase, 'finished');
+
+  const back = new Connection(server.url, friendSession);
+  clients.push(back);
+  back.start();
+  await until(() => back.status === 'connected' && a.state?.players[1]?.connected === true);
+  assert.equal(a.state!.players[1]!.standIn, undefined);
+  assert.deepEqual(server.store.standInIds(roomId), []);
 });
 
 test('staggered all-offline deadlines never hand an absent survivor an arbitrary win', () => {

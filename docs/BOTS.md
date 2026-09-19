@@ -140,11 +140,45 @@ a bot now plays a card rather than ending the turn on one — knights first, sin
 a knight is never wasted and counts toward largest army — because a card still
 in hand when the game ends was worth nothing.
 
+### Covering a seat somebody left
+
+A dropped connection used to end a game: three minutes of grace, then the absent
+player resigned, and on a two-player table the person still connected won a game
+nobody had played. That ruined the match for everyone left at it, and it was the
+most common way a game ended badly.
+
+Now a seat that has been empty for thirty seconds is picked up by a bot. The
+player keeps their pieces, their hand, their cards and their place in the order:
+nothing is transferred and nothing is surrendered. The moment they reconnect the
+seat is theirs again, inside the same transaction that records their return, so
+there is never a window where both the person and the bot believe the seat is
+theirs. Both halves of the handover go into the match's log, because a game
+somebody won while a bot played four of their turns should say so afterwards.
+
+Resignation still exists, and still ends a game — it is just what it says it is.
+Leaving is a resignation. Being removed by the host is a resignation. A table
+that nobody at all is sitting at still pauses, and is filed as abandoned once
+the long grace runs out; a bot is never left playing to an empty room.
+
+Before its first move, a stand-in reads how the player was playing: what they
+had built, how long their road was, how many knights they had played, which
+harbours their corners touched. The code counts those; the model is asked one
+question, with five answers, about which style that record fits, and whether
+they were playing against whoever was in front. That answer biases the seat's
+plan for the rest of the absence, so the stand-in finishes the game it inherited
+rather than starting a different one in somebody else's chair. It costs one
+decision per handover, not one per turn, and if the service is unreachable the
+same question is answered from the same numbers and the answer is marked as a
+guess.
+
 ### It is not cheating
 
 Every bot is handed the same filtered view of the game the browser is handed:
 `gameView(game, seatId)`. No opponent's hand, no peeking at the development
 deck, no adjusted dice, and no shared plans between bots at the same table. A
+stand-in is the same: it holds the seat's own cards because it *is* that seat
+for the moment, and the record it is profiled from — pieces, road length,
+knights played, harbours — is what every other player at the table can see. A
 champion's advantage is entirely in what it does with public information — the
 standings already on the portraits, the numbers already on the board, and the
 length of its own shortlist. A champion that beats you beat you with what was on

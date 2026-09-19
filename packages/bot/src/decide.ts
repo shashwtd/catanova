@@ -41,6 +41,8 @@ import {
 import { ARCHETYPES, describe, initialPlan, planIsStale } from './plan.js';
 import type { Archetype, BotPlan, Focus, Threat } from './plan.js';
 import type { BotLevel } from '../../protocol/src/bots.js';
+import { PLAY_STYLES, STYLE_ARCHETYPE } from './style.js';
+import type { StandInStyle } from './style.js';
 
 /** How many options of each kind are ever shown to the model. Shortlists keep
  *  the state small and stop the few good moves being buried in the many legal
@@ -70,6 +72,12 @@ export type DecideContext = {
    * decides how much attention they pay to whoever is winning. See `contests`.
    */
   level?: BotLevel;
+  /**
+   * Set only when this seat belongs to a player who dropped out and is being
+   * kept warm. It carries how that player was playing, so the stand-in
+   * continues their game rather than starting a different one in their chairs.
+   */
+  standIn?: StandInStyle;
 };
 
 /** What each card does, so that "play a development card" is a choice the bot
@@ -141,7 +149,7 @@ function bestCardToPlay(ctx: DecideContext, playable: readonly string[]): string
  * fact about the board, so it is decided here rather than asked about.
  */
 function knightBeforeRoll(ctx: DecideContext): string | null {
-  if (!contests(ctx.level).clearsItsOwnLand) return null;
+  if (!contests(ctx.level, ctx.standIn).clearsItsOwnLand) return null;
   const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
   const knight = ctx.view.legal.playableCards.find((id) => mine.find((c) => c.id === id)?.kind === 'knight');
   if (!knight) return null;
@@ -163,8 +171,11 @@ function knightBeforeRoll(ctx: DecideContext): string | null {
  * Both are arithmetic, decided here rather than asked about, so the difference
  * holds even when the decision service is unreachable.
  */
-function contests(level: BotLevel | undefined) {
-  const contesting = level === 'sharp' || level === 'champ';
+function contests(level: BotLevel | undefined, standIn?: StandInStyle) {
+  // A stand-in that plays nothing like the person it replaced is worse for the
+  // table than the empty seat was, so a read of how they were playing overrides
+  // the level's own temperament on the one axis it speaks to.
+  const contesting = standIn ? standIn.contesting : level === 'sharp' || level === 'champ';
   const champ = level === 'champ';
   return {
     /** How much more a robber tile is worth for belonging to the leader. */
@@ -268,10 +279,21 @@ function summarise(ctx: DecideContext) {
       threat: plan.threat,
     },
     turn: view.turn,
+    // A stand-in is finishing somebody else's game, and the model is told so:
+    // its job is continuity, not a better idea. Everything here was worked out
+    // from what that player put on the board.
+    ...(ctx.standIn
+      ? {
+          playing_for: {
+            note: 'This seat belongs to a player who dropped out. Keep playing the way they were.',
+            their_style: PLAY_STYLES[ctx.standIn.style],
+          },
+        }
+      : {}),
     ...(plan.targetSite !== null ? { target_corner: cornerFacts(board, plan.targetSite) } : {}),
     // Two points each, and the two things a game is most often won on late.
     // This is the same standings table the portraits show every player.
-    ...(contests(ctx.level).readsTheTable
+    ...(contests(ctx.level, ctx.standIn).readsTheTable
       ? {
           awards: {
             longest_road: `${named(view.longestRoad)} holds it; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
@@ -287,7 +309,9 @@ function summarise(ctx: DecideContext) {
 function planQuestions(ctx: DecideContext): Record<string, Question> {
   return {
     plan_strategy: choice(
-      'Which long game suits this position best?',
+      ctx.standIn
+        ? `Which long game suits this position best? This seat's owner was ${PLAY_STYLES[ctx.standIn.style].toLowerCase()}, and the aim is to finish the game they were playing rather than start a different one — so prefer ${STYLE_ARCHETYPE[ctx.standIn.style]} unless the board has made it impossible.`
+        : 'Which long game suits this position best?',
       ARCHETYPES as unknown as Record<string, string>,
     ),
     plan_focus: choice('What should the next few turns of resources be saved for?', {
@@ -326,7 +350,7 @@ function readPlan(
 /** Who is close enough to winning that the bot should start obstructing. */
 function threatOf(ctx: DecideContext): Threat {
   const { view, meId } = ctx;
-  const { threatWithin, mindsAwards } = contests(ctx.level);
+  const { threatWithin, mindsAwards } = contests(ctx.level, ctx.standIn);
   const leader = leaderOf(view, meId);
   const goal = view.victoryPoints ?? 10;
   if (leader && leader.points >= goal - threatWithin) return 'leader-close';
@@ -423,7 +447,7 @@ async function openingPlacement(ctx: DecideContext, plan: BotPlan): Promise<Deci
 
 async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const { board, view, meId, jev } = ctx;
-  const { leaderWeight, huntsLeader } = contests(ctx.level);
+  const { leaderWeight, huntsLeader } = contests(ctx.level, ctx.standIn);
   const hexes = rankRobberHexes(board, view, meId, LIMIT.robberHexes, leaderWeight);
   const first = hexes[0];
   if (first === undefined)
@@ -486,7 +510,7 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const hand = handOf(view);
   const can = affordable(hand);
 
-  const { shortlist, planLife, spendsEveryTurn } = contests(ctx.level);
+  const { shortlist, planLife, spendsEveryTurn } = contests(ctx.level, ctx.standIn);
   const corners = rankCorners(board, legal.settlements, shortlist.corners);
   const cities = legal.cities.slice(0, shortlist.corners);
   const roads = rankRoads(board, legal.roads, plan.targetSite, shortlist.roads);
@@ -693,7 +717,9 @@ function degradedMove(ctx: DecideContext, plan: BotPlan): Decision {
     );
   }
   if (view.phase === 'robber') {
-    const hex = rankRobberHexes(board, view, ctx.meId, 1, contests(ctx.level).leaderWeight)[0] ?? view.robber;
+    const hex =
+      rankRobberHexes(board, view, ctx.meId, 1, contests(ctx.level, ctx.standIn).leaderWeight)[0] ??
+      view.robber;
     const victim = robberTargets(view, hex, ctx.meId)[0];
     return none(plan, { kind: 'robber', hex, ...(victim ? { victim } : {}) }, 'Blocking the strongest tile.');
   }

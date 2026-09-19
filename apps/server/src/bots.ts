@@ -22,8 +22,11 @@ import {
   addUsage,
   emptyUsage,
   describe,
+  profileStyle,
+  STYLE_ARCHETYPE,
+  STYLE_LABEL,
 } from '../../../packages/bot/src/index.js';
-import type { BotPlan, BotUsage, JevClient } from '../../../packages/bot/src/index.js';
+import type { BotPlan, BotUsage, JevClient, StandInStyle } from '../../../packages/bot/src/index.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { gameView } from '../../../packages/rules/src/game.js';
 import type { Game } from '../../../packages/rules/src/game.js';
@@ -62,7 +65,14 @@ const OPENING_MS: [number, number] = [1900, 3600];
 const DISTRACTED_CHANCE = 0.06;
 const DISTRACTED_MS: [number, number] = [900, 2200];
 
-export type BotSeat = { id: string; name: string; level: BotLevel };
+export type BotSeat = {
+  id: string;
+  name: string;
+  level: BotLevel;
+  /** Present when this is somebody's seat being kept warm rather than a bot
+   *  the host added. `style` is null until it has been read, once. */
+  standIn?: { since: number; style: StandInStyle | null };
+};
 
 export type BotDriverDependencies = {
   store: Store;
@@ -81,6 +91,9 @@ export type BotDriverDependencies = {
  */
 export class BotDriver {
   private readonly plans = new Map<string, BotPlan>();
+  /** Seats currently held for an absent player, so a plan built for a handover
+   *  is dropped when the seat goes back to its owner. */
+  private readonly standInPlans = new Set<string>();
   private readonly usage = new Map<string, BotUsage>();
   private readonly busy = new Set<string>();
   private readonly readyAt = new Map<string, number>();
@@ -154,6 +167,10 @@ export class BotDriver {
       this.readyAt.delete(roomId);
       return;
     }
+    // A seat that has gone back to its owner and been dropped again starts
+    // from a clean plan: the one the last stand-in was following belonged to a
+    // position several turns old.
+    if (!seat.standIn && this.standInPlans.delete(seat.id)) this.plans.delete(seat.id);
     const waiting = this.pending.get(roomId);
     if (waiting && waiting.revision === state.revision && waiting.seat.id === seat.id) {
       if (waiting.readyAt > now) return;
@@ -165,15 +182,22 @@ export class BotDriver {
     this.pending.delete(roomId);
     if ((this.readyAt.get(roomId) ?? 0) > now) return;
     const startedAt = now;
+    // A seat taken over from a person is read once, before the first move: what
+    // were they building, and were they playing against the leader? Everything
+    // the question is built from is what they put on the board, so a stand-in
+    // knows no more about the table than the people still at it.
+    const style = seat.standIn ? await this.styleFor(roomId, seat, game) : undefined;
     const decision = await decide({
       view: gameView(game, seat.id),
       board: game.board,
       meId: seat.id,
-      plan: this.plans.get(seat.id) ?? initialPlan(game.turn),
+      plan: this.plans.get(seat.id) ?? this.openingPlan(game.turn, style),
       jev: this.jev,
       level: seat.level,
+      ...(style ? { standIn: style } : {}),
     });
     this.plans.set(seat.id, decision.plan);
+    if (seat.standIn) this.standInPlans.add(seat.id);
     addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, decision);
     // Wait before committing, including the very first bot move. Keep the
     // decision so scheduler ticks during the pause never spend more API tokens.
@@ -247,6 +271,56 @@ export class BotDriver {
     if (this.random() < DISTRACTED_CHANCE) target += pick(DISTRACTED_MS);
     const spent = (this.dependencies.now?.() ?? Date.now()) - startedAt;
     return Math.max(120, Math.round(target - spent));
+  }
+
+  /**
+   * How the absent player was playing, read once per handover and kept.
+   *
+   * The read costs one decision, not one per turn: it is stored with the
+   * stand-in row, so a server restart mid-handover re-reads it and nothing
+   * else does. If it cannot be read at all the stand-in still plays, from the
+   * record alone.
+   */
+  private async styleFor(roomId: string, seat: BotSeat, game: Game): Promise<StandInStyle | undefined> {
+    if (seat.standIn?.style) return seat.standIn.style;
+    let profiled;
+    try {
+      profiled = await profileStyle({
+        view: gameView(game, seat.id),
+        board: game.board,
+        playerId: seat.id,
+        jev: this.jev,
+      });
+    } catch (error) {
+      this.dependencies.log?.('bot_style_failed', {
+        roomId,
+        seat: seat.name,
+        error: (error as Error).message,
+      });
+      return undefined;
+    }
+    if (!profiled) return undefined;
+    this.dependencies.store.saveStandInStyle(roomId, seat.id, profiled.style);
+    addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, {
+      ...profiled,
+      degraded: !!profiled.style.inferred,
+    });
+    this.dependencies.log?.('bot_standin_style', {
+      roomId,
+      seat: seat.name,
+      style: profiled.style.style,
+      playing: STYLE_LABEL[profiled.style.style],
+      contesting: profiled.style.contesting,
+      ...(profiled.style.inferred ? { inferred: true } : {}),
+    });
+    return profiled.style;
+  }
+
+  /** A stand-in's first plan continues the game it inherited rather than
+   *  starting a different one in somebody else's chair. */
+  private openingPlan(turn: number, style?: StandInStyle): BotPlan {
+    const plan = initialPlan(turn);
+    return style ? { ...plan, archetype: STYLE_ARCHETYPE[style.style] } : plan;
   }
 
   /** The bot that owes a move: whoever must discard first, otherwise the active

@@ -17,6 +17,19 @@ export type { JevClient, Question, Answer, Evaluation } from './jev.js';
 export { decide } from './decide.js';
 export type { Decision, DecideContext } from './decide.js';
 
+export {
+  PLAY_STYLES,
+  PLAY_STYLE_LIST,
+  STYLE_ARCHETYPE,
+  STYLE_LABEL,
+  isPlayStyle,
+  observe,
+  parseStandInStyle,
+  profileStyle,
+  styleFromRecord,
+} from './style.js';
+export type { PlayStyle, StandInStyle, Observation } from './style.js';
+
 export { initialPlan, describe, planIsStale, ARCHETYPES, FOCUS_LABEL } from './plan.js';
 export type { BotPlan, Archetype, Focus, Threat } from './plan.js';
 

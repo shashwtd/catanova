@@ -153,6 +153,7 @@ export function PlayerRail({
               )}
               <DisconnectStatus
                 resigned={p.resigned}
+                standIn={!!seat?.standIn && game.phase !== 'finished'}
                 deadline={!seat?.connected && game.phase !== 'finished' ? seat?.resignAt : undefined}
                 now={serverNow}
                 paused={room.paused}
@@ -163,7 +164,7 @@ export function PlayerRail({
                 <strong className="profile-name-banner" title={p.name}>
                   {p.name}
                 </strong>
-                {seat?.bot && <BotMark level={seat.botLevel} size={16} />}
+                {(seat?.bot || seat?.standIn) && <BotMark level={seat.botLevel} size={16} />}
               </div>
               <div className="profile-details">
                 <div className="profile-stats">

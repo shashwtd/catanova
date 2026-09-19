@@ -9,6 +9,8 @@ import { botName, randomBotLevel } from '../../../packages/protocol/src/bots.js'
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { availableColors, isPlayerColor } from '../../../packages/protocol/src/colors.js';
 import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
+import { parseStandInStyle } from '../../../packages/bot/src/style.js';
+import type { StandInStyle } from '../../../packages/bot/src/style.js';
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
@@ -27,6 +29,7 @@ import {
   gameView,
   parseGameAction,
   resignPlayers,
+  noteStandIn,
 } from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
@@ -49,6 +52,18 @@ const hash = (token: string) => createHash('sha256').update(token).digest('hex')
 const privateRandom = () => randomInt(0, 2 ** 32) / 2 ** 32;
 export const ROOM_CODE_LEASE_MS = 30 * 24 * 60 * 60 * 1000;
 export const RECONNECT_GRACE_MS = 3 * 60 * 1000;
+/**
+ * How long a seat sits empty before a bot picks it up.
+ *
+ * Short, because the cost of waiting falls on everybody else at the table: the
+ * whole point is that one person's train going into a tunnel does not stop the
+ * game. Long enough that an ordinary reload does not hand the seat over.
+ */
+export const STANDIN_AFTER_MS = 30 * 1000;
+/** How well a stand-in plays. Not the champion — taking a seat over is meant to
+ *  keep the game going, not to turn the absent player into the strongest one at
+ *  the table — and not the mildest either, which would throw their game away. */
+export const STANDIN_LEVEL: BotLevel = 'sharp';
 type Absence = { disconnectedAt: number; resignAt: number };
 type Presence = { version?: 2; pausedAt?: number; seats: Record<string, Absence> };
 const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
@@ -189,6 +204,17 @@ export class Store {
       CREATE TABLE IF NOT EXISTS account_privacy (
         user_id TEXT PRIMARY KEY, share_last_seen INTEGER NOT NULL DEFAULT 1
       );
+      /* A seat a bot is currently holding for a player who dropped out. The
+         row is the whole state: it exists while the bot is playing and is
+         deleted the moment the player comes back. The style column is how that
+         player was playing, read once and kept so the handover costs one
+         decision rather than one per turn. */
+      CREATE TABLE IF NOT EXISTS seat_standins (
+        room_id TEXT NOT NULL REFERENCES rooms(id), player_id TEXT NOT NULL,
+        since INTEGER NOT NULL, level TEXT NOT NULL, style TEXT,
+        PRIMARY KEY(room_id, player_id)
+      );
+      CREATE INDEX IF NOT EXISTS standins_room ON seat_standins(room_id);
     `);
     if (
       !this.db
@@ -397,6 +423,7 @@ export class Store {
       }[]
     ).filter((p) => (game ? game.players.some((player) => player.id === p.id) : !p.departed));
     const presence = this.presence(roomId);
+    const standingIn = new Set(this.standInIds(roomId));
     const roomCode = this.roomCode(roomId);
     return {
       roomId,
@@ -409,6 +436,7 @@ export class Store {
         ready: !!p.ready,
         ...(p.bot ? { bot: true, botLevel: (p.bot_level as string | null) ?? 'steady' } : {}),
         ...(isPlayerColor(p.color) ? { color: p.color } : {}),
+        ...(standingIn.has(p.id) ? { standIn: true as const } : {}),
         ...presence?.seats[p.id],
       })),
       ...(presence?.pausedAt !== undefined ? { paused: true } : {}),
@@ -830,19 +858,37 @@ export class Store {
       return { revision, counter: room.counter, duplicate: false };
     });
   }
-  /** Rooms with at least one bot seat and a game still running. Kept as a
-   *  query rather than a subscription so a restart needs no rebuilding. */
+  /** Rooms with a game still running and at least one seat a bot owes a move
+   *  for: a bot the host added, or a seat a bot is holding for somebody who
+   *  dropped out. Kept as a query rather than a subscription so a restart needs
+   *  no rebuilding. */
   botRooms(): string[] {
     return this.db
       .prepare(
-        'SELECT DISTINCT s.room_id AS room_id FROM seats s JOIN games g ON g.room_id = s.room_id WHERE s.bot = 1 AND s.departed = 0',
+        `SELECT DISTINCT room_id FROM (
+           SELECT s.room_id AS room_id FROM seats s JOIN games g ON g.room_id = s.room_id
+           WHERE s.bot = 1 AND s.departed = 0
+           UNION SELECT i.room_id AS room_id FROM seat_standins i JOIN games g ON g.room_id = i.room_id
+         )`,
       )
       .all()
       .map((row) => row.room_id as string);
   }
-  /** The bot seats in one room, with the level the host picked for each. */
-  botSeatsIn(roomId: string): { id: string; name: string; level: BotLevel }[] {
-    return this.db
+  /**
+   * Every seat a bot plays in one room.
+   *
+   * Two kinds, and the driver treats them the same: a seat the host filled
+   * with a bot, and a seat whose player dropped out. The second carries the
+   * style read from how that player had been playing, so a stand-in continues
+   * their game rather than starting its own.
+   */
+  botSeatsIn(roomId: string): {
+    id: string;
+    name: string;
+    level: BotLevel;
+    standIn?: { since: number; style: StandInStyle | null };
+  }[] {
+    const bots = this.db
       .prepare('SELECT id, name, bot_level FROM seats WHERE room_id = ? AND bot = 1 AND departed = 0')
       .all(roomId)
       .map((row) => ({
@@ -850,6 +896,36 @@ export class Store {
         name: row.name as string,
         level: ((row.bot_level as string | null) ?? 'steady') as BotLevel,
       }));
+    const standIns = this.db
+      .prepare(
+        `SELECT i.player_id AS id, s.name AS name, i.level AS level, i.since AS since, i.style AS style
+         FROM seat_standins i JOIN seats s ON s.id = i.player_id WHERE i.room_id = ?`,
+      )
+      .all(roomId)
+      .map((row) => ({
+        id: row.id as string,
+        name: row.name as string,
+        level: ((row.level as string | null) ?? STANDIN_LEVEL) as BotLevel,
+        standIn: {
+          since: row.since as number,
+          style: row.style ? parseStandInStyle(JSON.parse(row.style as string)) : null,
+        },
+      }));
+    return [...bots, ...standIns];
+  }
+  /** Which seats in a room a bot is currently holding. */
+  standInIds(roomId: string): string[] {
+    return this.db
+      .prepare('SELECT player_id FROM seat_standins WHERE room_id = ?')
+      .all(roomId)
+      .map((row) => row.player_id as string);
+  }
+  /** Remember how the absent player was playing. Written once per handover by
+   *  the driver, which is where the decision service lives. */
+  saveStandInStyle(roomId: string, playerId: string, style: StandInStyle): void {
+    this.db
+      .prepare('UPDATE seat_standins SET style = ? WHERE room_id = ? AND player_id = ?')
+      .run(JSON.stringify(style), roomId, playerId);
   }
   /** Remember that this account was here. Called on the presence heartbeat, so
    *  it is written often and read rarely. */
@@ -975,7 +1051,18 @@ export class Store {
     });
   }
   private writePresence(roomId: string, state: Presence) {
-    const deadlines = Object.values(state.seats).map((seat) => seat.resignAt);
+    // Two deadlines matter for an absent seat: the short one, after which a bot
+    // picks it up, and the long one, after which a table nobody is sitting at
+    // is finally abandoned. A seat a bot already holds has only the second one
+    // left, so the room stops coming up due every tick.
+    const standing = new Set(this.standInIds(roomId));
+    const deadlines = Object.entries(state.seats).map(([id, seat]) =>
+      // A paused room has nobody to stand in for, and a seat already held has
+      // only the long deadline left, so neither is woken early.
+      state.pausedAt !== undefined || standing.has(id)
+        ? seat.resignAt
+        : Math.min(seat.resignAt, seat.disconnectedAt + STANDIN_AFTER_MS),
+    );
     this.db
       .prepare(
         'INSERT INTO room_presence(room_id,state,next_deadline) VALUES(?,?,?) ON CONFLICT(room_id) DO UPDATE SET state=excluded.state,next_deadline=excluded.next_deadline',
@@ -986,6 +1073,8 @@ export class Store {
     if (!this.trackPresence) return;
     if (game.phase === 'finished') {
       this.db.prepare('DELETE FROM room_presence WHERE room_id=?').run(roomId);
+      // The game is over, so nothing is being held for anybody any more.
+      this.db.prepare('DELETE FROM seat_standins WHERE room_id=?').run(roomId);
       return;
     }
     const old = this.presence(roomId),
@@ -1014,7 +1103,11 @@ export class Store {
   /** Call only for admitted sockets, after replacement checks. A returning resigned seat can watch. */
   setConnected(seat: Seat, connected: boolean) {
     if (!this.trackPresence) return;
-    if (connected) this.expireAbsences(seat.room_id);
+    if (connected) {
+      this.expireAbsences(seat.room_id);
+      // They are back, so the seat is theirs again before anything else reads it.
+      this.transaction(() => this.endStandIn(seat.room_id, seat.id));
+    }
     const nextConnected = new Set(this.connectedSeats);
     if (connected) nextConnected.add(seat.id);
     else nextConnected.delete(seat.id);
@@ -1060,34 +1153,111 @@ export class Store {
   private expireAbsences(roomId: string): boolean {
     const presence = this.presence(roomId);
     if (!presence) return false;
-    const due = Object.entries(presence.seats)
-      .filter(([id, absence]) => !this.connectedSeats.has(id) && absence.resignAt <= this.now())
-      .map(([id]) => id);
-    if (!due.length) return false;
+    const now = this.now();
+    const absent = Object.entries(presence.seats).filter(([id]) => !this.connectedSeats.has(id));
+    const holding = new Set(this.standInIds(roomId));
+    // A seat that has been empty for half a minute is picked up by a bot, so
+    // one person's dropped connection does not stop the game for everyone else.
+    // Only while somebody is still at the table: a paused room has nobody to
+    // keep playing for, and a bot playing to an empty room is just noise.
+    const takeOver =
+      presence.pausedAt !== undefined
+        ? []
+        : absent
+            .filter(([id, absence]) => !holding.has(id) && absence.disconnectedAt + STANDIN_AFTER_MS <= now)
+            .map(([id]) => id);
+    // Resignation is now only for a table nobody is sitting at. While anyone is
+    // still watching, an absent player keeps their pieces, their points and
+    // their place, and a bot plays their turns until they come back.
+    const abandoned =
+      presence.pausedAt === undefined
+        ? []
+        : absent.filter(([, absence]) => absence.resignAt <= now).map(([id]) => id);
+    if (!takeOver.length && !abandoned.length) return false;
     return this.transaction(() => {
       const current = this.loadGame(roomId);
       if (!current || current.phase === 'finished') return false;
-      const next = resignPlayers(current, due, {
-        reason: 'disconnect',
-        winnerEligibleIds: [...this.connectedSeats],
-      });
-      if (next === current) {
-        this.updatePresence(roomId, current);
-        return false;
+      if (abandoned.length) {
+        const next = resignPlayers(current, abandoned, {
+          reason: 'disconnect',
+          winnerEligibleIds: [...this.connectedSeats],
+        });
+        if (next === current) {
+          this.updatePresence(roomId, current);
+          return false;
+        }
+        this.db.prepare('DELETE FROM seat_standins WHERE room_id=?').run(roomId);
+        this.saveLifecycle(
+          roomId,
+          current,
+          next,
+          'resign-' +
+            hash(JSON.stringify({ roomId, revision: this.snapshot(roomId).revision, abandoned })).slice(
+              0,
+              48,
+            ),
+          abandoned.length === 1 ? abandoned[0]! : null,
+          { kind: 'resign', players: abandoned },
+          next.finishReason === 'abandoned' ? 'abandoned' : 'resign',
+          true,
+        );
+        return true;
       }
+      let state = current;
+      const taken: string[] = [];
+      for (const id of takeOver) {
+        const next = noteStandIn(state, id, true);
+        if (next === state) continue;
+        this.db
+          .prepare(
+            'INSERT OR REPLACE INTO seat_standins(room_id, player_id, since, level, style) VALUES (?, ?, ?, ?, NULL)',
+          )
+          .run(roomId, id, now, STANDIN_LEVEL);
+        state = next;
+        taken.push(id);
+      }
+      if (!taken.length) return false;
       this.saveLifecycle(
         roomId,
         current,
-        next,
-        'resign-' +
-          hash(JSON.stringify({ roomId, revision: this.snapshot(roomId).revision, due })).slice(0, 48),
-        due.length === 1 ? due[0]! : null,
-        { kind: 'resign', players: due },
-        next.finishReason === 'abandoned' ? 'abandoned' : 'resign',
+        state,
+        'standin-' +
+          hash(JSON.stringify({ roomId, revision: this.snapshot(roomId).revision, taken })).slice(0, 48),
+        taken.length === 1 ? taken[0]! : null,
+        { kind: 'standIn', players: taken },
+        'standIn',
         true,
       );
       return true;
     });
+  }
+  /**
+   * Hand a seat back.
+   *
+   * Called the moment its player reconnects, inside the same transaction that
+   * records their return, so there is never a window where both the person and
+   * the bot believe the seat is theirs.
+   */
+  private endStandIn(roomId: string, playerId: string): boolean {
+    if (!this.db.prepare('SELECT 1 FROM seat_standins WHERE room_id=? AND player_id=?').get(roomId, playerId))
+      return false;
+    this.db.prepare('DELETE FROM seat_standins WHERE room_id=? AND player_id=?').run(roomId, playerId);
+    const current = this.loadGame(roomId);
+    if (!current || current.phase === 'finished') return false;
+    const next = noteStandIn(current, playerId, false);
+    if (next === current) return false;
+    this.saveLifecycle(
+      roomId,
+      current,
+      next,
+      'resumed-' +
+        hash(JSON.stringify({ roomId, revision: this.snapshot(roomId).revision, playerId })).slice(0, 48),
+      playerId,
+      { kind: 'standInEnded', player: playerId },
+      'standIn',
+      true,
+    );
+    return true;
   }
   /** Lifecycle changes and their private/public projections share the caller's transaction. */
   private saveLifecycle(
@@ -1118,6 +1288,11 @@ export class Store {
     if (!lines.length && kind === 'leave')
       lines.push(`${next.players.find((p) => p.id === actor)?.name ?? 'A player'} left the room.`);
     this.recordEvent(roomId, revision, commandId, actor, action, next, lines, kind, automatic);
+    // Nobody is held for a seat that has resigned, whichever way it got there:
+    // leaving, being removed, or a table that was finally abandoned.
+    for (const player of next.players)
+      if (player.resigned)
+        this.db.prepare('DELETE FROM seat_standins WHERE room_id=? AND player_id=?').run(roomId, player.id);
     this.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(next), roomId);
     this.db.prepare('UPDATE rooms SET revision=? WHERE id=?').run(revision, roomId);
     this.updateClock(roomId, next);
@@ -1339,7 +1514,7 @@ export class Store {
         for (const p of current.players)
           if (p.resigned) this.db.prepare('UPDATE seats SET departed=1 WHERE id=?').run(p.id);
         this.db.prepare('UPDATE seats SET ready=0 WHERE room_id=?').run(seat.room_id);
-        for (const table of ['games', 'turn_clocks', 'room_presence', 'room_boards'])
+        for (const table of ['games', 'turn_clocks', 'room_presence', 'room_boards', 'seat_standins'])
           this.db.prepare('DELETE FROM ' + table + ' WHERE room_id=?').run(seat.room_id);
         this.db
           .prepare(

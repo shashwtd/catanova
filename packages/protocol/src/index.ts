@@ -65,6 +65,9 @@ export type RoomPlayer = {
   profile?: Profile;
   /** What this seat asked to be. Absent means "whatever is free". */
   color?: PlayerColor;
+  /** A bot is playing this seat while its player is away. They keep their
+   *  pieces, their hand and their points; only the turns are being covered. */
+  standIn?: true;
   ready?: boolean;
   disconnectedAt?: number;
   resignAt?: number;
