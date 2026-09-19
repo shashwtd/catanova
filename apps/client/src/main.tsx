@@ -52,7 +52,7 @@ import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.j
 import { initialMetrics } from './connection.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { mountApp } from './mount-app.js';
 import {
@@ -123,6 +123,9 @@ import './hub-entry-refinement.css';
 import './landing-features.css';
 import './room-seats.css';
 import './mobile-shelf.css';
+
+/** One shared empty list, so `glowHexes` is not a new array every render. */
+const NO_GLOW: number[] = [];
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -359,6 +362,25 @@ function App() {
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
   }, [placement]);
+  /**
+   * The board is dealt once and never changes, but every state message arrives
+   * as fresh JSON, so `g.board` was a new object each time and the scenery was
+   * rebuilt with it. Pinning it to the seed lets the static half of the board
+   * render once for the whole game.
+   */
+  const stableBoard = useMemo(() => g?.board, [g?.board.seed]);
+  /**
+   * Stable handler identities. Defined inline they changed on every render,
+   * which defeats the board's memo on its own; the ref keeps the identity
+   * fixed while always calling the current logic.
+   */
+  const handlers = useRef({ previewPlacement: (_: GameAction) => {}, chooseRobber: (_: number) => {} });
+  const onBoardAction = useCallback((action: GameAction) => handlers.current.previewPlacement(action), []);
+  const onBoardRobber = useCallback((hex: number) => handlers.current.chooseRobber(hex), []);
+  // Both are hoisted declarations further down, so this reads them fresh on
+  // every render while the identities the board sees never change.
+  handlers.current = { previewPlacement, chooseRobber };
+
   function previewPlacement(action: GameAction) {
     if (disabled || !g || !room || !me) return;
     if (!isBuildAction(action)) {
@@ -911,17 +933,17 @@ function App() {
           <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
             <Board
               art={BOARD_THEMES[preferences.boardTheme]}
-              board={g.board}
+              board={stableBoard ?? g.board}
               game={presentedGame ?? g}
-              glowHexes={reducedMotion ? [] : feedback.event?.glowHexes}
+              glowHexes={reducedMotion ? NO_GLOW : feedback.event?.glowHexes}
               effectId={feedback.event?.id}
               me={me}
               mode={mode}
               disabled={disabled}
               selectedRobberHex={robberHex}
               pendingBuild={placementReady ? placement?.action : null}
-              onAction={previewPlacement}
-              onRobber={chooseRobber}
+              onAction={onBoardAction}
+              onRobber={onBoardRobber}
             />
           </BoardViewport>
           <ReactionLayer flying={reactions.flying} />
