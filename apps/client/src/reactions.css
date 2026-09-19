@@ -327,80 +327,29 @@
   }
 }
 
-/* Nervous: a fast, small tremble that never quite settles. */
-.motion-jitter .reaction-face {
-  animation-name: motion-jitter;
+/* Clown: a springy squash and a wobble, like a horn being pressed. */
+.motion-honk .reaction-face {
+  animation-name: motion-honk;
 }
-@keyframes motion-jitter {
+@keyframes motion-honk {
   0%,
   100% {
-    transform: translate(0, 0) rotate(0deg);
+    transform: scale(1, 1) rotate(0deg);
   }
-  10% {
-    transform: translate(-1.5px, 1px) rotate(-2deg);
+  12% {
+    transform: scale(1.22, 0.82) rotate(-6deg);
   }
-  20% {
-    transform: translate(1.5px, -1px) rotate(2deg);
-  }
-  30% {
-    transform: translate(-1.5px, -1px) rotate(-2deg);
+  26% {
+    transform: scale(0.88, 1.16) rotate(5deg);
   }
   40% {
-    transform: translate(1.5px, 1px) rotate(2deg);
+    transform: scale(1.12, 0.92) rotate(-4deg);
   }
-  50% {
-    transform: translate(-1.5px, 1px) rotate(-2deg) scale(1.04);
+  56% {
+    transform: scale(0.95, 1.06) rotate(3deg);
   }
-  60% {
-    transform: translate(1.5px, -1px) rotate(2deg);
-  }
-  70% {
-    transform: translate(-1.5px, 0) rotate(-1deg);
-  }
-  85% {
-    transform: translate(1px, 0) rotate(1deg);
-  }
-}
-
-/* Roll already: sags to one side and waits, and waits. */
-.motion-drift .reaction-face {
-  animation-name: motion-drift;
-}
-@keyframes motion-drift {
-  0% {
-    transform: rotate(0deg) scale(1);
-  }
-  40% {
-    transform: rotate(9deg) translateY(3px) scale(0.98);
-  }
-  75% {
-    transform: rotate(13deg) translateY(5px) scale(0.96);
-  }
-  100% {
-    transform: rotate(15deg) translateY(6px) scale(0.95);
-  }
-}
-
-/* Cheeky: a quick pop and a tilt, pleased with itself. */
-.motion-cheeky .reaction-face {
-  animation-name: motion-cheeky;
-}
-@keyframes motion-cheeky {
-  0% {
-    transform: rotate(0deg) scale(1);
-  }
-  18% {
-    transform: rotate(-14deg) scale(1.18);
-  }
-  32% {
-    transform: rotate(6deg) scale(0.96);
-  }
-  48% {
-    transform: rotate(-9deg) scale(1.09);
-  }
-  70%,
-  100% {
-    transform: rotate(-7deg) scale(1.03);
+  74% {
+    transform: scale(1.05, 0.97) rotate(-2deg);
   }
 }
 
@@ -504,11 +453,12 @@
 .reaction-choice {
   display: grid;
   place-items: center;
-  /* The face is the whole of the button. The padding it used to sit inside was
-     spent on nothing: there is no label and no frame to clear. */
-  width: 50px;
-  height: 50px;
-  padding: 1px;
+  /* Six pixels of air around each face: enough that they read as separate
+     tokens rather than a sheet of stickers, and not so much that the drawing
+     is the small part of the button. */
+  width: 44px;
+  height: 44px;
+  padding: 6px;
   border: 0;
   border-radius: 10px;
   background: none;
@@ -561,10 +511,9 @@
   /* As wide as the button it hangs from, and no wider: a column of faces, not
      a panel. The faces take the width the padding used to. */
   .reaction-tray {
-    /* A little wider than the button it hangs from. It was exactly the
-       button's width, which made a tidy column of faces smaller than they
-       needed to be for the space the column already occupies. */
-    width: calc(var(--game-tool-edge, 44px) + 10px);
+    /* Exactly as wide as the button it hangs from, so the column reads as that
+       button unrolled rather than as a panel that happens to be near it. */
+    width: var(--game-tool-edge, 44px);
     /* No border and no padding: at this width every pixel spent on the frame
        comes straight off the faces, which are the point. A face is a circle of
        exactly the tray's width, and the pill's end caps are semicircles of the
@@ -591,7 +540,7 @@
     width: 100%;
     height: auto;
     aspect-ratio: 1;
-    padding: 0;
+    padding: 6px;
     border-radius: 999px;
   }
   .reaction-scroll::-webkit-scrollbar {

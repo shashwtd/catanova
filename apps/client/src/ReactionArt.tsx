@@ -8,7 +8,7 @@
  *
  * Every face is built the same way — a wax disc, a soft highlight, and brows,
  * eyes and a mouth drawn in one ink. Keeping the construction identical is what
- * makes fourteen separate feelings read as one set, so the expression is the
+ * makes twelve separate feelings read as one set, so the expression is the
  * only thing that changes between them.
  */
 
@@ -96,6 +96,30 @@ const REACTION_FACES: Record<ReactionName, React.ReactElement> = {
       <path d="M11 23.2c3.5 1.6 7.2-.5 8.6-3.4" />
     </Face>
   ),
+  /* A seven. Again. */
+  shock: (
+    <Face wax="#ead4a2" rim="#9b8352">
+      <path d="M7.9 10.2c1.5-1.7 4-1.9 5.7-.6" strokeWidth="1.7" />
+      <path d="M24.1 10.2c-1.5-1.7-4-1.9-5.7-.6" strokeWidth="1.7" />
+      <circle cx="11.6" cy="15.4" r="3.2" fill={WHITE} strokeWidth="1.7" />
+      <circle cx="20.4" cy="15.4" r="3.2" fill={WHITE} strokeWidth="1.7" />
+      {dot(11.6, 15.6, 1.5)}
+      {dot(20.4, 15.6, 1.5)}
+      <ellipse cx="16" cy="24" rx="3" ry="3.6" fill={INK} stroke="none" />
+    </Face>
+  ),
+  /* You cannot be serious. */
+  eyeroll: (
+    <Face wax="#ccb68d" rim="#7f6c47">
+      <path d="M8.4 10.6h5.2" strokeWidth="1.7" />
+      <path d="M18.4 10.6h5.2" strokeWidth="1.7" />
+      <circle cx="11.6" cy="15.2" r="3.1" fill={WHITE} strokeWidth="1.7" />
+      <circle cx="20.4" cy="15.2" r="3.1" fill={WHITE} strokeWidth="1.7" />
+      {dot(11.6, 13.3, 1.4)}
+      {dot(20.4, 13.3, 1.4)}
+      <path d="M11.4 23.2h9.2" />
+    </Face>
+  ),
   /* Everything was going so well. */
   sad: (
     <Face wax="#7392aa" rim="#3b5468">
@@ -111,26 +135,12 @@ const REACTION_FACES: Record<ReactionName, React.ReactElement> = {
       />
     </Face>
   ),
-  /* A seven. Again. */
-  shock: (
-    <Face wax="#ead4a2" rim="#9b8352">
-      <path d="M7.9 10.2c1.5-1.7 4-1.9 5.7-.6" strokeWidth="1.7" />
-      <path d="M24.1 10.2c-1.5-1.7-4-1.9-5.7-.6" strokeWidth="1.7" />
-      <circle cx="11.6" cy="15.4" r="3.2" fill={WHITE} strokeWidth="1.7" />
-      <circle cx="20.4" cy="15.4" r="3.2" fill={WHITE} strokeWidth="1.7" />
-      {dot(11.6, 15.6, 1.5)}
-      {dot(20.4, 15.6, 1.5)}
-      <ellipse cx="16" cy="24" rx="3" ry="3.6" fill={INK} stroke="none" />
-    </Face>
-  ),
-  /* Credit where it is due. */
-  nice: (
-    <Face wax="#92bd5e" rim="#4d7a2c">
-      {dot(11.6, 14.6)}
-      {dot(20.4, 14.6)}
-      <path d="M10.2 20.6c1.6 4.2 10 4.2 11.6 0" strokeWidth="2.2" />
-      {spark(25.4, 8.2, 3.1, '#fff4cd')}
-      {spark(6.6, 21.6, 2.2, '#fff4cd')}
+  /* Ten points to the player on your left. */
+  dead: (
+    <Face wax="#9aa3a0" rim="#555f5d">
+      <path d="m9.3 12.8 4.6 4.4M13.9 12.8l-4.6 4.4" strokeWidth="2.1" />
+      <path d="m18.1 12.8 4.6 4.4M22.7 12.8l-4.6 4.4" strokeWidth="2.1" />
+      <path d="M11.8 23.4q1.4-1.6 2.8 0t2.8 0 2.8 0" strokeWidth="1.8" />
     </Face>
   ),
   /* Nobody rolls an eight four times in a row. */
@@ -144,18 +154,6 @@ const REACTION_FACES: Record<ReactionName, React.ReactElement> = {
       {dot(11.7, 16.5, 1.3)}
       {dot(20.4, 16.5, 1.3)}
       <path d="M11.6 23.6 20.6 22" />
-    </Face>
-  ),
-  /* You cannot be serious. */
-  eyeroll: (
-    <Face wax="#ccb68d" rim="#7f6c47">
-      <path d="M8.4 10.6h5.2" strokeWidth="1.7" />
-      <path d="M18.4 10.6h5.2" strokeWidth="1.7" />
-      <circle cx="11.6" cy="15.2" r="3.1" fill={WHITE} strokeWidth="1.7" />
-      <circle cx="20.4" cy="15.2" r="3.1" fill={WHITE} strokeWidth="1.7" />
-      {dot(11.6, 13.3, 1.4)}
-      {dot(20.4, 13.3, 1.4)}
-      <path d="M11.4 23.2h9.2" />
     </Face>
   ),
   /* One sheep. One. Please. */
@@ -172,52 +170,42 @@ const REACTION_FACES: Record<ReactionName, React.ReactElement> = {
       <path d="M13.2 24q1.4-1.4 2.8 0t2.8 0" strokeWidth="1.7" />
     </Face>
   ),
-  /* Counting your cards and hoping nobody rolls a seven. */
-  nervous: (
-    <Face wax="#ddca92" rim="#8d7b43">
-      <path d="M8.2 12.4c1.5-1.5 3.8-1.7 5.4-.6" strokeWidth="1.7" />
-      <path d="M23.8 12.4c-1.5-1.5-3.8-1.7-5.4-.6" strokeWidth="1.7" />
-      {dot(11.6, 16.6, 1.7)}
-      {dot(20.4, 16.6, 1.7)}
-      <path d="M10.6 22.8q1.35-2 2.7 0t2.7 0 2.7 0 2.7 0" strokeWidth="1.8" />
+  /* A decision so bad it deserves the full costume. */
+  clown: (
+    <Face wax="#f0e3d6" rim="#a08577">
+      <path d="M6.2 13.2a3.4 3.4 0 0 1 4.6-4.4" fill="#e2753a" stroke="none" />
+      <path d="M25.8 13.2a3.4 3.4 0 0 0-4.6-4.4" fill="#e2753a" stroke="none" />
+      <path d="M8.8 11.9c1.4-2 4-2 5.4 0" strokeWidth="1.8" />
+      <path d="M23.2 11.9c-1.4-2-4-2-5.4 0" strokeWidth="1.8" />
+      {dot(11.6, 15.6, 1.7)}
+      {dot(20.4, 15.6, 1.7)}
+      <circle cx="7.9" cy="19.6" r="2.4" fill="#ef9aa6" stroke="none" />
+      <circle cx="24.1" cy="19.6" r="2.4" fill="#ef9aa6" stroke="none" />
+      <path d="M10.2 22.2c2.2 3.8 9.4 3.8 11.6 0" strokeWidth="1.9" />
+      <circle cx="16" cy="19.1" r="2.7" fill="#e04b36" stroke="none" />
+      <circle cx="15.2" cy="18.3" r="0.9" fill="#fff" opacity="0.55" stroke="none" />
+    </Face>
+  ),
+  /* The roll of the game, and everybody heard about it. */
+  hype: (
+    <Face wax="#ef8c3c" rim="#9c4a12">
+      <path d="M8.4 11.2c1.5-1.9 4.1-1.9 5.6 0" strokeWidth="1.8" />
+      <path d="M23.6 11.2c-1.5-1.9-4.1-1.9-5.6 0" strokeWidth="1.8" />
+      {spark(11.6, 16, 3.4, WHITE)}
+      {spark(20.4, 16, 3.4, WHITE)}
       <path
-        d="M25.4 7.6c1.7 2.2 2.5 3.3 2.5 4.1a2.5 2.5 0 0 1-5 0c0-.8.8-1.9 2.5-4.1z"
-        fill={TEAR}
-        stroke="none"
+        d="M9.6 20.8h12.8c0 4.2-2.9 7.2-6.4 7.2s-6.4-3-6.4-7.2z"
+        fill={INK}
+        stroke={INK}
+        strokeWidth="1.4"
       />
-    </Face>
-  ),
-  /* Your turn. Still your turn. */
-  bored: (
-    <Face wax="#a9a08b" rim="#655f4f">
-      <path d="M8.4 11.4h5.2" strokeWidth="1.6" />
-      <path d="M18.4 11.4h5.2" strokeWidth="1.6" />
-      <path d="M8.6 15.4h5.4" />
-      <path d="M18 15.4h5.4" />
-      <path d="M8.8 15.6c1.3 1.5 4.1 1.5 5.4 0" strokeWidth="1.4" />
-      <path d="M18.2 15.6c1.3 1.5 4.1 1.5 5.4 0" strokeWidth="1.4" />
-      <path d="M11.6 23h8.8" />
-    </Face>
-  ),
-  /* Traded you a brick. Took your port. */
-  wink: (
-    <Face wax="#eac05a" rim="#9f7a26">
-      <path d="M7.9 14.8c1.5-2.8 4.4-2.8 5.9 0" />
-      {dot(20.6, 14.4)}
-      <path d="M10.4 20.4h11.2c0 3.5-2.5 6-5.6 6s-5.6-2.5-5.6-6z" fill={INK} stroke={INK} strokeWidth="1.4" />
       <path
-        d="M13.4 24.4c1-.8 4.2-.8 5.2 0 .4.4-.7 2.1-2.6 2.1s-3-1.7-2.6-2.1z"
+        d="M13.4 25.1c1-.9 4.2-.9 5.2 0 .4.4-.7 2.1-2.6 2.1s-3-1.7-2.6-2.1z"
         fill={TONGUE}
         stroke="none"
       />
-    </Face>
-  ),
-  /* Ten points to the player on your left. */
-  dead: (
-    <Face wax="#9aa3a0" rim="#555f5d">
-      <path d="m9.3 12.8 4.6 4.4M13.9 12.8l-4.6 4.4" strokeWidth="2.1" />
-      <path d="m18.1 12.8 4.6 4.4M22.7 12.8l-4.6 4.4" strokeWidth="2.1" />
-      <path d="M11.8 23.4q1.4-1.6 2.8 0t2.8 0 2.8 0" strokeWidth="1.8" />
+      {spark(26.4, 7.6, 2.6, '#ffe08a')}
+      {spark(5.8, 9.8, 1.9, '#ffe08a')}
     </Face>
   ),
 };

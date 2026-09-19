@@ -68,7 +68,7 @@ test('accepted reactions reach each player and spectator once, without revisions
   assert.equal(a.reactions().length, 1);
   for (let i = 0; i < 3; i++) {
     now += 500;
-    a.send({ type: 'react', reaction: 'nice' });
+    a.send({ type: 'react', reaction: 'hype' });
     await until(() => watcher.reactions().length === i + 2);
   }
   now += 500;
