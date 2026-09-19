@@ -425,24 +425,59 @@
   stroke: #674823;
   stroke-width: 1.5;
 }
+/* ------------------------------------------------------------------ *
+ * Results
+ *
+ * The old screen gave the winner's total and then a row of trivia:
+ * "most roads", which every player has fifteen of and which scores
+ * nothing. What it never said was the thing everyone actually wants at
+ * the end of a game — why this person won. So the hero now carries the
+ * arithmetic of the win, every row carries its own, and the two awards
+ * that were genuinely contested get named instead of counted.
+ *
+ * The palette was also too close to the wood behind it. Body text sits
+ * near 7:1 against the plank now rather than the 2:1 it was.
+ * ------------------------------------------------------------------ */
 .game-over-hero {
   text-align: center;
   position: relative;
   padding-top: 6px;
 }
+/* A badge pinned to the portrait rather than a trophy floating off beside the
+   name, where it read as a stray sticker. */
 .game-over-laurel {
   position: absolute;
-  top: 0;
-  left: calc(50% + 32px);
-  transform: rotate(12deg);
+  right: -12px;
+  bottom: -12px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid #f0d08b;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #4a3c24, #241c11);
+  box-shadow: 0 4px 10px #0a0f0c8c;
 }
-.game-over-hero > .avatar-medallion {
-  width: 94px;
-  height: 94px;
+/* The winner's own colour, as a ring: the same one their roads were. */
+.game-over-winner-portrait {
+  position: relative;
+  display: block;
+  width: 100px;
+  height: 100px;
   margin: 0 auto;
+  padding: 4px;
+  border: 4px solid var(--player-color, #e2b45e);
+  border-radius: 20px;
+  background: #1d2620;
+  box-shadow: 0 6px 18px #0b120e7a;
+}
+.game-over-winner-portrait .avatar-medallion {
+  width: 100%;
+  height: 100%;
+  border-radius: 13px;
 }
 .game-over-hero p {
-  color: #d5bc85;
+  color: #e8cf9f;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 12px;
@@ -450,112 +485,249 @@
 }
 .game-over-hero h1 {
   font:
-    700 clamp(24px, 4vw, 36px)/1.15 Cinzel,
+    700 clamp(26px, 4vw, 38px)/1.15 Cinzel,
     serif;
-  margin: 0 0 8px;
-  color: #fff1c8;
+  margin: 0 0 10px;
+  color: #fff6dd;
   overflow-wrap: anywhere;
 }
-.game-over-hero > span {
+.game-over-hero .game-over-total {
+  margin: 0;
+  color: #f3e2bf;
   font:
-    500 14px/1.4 Barlow,
+    500 15px/1.4 Barlow,
     sans-serif;
-  color: #e3c9a6;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.game-over-hero .game-over-total b {
+  font:
+    700 20px/1 Barlow,
+    sans-serif;
+  color: #ffdf9e;
+}
+/* The reason, as the sum that produced it. */
+.game-over-reason {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.game-over-reason li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid #e6c48540;
+  border-radius: 999px;
+  background: #2a2117b8;
+  color: #f6e8ca;
+  font:
+    500 13px/1.2 Barlow,
+    sans-serif;
+}
+.game-over-reason b {
+  color: #ffd98f;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .game-over-standings {
   display: grid;
   gap: 0;
-  margin-top: 24px;
-  border-block: 1px solid #e3bb7b45;
+  margin-top: 26px;
+  border-top: 1px solid #e3bb7b50;
+}
+.game-over-standings-heading {
+  margin: 16px 0 6px;
+  color: #e8cf9f;
+  font:
+    600 12px/1 Barlow,
+    sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 .game-over-player {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px 46px 1fr auto;
   align-items: center;
-  gap: 12px;
-  padding: 12px 8px;
+  gap: 14px;
+  padding: 13px 6px;
   border: 0;
-  border-bottom: 1px solid #efd7ae18;
+  border-top: 1px solid #efd7ae1f;
   border-radius: 0;
   background: transparent;
 }
 .game-over-player.is-winner {
-  background: linear-gradient(90deg, transparent, #ffe1a322, transparent);
+  background: linear-gradient(90deg, #ffe1a316, #ffe1a326 45%, transparent);
+}
+.game-over-player.has-resigned {
+  opacity: 0.72;
 }
 .game-over-place {
-  flex: none;
-  width: 15px;
-  font-size: 17px;
-  color: #a99475;
+  width: 18px;
+  font:
+    700 18px/1 Barlow,
+    sans-serif;
+  color: #d3bc93;
+  font-variant-numeric: tabular-nums;
 }
-.game-over-player > .avatar-medallion {
+/* Colour again, and the only thing in the row that carries it, so scanning
+   for yourself is one glance rather than reading four names. */
+.game-over-player-portrait {
+  display: block;
   width: 46px;
   height: 46px;
-  flex: none;
+  padding: 2px;
+  border: 3px solid var(--player-color, #9a8a6b);
+  border-radius: 12px;
+  background: #1d2620;
+}
+.game-over-player-portrait .avatar-medallion {
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
 }
 .game-over-player-details {
-  flex: 1;
   min-width: 0;
 }
 .game-over-player-details > strong {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 17px;
+  color: #fff3d8;
   overflow-wrap: anywhere;
 }
-.game-over-player-details > span {
-  display: block;
-  font-size: 12px;
-  color: #e3cfb0;
-  margin-top: 5px;
+.game-over-resigned {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #4a332eb0;
+  color: #f0c6b6;
+  font:
+    600 10px/1.4 Barlow,
+    sans-serif;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.game-over-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.game-over-parts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #ffffff0f;
+  color: #efdcb9;
+  font:
+    500 12px/1.3 Barlow,
+    sans-serif;
+}
+.game-over-parts b {
+  color: #ffd98f;
+  font-variant-numeric: tabular-nums;
+}
+/* The two that were contested rather than accumulated. */
+.game-over-parts li[data-part='longestRoad'],
+.game-over-parts li[data-part='largestArmy'] {
+  background: #e6bd6c22;
+  color: #ffe6ae;
+}
+.game-over-parts li[data-part='none'] {
+  background: none;
+  color: #cbb996;
+  padding-left: 0;
 }
 .game-over-score {
   text-align: center;
+  min-width: 56px;
 }
 .game-over-score b {
   display: block;
   font:
-    700 29px/1 Barlow,
+    700 30px/1 Barlow,
     sans-serif;
   color: #ffe1a2;
+  font-variant-numeric: tabular-nums;
 }
 .game-over-score small {
   display: block;
-  color: #b9a78a;
+  color: #d5c3a2;
   font-size: 11px;
   margin-top: 4px;
 }
-.game-over-awards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+/* What the match was, in three facts that are true of the match rather than
+   of one player's supply of wooden sticks. */
+.game-over-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 14px 4px 0;
+  border-top: 1px solid #e3bb7b50;
 }
-.game-over-awards:empty {
-  display: none;
+.game-over-facts > div {
+  min-width: 0;
 }
-.game-over-awards > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: #e8cd8d;
-  font-size: 12px;
-  margin-top: 5px;
+.game-over-facts dt {
+  color: #e0c79a;
+  font:
+    600 11px/1 Barlow,
+    sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
-.game-over-highlights {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin: 8px 0;
+.game-over-facts dd {
+  margin: 6px 0 0;
+  color: #fff3d8;
+  font:
+    500 14px/1.3 Barlow,
+    sans-serif;
+  overflow-wrap: anywhere;
 }
-.game-over-highlights > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  font-size: 13px;
-}
-.game-over-highlights small {
-  display: block;
-  color: #dfc398;
-  margin-bottom: 4px;
+@media (max-width: 560px) {
+  .game-over-plank {
+    padding: 26px 20px 24px;
+  }
+  .game-over-player {
+    grid-template-columns: 16px 40px 1fr auto;
+    gap: 10px;
+  }
+  .game-over-player-portrait {
+    width: 40px;
+    height: 40px;
+  }
+  .game-over-score b {
+    font-size: 25px;
+  }
+  /* A pill is wider than the words in it, and this column is barely wider than
+     the words, so the boxes bought nothing and cost a line each. Plain lines. */
+  .game-over-parts {
+    gap: 1px 10px;
+  }
+  .game-over-parts li {
+    padding: 0;
+    background: none;
+  }
+  .game-over-parts li[data-part='longestRoad'],
+  .game-over-parts li[data-part='largestArmy'] {
+    background: none;
+  }
+  .game-over-reason li {
+    padding: 4px 9px;
+    font-size: 12px;
+  }
 }
 .game-over-actions {
   display: flex;

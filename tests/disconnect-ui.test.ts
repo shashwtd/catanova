@@ -89,12 +89,12 @@ test('profiles and turn prompts distinguish reconnecting, paused, resigned and r
       onQuit: () => {},
     }),
   );
-  assert.match(results, /Bob wins!/);
+  assert.match(results, /Bob wins</);
   assert.match(results, /results-timber/);
   assert.doesNotMatch(results, /Dice statistics|dice-histogram/);
-  assert.match(results, /Victory by resignation/);
+  assert.match(results, /Won by resignation/);
   assert.match(results, /Return to lobby/);
-  assert.ok(!finished.includes('Auto-resign'));
+  assert.ok(!finished.includes('Away'));
   view.winner = null;
   view.finishReason = 'abandoned';
   assert.equal(gameStatus(view, 'b', room).prompt, 'Game ended — everyone left');

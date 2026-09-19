@@ -208,8 +208,15 @@ test('results rank the ten-point winner above an eight-point first seat, includi
   );
   const rows = html.match(/<article class="game-over-player[^]*?<\/article>/g)!;
   assert.match(rows[0]!, /is-winner/);
-  assert.match(rows[0]!, /game-over-place">1<.*<strong>Player 2<.*<b>10</);
-  assert.match(rows[1]!, /game-over-place">2<.*<strong>Player 1<.*<b>8</);
+  assert.match(rows[0]!, /game-over-place"[^>]*>1<[^]*<strong>Player 2<[^]*<b>10</);
+  assert.match(rows[1]!, /game-over-place"[^>]*>2<[^]*<strong>Player 1<[^]*<b>8</);
+  // Every row says where its score came from, not just what it came to.
+  assert.match(rows[0]!, /How Player 2 scored/);
+  assert.match(html, /Final standings/);
+  // "Most roads" is gone: everyone has fifteen and spending them scores nothing.
+  assert.ok(!html.includes('Most roads'));
+  assert.match(html, /<dt>Longest Road<\/dt>/);
+  assert.match(html, /<dt>Largest Army<\/dt>/);
 });
 
 test('the declared winner leads resignation results and equal-score rivals share places', () => {
