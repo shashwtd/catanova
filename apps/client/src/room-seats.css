@@ -327,3 +327,37 @@
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * The room's header on a phone
+ *
+ * Three columns of [leave · wordmark · friends] put the leave button in
+ * the top-left corner, which is where the game's name should be, and
+ * squeezed the name into a middle column narrow enough to wrap the
+ * button's label onto two lines. The name takes the left, and the two
+ * things you might press take the right.
+ * ------------------------------------------------------------------ */
+@media (max-width: 700px) {
+  .room-lobby .lobby-heading {
+    grid-template-columns: auto 1fr auto;
+  }
+  /* The row has to be named as well as the column: placing the leave button
+     in the last column while it is still first in the markup otherwise sends
+     everything after it onto a second row. */
+  .room-lobby .lobby-heading > * {
+    grid-row: 1;
+  }
+  .room-lobby .lobby-heading .lobby-wordmark {
+    grid-column: 1;
+    justify-self: start;
+  }
+  .room-lobby .lobby-heading .lobby-tools {
+    grid-column: 2;
+    justify-self: end;
+  }
+  .room-lobby .lobby-heading .lobby-back {
+    grid-column: 3;
+    justify-self: end;
+    white-space: nowrap;
+  }
+}

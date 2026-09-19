@@ -119,26 +119,25 @@
     display: contents;
   }
 
-  /* The table. */
+  /* The wrappers group things on a wide screen; here the dock places their
+     children itself, so both step out of the way. */
   .playing .hand-dock-separated .card-table {
+    display: contents;
+  }
+
+  /* The table: what you own, along the bottom. */
+  .playing .hand-dock-separated .hand-zone {
     grid-column: 1 / 4;
     grid-row: 2;
-    /* Wide-screen rules pin this to the right of its space; here it is the
-       table itself and runs the width it is given. */
     justify-self: stretch;
     align-self: end;
-    justify-content: center;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 7px;
     width: auto;
-    max-width: none;
     height: auto;
     min-width: 0;
-    /* Only as tall as what it holds. It used to stretch to match the dice
-       beside it, which put twenty empty pixels around a row of five numbers. */
-    padding: 7px var(--shelf-pad);
+    justify-content: space-between;
+    align-items: center;
+    gap: 2px;
+    padding: 10px var(--shelf-pad);
     border: 1px solid #c8a87845;
     border-radius: 13px;
     background: linear-gradient(#2c2620f2, #211c17f7);
@@ -149,14 +148,6 @@
   }
   .playing .hand-dock-separated .card-table::before {
     content: none;
-  }
-  .playing .hand-dock-separated .hand-zone {
-    width: 100%;
-    height: auto;
-    min-width: 0;
-    justify-content: space-between;
-    align-items: center;
-    gap: 2px;
   }
   .playing .hand-dock-separated .resource-hand.resource-counters {
     width: 100%;
@@ -170,39 +161,64 @@
     min-width: 0;
     justify-content: center;
   }
-  /* Cards in hand belong with the rest of what you are holding, so they sit
-     inside the table rather than starting a row of their own. */
-  .playing .hand-dock-separated .development-tray {
-    justify-content: center;
-    margin: 0;
-  }
 
-  /* What you can do, on the line above the table. */
-  .playing .hand-dock-separated .purchase-control {
+  /* The line above it, left to right: trade, buy, and the cards you hold.
+     The cards used to open a row of their own, which took sixty more pixels
+     off the board the moment you bought one. They sit on this line instead. */
+  .playing .hand-dock-separated .utility-actions {
     grid-column: 1;
     grid-row: 1;
   }
-  .playing .hand-dock-separated .utility-actions {
+  .playing .hand-dock-separated .purchase-control {
     grid-column: 2;
     grid-row: 1;
   }
-
-  /* The dice: their own tile down the right, clear of the table, with the
-     throw landing directly above the button that threw it. */
-  /* The throw lands in the one part of the row that is otherwise empty. */
-  .playing .hand-dock-separated [data-dice-dock] {
+  .playing .hand-dock-separated .development-tray {
     grid-column: 3;
     grid-row: 1;
-    justify-self: center;
     align-self: center;
+    justify-content: flex-start;
+    min-width: 0;
+    gap: 4px;
+    margin: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
   }
-  /* The one action is the tallest thing down here, and it stands on the same
-     line as the table rather than forcing the table's row to its own height. */
+  .playing .hand-dock-separated .development-tray::-webkit-scrollbar {
+    display: none;
+  }
+  /* The fan carries 38px of vertical padding for a hover lift there is no
+     hover for here, which was most of what made a bought card cost the board
+     sixty pixels. Two pixels is enough for the card's own shadow. */
+  .playing .hand-dock.hand-dock-separated .development-tray .development-fan {
+    gap: 4px;
+    padding: 2px 0;
+  }
+  .playing .hand-dock.hand-dock-separated .development-tray :is(.development-slot, .development-card) {
+    width: 44px;
+    height: 60px;
+  }
+
+  /* The dice, and the button that throws them, down the right. The throw goes
+     above the button rather than out in the middle of the row: that corner is
+     empty until you roll, and this puts the result where it came from. */
+  .playing .hand-dock-separated [data-dice-dock] {
+    grid-column: 4;
+    grid-row: 1;
+    align-self: start;
+    justify-self: center;
+  }
   .playing .hand-dock-separated .turn-action {
     grid-column: 4;
     grid-row: 1 / -1;
     align-self: end;
     justify-self: center;
+  }
+  /* Both of these keep their height and take a little more width, which is
+     what they needed: they were two narrow slabs beside a wide table. */
+  .playing .hand-dock.hand-dock-separated .table-actions :is(.trade-action, .development-buy) {
+    width: 58px;
   }
 
   /* Trade and the turn action carry their words here as they do everywhere

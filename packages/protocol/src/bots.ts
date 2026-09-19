@@ -31,14 +31,34 @@ export const BOT_LEVEL_LABEL: Record<BotLevel, string> = {
 };
 
 /**
+ * How often each one turns up.
+ *
+ * Not evenly: a champion you meet every third game is a difficulty setting you
+ * did not choose, while one in five is an occasional bad afternoon. Must sum
+ * to one.
+ */
+export const BOT_LEVEL_ODDS: Record<BotLevel, number> = {
+  steady: 0.4,
+  sharp: 0.4,
+  champ: 0.2,
+};
+
+/**
  * Which one turns up when a seat is filled.
  *
  * The host asks for a bot, not for a difficulty: you find out who you have
  * drawn by playing them, which is also what happens when a stranger sits down.
  * The server draws it, so the choice is never the client's to make.
  */
-export const randomBotLevel = (random: () => number = Math.random): BotLevel =>
-  BOT_LEVELS[Math.min(BOT_LEVELS.length - 1, Math.floor(random() * BOT_LEVELS.length))]!;
+export function randomBotLevel(random: () => number = Math.random): BotLevel {
+  let roll = random();
+  for (const level of BOT_LEVELS) {
+    roll -= BOT_LEVEL_ODDS[level];
+    if (roll < 0) return level;
+  }
+  // Only reachable if the source returns exactly 1, or the odds drift.
+  return BOT_LEVELS[BOT_LEVELS.length - 1]!;
+}
 
 /** Bots play under fixed names so no model ever has to invent one, and so a bot
  *  can never take a name a person has reserved. */

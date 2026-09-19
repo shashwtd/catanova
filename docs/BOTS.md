@@ -103,23 +103,26 @@ values. Never commit the key or put it in a client-side environment variable.
 ## Who sits down
 
 There are three of them, and the host does not choose. Filling a seat draws one
-at random on the server, so you find out who you have by playing them — the same
-way you would with a stranger. Each is marked by its own machine beside its
-name, so once you know the three you know who you are up against.
+on the server — steady and sharp two in five each, a champion one in five — so
+you find out who you have by playing them, the same way you would with a
+stranger. Each is marked by its own machine beside its name; the seat itself
+says only "bot", because naming the difficulty would give away a game nobody
+has played yet.
 
 They differ only in how much attention they pay to the rest of the table. All of
 it is arithmetic in `contests()` in `packages/bot/decide.ts`, so the differences
 hold even with no decision service reachable.
 
-|                                | Steady                                           | Sharp                                                 | Champion                                                 |
-| ------------------------------ | ------------------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
-| Robber tile                    | wherever the most production is, whoever owns it | the leader's tiles count double                       | the leader's tiles count double                          |
-| Robbed player                  | whoever is on the tile                           | the leader, when they are on it                       | the leader, when they are on it                          |
-| Counts as a threat             | a leader one point from winning                  | a leader three points out, or an award held elsewhere | a leader **four** points out, or an award held elsewhere |
-| Rethinks its plan              | every four turns                                 | every four turns                                      | every **two** turns                                      |
-| Options weighed each move      | 12 corners, 8 roads                              | 12 corners, 8 roads                                   | **16 corners, 12 roads**                                 |
-| Will end a turn it could spend | yes                                              | yes                                                   | **no, while anything useful is affordable**              |
-| Knows the award standings      | no                                               | no                                                    | **yes**                                                  |
+|                                                                      | Steady                                           | Sharp                                                 | Champion                                                 |
+| -------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------- |
+| Robber tile                                                          | wherever the most production is, whoever owns it | the leader's tiles count double                       | the leader's tiles count double                          |
+| Robbed player                                                        | whoever is on the tile                           | the leader, when they are on it                       | the leader, when they are on it                          |
+| Counts as a threat                                                   | a leader one point from winning                  | a leader three points out, or an award held elsewhere | a leader **four** points out, or an award held elsewhere |
+| Rethinks its plan                                                    | every four turns                                 | every four turns                                      | every **two** turns                                      |
+| Options weighed each move                                            | 12 corners, 8 roads                              | 12 corners, 8 roads                                   | **16 corners, 12 roads**                                 |
+| Will end a turn it could spend                                       | yes                                              | yes                                                   | **no, while anything useful is affordable**              |
+| Knows the award standings                                            | no                                               | no                                                    | **yes**                                                  |
+| Spends a knight before the dice to clear the robber off its own land | no                                               | no                                                    | **yes**                                                  |
 
 A steady bot plays its own game and you mostly notice it when it takes a corner
 you wanted. A sharp bot follows you round the board once you start to lead. A
@@ -127,6 +130,15 @@ champion plays to win: it is told where longest road and largest army stand and
 how many points it still needs, it rethinks its plan twice as often — which is
 what lets it answer a road being cut off by going after something else rather
 than pushing at the block — and it never sits on resources it could spend.
+
+### Development cards
+
+Every bot is told which cards it is holding and what each one does. It was not,
+which is why they so rarely played any: they were being asked whether to play a
+development card without being shown the hand. With no decision service to ask,
+a bot now plays a card rather than ending the turn on one — knights first, since
+a knight is never wasted and counts toward largest army — because a card still
+in hand when the game ends was worth nothing.
 
 ### It is not cheating
 

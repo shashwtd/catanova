@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { TurnTimer } from '../apps/client/src/TurnTimer.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { Invite, Lobby } from '../apps/client/src/Lobby.js';
+import { BotMark } from '../apps/client/src/GameIcons.js';
 import { GameSettings } from '../apps/client/src/GameSettings.js';
 import { ProfileEditor } from '../apps/client/src/Profile.js';
 import { DEFAULT_PREFERENCES } from '../apps/client/src/preferences.js';
@@ -134,15 +135,15 @@ test('each bot level is marked by its own machine, never the word BOT', () => {
     const html = renderLobby(room, 'p0');
     assert.ok(!/>\s*BOT\s*</.test(html), 'the word is gone');
     assert.match(html, new RegExp(`player-bot-tag[^>]*data-level="${level}"`));
-    assert.match(html, new RegExp(`aria-label="${BOT_LEVEL_LABEL[level]} bot"`));
-    // The seat says how it plays, which is more use than a bot reporting that
-    // it is ready, which it always is.
-    assert.ok(html.includes(`${BOT_LEVEL_LABEL[level]} bot`));
+    // The mark says "bot" and never which one: naming the difficulty on the
+    // seat would give away a game that has not been played yet.
+    assert.match(html, /player-bot-tag[^>]*aria-label="Bot"/);
+    assert.ok(!html.includes(`${BOT_LEVEL_LABEL[level]} bot`), 'the level is not announced');
+    assert.ok(html.includes('>Bot<'), 'the seat says bot, and stops there');
     // Three levels, three drawings: a shared shape with nothing to tell them
-    // apart would make the mark decoration rather than information.
-    const drawing = /<svg[^>]*>\s*<path d="([^"]+)"/.exec(html.slice(html.indexOf('player-bot-tag')));
-    assert.ok(drawing, `no artwork for ${level}`);
-    marks.add(drawing[1]!);
+    // apart would make the mark decoration rather than information. Rendered
+    // on its own, so this cannot accidentally match another seat's icon.
+    marks.add(renderToStaticMarkup(createElement(BotMark, { level })));
   }
   assert.equal(marks.size, BOT_LEVELS.length, 'every level looks different');
 });

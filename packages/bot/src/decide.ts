@@ -17,9 +17,11 @@
  */
 
 import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../rules/src/index.js';
+import { CARD_NAMES } from '../../rules/src/game.js';
 import type { Resource } from '../../rules/src/index.js';
 import type { Board } from '../../rules/src/board.js';
-import type { GameAction, GameView, Hand } from '../../rules/src/game.js';
+import { roadSites } from '../../rules/src/game.js';
+import type { CardKind, GameAction, GameView, Hand } from '../../rules/src/game.js';
 import { choice, noul, JevUnavailable } from './jev.js';
 import type { JevClient, Question } from './jev.js';
 import {
@@ -70,6 +72,84 @@ export type DecideContext = {
   level?: BotLevel;
 };
 
+/** What each card does, so that "play a development card" is a choice the bot
+ *  can actually weigh rather than a word. */
+const CARD_USE: Record<string, string> = {
+  knight: 'move the robber off my land or onto somebody else, and count toward largest army',
+  roadBuilding: 'two roads for free: reach a corner now, or extend the longest road',
+  yearOfPlenty: 'take any two resources from the bank, enough to finish a purchase this turn',
+  monopoly: 'take every card of one resource from every other player',
+};
+
+/** The cards in hand that could be played right now, counted by kind. */
+function playableKinds(ctx: DecideContext): Record<string, number> {
+  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
+  const out: Record<string, number> = {};
+  for (const id of ctx.view.legal.playableCards) {
+    const kind = mine.find((c) => c.id === id)?.kind;
+    if (kind) out[kind] = (out[kind] ?? 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * The cards that would actually do something if played.
+ *
+ * `legal.playableCards` means "the rules let you play this now", which is not
+ * the same as "this will work": Road Building is refused outright when there is
+ * nowhere to put a road, and Year of Plenty needs something left in the bank.
+ * Offering either of those as a move produced a rejected action, and offering a
+ * card that does nothing is bad play even when the rules allow it.
+ */
+function usableCards(ctx: DecideContext): string[] {
+  const { view, meId } = ctx;
+  const mine = view.players.find((p) => p.id === meId)?.cards ?? [];
+  const bankHas = RESOURCES.reduce((n, r) => n + view.bank[r], 0);
+  const roadRoom =
+    (view.players.find((p) => p.id === meId)?.pieces.roads ?? 0) < 15 && roadSites(view, meId).length > 0;
+  return view.legal.playableCards.filter((id) => {
+    const kind = mine.find((c) => c.id === id)?.kind;
+    if (kind === 'roadBuilding') return roadRoom;
+    if (kind === 'yearOfPlenty') return bankHas > 0;
+    return true;
+  });
+}
+
+/**
+ * The card to play when nobody is there to judge it.
+ *
+ * Knights first: they are never wasted, they move the robber and they build
+ * toward largest army. Then Road Building, which is two roads for nothing.
+ * Year of Plenty and Monopoly want a plan behind them, so they come last.
+ */
+const CARD_ORDER = ['knight', 'roadBuilding', 'yearOfPlenty', 'monopoly'];
+function bestCardToPlay(ctx: DecideContext, playable: readonly string[]): string | undefined {
+  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
+  const rank = (id: string) => {
+    const kind = mine.find((c) => c.id === id)?.kind ?? '';
+    const at = CARD_ORDER.indexOf(kind);
+    return at === -1 ? CARD_ORDER.length : at;
+  };
+  return [...playable].sort((a, b) => rank(a) - rank(b))[0];
+}
+
+/**
+ * A knight worth playing before the dice.
+ *
+ * If the robber is sitting on a hex this bot builds on, every turn it waits is
+ * a turn of its own production thrown away — and the knight is free. This is a
+ * fact about the board, so it is decided here rather than asked about.
+ */
+function knightBeforeRoll(ctx: DecideContext): string | null {
+  if (!contests(ctx.level).clearsItsOwnLand) return null;
+  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
+  const knight = ctx.view.legal.playableCards.find((id) => mine.find((c) => c.id === id)?.kind === 'knight');
+  if (!knight) return null;
+  const blocked = ctx.board.hexes[ctx.view.robber];
+  const onMine = blocked?.vertices.some((v) => ctx.view.buildings[v]?.player === ctx.meId);
+  return onMine ? knight : null;
+}
+
 /**
  * What a level actually changes.
  *
@@ -107,6 +187,9 @@ function contests(level: BotLevel | undefined) {
     /** Whether the state carries the award standings and the gap to the win.
      *  Every number in it is on the other players' portraits already. */
     readsTheTable: champ,
+    /** Whether a knight is spent before the dice to get the robber off its
+     *  own production rather than waiting for a turn it suits better. */
+    clearsItsOwnLand: champ,
   };
 }
 
@@ -169,6 +252,9 @@ function summarise(ctx: DecideContext) {
       settlements: me?.pieces.settlements ?? 0,
       cities: me?.pieces.cities ?? 0,
       roads: me?.pieces.roads ?? 0,
+      // Without this a bot was asked whether to play a development card
+      // without being told which ones it was holding, so it almost never did.
+      playable_cards: playableKinds(ctx),
     },
     opponents: view.players
       .filter((p) => p.id !== meId)
@@ -257,7 +343,12 @@ export async function decide(ctx: DecideContext): Promise<Decision> {
   const plan = ctx.plan ?? initialPlan(view.turn);
 
   // --- rungs the rules already decide -------------------------------------
-  if (view.phase === 'roll') return none(plan, { kind: 'roll' }, 'Rolling.');
+  if (view.phase === 'roll') {
+    const knight = knightBeforeRoll(ctx);
+    if (knight)
+      return none(plan, playCard(ctx, plan, knight), 'Knight first: the robber is on my own production.');
+    return none(plan, { kind: 'roll' }, 'Rolling.');
+  }
 
   if (view.phase === 'discard') {
     const count = Math.floor(handTotal(hand) / 2);
@@ -399,7 +490,7 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const corners = rankCorners(board, legal.settlements, shortlist.corners);
   const cities = legal.cities.slice(0, shortlist.corners);
   const roads = rankRoads(board, legal.roads, plan.targetSite, shortlist.roads);
-  const playable = legal.playableCards;
+  const playable = usableCards(ctx);
 
   const moves: Record<string, string> = {};
   if (corners.length) moves.settlement = 'build a settlement on a new corner: one point and more production';
@@ -409,7 +500,11 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const trade = bankTrade(hand, legal.rates, plan.needs, view.bank);
   if (trade)
     moves.trade = `trade ${RESOURCE_NAMES[trade.give].toLowerCase()} to the bank for the ${RESOURCE_NAMES[trade.receive].toLowerCase()} the plan needs`;
-  if (playable.length) moves.playCard = 'play a development card from the hand';
+  const kinds = playableKinds(ctx);
+  if (playable.length)
+    moves.playCard = `play a development card: ${Object.keys(kinds)
+      .map((kind) => CARD_NAMES[kind as CardKind] ?? kind)
+      .join(' or ')}`;
   // Passing while a point is sitting there affordable is how a bot loses a
   // game it was winning. A champion goes further: if anything useful can be
   // bought, the turn is not over.
@@ -434,6 +529,10 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat, everyFewTurns: planLife });
 
   const fallback = (): Decision => {
+    // A card held to the end of the game was worth nothing. With no decision
+    // service to ask, playing one beats passing on the turn, and the strongest
+    // of them is picked here rather than the first that came out of the deck.
+    const card = playable.length ? bestCardToPlay(ctx, playable) : undefined;
     const action: GameAction =
       cities.length && can.includes('city')
         ? { kind: 'city', vertex: cities[0]! }
@@ -445,7 +544,9 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
               ? { kind: 'bankTrade', give: trade.give, receive: trade.receive }
               : legal.canBuyCard
                 ? { kind: 'buyCard' }
-                : { kind: 'endTurn' };
+                : card
+                  ? playCard(ctx, plan, card)
+                  : { kind: 'endTurn' };
     return { ...none(plan, action, 'Playing the plan without the decision service.'), degraded: true };
   };
   if (!jev) return fallback();
@@ -492,11 +593,18 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
           which_card: choice(
             'If a card is played, which one?',
             Object.fromEntries(
-              playable.map((id) => [
-                id,
-                (view.players.find((p) => p.id === meId)?.cards ?? []).find((c) => c.id === id)?.kind ??
-                  'card',
-              ]),
+              playable.map((id) => {
+                const kind = (view.players.find((p) => p.id === meId)?.cards ?? []).find(
+                  (c) => c.id === id,
+                )?.kind;
+                return [
+                  id,
+                  {
+                    card: kind ? (CARD_NAMES[kind] ?? kind) : 'card',
+                    does: (kind && CARD_USE[kind]) ?? 'a one-off effect',
+                  },
+                ];
+              }),
             ),
           ),
         }
@@ -552,9 +660,21 @@ function playCard(ctx: DecideContext, plan: BotPlan, cardId: string): GameAction
   const kind = (me?.cards ?? []).find((c) => c.id === cardId)?.kind;
   const wanted = plan.needs.length ? plan.needs : (['ore', 'wheat'] as Resource[]);
   if (kind === 'yearOfPlenty') {
+    // The rules want exactly two, or whatever is left if the bank is down to
+    // one, and never a resource it has run out of.
+    const stock: Hand = { ...ctx.view.bank };
     const resources: Hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
-    resources[wanted[0] ?? 'ore'] += 1;
-    resources[wanted[1] ?? wanted[0] ?? 'wheat'] += 1;
+    let take = Math.min(
+      2,
+      RESOURCES.reduce((n, r) => n + stock[r], 0),
+    );
+    for (const r of [...wanted, ...RESOURCES]) {
+      if (!take) break;
+      if (stock[r] <= 0) continue;
+      stock[r] -= 1;
+      resources[r] += 1;
+      take -= 1;
+    }
     return { kind: 'playCard', cardId, resources };
   }
   if (kind === 'monopoly') return { kind: 'playCard', cardId, resource: wanted[0] ?? 'ore' };

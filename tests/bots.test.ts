@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Store } from '../apps/server/src/store.js';
 import { newSession } from '../apps/client/src/connection.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
-import { BOT_LEVELS, randomBotLevel } from '../packages/protocol/src/bots.js';
+import { BOT_LEVELS, BOT_LEVEL_ODDS, randomBotLevel } from '../packages/protocol/src/bots.js';
 import { Lobby } from '../apps/client/src/Lobby.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { createGame, gameView, applyAction } from '../packages/rules/src/game.js';
@@ -112,24 +112,48 @@ test('the add-bot command asks for a bot and cannot choose which one', () => {
   );
 });
 
-test('the draw reaches every level and never leaves the set', () => {
-  const seen = new Set<string>();
-  for (let i = 0; i < 3000; i++) seen.add(randomBotLevel());
-  assert.deepEqual([...seen].sort(), [...BOT_LEVELS].sort(), 'all three turn up');
-  // The edges of the random source stay inside the set.
+test('the draw favours the ordinary bots and keeps the champion rare', () => {
+  assert.equal(
+    Object.values(BOT_LEVEL_ODDS).reduce((a, b) => a + b, 0),
+    1,
+    'the odds are a distribution',
+  );
+  assert.ok(BOT_LEVEL_ODDS.champ < BOT_LEVEL_ODDS.steady, 'a champion is the rare one');
+
+  // Each band of the random source lands in the level that owns it.
   assert.equal(
     randomBotLevel(() => 0),
-    BOT_LEVELS[0],
+    'steady',
   );
   assert.equal(
-    randomBotLevel(() => 0.999999),
-    BOT_LEVELS[BOT_LEVELS.length - 1],
+    randomBotLevel(() => 0.39),
+    'steady',
+  );
+  assert.equal(
+    randomBotLevel(() => 0.4),
+    'sharp',
+  );
+  assert.equal(
+    randomBotLevel(() => 0.79),
+    'sharp',
+  );
+  assert.equal(
+    randomBotLevel(() => 0.8),
+    'champ',
   );
   assert.equal(
     randomBotLevel(() => 1),
-    BOT_LEVELS[BOT_LEVELS.length - 1],
+    'champ',
     'never off the end',
   );
+
+  const counts: Record<string, number> = { steady: 0, sharp: 0, champ: 0 };
+  for (let i = 0; i < 20_000; i++) counts[randomBotLevel()]! += 1;
+  for (const level of BOT_LEVELS)
+    assert.ok(
+      Math.abs(counts[level]! / 20_000 - BOT_LEVEL_ODDS[level]) < 0.02,
+      `${level} came up ${((counts[level]! / 20_000) * 100).toFixed(1)}%`,
+    );
 });
 
 test('only the host sees the control that seats a bot', () => {
@@ -275,6 +299,61 @@ test('steady and sharp are the same rules with different attention on the leader
   assert.equal(sharp.hex, quiet.id, 'sharp gives up production to hit the leader');
   assert.equal(sharp.victim, 'leader');
   assert.notEqual(steady.hex, sharp.hex, 'the two levels are not the same bot');
+});
+
+test('a bot plays the cards it holds, and is told what it is holding', async () => {
+  const game = createGame(
+    [
+      { id: 'me', name: 'Me' },
+      { id: 'b', name: 'B' },
+    ],
+    3,
+    Math.random,
+  );
+  game.phase = 'actions';
+  game.active = 0;
+  game.players[0]!.cards = [
+    { id: 'c1', kind: 'monopoly', boughtTurn: 0 },
+    { id: 'c2', kind: 'knight', boughtTurn: 0 },
+  ];
+  game.turn = 4;
+  assert.equal(gameView(game, 'me').legal.playableCards.length, 2);
+
+  // With nothing to ask, the bot used to end the turn and keep the cards for a
+  // game that was over before it played them.
+  const offline = await decide({
+    view: gameView(game, 'me'),
+    board: game.board,
+    meId: 'me',
+    plan: initialPlan(game.turn),
+    jev: null,
+    level: 'steady',
+  });
+  assert.equal(offline.action.kind, 'playCard');
+  assert.equal(
+    (offline.action as { cardId: string }).cardId,
+    'c2',
+    'the knight goes first: never wasted, and it counts toward largest army',
+  );
+
+  // And with a service to ask, it is told what is in its hand — without which
+  // it was being asked whether to play a card it could not see.
+  let seen: { me: { playable_cards: Record<string, number> } } | null = null;
+  await decide({
+    view: gameView(game, 'me'),
+    board: game.board,
+    meId: 'me',
+    plan: initialPlan(game.turn),
+    level: 'steady',
+    jev: {
+      model: 'test',
+      async evaluate(state: unknown) {
+        seen = state as typeof seen;
+        return { answers: {}, inputTokens: 0, costUsd: 0 };
+      },
+    } as never,
+  });
+  assert.deepEqual(seen!.me.playable_cards, { monopoly: 1, knight: 1 });
 });
 
 test('a champion never passes on a useful turn, and reads the standings', async () => {

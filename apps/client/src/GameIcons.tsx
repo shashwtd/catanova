@@ -1,5 +1,5 @@
 import type { SVGProps } from 'react';
-import { BOT_LEVEL_LABEL, isBotLevel } from '../../../packages/protocol/src/bots.js';
+import { isBotLevel } from '../../../packages/protocol/src/bots.js';
 import { PAINTED_ICONS, ICON_ATLAS, ICON_ATLAS_WIDTH, ICON_ATLAS_HEIGHT } from './painted-icons.js';
 // Everyday controls use crisp, contextual ink; game pieces keep their painted artwork.
 const CONTROL_PATHS = {
@@ -30,11 +30,10 @@ const CONTROL_PATHS = {
   // Three machines from one drawing. The head, the ears and the aerial stay put
   // so they read as the same kind of thing; only the face and what is on top
   // change, which is enough to tell three players apart at portrait size.
-  bot: 'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
+  bot: 'M8.6 3.2 10 6 M15.4 3.2 14 6 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
   'bot-sharp':
     'M12 3v3 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M8.4 11.4 10.8 13 M15.6 11.4 13.2 13 M2 11v4 M22 11v4',
-  'bot-champ':
-    'M8.4 4 10.3 6 12 3.1 13.7 6 15.6 4 M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3 M9 12v2 M15 12v2 M2 11v4 M22 11v4',
+
   smile: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18 M9 10v.5 M15 10v.5 M8 14a5 5 0 0 0 8 0',
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
 } as const;
@@ -83,7 +82,6 @@ export function GameIcon({ name, size = 24, className = '', ...props }: IconProp
 const icon = (name: GameIconName) => (props: IconProps) => <GameIcon name={name} {...props} />;
 export const Bot = icon('bot'),
   BotSharp = icon('bot-sharp'),
-  BotChamp = icon('bot-champ'),
   Eye = icon('eye'),
   Smile = icon('smile'),
   Dices = icon('dice'),
@@ -139,19 +137,58 @@ export const JoinRoom = icon('join'),
   LightCheck = icon('light-check');
 
 /**
+ * The champion.
+ *
+ * The same machine as the other two — one head, one pair of ears, one face —
+ * wearing a crown instead of an aerial. What sets it apart is the finish: it is
+ * the only one struck in gold rather than a flat ink, because it is the one you
+ * are meant to spot across the table.
+ */
+const CHAMP = 'catanova-champion-gold';
+export function BotChamp({ size = 24, className = '', ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={`game-icon control-icon bot-champion ${className}`}
+      fill="none"
+      stroke={`url(#${CHAMP})`}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      {...props}
+    >
+      <defs>
+        {/* One id for every copy: they are identical, so a document holding
+            four champions still paints the same gold. */}
+        <linearGradient id={CHAMP} x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0" stopColor="#fff2c6" />
+          <stop offset="0.45" stopColor="#e8b24d" />
+          <stop offset="1" stopColor="#a9682b" />
+        </linearGradient>
+      </defs>
+      <path d="M8.4 4 10.3 6 12 3.1 13.7 6 15.6 4" />
+      <path d="M7 6h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3" />
+      <path d="M9 12v2 M15 12v2 M2 11v4 M22 11v4" />
+    </svg>
+  );
+}
+
+/**
  * The mark beside a bot's name.
  *
- * Which machine it is says who you are playing: the three share a head and an
- * aerial so they read as the same kind of thing, and differ in the face and
- * what sits on top. The colour follows, quietly — a champion is worth noticing
- * across the table.
+ * It says "bot" and nothing else. Which of the three you have drawn is
+ * something the drawing tells you and the game teaches you; naming the
+ * difficulty on the seat would give away a game you have not played yet.
  */
 export function BotMark({ level, size = 17 }: { level?: string; size?: number }) {
   const known = isBotLevel(level) ? level : 'steady';
   const Mark = known === 'champ' ? BotChamp : known === 'sharp' ? BotSharp : Bot;
-  const label = `${BOT_LEVEL_LABEL[known]} bot`;
   return (
-    <span className="player-bot-tag" data-level={known} role="img" aria-label={label} title={label}>
+    <span className="player-bot-tag" data-level={known} role="img" aria-label="Bot" title="Bot">
       <Mark size={size} />
     </span>
   );

@@ -22,7 +22,6 @@ import {
 import { useEffect, useRef, useState, useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
-import { BOT_LEVEL_LABEL, isBotLevel } from '../../../packages/protocol/src/bots.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { Avatar } from './Profile.js';
@@ -374,7 +373,8 @@ export function Lobby({
                     ) : i === 0 ? (
                       'Host'
                     ) : p.bot ? (
-                      `${BOT_LEVEL_LABEL[isBotLevel(p.botLevel) ? p.botLevel : 'steady']} bot`
+                      // Not which one: you find that out by playing them.
+                      'Bot'
                     ) : p.ready ? (
                       <>
                         <Check size={15} />
