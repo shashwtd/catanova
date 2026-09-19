@@ -408,8 +408,10 @@
  * The pieces on the island carry no names, so colour is the only thing
  * that says a road is yours. Handing it out by seat order meant nobody
  * had a reason to look at it before the game began, and then had to work
- * it out mid-turn. Every card now wears its colour as a frame, and your
- * own card carries the whole palette underneath.
+ * it out mid-turn. Every card wears its colour as a frame, and your own
+ * card offers the rest of the palette behind one press — a permanent row
+ * of eight swatches is a paint chart, and the question it answers gets
+ * asked once.
  * ------------------------------------------------------------------ */
 .room-lobby .seat-card .seat-portrait {
   background:
@@ -420,17 +422,70 @@
     0 6px 16px #0b1a1455,
     inset 0 0 0 1px #17241f;
 }
+/* The card has to let the palette out of it. */
+.room-lobby .seat-card {
+  overflow: visible;
+}
+.room-lobby .seat-color-choice {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}
+.room-lobby .seat-color-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 4px 11px 4px 6px;
+  border: 1px solid #ffffff1f;
+  border-radius: 999px;
+  background: #ffffff10;
+  color: #ecdcb8;
+  font:
+    600 12px/1 Barlow,
+    sans-serif;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.room-lobby .seat-color-current:hover:not(:disabled) {
+  background: #ffffff1c;
+}
+.room-lobby .seat-color-dot {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 2px solid #ffffff38;
+  border-radius: 999px;
+  background: var(--swatch);
+}
+/* Anchored under the button rather than pushing the card taller, so opening
+   it never shuffles the other seats around. */
 .room-lobby .seat-colors {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  translate: -50% 0;
+  z-index: 5;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  width: 100%;
-  max-width: 152px;
-  margin: 2px auto 0;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid #c8b18355;
+  border-radius: 13px;
+  background: #24352bf5;
+  box-shadow: 0 10px 26px #0a140e7a;
+  animation: seat-colors-in 0.14s ease-out;
+}
+@keyframes seat-colors-in {
+  from {
+    opacity: 0;
+    translate: -50% -4px;
+  }
 }
 .room-lobby .seat-color {
-  width: 100%;
-  aspect-ratio: 1;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 2px solid #ffffff2e;
   border-radius: 999px;
@@ -448,9 +503,8 @@
 .room-lobby .seat-color[aria-checked='true'] {
   border-color: #fff4d6;
   box-shadow:
-    0 0 0 2px #1d2b23,
+    0 0 0 2px #24352b,
     0 0 0 4px var(--swatch);
-  cursor: default;
 }
 /* Somebody else has it. Still shown, so the table's arrangement reads at a
    glance, but drained and unpressable. */
@@ -459,13 +513,16 @@
   filter: grayscale(0.7);
   cursor: not-allowed;
 }
-.room-lobby .seat-color:focus-visible {
+.room-lobby .seat-color:focus-visible,
+.room-lobby .seat-color-current:focus-visible {
   outline: 2px solid #f0d79a;
   outline-offset: 3px;
 }
-@media (max-width: 700px) {
+@media (prefers-reduced-motion: reduce) {
   .room-lobby .seat-colors {
-    max-width: 128px;
-    gap: 5px;
+    animation: none;
+  }
+  .room-lobby .seat-color:hover:not(:disabled) {
+    transform: none;
   }
 }

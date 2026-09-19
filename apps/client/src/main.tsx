@@ -38,7 +38,7 @@ import { RoomInviteNotice, visibleRoomInvitations } from './RoomInvitePanel.js';
 import { FriendsDrawer } from './FriendsDrawer.js';
 import { PlayerHub, PlayerProfile } from './PlayerHub.js';
 import { usePlayerGames } from './usePlayerGames.js';
-import { seatHexColors } from './player-colors.js';
+import { seatColorMap } from './player-colors.js';
 import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
 import { useAccountPrivacy } from './usePrivacy.js';
 import {
@@ -382,7 +382,7 @@ function App() {
    *  the seats' own colours rather than rebuilt on every render — `Board` is
    *  memoised and a fresh array each time would defeat it. */
   const seatColors = useMemo(
-    () => seatHexColors(room?.players),
+    () => seatColorMap(room?.players),
     [room?.players.map((p) => `${p.id}:${p.color ?? ''}`).join('|')],
   );
   /**

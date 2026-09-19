@@ -12,8 +12,16 @@ import {
   availableColors,
   seatColors,
 } from '../packages/protocol/src/colors.js';
-import { seatHexColors, playerHexColor, DEFAULT_SEAT_HEX } from '../apps/client/src/player-colors.js';
-import { Lobby } from '../apps/client/src/Lobby.js';
+import {
+  seatHexColors,
+  seatColorMap,
+  playerHexColor,
+  DEFAULT_SEAT_HEX,
+} from '../apps/client/src/player-colors.js';
+import { ColorChoice, Lobby } from '../apps/client/src/Lobby.js';
+import { PlayerRail } from '../apps/client/src/PlayerRail.js';
+import { Board } from '../apps/client/src/Board.js';
+import { createGame, gameView } from '../packages/rules/src/game.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 
@@ -115,7 +123,7 @@ test('the wire refuses a colour that is not one of ours, or one smuggled in with
   );
 });
 
-test('the lobby offers every colour, marks yours, and locks the ones other people hold', () => {
+test('a card shows the colour it is, and the palette only when asked for', () => {
   const player = (id: string, name: string, color?: string) => ({
     id,
     name,
@@ -146,16 +154,83 @@ test('the lobby offers every colour, marks yours, and locks the ones other peopl
       onChooseColor() {},
     }),
   );
+  // At rest the card says which colour you are and offers to change it. Eight
+  // swatches permanently under a name is a paint chart.
+  assert.match(html, /aria-label="Your colour: Jade\. Change it"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.ok(!html.includes('class="seat-color"'), 'the palette is not on the card until it is asked for');
+  // Only your own card offers it at all.
+  assert.equal(html.match(/seat-color-choice/g)!.length, 1);
+});
+
+test('the palette shows all eight, marks yours, and locks the ones other people hold', () => {
+  const html = renderToStaticMarkup(
+    createElement(ColorChoice, {
+      mine: 'jade' as const,
+      taken: new Set(['jade', 'rose'] as const),
+      busy: false,
+      onChoose() {},
+      initialOpen: true,
+    }),
+  );
   const swatches = html.match(/<button[^>]*class="seat-color"[^>]*>/g)!;
-  assert.equal(swatches.length, PLAYER_COLOR_LIST.length, 'the whole palette is visible');
+  assert.equal(swatches.length, PLAYER_COLOR_LIST.length, 'the whole palette is visible once open');
   const of = (label: string) => swatches.find((s) => s.includes(`aria-label="${label}"`))!;
   assert.match(of('Jade'), /aria-checked="true"/);
-  assert.match(of('Jade'), /disabled=""/);
   // Somebody else has rose: drawn, named as taken, and not pressable.
   assert.match(of('Rose, taken'), /data-held="true"/);
   assert.match(of('Rose, taken'), /disabled=""/);
   assert.match(of('Coral'), /aria-checked="false"/);
   assert.ok(!of('Coral').includes('disabled=""'));
-  // Only your own card offers the palette.
-  assert.equal(html.match(/class="seat-colors"/g)!.length, 1);
+});
+
+test('the rail and the board agree about whose colour is whose, however the seats were shuffled', () => {
+  // The game shuffles the seats when it starts, so the room's order and the
+  // game's order are different lists of the same people. Anything that took a
+  // colour from one and an index from the other painted roads in somebody
+  // else's colour — and only sometimes, which is why it survived.
+  const named = ['Ana', 'Bo', 'Cy', 'Dee'];
+  const seats = named.map((name, i) => ({ id: `p${i}`, name }));
+  const game = createGame(seats, 24, () => 0.34);
+  game.phase = 'actions';
+  game.turn = 3;
+  // Deal every player a piece so the board has something of theirs to colour.
+  game.board.vertices.slice(0, 4).forEach((vertex, i) => {
+    game.buildings[vertex.id] = { player: `p${i}`, kind: 'settlement' };
+  });
+  // The room lists them in seat order with their chosen colours; the game
+  // lists them in the reverse of that, standing in for the shuffle.
+  const roomPlayers = seats.map((seat, i) => ({
+    ...seat,
+    connected: true,
+    ready: true,
+    profile: defaultProfile(seat.name),
+    color: (['jade', 'bronze', 'sky', 'rose'] as const)[i]!,
+  }));
+  const view = gameView(game, 'p0');
+  view.players.reverse();
+  const room = { roomId: 'r', revision: 1, counter: 0, game: view, players: roomPlayers } as RoomState;
+
+  const rail = renderToStaticMarkup(createElement(PlayerRail, { game: view, room, me: 'p0' }));
+  const board = renderToStaticMarkup(
+    createElement(Board, {
+      board: game.board,
+      game: view,
+      me: 'p0',
+      mode: null,
+      disabled: true,
+      onAction() {},
+      onRobber() {},
+      colors: seatColorMap(roomPlayers),
+    }),
+  );
+  for (const seat of roomPlayers) {
+    const expected = PLAYER_COLORS[seat.color];
+    // The rail's portrait for this player.
+    const card = rail.match(new RegExp(`data-player-profile="${seat.id}"[^>]*`))![0];
+    assert.match(card, new RegExp(`--player-color:${expected}`), `${seat.name} in the rail`);
+    // And their settlement on the island.
+    const piece = board.match(new RegExp(`aria-label="${seat.name} · settlement"[^]*?fill="([^"]+)"`))!;
+    assert.equal(piece[1], expected, `${seat.name} on the board`);
+  }
 });

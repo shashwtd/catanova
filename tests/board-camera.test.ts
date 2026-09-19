@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
+import { CORD_HEIGHT, cordY } from '../apps/client/src/StringLights.js';
 import {
   BoardGesture,
   constrainCamera,
@@ -228,22 +229,32 @@ test('the table is lit from somewhere, and none of the lighting can be clicked',
   const html = renderToStaticMarkup(
     createElement(BoardViewport, { seed: 7, children: createElement('div', null, 'island') }),
   );
-  // Five bulbs. A garland of twenty reads as bunting and competes with the
-  // board; a few good ones read as a room.
-  const bulbs = html.match(/class="string-bulb"/g) ?? [];
-  assert.equal(bulbs.length, 5);
-  // Every bulb sits on the cord rather than near it: the same parabola draws
-  // both, so a change to the sag can never leave one floating.
-  const cord = html.match(/d="M0 (\d+) Q600 (\d+) 1200 \d+"/)!;
-  const top = Number(cord[1]),
-    depth = (Number(cord[2]) - top) / 2;
-  for (const style of html.matchAll(/left:([\d.]+)%;top:([\d.]+)px/g)) {
-    const t = Number(style[1]) / 100;
+  // Eleven lanterns, and no two neighbours the same colour: a string of one
+  // hue reads as a light fitting, not as a room.
+  const shades = [...html.matchAll(/--bulb:([^;"]+)/g)].map((m) => m[1]!.trim());
+  assert.equal(shades.length, 11);
+  for (const [index, shade] of shades.entries())
+    assert.notEqual(shade, shades[index + 1], `two ${shade} lanterns in a row`);
+  // Every lantern sits on the cord rather than near it: one function places
+  // both, so a change to the wave can never leave one hanging in mid air.
+  for (const style of html.matchAll(/left:([\d.]+)%;top:([\d.]+)px/g))
     assert.ok(
-      Math.abs(Number(style[2]) - (top + depth * (1 - (2 * t - 1) ** 2))) < 0.5,
-      `bulb at ${style[1]}% hangs off the wire`,
+      Math.abs(Number(style[2]) - cordY(Number(style[1]) / 100)) < 0.01,
+      `a lantern at ${style[1]}% hangs off the wire`,
     );
-  }
+  // And the cord waves rather than sagging once, staying near the top.
+  const cord = html.match(/ d="M0 ([\d.]+)([^"]*)"/)![0];
+  const heights = [...cord.matchAll(/[ML]\d+ ([\d.]+)/g)].map((m) => Number(m[1]));
+  assert.ok(Math.max(...heights) <= CORD_HEIGHT, 'the cord stays inside its own box');
+  let turns = 0;
+  for (let i = 1; i < heights.length - 1; i++)
+    if (
+      (heights[i]! - heights[i - 1]!) * (heights[i + 1]! - heights[i]!) < 0 ||
+      (heights[i] === heights[i - 1] && heights[i] !== heights[i + 1])
+    )
+      turns++;
+  assert.ok(turns >= 4, `the cord only changes direction ${turns} times`);
+
   // The lighting is scenery: it must never take a click meant for a corner.
   const css = readFileSync('apps/client/src/table-light.css', 'utf8');
   for (const selector of ['.table-light', '.table-vignette', '.string-lights']) {
@@ -257,5 +268,8 @@ test('the table is lit from somewhere, and none of the lighting can be clicked',
     const block = css.slice(css.indexOf(`${selector} {`));
     assert.match(block.slice(0, block.indexOf('}')), /position: fixed/);
   }
+  // A phone gives the space back to the board.
+  const phone = css.slice(css.indexOf('@media (max-width: 700px)'));
+  assert.match(phone.slice(0, phone.indexOf('}\n}')), /\.string-lights \{\s*display: none/);
   assert.match(css, /prefers-reduced-motion[\s\S]*animation: none/);
 });

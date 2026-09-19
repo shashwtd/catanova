@@ -183,8 +183,11 @@
   height: auto;
   aspect-ratio: 1;
 }
+/* The gold bled across the coloured frame and read as a smudge on it. The
+   glow is the player's own colour now, so it reinforces the frame instead of
+   competing with it. */
 .player-profile.active .avatar-medallion {
-  filter: drop-shadow(0 0 6px #ffd37499);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--player-color), transparent 35%));
 }
 .player-profile.self .profile-caption strong {
   color: var(--player-color);

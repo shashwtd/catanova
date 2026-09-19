@@ -6,6 +6,9 @@ import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
 import { Terrain, type TerrainArt } from './Terrain.js';
 import { DEFAULT_SEAT_HEX } from './player-colors.js';
+
+/** One shared empty map, so an unsupplied `colors` is not a new object. */
+const EMPTY_COLORS: Record<string, string> = {};
 import { DICE_READABLE_MS } from './DiceThrow.js';
 import type { BuildAction } from './placement.js';
 import {
@@ -304,7 +307,7 @@ export const Board = memo(function Board({
   effectId,
   pendingBuild = null,
   selectedRobberHex = null,
-  colors = DEFAULT_SEAT_HEX,
+  colors = EMPTY_COLORS,
   art,
 }: {
   board: Island;
@@ -318,8 +321,9 @@ export const Board = memo(function Board({
   effectId?: string;
   pendingBuild?: BuildAction | null;
   selectedRobberHex?: number | null;
-  /** One colour per seat, in seat order. */
-  colors?: readonly string[];
+  /** Every player's colour, keyed by player id. Never by index: the game
+   *  shuffles the seats at the start, so the two orders differ. */
+  colors?: Record<string, string>;
   art?: TerrainArt;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
@@ -331,8 +335,10 @@ export const Board = memo(function Board({
         .join(' '),
     [board.seed],
   );
+  // A board with no room to ask — a preview, a test — falls back to the four
+  // the game has always started with, in whatever order it has.
   const color = (id: string) =>
-    colors[game?.players.findIndex((p) => p.id === id) ?? 0] ?? colors[0] ?? DEFAULT_SEAT_HEX[0]!;
+    colors[id] ?? DEFAULT_SEAT_HEX[game?.players.findIndex((p) => p.id === id) ?? 0] ?? DEFAULT_SEAT_HEX[0]!;
   const ownTurn = !!game && game.players[game.active]?.id === me && !game.winner;
   const interactive = ownTurn && !disabled;
   const setupSettlement = game?.phase === 'setupSettlement',

@@ -227,40 +227,85 @@ function OpenSeat({
  * Colour is the only label the pieces on the island carry, so being told
  * yours — rather than being handed the third one because you joined third —
  * is the difference between recognising your own roads and counting seats.
- * A colour somebody else holds is still drawn, greyed and unpressable, so the
- * table's whole arrangement is visible from one card.
+ *
+ * It opens on a press rather than sitting there permanently. Eight swatches
+ * under a name is a paint chart, and the question they answer is one a player
+ * asks once: the card shows the colour it is, and the rest of the palette is
+ * one tap away. A colour somebody else holds is still drawn, greyed and
+ * unpressable, so the table's whole arrangement is visible while choosing.
  */
-function ColorChoice({
+export function ColorChoice({
   mine,
   taken,
   busy,
   onChoose,
+  initialOpen = false,
 }: {
   mine: PlayerColor;
   taken: ReadonlySet<PlayerColor>;
   busy: boolean;
   onChoose: (color: PlayerColor) => void;
+  /** Opened for tests, which render one frame and cannot press anything. */
+  initialOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(initialOpen);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open]);
   return (
-    <div className="seat-colors" role="radiogroup" aria-label="Your colour">
-      {PLAYER_COLOR_LIST.map((color) => {
-        const held = taken.has(color) && color !== mine;
-        return (
-          <button
-            key={color}
-            type="button"
-            role="radio"
-            className="seat-color"
-            style={{ '--swatch': PLAYER_COLORS[color] } as CSSProperties}
-            aria-checked={color === mine}
-            aria-label={held ? `${PLAYER_COLOR_LABEL[color]}, taken` : PLAYER_COLOR_LABEL[color]}
-            title={held ? `${PLAYER_COLOR_LABEL[color]} · taken` : PLAYER_COLOR_LABEL[color]}
-            data-held={held}
-            disabled={busy || held || color === mine}
-            onClick={() => onChoose(color)}
-          />
-        );
-      })}
+    <div className={`seat-color-choice ${open ? 'is-open' : ''}`} ref={root}>
+      <button
+        type="button"
+        className="seat-color-current"
+        style={{ '--swatch': PLAYER_COLORS[mine] } as CSSProperties}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label={`Your colour: ${PLAYER_COLOR_LABEL[mine]}. Change it`}
+        title="Change your colour"
+        disabled={busy}
+        onClick={() => setOpen((was) => !was)}
+      >
+        <span className="seat-color-dot" aria-hidden="true" />
+        <span>{PLAYER_COLOR_LABEL[mine]}</span>
+      </button>
+      {open && (
+        <div className="seat-colors" role="radiogroup" aria-label="Your colour">
+          {PLAYER_COLOR_LIST.map((color) => {
+            const held = taken.has(color) && color !== mine;
+            return (
+              <button
+                key={color}
+                type="button"
+                role="radio"
+                className="seat-color"
+                style={{ '--swatch': PLAYER_COLORS[color] } as CSSProperties}
+                aria-checked={color === mine}
+                aria-label={held ? `${PLAYER_COLOR_LABEL[color]}, taken` : PLAYER_COLOR_LABEL[color]}
+                title={held ? `${PLAYER_COLOR_LABEL[color]} · taken` : PLAYER_COLOR_LABEL[color]}
+                data-held={held}
+                disabled={busy || held}
+                onClick={() => {
+                  if (color !== mine) onChoose(color);
+                  setOpen(false);
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

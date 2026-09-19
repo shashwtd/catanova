@@ -76,78 +76,71 @@
 .string-lights {
   position: absolute;
   top: 0;
-  left: -4%;
-  width: 108%;
-  height: 110px;
-  /* Above the island: a lamp strung over a table hangs in front of it. */
+  left: -3%;
+  width: 106%;
+  height: 84px;
+  /* Above the island: a string hung over a table hangs in front of it. */
   z-index: 12;
   pointer-events: none;
 }
+/* Only the cord is stretched. Its rendered height matches its viewBox height,
+   so a lantern's `top` in pixels is the same number the curve gives. */
 .string-cord {
   display: block;
   width: 100%;
-  height: 110px;
+  height: 40px;
 }
-.string-bulb {
+.string-lantern {
   position: absolute;
-  width: 34px;
-  height: 56px;
-  margin-left: -17px;
-  /* The glow is a filter on the bulb rather than another element, so a bulb is
-     one composited layer and the halo follows it exactly. */
-  filter: drop-shadow(0 0 10px rgb(var(--lamp-warm) / 62%)) drop-shadow(0 0 30px rgb(var(--lamp-warm) / 32%));
+  width: 24px;
+  height: 32px;
+  margin-left: -12px;
+  /* The halo is a filter on the lantern rather than another element, so each
+     one is a single composited layer and its glow is its own colour. */
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--bulb), transparent 22%))
+    drop-shadow(0 0 18px color-mix(in srgb, var(--bulb), transparent 50%));
 }
-.string-bulb svg {
+.string-lantern svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
-.bulb-glass {
-  fill: #f7d18a;
-  fill-opacity: 0.94;
+.lantern-glass {
+  fill: var(--bulb);
+  fill-opacity: 0.96;
 }
-.bulb-filament {
-  stroke: #fffaf0;
+/* Petals, in the lantern's own colour lightened, so the moulding reads without
+   drawing a cage of white lines over it. */
+.lantern-ribs {
+  stroke: #fff;
+  stroke-opacity: 0.42;
+  stroke-width: 0.9;
 }
-/* Two of the five, out of step, so the row never pulses together the way a
-   string of fairy lights on a timer does. */
-.string-bulb[data-breathing='true'] {
-  animation: bulb-breath 7.5s ease-in-out infinite;
+.string-lantern[data-breathing='true'] {
+  animation: lantern-breath 7.5s ease-in-out infinite;
 }
-@keyframes bulb-breath {
+@keyframes lantern-breath {
   0%,
   100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.82;
+    opacity: 0.84;
   }
 }
 
-/* A phone has no height to give away, so the wire hangs shallower and the
-   bulbs come in. Below a very short viewport they go entirely: a game of
-   Catan on a landscape phone needs every pixel for the island. */
+/* A phone has no height to give away. The string goes entirely: on a small
+   screen the board wants every pixel between the portraits and the dock, and
+   a decoration that costs a row of hexes is not worth having. */
 @media (max-width: 700px) {
-  .string-lights {
-    height: 82px;
-  }
-  .string-cord {
-    height: 82px;
-  }
-  .string-bulb {
-    transform: scale(0.72);
-    transform-origin: top center;
-  }
-}
-@media (max-height: 460px) {
   .string-lights {
     display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .string-bulb[data-breathing='true'] {
+  .string-lantern[data-breathing='true'] {
     animation: none;
   }
 }

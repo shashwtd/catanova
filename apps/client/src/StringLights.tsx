@@ -1,75 +1,116 @@
 /**
- * Five bulbs on a wire, strung above the table.
+ * A string of little frosted lanterns, strung along the top of the table.
  *
  * The table was a tiled wood photograph under a flat grey wash: evenly lit
  * everywhere, which is the one thing a real table never is, and the island sat
  * on it like a sticker. What was missing was a light source. This is it, and
- * the warm pool and vignette it justifies are what actually make the wood read
- * as a surface rather than a texture.
+ * the warm pool it justifies is what actually makes the wood read as a
+ * surface rather than a texture.
  *
- * Five, not twenty. A garland of small bulbs reads as bunting and competes
- * with the board; a few good ones read as a room. Each one is drawn rather
- * than sprited — glass, filament, cap and halo — so it stays crisp at any size
- * and costs no download.
+ * Each lamp is a squat ribbed lantern rather than a bulb: frosted plastic, a
+ * brass collar, petals running top to bottom, and its own colour — the string
+ * cycles through six so no two neighbours match. All of it is drawn rather
+ * than sprited, so it stays crisp at any size and costs no download.
  *
- * It is the wire that gets stretched, not the bulbs: the SVG holds only the
- * cord, so scaling it across any width leaves the glass round. Nothing here
- * takes pointer events, and the only movement is a slow breath on two bulbs,
- * which stops entirely under reduced motion.
+ * The cord waves rather than sagging once, and it stays near the top, where
+ * there is room for it above the island. It is the cord that gets stretched,
+ * not the lanterns: the SVG holds only the wire, so scaling it across any
+ * width leaves the glass round. The wire and the lanterns are placed by the
+ * same function, so a lantern can never drift off it.
+ *
+ * Nothing here takes pointer events, and the only movement is a slow breath on
+ * two of them, which stops entirely under reduced motion.
  */
 
-/** Where each bulb hangs, as a fraction of the width, and the sag of the wire
- *  at that point in the cord's own coordinates. */
-const SAG_TOP = 10,
-  SAG_DEPTH = 48;
-const BULBS = [0.14, 0.32, 0.5, 0.68, 0.86].map((t, index) => ({
-  t,
-  /** The same parabola the cord is drawn from, so a bulb never floats off it. */
-  y: SAG_TOP + SAG_DEPTH * (1 - (2 * t - 1) ** 2),
-  /** Only the outer two breathe, and out of step, so the row never pulses
-   *  together the way a string of fairy lights on a timer does. */
-  breathing: index === 0 || index === 4,
-  delay: index === 0 ? 0 : 3.4,
-}));
+/** The cord's shape, in its own coordinates: three dips, high on the wall. */
+const CORD_TOP = 6,
+  CORD_DEPTH = 30,
+  CORD_WAVES = 3,
+  CORD_WIDTH = 1200;
+export const CORD_HEIGHT = 40;
+
+/** Where the cord is at a given fraction of the way across. */
+export const cordY = (t: number) =>
+  CORD_TOP + CORD_DEPTH * 0.5 * (1 - Math.cos(2 * Math.PI * CORD_WAVES * t));
+
+/** Sampled rather than expressed as bezier handles, so the lanterns and the
+ *  wire are placed by one function and cannot disagree about where it is. */
+function cordPath(samples = 96) {
+  return Array.from({ length: samples + 1 }, (_, i) => {
+    const t = i / samples;
+    return `${i ? 'L' : 'M'}${(t * CORD_WIDTH) | 0 || 0} ${cordY(t).toFixed(2)}`;
+  }).join(' ');
+}
+
+/** Frosted plastic in six colours, the way a real string of them comes. */
+const SHADES = ['#95e3b8', '#85dcd8', '#b6a9ee', '#f0a3c2', '#f4ab80', '#f7dfa4'] as const;
+
+const LANTERNS = Array.from({ length: 11 }, (_, index) => {
+  const t = (index + 0.5) / 11;
+  return {
+    t,
+    y: cordY(t),
+    shade: SHADES[index % SHADES.length]!,
+    /** Two of them breathe, out of step, so the string never pulses together
+     *  the way a set of fairy lights on a timer does. */
+    breathing: index === 1 || index === 8,
+    delay: index === 1 ? 0 : 3.7,
+  };
+});
 
 export function StringLights() {
   return (
     <div className="string-lights" aria-hidden="true">
-      <svg className="string-cord" viewBox="0 0 1200 110" preserveAspectRatio="none" focusable="false">
+      <svg
+        className="string-cord"
+        viewBox={`0 0 ${CORD_WIDTH} ${CORD_HEIGHT}`}
+        preserveAspectRatio="none"
+        focusable="false"
+      >
         <path
-          d={`M0 ${SAG_TOP} Q600 ${SAG_TOP + SAG_DEPTH * 2} 1200 ${SAG_TOP}`}
+          d={cordPath()}
           fill="none"
           stroke="#2a211b"
-          strokeWidth="2.5"
+          strokeWidth="2"
+          strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      {BULBS.map((bulb) => (
+      {LANTERNS.map((lantern) => (
         <span
-          key={bulb.t}
-          className="string-bulb"
-          data-breathing={bulb.breathing}
-          style={{ left: `${bulb.t * 100}%`, top: `${bulb.y}px`, animationDelay: `${bulb.delay}s` }}
+          key={lantern.t}
+          className="string-lantern"
+          data-breathing={lantern.breathing}
+          style={
+            {
+              left: `${lantern.t * 100}%`,
+              top: `${lantern.y}px`,
+              animationDelay: `${lantern.delay}s`,
+              '--bulb': lantern.shade,
+            } as React.CSSProperties
+          }
         >
-          <svg viewBox="0 0 28 46" focusable="false">
-            {/* The cap: a short brass collar the glass hangs from. */}
-            <path d="M14 0v7" stroke="#2a211b" strokeWidth="2.5" />
-            <rect x="9.5" y="6" width="9" height="6.5" rx="1.6" fill="#9c8055" />
-            <rect x="9.5" y="6" width="9" height="2.2" rx="1" fill="#c8a870" />
-            {/* The glass, warm through and brightest just off centre. */}
+          <svg viewBox="0 0 30 40" focusable="false">
+            {/* The drop from the cord, and the brass collar it hangs on. */}
+            <path d="M15 0v6" stroke="#2a211b" strokeWidth="1.8" />
+            <rect x="11.3" y="4.6" width="7.4" height="4.6" rx="1.5" fill="#9c8055" />
+            <rect x="11.3" y="4.6" width="7.4" height="1.7" rx="0.8" fill="#c8a870" />
+            {/* The lantern itself: squat, and wider than it is tall. */}
             <path
-              className="bulb-glass"
-              d="M9.5 12.5h9c2.9 2.4 4.6 5.9 4.6 9.9 0 5.5-4.1 9.9-9.1 9.9s-9.1-4.4-9.1-9.9c0-4 1.7-7.5 4.6-9.9Z"
+              className="lantern-glass"
+              d="M15 9.2c8.6 0 13 4.6 13 11s-5.8 11.2-13 11.2S2 26.6 2 20.2s4.4-11 13-11Z"
             />
-            <ellipse cx="10.6" cy="19.4" rx="2.5" ry="3.4" fill="#fff4d2" opacity="0.5" />
-            {/* The filament, which is the only part that is actually bright. */}
-            <path
-              className="bulb-filament"
-              d="M11.6 19.5c0 2.6 1 3.4 1.2 5.1.2-1.7 1.2-2.5 1.2-5.1"
-              fill="none"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
+            <ellipse cx="15" cy="27.4" rx="11" ry="4" fill="#000" opacity="0.07" />
+            {/* Petals, which is what makes it read as moulded plastic rather
+                than as a ball of colour. */}
+            <g className="lantern-ribs" fill="none" strokeLinecap="round">
+              <path d="M15 9.4c-6.8 4-6.8 17.8 0 21.8" />
+              <path d="M15 9.4c-3.6 4-3.6 17.8 0 21.8" />
+              <path d="M15 9.4c3.6 4 3.6 17.8 0 21.8" />
+              <path d="M15 9.4c6.8 4 6.8 17.8 0 21.8" />
+            </g>
+            <ellipse cx="10.4" cy="15.8" rx="3.3" ry="4.4" fill="#fff" opacity="0.4" />
+            <ellipse className="lantern-glass" cx="15" cy="32.6" rx="2.4" ry="1.7" />
           </svg>
         </span>
       ))}

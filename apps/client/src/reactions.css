@@ -457,7 +457,7 @@
 .reaction-scroll {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 2px;
 }
 
 /*
@@ -504,9 +504,11 @@
 .reaction-choice {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 4px;
+  /* The face is the whole of the button. The padding it used to sit inside was
+     spent on nothing: there is no label and no frame to clear. */
+  width: 50px;
+  height: 50px;
+  padding: 1px;
   border: 0;
   border-radius: 10px;
   background: none;
@@ -559,7 +561,10 @@
   /* As wide as the button it hangs from, and no wider: a column of faces, not
      a panel. The faces take the width the padding used to. */
   .reaction-tray {
-    width: var(--game-tool-edge, 44px);
+    /* A little wider than the button it hangs from. It was exactly the
+       button's width, which made a tidy column of faces smaller than they
+       needed to be for the space the column already occupies. */
+    width: calc(var(--game-tool-edge, 44px) + 10px);
     /* No border and no padding: at this width every pixel spent on the frame
        comes straight off the faces, which are the point. A face is a circle of
        exactly the tray's width, and the pill's end caps are semicircles of the
@@ -575,7 +580,7 @@
   }
   .reaction-scroll {
     grid-template-columns: 1fr;
-    gap: 2px;
+    gap: 1px;
     max-height: min(58vh, 420px);
     overflow-y: auto;
     overscroll-behavior-y: contain;
