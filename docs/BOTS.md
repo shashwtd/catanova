@@ -71,6 +71,11 @@ page.
 
 Output tokens are free on this model, so cost tracks input alone.
 
+Taking over a seat costs one request on top of that, once, whatever happens
+afterwards: reading how the absent player was playing is 714 input tokens, about
+$0.00003, measured against `jev-latest`. It is charged per handover, not per
+turn, and a player who reconnects and drops again is read again.
+
 ## Configuration
 
 Bots work with no configuration: without a key they play from their
