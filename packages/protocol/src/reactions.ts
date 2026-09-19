@@ -7,31 +7,33 @@
  * none of them belong to a carved wooden island. These are the same expression
  * everywhere, in the game's own colours, and they cost no download.
  *
- * Ordered by how often the feeling actually comes up in a game of Catan, so the
- * first row of the picker is the one people reach for: someone laughing at your
- * misfortune, someone furious about the robber, someone quietly plotting. The
- * long tail is still there, it is just further along.
+ * Twelve, in the order people reach for them. The first eight are the ones a
+ * game of Catan produces on its own — someone laughing at your misfortune,
+ * someone furious about the robber, someone quietly plotting, someone who has
+ * just been finished off by a seven. The last four are for the moments that
+ * need a specific word: a player who is obviously scheming, a player begging
+ * for one sheep, a decision that deserves a clown, and a play worth shouting
+ * about.
  *
  * `motion` names the choreography the client plays. It lives here rather than
  * in the client so the set stays one decision: adding a reaction means adding a
  * row, a face, and a keyframe.
  */
 
+// Keep wire IDs stable across deployments: wink and nice now use clown and hype art.
 export const REACTIONS = {
-  laugh: { label: 'Laughing', motion: 'giggle' },
+  laugh: { label: 'Dying laughing', motion: 'giggle' },
   angry: { label: 'Furious', motion: 'rage' },
   evil: { label: 'Plotting', motion: 'loom' },
   smug: { label: 'Smug', motion: 'swagger' },
-  sad: { label: 'Devastated', motion: 'wilt' },
   shock: { label: 'Shocked', motion: 'jolt' },
-  nice: { label: 'Nice one', motion: 'cheer' },
-  suspicious: { label: 'Suspicious', motion: 'squint' },
   eyeroll: { label: 'Oh, please', motion: 'roll' },
+  sad: { label: 'Devastated', motion: 'wilt' },
+  dead: { label: 'Completely cooked', motion: 'sink' },
+  suspicious: { label: 'Suspicious', motion: 'squint' },
   pleading: { label: 'Please trade', motion: 'beg' },
-  nervous: { label: 'Nervous', motion: 'jitter' },
-  bored: { label: 'Roll already', motion: 'drift' },
-  wink: { label: 'Cheeky', motion: 'cheeky' },
-  dead: { label: 'I am finished', motion: 'sink' },
+  wink: { label: 'Clown move', motion: 'honk' },
+  nice: { label: 'Hyped', motion: 'cheer' },
 } as const;
 
 export type ReactionName = keyof typeof REACTIONS;

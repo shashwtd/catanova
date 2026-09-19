@@ -223,8 +223,11 @@ export function parseClientMessage(input: string): ClientMessage {
   // A reaction changes no game state, so it carries no command id and no
   // revision: it is chat, not a move, and a dropped one costs nothing.
   if (v.type === 'react') {
-    if (!isReaction(v.reaction)) throw new Error('Unknown reaction');
-    return { type: 'react', reaction: v.reaction };
+    // Older open tabs may still send faces retired from the picker. Broadcast
+    // a supported equivalent rather than breaking their connection or renderer.
+    const reaction = v.reaction === 'nervous' ? 'sad' : v.reaction === 'bored' ? 'eyeroll' : v.reaction;
+    if (!isReaction(reaction)) throw new Error('Unknown reaction');
+    return { type: 'react', reaction };
   }
   if (v.type === 'launchReady') {
     if (typeof v.id !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(v.id) || typeof v.success !== 'boolean')

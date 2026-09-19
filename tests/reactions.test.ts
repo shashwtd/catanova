@@ -118,14 +118,22 @@ test('the rate limit allows a burst and then rests, by one shared rule', () => {
 
 test('a reaction face fills its button, and no icon rule quietly shrinks it', () => {
   const reactions = readFileSync('apps/client/src/reactions.css', 'utf8');
-  // On a phone the tray is one column as wide as the button it hangs from, and
-  // the face is the whole of that: no padding, no border, nothing spent on a
-  // frame that could come off the drawing.
+  // On a phone the tray is one column exactly as wide as the button it hangs
+  // from, so it reads as that button unrolled rather than as a panel near it.
   const phone = reactions.slice(reactions.indexOf('@media (max-width: 700px)'));
   const tray = phone.slice(phone.indexOf('.reaction-tray {'));
+  assert.match(tray.slice(0, tray.indexOf('}')), /width: var\(--game-tool-edge[^)]*\);/);
   assert.match(tray.slice(0, tray.indexOf('}')), /padding: 0;/);
-  const choice = phone.slice(phone.indexOf('.reaction-choice {'));
-  assert.match(choice.slice(0, choice.indexOf('}')), /padding: 0;/);
+  // And the face is the large part of its button: a few pixels of air so they
+  // read as separate tokens, not a frame the drawing sits inside.
+  const air = (block: string) => Number(block.match(/padding: (\d+)px;/)![1]);
+  const phoneChoice = phone.slice(phone.indexOf('.reaction-choice {'));
+  assert.ok(air(phoneChoice.slice(0, phoneChoice.indexOf('}'))) <= 8);
+  const desktop = reactions.slice(0, reactions.indexOf('@media (max-width: 700px)'));
+  const wide = desktop.slice(desktop.indexOf('.reaction-choice {'));
+  const box = wide.slice(0, wide.indexOf('}'));
+  const size = Number(box.match(/width: (\d+)px;/)![1]);
+  assert.ok(size - air(box) * 2 >= size * 0.6, 'the drawing is most of the button');
 
   // The rail shrinks every icon on a small screen. A face is not an icon on a
   // button, it is the whole of one, and that rule was quietly taking each face
@@ -141,4 +149,33 @@ test('a reaction face fills its button, and no icon rule quietly shrinks it', ()
       `".side-controls${selector}svg" sizes reaction faces too`,
     );
   }
+});
+
+test('reaction updates remain safe for tabs opened before deployment', () => {
+  const previous = [
+    'laugh',
+    'angry',
+    'evil',
+    'smug',
+    'sad',
+    'shock',
+    'nice',
+    'suspicious',
+    'eyeroll',
+    'pleading',
+    'nervous',
+    'bored',
+    'wink',
+    'dead',
+  ];
+  for (const reaction of previous) {
+    const message = parseClientMessage(JSON.stringify({ type: 'react', reaction }));
+    assert.equal(message.type, 'react');
+    if (message.type !== 'react') throw new Error('Expected reaction');
+    assert.ok(isReaction(message.reaction));
+    assert.ok(previous.includes(message.reaction), 'old clients must recognize every broadcast ID');
+  }
+  assert.ok(REACTION_LIST.every((name) => previous.includes(name)));
+  assert.equal(REACTIONS.wink.label, 'Clown move');
+  assert.equal(REACTIONS.nice.label, 'Hyped');
 });
