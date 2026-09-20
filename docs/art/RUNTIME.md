@@ -59,3 +59,24 @@ PUPPETEER_MODULE=/abs/path/to/puppeteer/lib/puppeteer/puppeteer.js \
 It only ever clicks what a player can click, so a shot can only show a position
 the rules allow. Re-run it, then run `optimize-art.mjs`, to refresh the pictures
 after an interface change.
+
+## Measurement
+
+Google Tag Manager loads from `/analytics.js`, a file the build writes next to
+the pages. It is not inline, so `script-src` still refuses inline script
+everywhere; the policy in `apps/server/src/static.ts` names the tag manager and
+analytics hosts and nothing else. A Custom HTML tag added in the tag manager
+later will be blocked by that, deliberately.
+
+Two rules the pages keep:
+
+- **Only public pages measure.** `index.html` and `/guide/` carry the tag.
+  `app.html`, which a room address and the sign-in callback are served, does
+  not, so opening an invitation loads no tag at all.
+- **A room code never leaves.** `/room/D53W` reports as `/room`, along with
+  `/join`, `/invite` and `/auth`. The redaction is pushed to `dataLayer` before
+  the container loads, and lives in `apps/client/src/analytics.ts`.
+
+Build with `GTM_ID=off` for a local or staging build, so the report is about
+players rather than about us. `GTM_ID=GTM-XXXX` points a build at another
+container.

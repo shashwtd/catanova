@@ -58,7 +58,12 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.match(await response.text(), /Catanova/);
   assert.match(response.headers.get('content-security-policy')!, /frame-ancestors 'none'/);
   assert.ok(response.headers.get('content-security-policy')!.includes(auth.url));
-  assert.match(response.headers.get('content-security-policy')!, /img-src 'self' data:;/);
+  // Pictures come from this origin, from data URIs, and from the measurement
+  // hosts. Nowhere else: a profile picture is proxied, never hotlinked.
+  assert.match(
+    response.headers.get('content-security-policy')!,
+    /img-src 'self' data: https:\/\/www\.googletagmanager\.com https:\/\/www\.google-analytics\.com;/,
+  );
   assert.ok(!response.headers.get('content-security-policy')!.includes('googleusercontent.com'));
   // Search and assistant crawlers receive the same public page as players; private entries stay noindex.
   for (const agent of ['Googlebot', 'bingbot', 'OAI-SearchBot', 'ChatGPT-User']) {

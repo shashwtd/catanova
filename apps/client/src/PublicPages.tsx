@@ -217,7 +217,7 @@ export function PublicArtPreloads() {
         rel="preload"
         as="image"
         type="image/webp"
-        href="/art/optimized/catanova-logo-v2.a161a887edbc.webp"
+        href="/art/optimized/catanova-logo-v2.e377bbe647d6.webp"
         fetchPriority="high"
       />
       <link

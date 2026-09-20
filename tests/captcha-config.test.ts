@@ -67,6 +67,9 @@ test('without a guest CAPTCHA site key, runtime config and CSP retain their orig
   const origin = `http://127.0.0.1:${server.port}`;
   assert.deepEqual(await (await fetch(`${origin}/api/config`)).json(), { auth: null, mode: 'local' });
   const csp = (await fetch(origin)).headers.get('content-security-policy')!;
-  assert.match(csp, /script-src 'self';/);
+  // No captcha configured, so its host is absent. Measurement is not
+  // conditional on it, and inline script stays refused either way.
   assert.ok(!csp.includes('challenges.cloudflare.com'));
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
+  assert.match(csp, /script-src 'self' https:\/\/www\.googletagmanager\.com;/);
 });
