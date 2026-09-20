@@ -4,6 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  ANALYTICS_LOADER_PATH,
+  GTM_CONTAINER,
+  analyticsHead,
+  analyticsLoader,
+  analyticsNoscript,
+} from '../apps/client/src/analytics.js';
+import {
   PublicGuide,
   PublicLanding,
   PublicMetadata,
@@ -88,13 +95,32 @@ ${PUBLIC_PAGES.map((page) => `- [${page.title}](${SITE_URL}${page.path}): ${page
 
 export async function renderPublicPages(directory: string) {
   const template = await readFile(join(directory, 'index.html'), 'utf8');
-  if (!template.includes('<!-- public-metadata -->') || !template.includes('<div id="root"></div>'))
+  if (
+    !template.includes('<!-- public-metadata -->') ||
+    !template.includes('<div id="root"></div>') ||
+    !template.includes('<!-- analytics -->')
+  )
     throw new Error('Expected the fresh Vite entry template before rendering public pages');
   const metadata = (index: 0 | 1) =>
     renderToStaticMarkup(createElement(PublicMetadata, { page: PUBLIC_PAGES[index] }));
+  /**
+   * Measurement goes on the pages the public arrives at, and nowhere else.
+   *
+   * `app.html` is what a room address and the sign-in callback are served,
+   * so somebody opening an invite link never loads a tag at all. Somebody who
+   * starts at the front door and creates a room has already loaded it, which
+   * is why the snippet redacts the address rather than relying on this.
+   */
+  const container = process.env.GTM_ID ?? GTM_CONTAINER;
+  const measuring = container !== 'off';
+  const measured = measuring ? { head: analyticsHead(), body: analyticsNoscript(container) } : { head: '', body: '' };
+  if (measuring)
+    await writeFile(join(directory, ANALYTICS_LOADER_PATH.slice(1)), analyticsLoader(container));
   const app = template
     .replace(/<title>[\s\S]*?<\/title>/, '')
-    .replace('<!-- public-metadata -->', metadata(0));
+    .replace('<!-- public-metadata -->', metadata(0))
+    .replace('<!-- analytics -->', '')
+    .replace('<!-- analytics-noscript -->', '');
   const artPreloads = renderToStaticMarkup(createElement(PublicArtPreloads));
   // Keep room entry and OAuth callback free of the public home-menu prerender.
   await writeFile(join(directory, 'app.html'), app);
@@ -102,6 +128,8 @@ export async function renderPublicPages(directory: string) {
     join(directory, 'index.html'),
     app
       .replace('</head>', `${artPreloads}</head>`)
+      .replace('</head>', `${measured.head}</head>`)
+      .replace('<body>', `<body>${measured.body}`)
       .replace(
         '<div id="root"></div>',
         `<div id="root">${renderToStaticMarkup(createElement(PublicLanding))}</div>`,
@@ -111,8 +139,8 @@ export async function renderPublicPages(directory: string) {
   await writeFile(
     join(directory, 'guide', 'index.html'),
     `<!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#123d43">${metadata(1)}${artPreloads}<link rel="stylesheet" href="/guide/guide.css"></head>
-<body>${renderToStaticMarkup(createElement(PublicGuide))}</body></html>\n`,
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#123d43">${measured.head}${metadata(1)}${artPreloads}<link rel="stylesheet" href="/guide/guide.css"></head>
+<body>${measured.body}${renderToStaticMarkup(createElement(PublicGuide))}</body></html>\n`,
   );
   await writeFile(
     join(directory, 'robots.txt'),

@@ -66,6 +66,9 @@ function matchesETag(header: string | undefined, etag: string) {
 }
 
 /** Same-origin distribution. Only the built client directory is ever exposed. */
+/** Off when the site was built with `GTM_ID=off`, so the policy matches the pages. */
+const analyticsEnabled = process.env.GTM_ID !== 'off';
+
 export async function serveClient(
   request: IncomingMessage,
   response: ServerResponse,
@@ -166,9 +169,28 @@ export async function serveClient(
     if (encoding !== 'identity') response.setHeader('Content-Encoding', encoding);
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy', 'same-origin');
+    /**
+     * The policy has to name the tag manager or nothing measures anything.
+     *
+     * A blocked tag fails silently: the console shows a violation, the report
+     * shows no traffic, and the two are easy not to connect. Our own loader is
+     * a file on this origin, so `'self'` still covers it and inline script
+     * stays refused everywhere. A Custom HTML tag added in the tag manager
+     * later will be blocked by that, which is the tradeoff and is deliberate.
+     */
+    const tagManager = analyticsEnabled
+      ? {
+          script: ' https://www.googletagmanager.com',
+          frame: ' https://www.googletagmanager.com',
+          img: ' https://www.googletagmanager.com https://www.google-analytics.com',
+          connect:
+            ' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com',
+        }
+      : { script: '', frame: '', img: '', connect: '' };
+    const frameSources = `${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${tagManager.frame}`;
     response.setHeader(
       'Content-Security-Policy',
-      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''};${captchaEnabled ? ' frame-src https://challenges.cloudflare.com;' : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${authOrigin ? ' ' + new URL(authOrigin).origin : ''}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${tagManager.script};${frameSources ? ` frame-src${frameSources};` : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:${tagManager.img}; connect-src 'self' ws: wss:${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${authOrigin ? ' ' + new URL(authOrigin).origin : ''}${tagManager.connect}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
     );
     response.setHeader(
       'Cache-Control',
