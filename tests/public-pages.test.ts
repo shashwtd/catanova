@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
 import { REACTIONS, REACTION_LIST } from '../packages/protocol/src/reactions.js';
+import { publicPath } from '../apps/client/src/analytics.js';
 import {
   GUIDE_FAQ,
   GUIDE_SECTIONS,
@@ -60,8 +61,37 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.ok(!home.includes('Catanova is open source.'));
   assert.ok(home.includes('<script type="module" src="/src/main.tsx"></script>'));
   assert.ok(shell.includes('<div id="root"></div>'));
+  // Measurement belongs on the pages the public arrives at. A room address and
+  // the sign-in callback are served app.html, so opening an invitation loads
+  // no tag at all, and a room code cannot reach a third party that way.
+  for (const marker of ['analytics.js', 'googletagmanager']) {
+    assert.ok(!shell.includes(marker), `app.html must stay clear of ${marker}`);
+    for (const page of [home, guide]) assert.ok(page.includes(marker), marker);
+  }
+  const loader = await readFile(join(directory, 'analytics.js'), 'utf8');
+  assert.ok(loader.includes('GTM-'), 'the loader names its container');
+  assert.ok(loader.includes('page_path'), 'and redacts before the container loads');
+  // Every private prefix collapses to one page name, so a report can say how
+  // many people reached a room without saying which room.
+  assert.equal(publicPath('/room/D53W'), '/room');
+  assert.equal(publicPath('/room/D53W?invite=ABCD'), '/room');
+  assert.equal(publicPath('/join/9XYZ'), '/join');
+  assert.equal(publicPath('/auth/callback#access_token=secret'), '/auth');
+  assert.equal(publicPath('/guide/'), '/guide/');
+  assert.equal(publicPath('/'), '/');
+  // A prefix must match a whole segment: /rooms is not /room.
+  assert.equal(publicPath('/rooms-we-like'), '/rooms-we-like');
   assert.match(home, /rel="preload" as="image" type="image\/webp"/);
   assert.match(guide, /rel="preload" as="image" type="image\/webp"/);
+  // A preload for a URL that does not exist is worse than no preload: it costs
+  // a request, warms nothing, and fails where nobody is looking. These URLs
+  // carry a content hash, so a re-export moves the file and leaves the page
+  // pointing at the old one, which is exactly how the logo preload broke.
+  for (const page of [home, guide])
+    for (const match of page.matchAll(/(?:href|src)="(\/art\/[^"]+)"/g))
+      await readFile(join('apps/client/public', match[1]!)).catch(() => {
+        throw new Error(`${match[1]} is referenced but not on disk`);
+      });
   assert.ok(!shell.includes('as="image"'), 'private game routes must not prefetch the welcome scenery');
   assert.ok(!shell.includes('Create room') && !shell.includes('Connecting…'));
   assert.ok(guide.includes('How to play') && guide.includes('City upgrade'));
@@ -153,10 +183,11 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.ok(guide.includes('id="questions"') && guide.includes('Can phones and computers play together?'));
   assert.ok(guide.includes('not an official CATAN game'));
   assert.ok(guide.includes('There is no public matchmaking'));
-  // The guide still ships no executable code; the only script on it is data.
+  // The guide ships no code of its own: one script of data, and the loader that
+  // starts measurement, which is a file on this origin rather than inline.
   assert.deepEqual(
     [...guide.matchAll(/<script([^>]*)>/g)].map((m) => m[1]!.trim()),
-    ['type="application/ld+json"'],
+    ['src="/analytics.js" async', 'type="application/ld+json"'],
   );
   assert.ok(!guide.includes('/src/main.tsx'));
   for (const html of [home, guide]) {
