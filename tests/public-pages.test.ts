@@ -64,12 +64,13 @@ test('the production entry is readable before JavaScript and only public pages e
   // Measurement belongs on the pages the public arrives at. A room address and
   // the sign-in callback are served app.html, so opening an invitation loads
   // no tag at all, and a room code cannot reach a third party that way.
-  for (const marker of ['analytics.js', 'googletagmanager']) {
+  for (const marker of ['analytics.js']) {
     assert.ok(!shell.includes(marker), `app.html must stay clear of ${marker}`);
     for (const page of [home, guide]) assert.ok(page.includes(marker), marker);
   }
   const loader = await readFile(join(directory, 'analytics.js'), 'utf8');
-  assert.ok(loader.includes('GTM-'), 'the loader names its container');
+  assert.ok(loader.includes('G-NGHVNKN7FZ'), 'the loader names its GA4 property');
+  assert.ok(!loader.includes('gtm.js') && !home.includes('ns.html'), 'the old GTM container is removed');
   assert.ok(loader.includes('page_path'), 'and redacts before the container loads');
   // Every private prefix collapses to one page name, so a report can say how
   // many people reached a room without saying which room.

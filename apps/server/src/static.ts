@@ -66,8 +66,8 @@ function matchesETag(header: string | undefined, etag: string) {
 }
 
 /** Same-origin distribution. Only the built client directory is ever exposed. */
-/** Off when the site was built with `GTM_ID=off`, so the policy matches the pages. */
-const analyticsEnabled = process.env.GTM_ID !== 'off';
+/** Off when the site was built with `GA_MEASUREMENT_ID=off`, so the policy matches the pages. */
+const analyticsEnabled = process.env.GA_MEASUREMENT_ID !== 'off';
 
 export async function serveClient(
   request: IncomingMessage,
@@ -178,19 +178,19 @@ export async function serveClient(
      * stays refused everywhere. A Custom HTML tag added in the tag manager
      * later will be blocked by that, which is the tradeoff and is deliberate.
      */
-    const tagManager = analyticsEnabled
+    const analyticsSources = analyticsEnabled
       ? {
           script: ' https://www.googletagmanager.com',
-          frame: ' https://www.googletagmanager.com',
+          frame: '',
           img: ' https://www.googletagmanager.com https://www.google-analytics.com',
           connect:
             ' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com',
         }
       : { script: '', frame: '', img: '', connect: '' };
-    const frameSources = `${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${tagManager.frame}`;
+    const frameSources = `${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${analyticsSources.frame}`;
     response.setHeader(
       'Content-Security-Policy',
-      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${tagManager.script};${frameSources ? ` frame-src${frameSources};` : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:${tagManager.img}; connect-src 'self' ws: wss:${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${authOrigin ? ' ' + new URL(authOrigin).origin : ''}${tagManager.connect}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${analyticsSources.script};${frameSources ? ` frame-src${frameSources};` : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:${analyticsSources.img}; connect-src 'self' ws: wss:${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${authOrigin ? ' ' + new URL(authOrigin).origin : ''}${analyticsSources.connect}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
     );
     response.setHeader(
       'Cache-Control',

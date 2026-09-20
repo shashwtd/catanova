@@ -5,10 +5,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   ANALYTICS_LOADER_PATH,
-  GTM_CONTAINER,
+  GA_MEASUREMENT_ID,
   analyticsHead,
   analyticsLoader,
-  analyticsNoscript,
 } from '../apps/client/src/analytics.js';
 import {
   PublicGuide,
@@ -111,9 +110,9 @@ export async function renderPublicPages(directory: string) {
    * starts at the front door and creates a room has already loaded it, which
    * is why the snippet redacts the address rather than relying on this.
    */
-  const container = process.env.GTM_ID ?? GTM_CONTAINER;
+  const container = process.env.GA_MEASUREMENT_ID ?? GA_MEASUREMENT_ID;
   const measuring = container !== 'off';
-  const measured = measuring ? { head: analyticsHead(), body: analyticsNoscript(container) } : { head: '', body: '' };
+  const measured = measuring ? { head: analyticsHead(), body: '' } : { head: '', body: '' };
   if (measuring)
     await writeFile(join(directory, ANALYTICS_LOADER_PATH.slice(1)), analyticsLoader(container));
   const app = template

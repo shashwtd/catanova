@@ -62,30 +62,20 @@ after an interface change.
 
 ## Measurement
 
-Google Tag Manager loads from `/analytics.js`, a file the build writes next to
-the pages. It is not inline, so `script-src` still refuses inline script
-everywhere; the policy in `apps/server/src/static.ts` names the tag manager and
-analytics hosts and nothing else. A Custom HTML tag added in the tag manager
-later will be blocked by that, deliberately.
+Direct Google Analytics 4 uses measurement ID `G-NGHVNKN7FZ`. It replaces
+GTM-W4XDJ2N4; the GTM container script and noscript iframe are no longer injected.
+`apps/client/src/analytics.ts` generates `/analytics.js`, which loads Google's
+`gtag/js` and configures GA4. Only the public homepage and guide inject it;
+private app entry routes do not. No Google Tag Manager publication is needed.
 
-Two rules the pages keep:
+The same-origin loader preserves the inline-script CSP restriction. It skips
+non-production hostnames and sets sanitized page URL defaults before loading
+GA4 and on SPA navigation. Referrers are blank and private-page titles generic.
+These defaults are not a sandbox: property settings can enable additional event
+collection. Disable enhanced history/form/outbound-link measurement if it would
+collect private URLs or inputs; validate any future analytics changes in DebugView.
+No usernames, emails or room codes are deliberately added as event parameters.
 
-- **Only public pages measure.** `index.html` and `/guide/` carry the tag.
-  `app.html`, which a room address and the sign-in callback are served, does
-  not, so opening an invitation loads no tag at all.
-- **Analytics URL defaults are redacted.** `/room/D53W` reports as `/room`, along with
-  `/join`, `/invite` and `/auth`. The redaction is set through `gtag` and `dataLayer` before
-  the container loads and after SPA navigation, in `apps/client/src/analytics.ts`.
-  Referrers are blank and private-page titles are generic. These are defaults,
-  not a sandbox: a container tag can override them or read the actual URL.
-
-Build with `GTM_ID=off` for a local or staging build, so the report is about
-players rather than about us. `GTM_ID=GTM-XXXX` points a build at another
-container.
-
-The published container must include a Google tag with the GA4 measurement ID
-(`G-…`); installing GTM alone does not collect reports. Configure tags to use the
-sanitized data-layer page fields, disable automatic history-based page views and
-form/outbound-click measurement, and never send room links, profile names, or
-authentication fields. Recheck this when publishing container changes.
-The script also skips non-production hostnames.
+`GA_MEASUREMENT_ID=off` disables injection at build time. A different `G-…` value
+selects another property. The former `GTM_ID` setting is retired. Consent UI was
+not added as part of this replacement.

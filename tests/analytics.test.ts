@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
-import { analyticsLoader, analyticsNoscript } from '../apps/client/src/analytics.js';
+import { analyticsLoader } from '../apps/client/src/analytics.js';
 
 test('analytics sets safe Google tag defaults before load and after SPA navigation', () => {
   const events: unknown[] = [];
@@ -20,9 +20,11 @@ test('analytics sets safe Google tag defaults before load and after SPA navigati
     createElement() { return {}; },
     getElementsByTagName() { return [{ parentNode: { insertBefore(tag: unknown) { inserted.push(tag); } } }]; },
   };
-  const script = analyticsLoader('GTM-TEST');
+  const script = analyticsLoader('G-TEST');
   runInNewContext(script, { window, document, location });
   assert.equal(inserted.length, 1);
+  assert.equal((inserted[0] as { src: string }).src, 'https://www.googletagmanager.com/gtag/js?id=G-TEST');
+  assert.ok(events.some((event) => (event as IArguments)[0] === 'config' && (event as IArguments)[1] === 'G-TEST'));
   assert.equal((events[0] as IArguments)[0], 'set');
   window.history.pushState(null, '', '/room/ABCD?invite=SECRET');
   const latest = events.at(-1) as Record<string, string>;
@@ -34,12 +36,11 @@ test('analytics sets safe Google tag defaults before load and after SPA navigati
   assert.ok(!JSON.stringify(events).includes('SECRET'));
   location.hostname = 'localhost';
   runInNewContext(script, { window, document, location });
-  assert.equal(inserted.length, 1, 'local previews must not load GTM');
+  assert.equal(inserted.length, 1, 'local previews must not load GA4');
 });
 
-test('build rejects container IDs containing markup or executable script', () => {
-  for (const bad of ['GTM-X\" onload=alert(1)', "GTM-X';alert(1)//", '']) {
-    assert.throws(() => analyticsLoader(bad), /Invalid GTM/);
-    assert.throws(() => analyticsNoscript(bad), /Invalid GTM/);
+test('build rejects measurement IDs containing markup or executable script', () => {
+  for (const bad of ['G-X\" onload=alert(1)', "G-X';alert(1)//", '']) {
+    assert.throws(() => analyticsLoader(bad), /Invalid GA4/);
   }
 });
