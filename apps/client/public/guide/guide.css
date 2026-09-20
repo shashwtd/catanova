@@ -244,53 +244,123 @@ code {
 }
 .guide-nav-links {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   padding: 0;
-  counter-reset: none;
 }
 .guide-nav-links a {
   display: grid;
-  grid-template-columns: 19px 1fr;
-  gap: 8px;
-  padding: 5px 0;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 4px 0;
   color: var(--ink);
   font-size: 14.5px;
   line-height: 1.4;
   text-decoration: none;
 }
+/* The number is a counter, not a decoration: it is the thing a reader matches
+   against the heading and against a note that says "see section 4", so it gets
+   its own aligned column and reads as a token rather than as leading text. */
 .guide-nav-links a > span {
-  color: var(--muted);
+  padding: 1px 0 2px;
+  border-radius: 3px;
+  background: var(--surface-alt);
+  color: var(--mark);
+  font-size: 12px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: center;
+  letter-spacing: 0.01em;
 }
 .guide-nav-links a:hover {
   color: var(--link-hover);
 }
 .guide-nav-links a:hover > span {
-  color: var(--link-hover);
+  background: #eedfbe;
 }
 .guide-nav-links ol {
   list-style: none;
-  margin: 0 0 3px;
-  padding: 0 0 0 9px;
-  border-left: 1px solid var(--rule);
+  margin: 1px 0 5px 8px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--rule);
 }
 .guide-nav-links ol a {
-  grid-template-columns: 24px 1fr;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
   padding: 3px 0;
   color: var(--muted);
   font-size: 13.5px;
 }
+.guide-nav-links ol a > span {
+  background: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-align: right;
+}
 .guide-nav-links ol a:hover {
+  color: var(--link-hover);
+}
+.guide-nav-links ol a:hover > span {
+  background: none;
   color: var(--link-hover);
 }
 .guide-nav-aside {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--rule);
   font-size: 14px;
+}
+.guide-nav-aside a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.guide-nav-aside a:hover {
+  text-decoration: underline;
+}
+.guide-nav-aside svg {
+  width: 17px;
+  height: 17px;
+  overflow: hidden;
+  opacity: 0.85;
+}
+
+/* --- The twelve reaction faces ------------------------------------------- */
+.guide-reactions {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+  margin: 0;
+  padding: 10px 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface);
+}
+.guide-reactions li {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px 4px 10px;
+  border-radius: 5px;
+  text-align: center;
+}
+.guide-reactions li:hover {
+  background: var(--surface-alt);
+}
+.guide-reaction-face svg {
+  width: 52px;
+  height: 52px;
+  overflow: visible;
+}
+.guide-reactions li > span:last-child {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
 }
 .guide-content {
   min-width: 0;
@@ -899,12 +969,17 @@ code {
 /* --- Narrower windows --------------------------------------------------- */
 @media (max-width: 1120px) {
   .guide-layout {
-    gap: 38px;
-    grid-template-columns: 186px minmax(0, 1fr);
+    gap: 34px;
+    grid-template-columns: 202px minmax(0, 1fr);
   }
   .guide-infobox {
     width: 272px;
     margin-left: 24px;
+  }
+}
+@media (max-width: 1120px) {
+  .guide-reactions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 @media (max-width: 900px) {

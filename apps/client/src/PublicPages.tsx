@@ -5,6 +5,8 @@ import { BrandLogo } from './BrandLogo.js';
 import { ResourceIcon } from './Board.js';
 import { DevelopmentArt } from './DevelopmentCards.js';
 import { GameIcon } from './GameIcons.js';
+import { ReactionFace } from './ReactionArt.js';
+import { REACTIONS, REACTION_LIST } from '../../../packages/protocol/src/reactions.js';
 import type { GameIconName } from './GameIcons.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -490,8 +492,14 @@ export function PublicGuide() {
           <strong>Contents</strong>
           <ContentsList />
           <div className="guide-nav-aside">
-            <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>Full rulebook</a>
-            <a href={REPOSITORY_URL}>Source on GitHub</a>
+            <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>
+              <GameIcon name="help" size={17} />
+              Full rulebook
+            </a>
+            <a href={REPOSITORY_URL}>
+              <GameIcon name="settings" size={17} />
+              Source on GitHub
+            </a>
           </div>
         </nav>
         <main id="guide-content" className="guide-content">
@@ -1111,6 +1119,19 @@ export function PublicGuide() {
               name under it. A short burst is fine; after that the button rests for a moment, which is the
               difference between a table and a chat room.
             </p>
+            <figure className="guide-table-figure">
+              <figcaption>The twelve, in tray order</figcaption>
+              <ul className="guide-reactions">
+                {REACTION_LIST.map((name) => (
+                  <li key={name}>
+                    <span className="guide-reaction-face" aria-hidden="true">
+                      <ReactionFace name={name} />
+                    </span>
+                    <span>{REACTIONS[name].label}</span>
+                  </li>
+                ))}
+              </ul>
+            </figure>
             <figure className="guide-figure guide-plate">
               <img
                 src="/art/optimized/guide-game-view.116377196968.webp"

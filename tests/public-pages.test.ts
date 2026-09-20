@@ -14,6 +14,7 @@ import {
   sceneryKeyframes,
 } from '../apps/client/src/TitleScenery.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
+import { REACTIONS, REACTION_LIST } from '../packages/protocol/src/reactions.js';
 import {
   GUIDE_FAQ,
   GUIDE_SECTIONS,
@@ -110,6 +111,13 @@ test('the production entry is readable before JavaScript and only public pages e
       assert.ok(guide.includes(`id="${anchor}"`), anchor);
     }
   }
+  // The guide draws every reaction with the same code the game draws them with,
+  // so a set that grows cannot leave the page showing a face nobody can send,
+  // or a name for one that no longer exists.
+  assert.equal((guide.match(/class="guide-reaction-face"/g) ?? []).length, REACTION_LIST.length);
+  for (const name of REACTION_LIST) assert.ok(guide.includes(REACTIONS[name].label), name);
+  assert.ok(!/\p{Extended_Pictographic}/u.test(guide), 'the guide draws its faces, it does not borrow them');
+
   // Notes are linked both ways, so a reader can always get back to the sentence.
   for (let n = 1; n <= 5; n += 1) {
     assert.ok(guide.includes(`id="ref-${n}"`) && guide.includes(`href="#note-${n}"`), `note ${n} marker`);
