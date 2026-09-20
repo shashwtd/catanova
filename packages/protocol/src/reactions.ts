@@ -23,17 +23,17 @@
 // Keep wire IDs stable across deployments: wink and nice now use clown and hype art.
 export const REACTIONS = {
   laugh: { label: 'Dying laughing', motion: 'giggle' },
-  angry: { label: 'Furious', motion: 'rage' },
-  evil: { label: 'Plotting', motion: 'loom' },
+  angry: { label: 'Rage', motion: 'rage' },
+  evil: { label: 'Evil', motion: 'loom' },
   smug: { label: 'Smug', motion: 'swagger' },
   shock: { label: 'Shocked', motion: 'jolt' },
-  eyeroll: { label: 'Oh, please', motion: 'roll' },
+  eyeroll: { label: 'Eye roll', motion: 'roll' },
   sad: { label: 'Devastated', motion: 'wilt' },
-  dead: { label: 'Completely cooked', motion: 'sink' },
-  suspicious: { label: 'Suspicious', motion: 'squint' },
-  pleading: { label: 'Please trade', motion: 'beg' },
-  wink: { label: 'Clown move', motion: 'honk' },
-  nice: { label: 'Hyped', motion: 'cheer' },
+  dead: { label: 'Dead', motion: 'sink' },
+  suspicious: { label: 'Side-eye', motion: 'squint' },
+  pleading: { label: 'Begging', motion: 'beg' },
+  wink: { label: 'Clown', motion: 'honk' },
+  nice: { label: 'Hype', motion: 'cheer' },
 } as const;
 
 export type ReactionName = keyof typeof REACTIONS;

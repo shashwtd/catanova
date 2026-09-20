@@ -3,9 +3,26 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
-import { GUIDE_FAQ, PUBLIC_PAGES, SOCIAL_CARD_ALT } from '../apps/client/src/PublicPages.js';
+import { REACTIONS, REACTION_LIST } from '../packages/protocol/src/reactions.js';
+import {
+  GUIDE_FAQ,
+  GUIDE_SECTIONS,
+  PUBLIC_PAGES,
+  SOCIAL_CARD_ALT,
+  subId,
+} from '../apps/client/src/PublicPages.js';
+import {
+  COSTS,
+  DEVELOPMENT_DECK,
+  RESOURCES,
+  RESOURCE_NAMES,
+  RULESET,
+  SUPPLY,
+} from '../packages/rules/src/index.js';
 
 test('the production entry is readable before JavaScript and only public pages enter discovery files', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'catanova-public-'));
@@ -50,8 +67,89 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.ok(guide.includes('How to play') && guide.includes('City upgrade'));
   assert.ok(guide.includes('3 Rock') && guide.includes('2 Hay'));
   assert.ok(guide.includes('cannot add friends while still guests'));
-  assert.ok(guide.includes('If someone loses connection') && guide.includes('half a minute'));
+  // A dropped connection is covered, not punished, and the guide says so twice
+  // over on purpose: once as the marks a player will actually see on the card,
+  // and once as the plain answer in the questions. Neither repeats the other.
+  assert.ok(guide.includes('What an empty chair looks like'));
+  assert.ok(guide.includes('Bot playing') && guide.includes('Resigned'));
+  assert.ok(guide.includes('half a minute'));
   assert.ok(!guide.includes('auto-resign'), 'a dropped connection is covered, not punished');
+  // Every feature the game has should be findable here. These are the ones
+  // that shipped without a word on this page until they were added.
+  for (const [anchor, phrase] of [
+    ['id="bots"', 'They are not cheating'],
+    ['id="setup"', 'Natural or balanced dice'],
+    ['id="table"', 'Reactions'],
+    ['id="glossary"', 'Largest Army'],
+  ] as const)
+    assert.ok(guide.includes(anchor) && guide.includes(phrase), anchor);
+  // A reference page is only useful if its own contents list works.
+  const navigable = [...guide.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
+  assert.ok(navigable.length >= 12, `only ${navigable.length} anchors`);
+  // The contents exist twice on purpose: a rail beside a wide window, and a
+  // disclosure after the opening on a phone. Every section and every subsection
+  // is linked from both, and every one of those links lands somewhere.
+  assert.equal((guide.match(/class="guide-nav-links"/g) ?? []).length, 2);
+  assert.ok(GUIDE_SECTIONS.length >= 12);
+  for (const [id, , subs] of GUIDE_SECTIONS) {
+    // Twice in the contents, once on the heading's own section link, and more
+    // wherever the prose cross-references it.
+    const links = (guide.match(new RegExp(`href="#${id}"`, 'g')) ?? []).length;
+    assert.ok(links >= 3, `${id} is linked ${links} times, expected both lists and its heading`);
+    assert.ok(guide.includes(`id="${id}"`), id);
+    for (const sub of subs) {
+      const anchor = subId(id, sub);
+      const subLinks = (guide.match(new RegExp(`href="#${anchor}"`, 'g')) ?? []).length;
+      assert.ok(subLinks >= 3, `${anchor} is linked ${subLinks} times`);
+      assert.ok(guide.includes(`id="${anchor}"`), anchor);
+    }
+  }
+  // The guide draws every reaction with the same code the game draws them with,
+  // so a set that grows cannot leave the page showing a face nobody can send,
+  // or a name for one that no longer exists.
+  assert.equal((guide.match(/class="guide-reaction-face"/g) ?? []).length, REACTION_LIST.length);
+  for (const name of REACTION_LIST) assert.ok(guide.includes(REACTIONS[name].label), name);
+  assert.ok(!/\p{Extended_Pictographic}/u.test(guide), 'the guide draws its faces, it does not borrow them');
+
+  // A link that leaves the site opens beside the page, never over it: somebody
+  // halfway down a rules page should not lose their place to read the rulebook.
+  for (const match of guide.matchAll(/<a ([^>]*href="https?:[^"]*"[^>]*)>/g)) {
+    const attributes = match[1]!;
+    assert.match(attributes, /target="_blank"/, attributes);
+    assert.match(attributes, /rel="[^"]*noopener/, attributes);
+  }
+  // And a link that stays on the site does not, because that would strand the
+  // reader in a second tab of the same site.
+  for (const match of guide.matchAll(/<a ([^>]*href="[/#][^"]*"[^>]*)>/g))
+    assert.doesNotMatch(match[1]!, /target="_blank"/, match[1]!);
+
+  // Notes are linked both ways, so a reader can always get back to the sentence.
+  for (let n = 1; n <= 5; n += 1) {
+    assert.ok(guide.includes(`id="ref-${n}"`) && guide.includes(`href="#note-${n}"`), `note ${n} marker`);
+    assert.ok(guide.includes(`id="note-${n}"`) && guide.includes(`href="#ref-${n}"`), `note ${n} return`);
+  }
+  // Numbers a reader came here to look up are generated from the rules rather
+  // than typed out, so the page cannot quietly disagree with the game. If a
+  // cost or the deck changes, this page changes with it.
+  for (const [kind, name] of [
+    ['road', 'Road'],
+    ['settlement', 'Settlement'],
+    ['city', 'City upgrade'],
+    ['developmentCard', 'Development card'],
+  ] as const) {
+    assert.ok(guide.includes(`>${name}</th>`) || guide.includes(`${name}</th>`), name);
+    for (const resource of RESOURCES) {
+      const amount = COSTS[kind][resource];
+      if (amount) assert.ok(guide.includes(`${amount} ${RESOURCE_NAMES[resource]}`), `${name} ${resource}`);
+    }
+  }
+  const deck = Object.values(DEVELOPMENT_DECK).reduce((sum, count) => sum + count, 0);
+  assert.ok(guide.includes(`shuffled deck of ${deck}`), 'the deck size is stated');
+  assert.ok(
+    guide.includes(`${SUPPLY.roads} roads, ${SUPPLY.settlements} settlements, ${SUPPLY.cities} cities`),
+    'the infobox lists the real piece counts',
+  );
+  assert.ok(guide.includes(RULESET), 'the infobox names the ruleset the server runs');
   assert.ok(guide.includes('id="questions"') && guide.includes('Can phones and computers play together?'));
   assert.ok(guide.includes('not an official CATAN game'));
   assert.ok(guide.includes('There is no public matchmaking'));
@@ -166,3 +264,4 @@ test('discovery assets are real files with declared icon and social dimensions',
   }
   assert.deepEqual(dimensions, [1200, 630]);
 });
+

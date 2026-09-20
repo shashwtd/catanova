@@ -127,6 +127,30 @@
       "quality": 88,
       "originalBytes": 2414627,
       "bytes": 305772
+    },
+    {
+      "source": "assets/source-art/guide-game.png",
+      "legacyUrl": "/art/guide-game.png",
+      "url": "/art/optimized/guide-game.796f79200bc4.webp",
+      "sha256": "796f79200bc466f4ccb56f3dfb04c111f5201560b573ff00b101fa14a0bae7b2",
+      "sourceSha256": "022a65066e5735c860c69c6e502179ed6ba6e35fb5fe5b7c98fb1863e40d9621",
+      "width": 1920,
+      "height": 1200,
+      "quality": 88,
+      "originalBytes": 3039013,
+      "bytes": 336340
+    },
+    {
+      "source": "assets/source-art/guide-players.png",
+      "legacyUrl": "/art/guide-players.png",
+      "url": "/art/optimized/guide-players.07d025acd09f.webp",
+      "sha256": "07d025acd09fd2604c4951a34da505715aca2646b883628f135447e51bcd5750",
+      "sourceSha256": "e1e23cd9c2df5329ce9e51c3e6d4618489b62a0bb925b93bc824cb863f4f404e",
+      "width": 414,
+      "height": 677,
+      "quality": 88,
+      "originalBytes": 457795,
+      "bytes": 50294
     }
   ]
 }
