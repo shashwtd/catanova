@@ -1,3 +1,5 @@
+import { resultsFromRoom } from '../../../packages/protocol/src/results.js';
+import type { MatchResults, ResultGame } from '../../../packages/protocol/src/results.js';
 import { useEffect, useId, useRef } from 'react';
 import type { GameStatistics as Statistics, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -14,7 +16,7 @@ import type { CSSProperties } from 'react';
  * fifteen roads and the count says only how many they spent. The award is the
  * thing that was actually contested and actually scored.
  */
-function award(game: NonNullable<RoomState['game']>, kind: 'longestRoad' | 'largestArmy') {
+function award(game: ResultGame, kind: 'longestRoad' | 'largestArmy') {
   const holder = game.players.find((p) => p.id === game[kind]);
   if (!holder) return 'Nobody claimed it';
   return kind === 'longestRoad'
@@ -25,13 +27,17 @@ function award(game: NonNullable<RoomState['game']>, kind: 'longestRoad' | 'larg
 /** Results use the final viewer-safe snapshot; scores are revealed by the server at victory. */
 export function GameOver({
   room,
+  results,
+  groupInLobby = false,
   busy,
   canReturn,
   error,
   onReturn,
   onQuit,
 }: {
-  room: RoomState;
+  room?: RoomState;
+  results?: MatchResults;
+  groupInLobby?: boolean;
   /** Accepted by older local previews; dice statistics live exclusively in the game menu. */
   statistics?: Statistics | null;
   busy: boolean;
@@ -40,15 +46,18 @@ export function GameOver({
   onReturn: () => void;
   onQuit: () => void;
 }) {
-  const game = room.game!;
+  const summary = results ?? resultsFromRoom(room!);
+  const game = summary.game;
   const grainId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const winner = game.players.find((p) => p.id === game.winner);
   const profile = (id: string, name: string) =>
-    room.players.find((p) => p.id === id)?.profile ?? defaultProfile(name);
+    summary.players.find((p) => p.id === id)?.profile ?? defaultProfile(name);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+    ref.current
+      ?.querySelector<HTMLButtonElement>(canReturn ? 'button.gold-button' : 'button')
+      ?.focus({ preventScroll: true });
     return () => {
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
@@ -117,7 +126,7 @@ export function GameOver({
             {winner && (
               <span
                 className="game-over-winner-portrait"
-                style={{ '--player-color': playerHexColor(room.players, winner.id) } as CSSProperties}
+                style={{ '--player-color': playerHexColor(summary.players, winner.id) } as CSSProperties}
               >
                 <Avatar profile={profile(winner.id, winner.name)} />
                 <span className="game-over-laurel" aria-hidden="true">
@@ -159,7 +168,7 @@ export function GameOver({
                 <article
                   key={player.id}
                   className={`game-over-player ${player.id === game.winner ? 'is-winner' : ''} ${player.resigned ? 'has-resigned' : ''}`}
-                  style={{ '--player-color': playerHexColor(room.players, player.id) } as CSSProperties}
+                  style={{ '--player-color': playerHexColor(summary.players, player.id) } as CSSProperties}
                 >
                   <span className="game-over-place" aria-label={`Place ${place}`}>
                     {place}
@@ -213,6 +222,11 @@ export function GameOver({
               <dd>{award(game, 'largestArmy')}</dd>
             </div>
           </dl>
+          {groupInLobby && (
+            <p className="game-over-lobby-notice" role="status">
+              Your group is in the lobby
+            </p>
+          )}
           {error && (
             <p className="game-over-error" role="alert">
               {error}
@@ -220,7 +234,7 @@ export function GameOver({
           )}
           <footer className="game-over-actions">
             <button className="dark-button" disabled={busy} onClick={onQuit}>
-              Quit Catanova
+              Back to hub
             </button>
             <button className="gold-button" disabled={busy || !canReturn} onClick={onReturn}>
               Return to lobby

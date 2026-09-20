@@ -18,6 +18,10 @@ test('signed-in home is distinct from the public landing and survives a safe OAu
   assert.equal(accountHomePath({ canPlay: false, config: { mode: 'authenticated' } }), '/');
   assert.equal(accountHomePath({ canPlay: true, config: { mode: 'authenticated' } }), '/play');
   assert.equal(accountHomePath({ canPlay: true, config: { mode: 'local' } }), '/');
+  assert.equal(
+    accountHomePath({ canPlay: true, config: { mode: 'local' }, profile: { name: 'Captain' } }),
+    '/play',
+  );
   for (const path of ['/play', '/play/', '/play?source=google']) assert.equal(safeEntryPath(path), '/play');
   for (const path of ['/play/extra', '//example.com/play', '/play#evil', 'https://example.com/play'])
     assert.equal(safeEntryPath(path), '/');

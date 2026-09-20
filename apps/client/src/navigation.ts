@@ -50,8 +50,17 @@ export function navigationRoomReference(pathname: string, search: string, state:
   return invite;
 }
 /** Authentication changes the home destination, never the meaning of an explicit invitation. */
-export function accountHomePath(auth: { canPlay: boolean; config: { mode: string } | null }): string {
-  return auth.canPlay && auth.config?.mode === 'authenticated' ? PLAYER_HOME_PATH : '/';
+type HomeAuth = {
+  canPlay: boolean;
+  config: { mode: string } | null;
+  profile?: { name: string };
+};
+/** A named local playtester has the same Play destination as an authenticated player. */
+const hasPlayerHome = (auth: HomeAuth) =>
+  auth.canPlay &&
+  (auth.config?.mode === 'authenticated' || (auth.config?.mode === 'local' && !!auth.profile?.name.trim()));
+export function accountHomePath(auth: HomeAuth): string {
+  return hasPlayerHome(auth) ? PLAYER_HOME_PATH : '/';
 }
 /** Only use a preview resolved from this exact reference for admission; never join a mutable alias later. */
 export function previewJoinReference(
@@ -66,10 +75,10 @@ export function previewJoinReference(
 
 /** Account setup and explicit invitations finish before the ordinary signed-in home. */
 export function showPlayerHome(
-  auth: { canPlay: boolean; config: { mode: string } | null; account: { registered: boolean } | null },
+  auth: HomeAuth & { account: { registered: boolean } | null },
   invite: string | null,
 ): boolean {
-  return auth.canPlay && auth.config?.mode === 'authenticated' && !!auth.account?.registered && !invite;
+  return hasPlayerHome(auth) && !invite && (auth.config?.mode === 'local' || !!auth.account?.registered);
 }
 
 /** OAuth may return only to the local player home or a room, never a stored external URL. */

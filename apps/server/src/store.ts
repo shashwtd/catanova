@@ -1,3 +1,5 @@
+import { resultsFromRoom } from '../../../packages/protocol/src/results.js';
+import type { RoomState } from '../../../packages/protocol/src/index.js';
 import {
   isRoomReference,
   isShortRoomCode,
@@ -425,7 +427,9 @@ export class Store {
     const presence = this.presence(roomId);
     const standingIn = new Set(this.standInIds(roomId));
     const roomCode = this.roomCode(roomId);
+    const previousResults = !game && viewer ? this.records.previousResults(roomId, viewer) : null;
     return {
+      ...(previousResults ? { previousResults } : {}),
       roomId,
       ...(roomCode ? { roomCode } : {}),
       ...room,
@@ -531,6 +535,13 @@ export class Store {
     } catch {
       throw new ProtocolError('INVALID_HISTORY_CURSOR', 'Please reload your game history');
     }
+  }
+  accountResults(userId: string, archiveId: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(archiveId))
+      throw new ProtocolError('RESULTS_NOT_FOUND', 'Results are unavailable');
+    const result = this.records.resultsForAccount(archiveId, userId);
+    if (!result) throw new ProtocolError('RESULTS_NOT_FOUND', 'Results are unavailable');
+    return result;
   }
   /** Synchronous helper for maintenance/tests; HTTP uses accountGamesAsync to yield between batches. */
   accountGames(userId: string, rawCursor?: string) {
@@ -1493,6 +1504,29 @@ export class Store {
         (action.kind === 'acceptTrade' ? !current.trade.open : current.trade.open) &&
         !current.trade.proposals?.some((proposal) => proposal.player === seat.id) &&
         !current.trade.declinedBy?.includes(seat.id);
+      // A concurrent return may reference the finished round already archived.
+      // It may acknowledge that reset only, never a new match or an arbitrary stale revision.
+      if (action.kind === 'returnToLobby' && !current) {
+        const previous = this.records.previousResults(seat.room_id, seat.id);
+        const final =
+          previous &&
+          this.db.prepare('SELECT revision FROM archived_matches WHERE room_id=?').get(previous.id);
+        const member = this.db
+          .prepare('SELECT departed FROM seats WHERE id=? AND room_id=?')
+          .get(seat.id, seat.room_id);
+        if (
+          previous &&
+          final?.revision === expectedRevision &&
+          member &&
+          !member.departed &&
+          !previous.game.players.find((p) => p.id === seat.id)?.resigned
+        ) {
+          this.db
+            .prepare('INSERT INTO game_receipts VALUES (?,?,?,?,?,?)')
+            .run(seat.room_id, seat.id, commandId, payloadHash, room.revision, room.counter);
+          return { revision: room.revision, counter: room.counter, duplicate: true };
+        }
+      }
       if (room.revision !== expectedRevision && !sameOfferReply)
         throw new ProtocolError('STALE_STATE', 'State changed; review the latest snapshot and try again');
       if (
@@ -1513,10 +1547,15 @@ export class Store {
         const revision = room.revision + 1;
         // Archive before opening the next round. The original event chain is never deleted.
         this.records.record(seat.room_id, this.eventHead(seat.room_id)?.revision ?? room.revision, current);
-        this.records.archive(seat.room_id, randomUUID());
+        const archiveId = randomUUID();
+        const results = resultsFromRoom(this.snapshot(seat.room_id, seat.id) as RoomState, archiveId);
+        this.records.archive(seat.room_id, archiveId);
+        this.records.saveResults(results);
         for (const p of current.players)
           if (p.resigned) this.db.prepare('UPDATE seats SET departed=1 WHERE id=?').run(p.id);
-        this.db.prepare('UPDATE seats SET ready=0 WHERE room_id=?').run(seat.room_id);
+        this.db
+          .prepare('UPDATE seats SET ready=CASE WHEN bot=1 THEN 1 ELSE 0 END WHERE room_id=?')
+          .run(seat.room_id);
         for (const table of ['games', 'turn_clocks', 'room_presence', 'room_boards', 'seat_standins'])
           this.db.prepare('DELETE FROM ' + table + ' WHERE room_id=?').run(seat.room_id);
         this.db

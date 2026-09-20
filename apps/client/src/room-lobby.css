@@ -330,3 +330,12 @@
     border-left-color: transparent;
   }
 }
+
+.room-lobby .lobby-share-results { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.room-lobby .lobby-previous-results {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px;
+  color: #f3ddb0; background: #32291f; border: 1px solid #9b8052; border-radius: 6px;
+  font: inherit; font-size: 14px; cursor: pointer;
+}
+.room-lobby .lobby-previous-results:hover { background: #51422f; }
+.room-lobby .lobby-previous-results:disabled { opacity: .6; cursor: default; }

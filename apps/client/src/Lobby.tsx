@@ -326,6 +326,7 @@ export function Lobby({
   onAddBot,
   onKick,
   onChooseColor,
+  onPreviousResults,
 }: {
   room: RoomState;
   me?: string;
@@ -342,6 +343,7 @@ export function Lobby({
   onAddBot?: () => void;
   onKick?: (playerId: string) => Promise<void>;
   onChooseColor?: (color: PlayerColor) => void;
+  onPreviousResults?: () => void;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -545,7 +547,18 @@ export function Lobby({
         </RoomSheet>
       )}
       <footer className="lobby-footer">
-        <Invite code={visibleRoomCode(room) ?? undefined} roomId={room.roomId} />
+        <div className="lobby-share-results">
+          <Invite code={visibleRoomCode(room) ?? undefined} roomId={room.roomId} />
+          {onPreviousResults && (
+            <button
+              className="lobby-previous-results"
+              onClick={onPreviousResults}
+              disabled={busy || !connected}
+            >
+              <Trophy size={18} /> Previous results
+            </button>
+          )}
+        </div>
         <div className="lobby-launch">
           <span role="status">
             {room.players.length < 2

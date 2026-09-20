@@ -104,7 +104,8 @@ export async function startServer(
             '/api/account/presence',
             '/api/account/room-invites',
             '/api/friends',
-          ].includes(url.pathname)
+          ].includes(url.pathname) ||
+          url.pathname.startsWith('/api/account/matches/')
         ) {
           const access = hubRequests.consume(clientAddress(request), now());
           if (!access.allowed) {
@@ -122,7 +123,18 @@ export async function startServer(
         };
         let result: unknown;
         if (request.method === 'GET' && url.pathname === '/api/account') result = await accounts.get(token);
-        else if (
+        else if (request.method === 'GET' && /^\/api\/account\/matches\/[^/]+\/results$/.test(url.pathname)) {
+          const account = await accounts.get(token);
+          if (account.expiresAt !== null && Date.parse(account.expiresAt) <= now())
+            throw accountFailure('GUEST_EXPIRED');
+          if (!account.registered || !account.profile) throw accountFailure('ONBOARDING_REQUIRED');
+          const access = historyRequests.consume(account.id, now());
+          if (!access.allowed) {
+            response.setHeader('Retry-After', String(access.retryAfter));
+            throw accountFailure('ACCOUNT_RATE_LIMIT');
+          }
+          result = store.accountResults(account.id, url.pathname.split('/')[4]!);
+        } else if (
           (request.method === 'GET' && url.pathname === '/api/account/games') ||
           (request.method === 'POST' && url.pathname === '/api/account/presence')
         ) {
@@ -198,19 +210,22 @@ export async function startServer(
         response.writeHead(200).end(JSON.stringify(result));
       } catch (error) {
         const code = error instanceof ProtocolError ? error.code : 'INVALID_ACCOUNT_REQUEST';
-        const status = ['ACCOUNT_SETUP_REQUIRED', 'ACCOUNT_UNAVAILABLE'].includes(code)
-          ? 503
-          : code === 'AUTH_REQUIRED'
-            ? 401
-            : code === 'GUEST_EXPIRED'
-              ? 410
-              : code === 'GOOGLE_REQUIRED'
-                ? 403
-                : code === 'USERNAME_TAKEN'
-                  ? 409
-                  : code === 'ACCOUNT_RATE_LIMIT'
-                    ? 429
-                    : 400;
+        const status =
+          code === 'RESULTS_NOT_FOUND'
+            ? 404
+            : ['ACCOUNT_SETUP_REQUIRED', 'ACCOUNT_UNAVAILABLE'].includes(code)
+              ? 503
+              : code === 'AUTH_REQUIRED'
+                ? 401
+                : code === 'GUEST_EXPIRED'
+                  ? 410
+                  : code === 'GOOGLE_REQUIRED'
+                    ? 403
+                    : code === 'USERNAME_TAKEN'
+                      ? 409
+                      : code === 'ACCOUNT_RATE_LIMIT'
+                        ? 429
+                        : 400;
         response.writeHead(status).end(
           JSON.stringify({
             code,

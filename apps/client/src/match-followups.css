@@ -731,16 +731,22 @@
 }
 .game-over-actions {
   display: flex;
+  align-items: center;
   justify-content: center;
   gap: 12px;
   margin-top: 22px;
 }
 .game-over-actions button {
   min-height: 44px;
+  min-width: 0;
   flex: 1;
+  padding-inline: 12px;
   font:
     600 16px/1.1 Barlow,
     sans-serif;
+}
+.game-over-actions .gold-button {
+  flex: 1.8;
 }
 .game-over-error {
   color: #ffb3a0;
@@ -959,4 +965,8 @@
   .playing .table-actions {
     align-items: center;
   }
+}
+
+.game-over-lobby-notice {
+  margin: 10px 0; text-align: center; color: #fff0c5; font-size: 15px;
 }

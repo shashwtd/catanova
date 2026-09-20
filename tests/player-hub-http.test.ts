@@ -299,3 +299,56 @@ test('only online accepted friends expose watch links to unfinished matches', as
   f.server.store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(game), roomId);
   assert.equal((await list()).friends[0].watchable, undefined, 'finished games are not offered');
 });
+
+test('archived results authorize recorded participants and return only final public fields', async (t) => {
+  const f = await fixture(t);
+  const roomId = await f.room(['Captain', 'Builder']);
+  const store = f.server.store;
+  for (const player of store.snapshot(roomId).players)
+    store.setConnected({ ...player, room_id: roomId }, true);
+  const other = { ...store.snapshot(roomId).players[1]!, room_id: roomId };
+  store.leave(other, 'leave-for-result', store.snapshot(roomId).revision);
+  const game = store.loadGame(roomId)!;
+  const host = { ...store.snapshot(roomId).players[0]!, room_id: roomId };
+  store.action(host, 'back', store.snapshot(roomId).revision, { kind: 'returnToLobby' });
+  const summary = store.accountGames(f.accounts.get('Captain')!.id).games[0]!;
+  const archiveId = store.db.prepare('SELECT room_id FROM archived_matches').get()!.room_id;
+  const path = `/api/account/matches/${archiveId}/results`;
+  assert.equal((await f.request(path)).status, 401);
+  assert.equal((await f.request(path, 'Trader')).status, 404);
+  assert.equal((await f.request('/api/account/matches/not-an-id/results', 'Captain')).status, 404);
+  for (const name of ['Captain', 'Builder']) {
+    const response = await f.request(path, name);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control')!, /no-store/);
+    const body = await response.json();
+    assert.equal(body.game.winner, game.winner);
+    assert.equal(body.id, archiveId);
+    assert.ok(summary);
+    const serialized = JSON.stringify(body);
+    for (const forbidden of [
+      'hand',
+      'resources',
+      'development',
+      'token',
+      'user_id',
+      f.accounts.get(name)!.id,
+    ])
+      assert.ok(!serialized.includes(forbidden), forbidden);
+    assert.equal(body.game.players.length, game.players.length);
+    for (const player of body.game.players) {
+      const original = game.players.find((p) => p.id === player.id);
+      assert.ok(original);
+      assert.deepEqual(Object.keys(player).sort(), [
+        'id',
+        'knights',
+        'name',
+        'pieces',
+        'points',
+        ...(original.resigned ? ['resigned'] : []),
+        'roadLength',
+      ]);
+      assert.equal(player.resigned, original.resigned || undefined);
+    }
+  }
+});
