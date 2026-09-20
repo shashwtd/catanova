@@ -236,11 +236,18 @@ export class Store {
       ['bot', 'INTEGER NOT NULL DEFAULT 0'],
       ['bot_level', 'TEXT'],
       ['color', 'TEXT'],
+      ['account_type', 'TEXT'],
     ])
       if (!columns.includes(name)) this.db.exec('ALTER TABLE seats ADD COLUMN ' + name + ' ' + type);
     this.db.exec(
       'CREATE UNIQUE INDEX IF NOT EXISTS seat_account_room ON seats(user_id, room_id) WHERE user_id IS NOT NULL AND departed = 0',
     );
+    const eventColumns = this.db
+      .prepare('PRAGMA table_info(game_events)')
+      .all()
+      .map((c) => c.name);
+    for (const name of ['actor_kind', 'participants'])
+      if (!eventColumns.includes(name)) this.db.exec('ALTER TABLE game_events ADD COLUMN ' + name + ' TEXT');
     this.records = new PlayerRecords(this.db);
     for (const row of this.db.prepare('SELECT id FROM seats WHERE bot = 1 AND departed = 0').all())
       this.botSeats.add(row.id as string);
@@ -366,6 +373,10 @@ export class Store {
             existing.name = profile.name;
           }
         }
+        if (identity && typeof identity.isGuest === 'boolean')
+          this.db
+            .prepare('UPDATE seats SET account_type=? WHERE id=?')
+            .run(identity.isGuest ? 'guest' : 'permanent', existing.id);
         this.renewRoomCode(existing.room_id);
         return { id: existing.id, room_id: existing.room_id, name: existing.name };
       }
@@ -398,6 +409,10 @@ export class Store {
           'INSERT INTO seats(id, room_id, token_hash, name, user_id, profile) VALUES (?, ?, ?, ?, ?, ?)',
         )
         .run(seat.id, seat.room_id, hash(token), profile.name, identity?.id ?? null, JSON.stringify(profile));
+      if (identity && typeof identity.isGuest === 'boolean')
+        this.db
+          .prepare('UPDATE seats SET account_type=? WHERE id=?')
+          .run(identity.isGuest ? 'guest' : 'permanent', seat.id);
       this.renewRoomCode(seat.room_id);
       return seat;
     });
@@ -685,6 +700,7 @@ export class Store {
     lines: string[],
     kind: string,
     automatic = false,
+    actorKind: 'human' | 'bot' | 'timer' | 'system' = 'system',
   ) {
     const state = JSON.stringify(game);
     const entry: HistoryEntry = {
@@ -711,6 +727,17 @@ export class Store {
         state,
         JSON.stringify(entry),
       );
+    // Private provenance alongside the existing journal, never in public history or snapshots.
+    const participants =
+      kind === 'start'
+        ? this.db
+            .prepare('SELECT id,bot,account_type AS accountType FROM seats WHERE room_id=? AND departed=0')
+            .all(roomId)
+            .filter((p) => game.players.some((player) => player.id === p.id))
+        : null;
+    this.db
+      .prepare('UPDATE game_events SET actor_kind=?,participants=? WHERE room_id=? AND revision=?')
+      .run(actorKind, participants ? JSON.stringify(participants) : null, roomId, revision);
     this.records.record(roomId, revision, game, entry);
   }
   round(roomId: string): number {
@@ -1301,7 +1328,18 @@ export class Store {
     const lines = next.log.filter((e) => e.id >= current.nextLog).map((e) => e.text);
     if (!lines.length && kind === 'leave')
       lines.push(`${next.players.find((p) => p.id === actor)?.name ?? 'A player'} left the room.`);
-    this.recordEvent(roomId, revision, commandId, actor, action, next, lines, kind, automatic);
+    this.recordEvent(
+      roomId,
+      revision,
+      commandId,
+      actor,
+      action,
+      next,
+      lines,
+      kind,
+      automatic,
+      !automatic && actor ? 'human' : 'system',
+    );
     // Nobody is held for a seat that has resigned, whichever way it got there:
     // leaving, being removed, or a table that was finally abandoned.
     for (const player of next.players)
@@ -1629,6 +1667,7 @@ export class Store {
         next.log.filter((e) => e.id >= (current?.nextLog ?? 0)).map((e) => e.text),
         action.kind,
         automatic === true,
+        automatic === 'bot' ? 'bot' : automatic ? 'timer' : 'human',
       );
       this.db
         .prepare(

@@ -22,7 +22,8 @@
     "test:connectivity": "tsx --test tests/connectivity.test.ts",
     "probe": "tsx scripts/probe.ts",
     "check": "npm run typecheck && npm test && npm run build",
-    "format": "prettier --write apps packages tests scripts docs README.md"
+    "format": "prettier --write apps packages tests scripts docs README.md",
+    "report:retention": "node --import tsx scripts/retention-report.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
