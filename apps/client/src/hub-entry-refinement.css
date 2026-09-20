@@ -80,12 +80,17 @@
   color: #fff4d6;
   text-decoration: none;
 }
-/* It says "Sign out" now, so it needs room for the words. It keeps its place
-   at the end of the row and stays the quietest thing there. */
+/* It says "Sign out" now, so it needs room for the words, and it stays the
+   quietest thing in the row.
+
+   It does not get `margin-left: auto`. This row wraps, and it sits at the foot
+   of the narrow profile column rather than across the page, so all three
+   controls only fit on one line above about 310px. An auto margin is invisible
+   while they fit and then, the moment Sign out wraps, strands it alone against
+   the right edge of its own line. Let it wrap and centre with the rest. */
 .player-home .hub-player-tools .hub-sign-out {
   width: auto;
   padding: 8px 14px;
-  margin-left: auto;
   white-space: nowrap;
 }
 .player-home .hub-player-tools .hub-sign-out:hover {

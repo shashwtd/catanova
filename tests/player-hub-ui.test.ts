@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PlayerHub, PlayerProfile } from '../apps/client/src/PlayerHub.js';
@@ -218,6 +219,19 @@ test('the player card owns help and editing, and Edit opens the editor directly'
   assert.ok(!html.includes('<footer'));
   const player = html.match(/<section class="hub-character"[\s\S]*?<\/section>/)?.[0] ?? '';
   assert.ok(player.includes('Edit profile') && player.includes('How to play') && player.includes('Sign out'));
+
+  // The profile tools sit at the foot of a narrow column, so the three controls
+  // wrap on an ordinary desktop, not only on a phone. An automatic inline
+  // margin on any of them is invisible while they fit on one line and then
+  // strands the wrapped one against the edge of a line of its own, which is
+  // what Sign out was doing. Whatever wraps must centre with the rest.
+  const refinement = readFileSync('apps/client/src/hub-entry-refinement.css', 'utf8');
+  for (const rule of refinement.matchAll(/\.hub-player-tools[^{]*\{([^}]*)\}/g))
+    assert.doesNotMatch(
+      rule[1]!,
+      /margin(-left|-right|-inline[^:]*)?:[^;]*auto/,
+      `an auto margin here strands a wrapped control: ${rule[0]!.split('{')[0]!.trim()}`,
+    );
   assert.ok(player.includes('hub-profile-action'));
   assert.ok(!html.includes('aria-label="Settings"'));
   const editor = renderToStaticMarkup(
