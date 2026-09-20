@@ -297,7 +297,6 @@ export const GUIDE_SECTIONS = [
   ['accounts', 'Your profile and seat', ['A profile that stays yours', 'If your connection drops']],
   ['questions', 'Common questions', []],
   ['glossary', 'Glossary', []],
-  ['gallery', 'Gallery', []],
   ['see-also', 'See also', []],
   ['references', 'Notes and references', []],
 ] as const;
@@ -492,11 +491,11 @@ export function PublicGuide() {
           <strong>Contents</strong>
           <ContentsList />
           <div className="guide-nav-aside">
-            <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>
+            <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`} target="_blank" rel="noopener noreferrer">
               <GameIcon name="help" size={17} />
               Full rulebook
             </a>
-            <a href={REPOSITORY_URL}>
+            <a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
               <GithubMark size={16} />
               Source on GitHub
             </a>
@@ -516,13 +515,13 @@ export function PublicGuide() {
             <p className="guide-infobox-title">Catanova</p>
             <figure className="guide-infobox-figure">
               <img
-                src="/art/optimized/title-board.a80caa7a5cac.webp"
-                alt="An island of nineteen hexagons on a wooden table, ringed by harbours, with roads and settlements in four colours beside resource cards and dice."
-                width="1672"
-                height="941"
+                src="/art/optimized/guide-game.796f79200bc4.webp"
+                alt="A game in progress: an island of hexagons with roads, settlements and cities in four colours, harbours around the coast, and the four players listed down the right."
+                width="1920"
+                height="1200"
                 decoding="async"
               />
-              <figcaption>A game set out. Every room gets a new island.</figcaption>
+              <figcaption>A four-player game, partway through.</figcaption>
             </figure>
             <dl>
               <InfoRow label="Players">2–4</InfoRow>
@@ -911,7 +910,7 @@ export function PublicGuide() {
                 Road Building requires a legal first road and uses a second whenever one is possible. Year of
                 Plenty takes a single card if that is all the bank has left, and cannot be played into an
                 empty bank. These are provisional readings<Ref n={3} />; the{' '}
-                <a href={`${REPOSITORY_URL}/blob/main/docs/RULE_SOURCES.md`}>compatibility ledger</a> tracks
+                <a href={`${REPOSITORY_URL}/blob/main/docs/RULE_SOURCES.md`} target="_blank" rel="noopener noreferrer">compatibility ledger</a> tracks
                 the source questions still open.
               </p>
             </details>
@@ -987,7 +986,7 @@ export function PublicGuide() {
             <p>
               Both sit on the player profiles all game. To take one, you have to beat the holder’s total
               rather than match it, so a tie leaves an award where it is.<Ref n={5} /> The{' '}
-              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md#10-longest-road`}>full road rules</a>{' '}
+              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md#10-longest-road`} target="_blank" rel="noopener noreferrer">full road rules</a>{' '}
               cover what happens to a tie after a route is broken.
             </p>
           </section>
@@ -1131,22 +1130,6 @@ export function PublicGuide() {
                 ))}
               </ul>
             </figure>
-            <figure className="guide-figure guide-plate">
-              <img
-                src="/art/optimized/guide-game-view.116377196968.webp"
-                alt="A game underway: a hex island of forest, hills, pasture, fields, mountains and one desert ringed by harbours, roads and settlements in four colours, and four player cards down the right."
-                width="1672"
-                height="941"
-                loading="lazy"
-                decoding="async"
-              />
-              <figcaption>
-                A table of four, partway through. The island sits in the middle and every player keeps a card
-                down one side carrying their points, what they are holding, and any award they have taken.
-                Each tile shows the number that makes it produce, with a dot underneath for every dice
-                combination that rolls it.
-              </figcaption>
-            </figure>
           </section>
           <section id="accounts" className="guide-section">
             <GuideHeading id="accounts" index={10}>
@@ -1158,6 +1141,20 @@ export function PublicGuide() {
               of inactivity, and a guest can link a Google account later to keep their username. They cannot
               add friends while still guests.
             </p>
+            <figure className="guide-figure guide-plate guide-plate-narrow">
+              <img
+                src="/art/optimized/guide-players.07d025acd09f.webp"
+                alt="Four player cards: a portrait in a coloured border, a name, a victory point count, a card count and a development card count."
+                width="414"
+                height="677"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption>
+                One card a player. The border is their colour, the first number their points, then what they
+                are holding. A leader carries a number one; a machine carries a small robot.
+              </figcaption>
+            </figure>
             <Sub section="accounts">If your connection drops</Sub>
             <p>
               Let the game reconnect on its own, or come back with the same account and invite before your
@@ -1260,64 +1257,31 @@ export function PublicGuide() {
               ))}
             </dl>
           </section>
-          <section id="gallery" className="guide-section">
-            <GuideHeading id="gallery" index={13}>
-              Gallery
-            </GuideHeading>
-            <ul className="guide-gallery">
-              {(
-                [
-                  [
-                    '/art/optimized/title-landscape.05db8101ac33.webp',
-                    'A painted island coast of forests, fields and hills under a bright sky.',
-                    'The island, from the shore.',
-                  ],
-                  [
-                    '/art/optimized/title-harbour.67cc2ec379af.webp',
-                    'A harbour at golden hour: a jetty stacked with timber and grain, a moored sailing boat, clear shallow water.',
-                    'A harbour. Build on either corner one touches to trade there.',
-                  ],
-                  [
-                    '/art/optimized/title-table-dusk.e18276f97f37.webp',
-                    'A wooden table after dark under hanging lanterns, with resource cards, dice and playing pieces.',
-                    'The table after dark, which is when most games seem to happen.',
-                  ],
-                ] as const
-              ).map(([src, alt, caption]) => (
-                <li key={src}>
-                  <figure>
-                    <img src={src} alt={alt} width="1672" height="941" loading="lazy" decoding="async" />
-                    <figcaption>{caption}</figcaption>
-                  </figure>
-                </li>
-              ))}
-            </ul>
-          </section>
           <section id="see-also" className="guide-section guide-seealso">
-            <GuideHeading id="see-also" index={14}>
+            <GuideHeading id="see-also" index={13}>
               See also
             </GuideHeading>
             <ul>
               <li>
-                <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>The rulebook</a>, which carries every
+                <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`} target="_blank" rel="noopener noreferrer">The rulebook</a>, which carries every
                 rule as the code enforces it, including the edge cases this page leaves out.
               </li>
               <li>
-                <a href={`${REPOSITORY_URL}/blob/main/docs/RULE_SOURCES.md`}>The compatibility ledger</a>, for
+                <a href={`${REPOSITORY_URL}/blob/main/docs/RULE_SOURCES.md`} target="_blank" rel="noopener noreferrer">The compatibility ledger</a>, for
                 the places Catanova had to choose a reading, and why.
               </li>
               <li>
-                <a href={`${REPOSITORY_URL}/blob/main/docs/PLAYTEST.md`}>Playtest limitations</a>, for what is
+                <a href={`${REPOSITORY_URL}/blob/main/docs/PLAYTEST.md`} target="_blank" rel="noopener noreferrer">Playtest limitations</a>, for what is
                 not finished yet.
               </li>
               <li>
-                <a href={REPOSITORY_URL}>The source on GitHub</a>: the server, the rules package and this
+                <a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">The source on GitHub</a>: the server, the rules package and this
                 page.
               </li>
             </ul>
           </section>
           <section id="references" className="guide-section">
-            <GuideHeading id="references" index={15}>
+            <GuideHeading id="references" index={14}>
               Notes and references
             </GuideHeading>
             <p className="guide-caption">
@@ -1359,7 +1323,7 @@ export function PublicGuide() {
                     ↑
                   </a>
                   <span>
-                    {text} <a href={`${REPOSITORY_URL}/blob/main/docs/${file}`}>{label}</a>.
+                    {text} <a href={`${REPOSITORY_URL}/blob/main/docs/${file}`} target="_blank" rel="noopener noreferrer">{label}</a>.
                   </span>
                 </li>
               ))}
@@ -1382,8 +1346,8 @@ export function PublicGuide() {
             </p>
             <p>
               The rules here are the ones in{' '}
-              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>the rulebook</a>, and the code that
-              enforces them is <a href={REPOSITORY_URL}>on GitHub</a>. Catanova is open source.
+              <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`} target="_blank" rel="noopener noreferrer">the rulebook</a>, and the code that
+              enforces them is <a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">on GitHub</a>. Catanova is open source.
             </p>
             <p className="guide-categories">
               <span>Categories</span>

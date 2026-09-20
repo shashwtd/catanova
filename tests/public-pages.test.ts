@@ -111,6 +111,18 @@ test('the production entry is readable before JavaScript and only public pages e
   for (const name of REACTION_LIST) assert.ok(guide.includes(REACTIONS[name].label), name);
   assert.ok(!/\p{Extended_Pictographic}/u.test(guide), 'the guide draws its faces, it does not borrow them');
 
+  // A link that leaves the site opens beside the page, never over it: somebody
+  // halfway down a rules page should not lose their place to read the rulebook.
+  for (const match of guide.matchAll(/<a ([^>]*href="https?:[^"]*"[^>]*)>/g)) {
+    const attributes = match[1]!;
+    assert.match(attributes, /target="_blank"/, attributes);
+    assert.match(attributes, /rel="[^"]*noopener/, attributes);
+  }
+  // And a link that stays on the site does not, because that would strand the
+  // reader in a second tab of the same site.
+  for (const match of guide.matchAll(/<a ([^>]*href="[/#][^"]*"[^>]*)>/g))
+    assert.doesNotMatch(match[1]!, /target="_blank"/, match[1]!);
+
   // Notes are linked both ways, so a reader can always get back to the sentence.
   for (let n = 1; n <= 5; n += 1) {
     assert.ok(guide.includes(`id="ref-${n}"`) && guide.includes(`href="#note-${n}"`), `note ${n} marker`);

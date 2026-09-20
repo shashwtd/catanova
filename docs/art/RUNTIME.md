@@ -39,3 +39,23 @@ These are byte-size and behavior improvements, not a claim that an actual thrott
 ## Current development cards
 
 The September 2026 [readability pass](development-cards-readable.md) uses a new, smaller 768px atlas (96,886 bytes). The full-resolution table above and `runtime-art.json` record the legacy art exports, which remain available for old PNG URLs.
+
+## Pictures of the game
+
+The player guide's screenshots are taken from a real game rather than drawn.
+`scripts/capture-guide-shots.mjs` drives a browser against a running server: it
+creates a room, sits three bots down, plays until the island has cities on it,
+hides the chrome that means nothing to a reader (the tool rail, the menus, and
+any caption naming the current moment), and writes PNG masters into
+`assets/source-art`. Like `optimize-art.mjs` it is a maintainer tool and never
+part of a build.
+
+```
+PORT=3100 node dist/apps/server/src/index.js &
+PUPPETEER_MODULE=/abs/path/to/puppeteer/lib/puppeteer/puppeteer.js \
+  node scripts/capture-guide-shots.mjs --url http://127.0.0.1:3100
+```
+
+It only ever clicks what a player can click, so a shot can only show a position
+the rules allow. Re-run it, then run `optimize-art.mjs`, to refresh the pictures
+after an interface change.

@@ -828,6 +828,16 @@ code {
   height: auto;
   aspect-ratio: 1672 / 941;
 }
+.guide-plate-narrow {
+  display: flex;
+  flex-direction: column;
+  max-width: 340px;
+}
+.guide-plate-narrow img {
+  aspect-ratio: 414 / 677;
+  object-fit: contain;
+  background: #46281c;
+}
 .guide-plate figcaption {
   margin: 0;
   padding: 10px 16px 12px;

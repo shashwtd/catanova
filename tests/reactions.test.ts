@@ -151,6 +151,40 @@ test('a reaction face fills its button, and no icon rule quietly shrinks it', ()
   }
 });
 
+test('the tray is the twelve that were asked for, in the order they were asked for', () => {
+  assert.deepEqual(REACTION_LIST, [
+    'laugh',
+    'angry',
+    'evil',
+    'smug',
+    'shock',
+    'eyeroll',
+    'sad',
+    'dead',
+    'suspicious',
+    'pleading',
+    'wink',
+    'nice',
+  ]);
+  assert.deepEqual(
+    REACTION_LIST.map((name) => REACTIONS[name].label),
+    [
+      'Dying laughing',
+      'Rage',
+      'Evil',
+      'Smug',
+      'Shocked',
+      'Eye roll',
+      'Devastated',
+      'Dead',
+      'Side-eye',
+      'Begging',
+      'Clown',
+      'Hype',
+    ],
+  );
+});
+
 test('reaction updates remain safe for tabs opened before deployment', () => {
   const previous = [
     'laugh',
@@ -176,6 +210,6 @@ test('reaction updates remain safe for tabs opened before deployment', () => {
     assert.ok(previous.includes(message.reaction), 'old clients must recognize every broadcast ID');
   }
   assert.ok(REACTION_LIST.every((name) => previous.includes(name)));
-  assert.equal(REACTIONS.wink.label, 'Clown move');
-  assert.equal(REACTIONS.nice.label, 'Hyped');
+  assert.equal(REACTIONS.wink.label, 'Clown');
+  assert.equal(REACTIONS.nice.label, 'Hype');
 });
