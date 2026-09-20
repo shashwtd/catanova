@@ -11,3 +11,7 @@ The real app is at `/play` and still uses the existing `/api` and `/ws` proxies 
 The collapsed **Preview** menu at the top switches between Hub, Lobby and Game. Enable **Concept terrain & ocean** to compare the simpler atlas on the same island; disable it to return to current production art. **Show sample awards** puts both award badges on sample profiles for inspection. These are visual fixtures, not a live rules simulation.
 
 The game preview uses the shared GameTools menu: History and Connection remain visible, while help, game rules, sound, fullscreen and leaving are grouped under Menu. Preview history and ping values are sample data. Lobby leaving uses the same confirmation sheet as real rooms.
+
+Open <http://127.0.0.1:5173/dev/results> to inspect the game-over screen immediately.
+It uses sample standings and the real results/lobby components. Return to lobby
+shows the sample room; Previous results reopens the screen. No live match is created.

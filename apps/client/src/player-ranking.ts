@@ -1,8 +1,8 @@
-import type { GameView } from '../../../packages/rules/src/game.js';
+import type { ResultGame, ResultPlayer } from '../../../packages/protocol/src/results.js';
 
 /** Rank the scores in this viewer's server projection: their own VP cards are
  * already counted once, while opponents' hidden points are still excluded. */
-export function playerStandings(game: GameView) {
+export function playerStandings<P extends ResultPlayer>(game: { players: P[]; winner: string | null }) {
   const players = game.players.map((player, seatIndex) => ({
     player,
     seatIndex,
@@ -19,7 +19,7 @@ export function playerStandings(game: GameView) {
 
 /** Final results rank revealed scores, without reordering the in-game seats.
  * The declared winner stays first, including a win by resignation. */
-export function finalStandings(game: GameView) {
+export function finalStandings(game: ResultGame) {
   const standings = playerStandings(game).sort(
     (a, b) =>
       Number(b.player.id === game.winner) - Number(a.player.id === game.winner) ||
@@ -50,7 +50,7 @@ export function finalStandings(game: GameView) {
  * with the sum of its own breakdown.
  */
 export type PointPart = { key: string; label: string; points: number; count?: number };
-export function pointBreakdown(game: GameView, player: GameView['players'][number]): PointPart[] {
+export function pointBreakdown(game: ResultGame, player: ResultPlayer): PointPart[] {
   const parts: PointPart[] = [];
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const add = (key: string, label: string, points: number, count?: number) => {

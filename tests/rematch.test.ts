@@ -8,7 +8,7 @@ import { Store } from '../apps/server/src/store.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import { parseClientMessage, type RoomState } from '../packages/protocol/src/index.js';
 import { snapshotProblem } from '../apps/client/src/state.js';
-import { gameView, type GameAction } from '../packages/rules/src/game.js';
+import { createGame, gameView, type GameAction } from '../packages/rules/src/game.js';
 
 const token = () => randomBytes(32).toString('hex');
 function crew(store: Store) {
@@ -95,6 +95,10 @@ test('returning to the same lobby preserves results, code, receipts and event hi
     store.close();
     store = new Store(path, { random: () => 0.3 });
     assert.equal(store.snapshot(roomId).round, lobby.round);
+    assert.deepEqual(
+      (store.snapshot(roomId, host.id) as RoomState).previousResults,
+      (lobby as RoomState).previousResults,
+    );
     assert.equal(store.roomCode(roomId), code);
     const newcomer = store.enter('join', token(), 'Newcomer', code);
     begin(store, roomId, 'second-start');
@@ -164,6 +168,50 @@ test('statistics expose only public totals and cannot receive injected dice', ()
     );
     assert.equal(stats.diceCounts.length, 11);
     assert.deepEqual(parseClientMessage('{"type":"statistics","diceCounts":[999]}'), { type: 'statistics' });
+  } finally {
+    store.close();
+  }
+});
+
+test('concurrent returns archive once, retain bots and do not reset a newer match', () => {
+  const store = new Store(':memory:');
+  try {
+    const [host, guest] = crew(store).slice(0, 2);
+    // The unused third human leaves before the game; the bot remains for the rematch.
+    const third = store.snapshot(host!.room_id).players[2]!;
+    store.leave({ ...third, room_id: host!.room_id }, token(), store.snapshot(host!.room_id).revision);
+    store.lobby(host!, token(), store.snapshot(host!.room_id).revision, false, undefined, undefined, true);
+    const roomId = host!.room_id;
+    const game = createGame(store.snapshot(roomId).players, 42, () => 0.3);
+    game.phase = 'finished';
+    game.winner = host!.id;
+    store.db.prepare('INSERT INTO games VALUES (?,?)').run(roomId, JSON.stringify(game));
+    const before = store.snapshot(roomId, host!.id) as RoomState;
+    store.action(host!, 'return-a', before.revision, { kind: 'returnToLobby' });
+    assert.equal(
+      store.action(guest!, 'return-b', before.revision, { kind: 'returnToLobby' }).duplicate,
+      true,
+    );
+    const lobby = store.snapshot(roomId, guest!.id) as RoomState;
+    assert.equal(store.db.prepare('SELECT count(*) n FROM archived_matches').get()!.n, 1);
+    assert.equal(lobby.players.find((p) => p.bot)?.ready, true);
+    assert.equal(lobby.players.find((p) => p.id === guest!.id)?.ready, false);
+    assert.equal(lobby.roomCode, before.roomCode);
+    assert.deepEqual(lobby.settings, before.settings);
+    assert.deepEqual(
+      lobby.players.map((p) => [p.id, p.profile, p.color]),
+      before.players.map((p) => [p.id, p.profile, p.color]),
+    );
+    assert.throws(() => store.action(host!, 'premature', lobby.revision, { kind: 'start' }), /ready/);
+    assert.equal((store.snapshot(roomId, 'spectator') as RoomState).previousResults, undefined);
+    assert.equal((store.snapshot(roomId, third.id) as RoomState).previousResults, undefined);
+    begin(store, roomId, token());
+    assert.throws(
+      () => store.action(guest!, 'late-return', before.revision, { kind: 'returnToLobby' }),
+      /State changed/,
+    );
+    assert.ok(store.loadGame(roomId));
+    assert.equal((store.snapshot(roomId, guest!.id) as RoomState).previousResults, undefined);
   } finally {
     store.close();
   }

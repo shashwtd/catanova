@@ -1,3 +1,4 @@
+import type { MatchResults } from './results.js';
 import { isRoomReference, normalizeRoomReference } from './room-reference.js';
 export {
   isRoomReference,
@@ -73,6 +74,7 @@ export type RoomPlayer = {
   resignAt?: number;
 };
 export type RoomState = {
+  previousResults?: MatchResults;
   spectating?: boolean;
   roomId: string;
   roomCode?: string;

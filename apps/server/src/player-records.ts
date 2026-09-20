@@ -1,3 +1,4 @@
+import type { MatchResults } from '../../../packages/protocol/src/results.js';
 import type { DatabaseSync } from 'node:sqlite';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { isRoomReference, isShortRoomCode } from '../../../packages/protocol/src/room-reference.js';
@@ -61,6 +62,12 @@ export class PlayerRecords {
         user_id TEXT NOT NULL, points INTEGER NOT NULL, outcome TEXT NOT NULL, resumable INTEGER NOT NULL,
         PRIMARY KEY(room_id,player_id)
       );
+      CREATE TABLE IF NOT EXISTS match_results (
+        archive_id TEXT PRIMARY KEY REFERENCES archived_matches(room_id),
+        source_room_id TEXT NOT NULL REFERENCES rooms(id), round INTEGER NOT NULL,
+        summary TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS match_results_room ON match_results(source_room_id,round DESC);
       CREATE INDEX IF NOT EXISTS archived_participants_account ON archived_participants(user_id,room_id);
       CREATE INDEX IF NOT EXISTS archived_matches_order ON archived_matches(sort_at DESC,room_id DESC);
       CREATE INDEX IF NOT EXISTS match_records_order ON match_records(sort_at DESC,room_id DESC);
@@ -179,6 +186,33 @@ export class PlayerRecords {
       )
       .run(archiveId, roomId);
     this.db.prepare('DELETE FROM match_records WHERE room_id=?').run(roomId);
+  }
+  saveResults(results: MatchResults) {
+    this.db
+      .prepare('INSERT INTO match_results VALUES (?,?,?,?)')
+      .run(results.id, results.roomId, results.round, JSON.stringify(results));
+  }
+  resultsForAccount(archiveId: string, userId: string): MatchResults | null {
+    const row = this.db
+      .prepare(
+        `SELECT r.summary FROM match_results r
+      JOIN archived_participants p ON p.room_id=r.archive_id
+      WHERE r.archive_id=? AND p.user_id=? LIMIT 1`,
+      )
+      .get(archiveId, userId);
+    return row ? (JSON.parse(row.summary as string) as MatchResults) : null;
+  }
+  previousResults(roomId: string, viewer: string): MatchResults | null {
+    const row = this.db
+      .prepare(
+        `SELECT summary FROM match_results
+      WHERE source_room_id=? ORDER BY round DESC LIMIT 1`,
+      )
+      .get(roomId);
+    if (!row) return null;
+    const result = JSON.parse(row.summary as string) as MatchResults;
+    // viewer is the authenticated socket's seat, never a client supplied player ID.
+    return result.game.players.some((p) => p.id === viewer) ? result : null;
   }
   /** Older saved matches are indexed once, on demand, without touching their game state or journal. */
   backfillBatch(userId: string, loadGame: (roomId: string) => Game | undefined, afterRoomId = '') {

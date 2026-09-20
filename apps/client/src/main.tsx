@@ -1,4 +1,5 @@
 import { GameHandDock } from './GameHandDock.js';
+import { useMatchResults } from './useMatchResults.js';
 import { GameOver } from './GameOver.js';
 import { GameStatistics } from './GameStatistics.js';
 import { LoungeBackdrop } from './LoungeBackdrop.js';
@@ -135,6 +136,7 @@ const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
   LAST_SEAT_KEY = 'catanova.last-seat.v1';
 const designPreview = import.meta.env.DEV && location.pathname === '/dev/lounge';
+const resultsPreview = import.meta.env.DEV && location.pathname === '/dev/results';
 // Consume the OAuth choice once per page load, outside React renders (including StrictMode).
 const arrivalLocation = entryLocation();
 const arrivalInvite = navigationRoomReference(
@@ -142,7 +144,7 @@ const arrivalInvite = navigationRoomReference(
   arrivalLocation.search,
   history.state,
 );
-const arrivalIntent = designPreview ? 'home' : takeEntryIntent(sessionStorage);
+const arrivalIntent = designPreview || resultsPreview ? 'home' : takeEntryIntent(sessionStorage);
 function readJSON<T>(storage: Storage, key: string): T | undefined {
   try {
     const value = storage.getItem(key);
@@ -246,6 +248,8 @@ function App() {
   const accountIdentity = auth.user?.id ?? (auth.config?.mode === 'local' ? 'local' : null);
   const currentIdentity = useRef(accountIdentity);
   currentIdentity.current = accountIdentity;
+  const currentHomePath = useRef(accountHomePath(auth));
+  currentHomePath.current = accountHomePath(auth);
   const connectedIdentity = useRef<string | null>(null);
   const [metrics, setMetrics] = useState(initialMetrics);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
@@ -296,6 +300,7 @@ function App() {
     player = g?.players.find((p) => p.id === me),
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me && !player?.resigned;
+  const matchResults = useMatchResults(room, `${accountIdentity ?? 'anonymous'}:${me ?? 'spectator'}`);
   const entering = !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite)));
   const playerHome = !room && !entering && showPlayerHome(auth, invite);
   const privacy = useAccountPrivacy(
@@ -454,7 +459,7 @@ function App() {
     setPreviewLoading(false);
     setPreviewError('');
     setEntry('home');
-    history.replaceState(null, '', accountHomePath(auth));
+    history.replaceState(null, '', currentHomePath.current);
   }
   function connect(session: Session, pending?: PendingCommand) {
     setAdmissionLabel(
@@ -631,7 +636,7 @@ function App() {
     const destination = accountHomePath(auth);
     if (location.pathname === '/' || location.pathname === '/play')
       history.replaceState(null, '', destination);
-  }, [auth.loading, auth.canPlay, auth.config?.mode, room?.roomId, invite]);
+  }, [auth.loading, auth.canPlay, auth.config?.mode, auth.profile.name, room?.roomId, invite]);
   useEffect(() => {
     const navigate = () => {
       const path = location.pathname,
@@ -878,12 +883,14 @@ function App() {
   const resumableInvite = entry === 'invite' && (!!previewRoom?.canResume || savedInviteSeat);
   async function ready(value: boolean) {
     const c = connection.current;
-    if (!c || disabled) return;
+    if (!c || disabled) return false;
     setBusy(true);
     try {
       await c.lobby(value);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^\w+: /, '') : 'Could not update readiness');
+      return false;
     } finally {
       if (connection.current === c) setBusy(c.awaitingConfirmation);
     }
@@ -1157,6 +1164,14 @@ function App() {
               if (connection.current === c) setBusy(c.awaitingConfirmation);
             }
           }}
+          onPreviousResults={
+            matchResults.results
+              ? async () => {
+                  if (room.players.find((p) => p.id === me)?.ready && !(await ready(false))) return;
+                  matchResults.open();
+                }
+              : undefined
+          }
           onStart={() => void act({ kind: 'start' })}
           onInvite={() => setPanel('friends')}
           onFriends={auth.config?.mode === 'authenticated' ? () => setPanel('friends') : undefined}
@@ -1338,18 +1353,23 @@ function App() {
           )}
         </>
       )}
-      {g?.phase === 'finished' && room && (
+      {matchResults.visible && matchResults.results && room && (
         <GameOver
-          room={room}
+          results={matchResults.results}
+          groupInLobby={!g}
           busy={busy || !connected || feedback.presentationBusy}
-          canReturn={!room.spectating && !player?.resigned}
+          canReturn={
+            !room.spectating && !matchResults.results.game.players.find((p) => p.id === me)?.resigned
+          }
           error={error}
-          onReturn={() => void act({ kind: 'returnToLobby' })}
-          onQuit={() => {
-            void leave().then(() => {
-              if (!connection.current) location.assign('/');
-            });
+          onReturn={() => {
+            if (!g) matchResults.dismiss();
+            else
+              void act({ kind: 'returnToLobby' }).then((ok) => {
+                if (ok) matchResults.dismiss();
+              });
           }}
+          onQuit={() => void leave()}
         />
       )}
       {g && (
@@ -1485,7 +1505,9 @@ function App() {
   );
 }
 const root = mountApp(document.getElementById('root')!);
-if (designPreview) {
+if (resultsPreview) {
+  void import('./dev/ResultsPreview.js').then(({ ResultsPreview }) => root.render(<ResultsPreview />));
+} else if (designPreview) {
   void import('./dev/LoungePreview.js').then(({ LoungePreview }) => root.render(<LoungePreview />));
 } else {
   root.render(<App />);

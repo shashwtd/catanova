@@ -75,7 +75,12 @@ test('signed-in home preserves setup, invite precedence and local mode while adm
   assert.equal(showPlayerHome({ ...auth, canPlay: false }, null), false);
   assert.equal(showPlayerHome({ ...auth, account: { ...account, registered: false } }, null), false);
   assert.equal(showPlayerHome({ ...auth, account: null }, null), false);
-  assert.equal(showPlayerHome({ ...auth, config: { mode: 'local' } }, null), false);
+  assert.equal(showPlayerHome({ ...auth, account: null, config: { mode: 'local' } }, null), true);
+  assert.equal(
+    showPlayerHome({ ...auth, profile: { name: '' }, account: null, config: { mode: 'local' } }, null),
+    false,
+  );
+  assert.equal(showPlayerHome({ ...auth, account: null, config: { mode: 'local' } }, 'AB2C'), false);
 });
 
 test('player lobby exposes history, profile and social controls without opening a room or forcing a join form', () => {
