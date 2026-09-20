@@ -85,7 +85,7 @@ export const GUIDE_FAQ = [
   {
     question: 'What happens if someone disconnects?',
     answer:
-      'Nothing is lost. Their settlements, roads and cards stay exactly where they were, a bot plays their turns after about half a minute so the rest of the table is not left waiting, and the seat goes back to them the moment they reconnect.',
+      'After about half a minute, a bot covers their turns while someone remains at the table. They resume the current game state when they reconnect, including moves made by the bot. If everyone disconnects, play pauses and the room is abandoned after three minutes without a return.',
   },
 ] as const;
 
@@ -1078,10 +1078,10 @@ export function PublicGuide() {
                       <td>Natural</td>
                       <td>
                         Natural is two ordinary dice: every roll independent, seven the most common total.
-                        Balanced deals from a shuffled deck of all thirty-six combinations, so across a
-                        shuffle the totals land close to their true frequencies and the same total twice
-                        running is a little less likely. It does not change the odds of any single number,
-                        only how often a long streak of them happens.
+                        Balanced draws from a deck of all thirty-six dice pairs, removing each drawn pair
+                        and refreshing the deck after twenty-four rolls. Pairs matching the previous total
+                        have a lower draw weight. The next roll therefore depends on earlier rolls; rare
+                        totals can still be missed, and no frequency is guaranteed.
                         <Ref n={4} />
                       </td>
                     </tr>
@@ -1157,8 +1157,8 @@ export function PublicGuide() {
             </figure>
             <Sub section="accounts">If your connection drops</Sub>
             <p>
-              Let the game reconnect on its own, or come back with the same account and invite before your
-              countdown runs out. The connection panel shows ping and sync status. Keep your guest session
+              Let the game reconnect on its own, or come back with the same account and invite while the
+              match is still active. The connection panel shows ping and sync status. Keep your guest session
               and browser storage while a game is running.
             </p>
             <aside className="guide-note guide-note-wide">
@@ -1171,7 +1171,9 @@ export function PublicGuide() {
               </p>
               <p>
                 Leaving on purpose is a different thing, and says <strong>Resigned</strong>. If{' '}
-                <em>everyone</em> disconnects, the game pauses rather than playing itself out.
+                <em>everyone</em> disconnects, the game pauses. After three minutes without a return,
+                the room is abandoned. Reconnecting to an active match restores its current state,
+                including any moves made by the covering bot.
               </p>
             </aside>
           </section>
