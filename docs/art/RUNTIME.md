@@ -70,9 +70,22 @@ private app entry routes do not. No Google Tag Manager publication is needed.
 
 The same-origin loader preserves the inline-script CSP restriction. It skips
 non-production hostnames and sets sanitized page URL defaults before loading
-GA4 and on SPA navigation. Referrers are blank and private-page titles generic.
-These defaults are not a sandbox: property settings can enable additional event
-collection. Disable enhanced history/form/outbound-link measurement if it would
+GA4 loads. Referrers are blank. If the loader executes after a private route has
+opened, it exits without loading Google. Before any pushState/replaceState, or on
+back/forward/hash navigation, it sets Google's `ga-disable-G-NGHVNKN7FZ` flag.
+Collection stays disabled for the rest of that document, including a return to `/`.
+A fresh public page load resumes normal website measurement. We intentionally do
+not report `/room` page views: gameplay reporting belongs to first-party records.
+
+Network interception with the published Google tag reproduced a raw room URL in
+automatic enhanced-measurement page views despite sanitized `gtag('set')` defaults.
+Moving the setter before history mutation did not fix that event-level override.
+The disable boundary was tested against those same requests, including delayed
+script arrival, another history wrapper and back navigation; no synthetic room
+identifiers were transmitted. Test requests were intercepted, not sent to GA4.
+
+These protections are not a general sandbox: property settings can enable other
+collection on public pages. Disable enhanced history/form/outbound-link measurement if it would
 collect private URLs or inputs; validate any future analytics changes in DebugView.
 No usernames, emails or room codes are deliberately added as event parameters.
 

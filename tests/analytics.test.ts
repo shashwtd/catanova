@@ -44,3 +44,47 @@ test('build rejects measurement IDs containing markup or executable script', () 
     assert.throws(() => analyticsLoader(bad), /Invalid GA4/);
   }
 });
+
+test('collection stops before other history wrappers run and stays off after returning home', () => {
+  const location = { hostname: 'catanova.io', origin: 'https://catanova.io', pathname: '/' };
+  const listeners = new Map<string, { callback: () => void; capture: boolean }>();
+  const observed: boolean[] = [];
+  const window: any = {
+    dataLayer: [],
+    history: Object.fromEntries(['pushState', 'replaceState'].map((method) => [method,
+      (_state: unknown, _title: string, path: string) => {
+        observed.push(window['ga-disable-G-TEST'] === true);
+        location.pathname = path;
+      },
+    ])),
+    addEventListener(name: string, callback: () => void, capture: boolean) {
+      listeners.set(name, { callback, capture });
+    },
+  };
+  const document = {
+    title: 'Catanova', createElement() { return {}; },
+    getElementsByTagName() { return [{ parentNode: { insertBefore() {} } }]; },
+  };
+  runInNewContext(analyticsLoader('G-TEST'), { window, document, location });
+  assert.equal(window['ga-disable-G-TEST'], undefined, 'public landing still measures');
+  window.history.pushState(null, '', '/room/ABCD');
+  window.history.replaceState(null, '', '/');
+  assert.deepEqual(observed, [true, true], 'even a previously installed wrapper sees disabled collection');
+  assert.equal(window['ga-disable-G-TEST'], true, 'back to public does not leak private referrer');
+  for (const name of ['popstate', 'hashchange']) {
+    assert.equal(listeners.get(name)?.capture, true);
+    window['ga-disable-G-TEST'] = false;
+    listeners.get(name)!.callback();
+    assert.equal(window['ga-disable-G-TEST'], true);
+  }
+});
+
+test('a loader delayed until after entry into the app never loads Google', () => {
+  for (const pathname of ['/room/ABCD', '/play', '/auth/callback']) {
+    const window = {};
+    runInNewContext(analyticsLoader('G-TEST'), {
+      window, document: {}, location: { hostname: 'catanova.io', pathname },
+    });
+    assert.deepEqual(window, {}, pathname);
+  }
+});
