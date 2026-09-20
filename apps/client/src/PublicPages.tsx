@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
 import { EntryScreen } from './EntryScreen.js';
-import { TitleScenery } from './TitleScenery.js';
 import { BrandLogo } from './BrandLogo.js';
 import { ResourceIcon } from './Board.js';
 import { DevelopmentArt } from './DevelopmentCards.js';
-import { GameIcon } from './GameIcons.js';
+import { GameIcon, GithubMark } from './GameIcons.js';
 import { ReactionFace } from './ReactionArt.js';
 import { REACTIONS, REACTION_LIST } from '../../../packages/protocol/src/reactions.js';
 import type { GameIconName } from './GameIcons.js';
@@ -244,7 +243,7 @@ export function PublicLanding() {
   } as ReturnType<typeof useAuth>;
   return (
     <main className="game-world entry-world" data-motion="reduced">
-      <TitleScenery />
+      <div className="title-scenery" aria-hidden="true" />
       <EntryScreen
         auth={auth}
         entry="home"
@@ -298,6 +297,7 @@ export const GUIDE_SECTIONS = [
   ['accounts', 'Your profile and seat', ['A profile that stays yours', 'If your connection drops']],
   ['questions', 'Common questions', []],
   ['glossary', 'Glossary', []],
+  ['gallery', 'Gallery', []],
   ['see-also', 'See also', []],
   ['references', 'Notes and references', []],
 ] as const;
@@ -497,7 +497,7 @@ export function PublicGuide() {
               Full rulebook
             </a>
             <a href={REPOSITORY_URL}>
-              <GameIcon name="settings" size={17} />
+              <GithubMark size={16} />
               Source on GitHub
             </a>
           </div>
@@ -516,14 +516,13 @@ export function PublicGuide() {
             <p className="guide-infobox-title">Catanova</p>
             <figure className="guide-infobox-figure">
               <img
-                src="/art/optimized/title-landscape.05db8101ac33.webp"
-                alt="A painted island coast of forests, fields and hills under a bright sky."
-                width="640"
-                height="360"
-                loading="lazy"
+                src="/art/optimized/title-board.a80caa7a5cac.webp"
+                alt="An island of nineteen hexagons on a wooden table, ringed by harbours, with roads and settlements in four colours beside resource cards and dice."
+                width="1672"
+                height="941"
                 decoding="async"
               />
-              <figcaption>The island is drawn fresh for every room.</figcaption>
+              <figcaption>A game set out. Every room gets a new island.</figcaption>
             </figure>
             <dl>
               <InfoRow label="Players">2–4</InfoRow>
@@ -1261,8 +1260,41 @@ export function PublicGuide() {
               ))}
             </dl>
           </section>
+          <section id="gallery" className="guide-section">
+            <GuideHeading id="gallery" index={13}>
+              Gallery
+            </GuideHeading>
+            <ul className="guide-gallery">
+              {(
+                [
+                  [
+                    '/art/optimized/title-landscape.05db8101ac33.webp',
+                    'A painted island coast of forests, fields and hills under a bright sky.',
+                    'The island, from the shore.',
+                  ],
+                  [
+                    '/art/optimized/title-harbour.67cc2ec379af.webp',
+                    'A harbour at golden hour: a jetty stacked with timber and grain, a moored sailing boat, clear shallow water.',
+                    'A harbour. Build on either corner one touches to trade there.',
+                  ],
+                  [
+                    '/art/optimized/title-table-dusk.e18276f97f37.webp',
+                    'A wooden table after dark under hanging lanterns, with resource cards, dice and playing pieces.',
+                    'The table after dark, which is when most games seem to happen.',
+                  ],
+                ] as const
+              ).map(([src, alt, caption]) => (
+                <li key={src}>
+                  <figure>
+                    <img src={src} alt={alt} width="1672" height="941" loading="lazy" decoding="async" />
+                    <figcaption>{caption}</figcaption>
+                  </figure>
+                </li>
+              ))}
+            </ul>
+          </section>
           <section id="see-also" className="guide-section guide-seealso">
-            <GuideHeading id="see-also" index={13}>
+            <GuideHeading id="see-also" index={14}>
               See also
             </GuideHeading>
             <ul>
@@ -1285,7 +1317,7 @@ export function PublicGuide() {
             </ul>
           </section>
           <section id="references" className="guide-section">
-            <GuideHeading id="references" index={14}>
+            <GuideHeading id="references" index={15}>
               Notes and references
             </GuideHeading>
             <p className="guide-caption">
@@ -1352,6 +1384,12 @@ export function PublicGuide() {
               The rules here are the ones in{' '}
               <a href={`${REPOSITORY_URL}/blob/main/docs/RULEBOOK.md`}>the rulebook</a>, and the code that
               enforces them is <a href={REPOSITORY_URL}>on GitHub</a>. Catanova is open source.
+            </p>
+            <p className="guide-categories">
+              <span>Categories</span>
+              {['Gameplay', 'Rules', 'Setup', 'Reference', 'Catanova'].map((category) => (
+                <b key={category}>{category}</b>
+              ))}
             </p>
             <p className="guide-colophon">
               <span>

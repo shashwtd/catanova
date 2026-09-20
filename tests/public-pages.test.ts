@@ -6,13 +6,6 @@ import { tmpdir } from 'node:os';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
-import {
-  TitleScenery,
-  TITLE_SLIDES,
-  SLIDE_HOLD_SECONDS,
-  SLIDE_FADE_SECONDS,
-  sceneryKeyframes,
-} from '../apps/client/src/TitleScenery.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
 import { REACTIONS, REACTION_LIST } from '../packages/protocol/src/reactions.js';
 import {
@@ -260,58 +253,3 @@ test('discovery assets are real files with declared icon and social dimensions',
   assert.deepEqual(dimensions, [1200, 630]);
 });
 
-test('every slide is a real, content-hashed file the art manifest knows about', async () => {
-  // A background that 404s shows nothing and reports nothing: the layer simply
-  // stays empty and the crossfade goes to blank. These URLs carry a hash of the
-  // file, so a re-export moves them, and nothing else would catch that.
-  const manifest = JSON.parse(await readFile('docs/art/runtime-art.json', 'utf8')) as {
-    images: { url: string; bytes: number }[];
-  };
-  const byUrl = new Map(manifest.images.map((image) => [image.url, image]));
-  let total = 0;
-  for (const slide of TITLE_SLIDES) {
-    const image = byUrl.get(slide.src);
-    assert.ok(image, `${slide.src} is not in the art manifest`);
-    const file = await readFile(join('apps/client/public', slide.src));
-    assert.equal(file.length, image!.bytes, slide.src);
-    assert.equal(file.subarray(8, 12).toString(), 'WEBP', slide.src);
-    assert.ok(slide.alt.length > 20, `${slide.src} needs a real description`);
-    total += file.length;
-  }
-  // The entry screen is the first thing anybody loads. Slides after the first
-  // are fetched at low priority, but they are still bytes on somebody's phone.
-  assert.ok(total < 1_200_000, `the slideshow weighs ${Math.round(total / 1024)}KB`);
-});
-
-test('the entry scenery crossfades every slide it is given, and rests on one', () => {
-  // With a single picture there is nothing to fade between, so no layers and no
-  // animation: the stylesheet's own background is the whole of it.
-  const one = renderToStaticMarkup(createElement(TitleScenery));
-  assert.ok(one.includes('class="title-scenery"'));
-  if (TITLE_SLIDES.length < 2) {
-    assert.ok(!one.includes('<style>'), 'one slide needs no keyframes');
-    assert.ok(!one.includes('<i'), 'one slide needs no layers');
-  }
-
-  // Each slide holds for its turn and no longer. The window a layer is opaque
-  // for is one nth of the cycle, which is why the keyframes are generated here
-  // rather than written out in CSS: a slide added to the list would otherwise
-  // leave every percentage in the stylesheet quietly wrong.
-  for (const count of [2, 3, 4, 7]) {
-    const cycle = count * SLIDE_HOLD_SECONDS;
-    const frames = sceneryKeyframes(count);
-    const stops = [...frames.matchAll(/([\d.]+)%\{opacity:(\d)\}/g)].map(
-      (m) => [Number(m[1]), Number(m[2])] as const,
-    );
-    const opaque = stops.filter(([, value]) => value === 1).map(([at]) => at);
-    assert.equal(opaque.length, 2, `${count} slides: expected one opaque window`);
-    const held = ((opaque[1]! - opaque[0]!) / 100) * cycle;
-    assert.ok(
-      Math.abs(held - (SLIDE_HOLD_SECONDS - SLIDE_FADE_SECONDS)) < 0.01,
-      `${count} slides: held opaque for ${held}s`,
-    );
-    // It starts and ends transparent, so layers stack without a seam.
-    assert.ok(frames.startsWith('@keyframes title-scenery-slide{0%{opacity:0}'));
-    assert.ok(frames.endsWith('100%{opacity:0}}'));
-  }
-});
