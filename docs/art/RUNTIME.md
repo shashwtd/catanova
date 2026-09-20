@@ -73,10 +73,19 @@ Two rules the pages keep:
 - **Only public pages measure.** `index.html` and `/guide/` carry the tag.
   `app.html`, which a room address and the sign-in callback are served, does
   not, so opening an invitation loads no tag at all.
-- **A room code never leaves.** `/room/D53W` reports as `/room`, along with
-  `/join`, `/invite` and `/auth`. The redaction is pushed to `dataLayer` before
-  the container loads, and lives in `apps/client/src/analytics.ts`.
+- **Analytics URL defaults are redacted.** `/room/D53W` reports as `/room`, along with
+  `/join`, `/invite` and `/auth`. The redaction is set through `gtag` and `dataLayer` before
+  the container loads and after SPA navigation, in `apps/client/src/analytics.ts`.
+  Referrers are blank and private-page titles are generic. These are defaults,
+  not a sandbox: a container tag can override them or read the actual URL.
 
 Build with `GTM_ID=off` for a local or staging build, so the report is about
 players rather than about us. `GTM_ID=GTM-XXXX` points a build at another
 container.
+
+The published container must include a Google tag with the GA4 measurement ID
+(`G-…`); installing GTM alone does not collect reports. Configure tags to use the
+sanitized data-layer page fields, disable automatic history-based page views and
+form/outbound-click measurement, and never send room links, profile names, or
+authentication fields. Recheck this when publishing container changes.
+The script also skips non-production hostnames.

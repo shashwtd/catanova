@@ -128,7 +128,7 @@ export async function renderPublicPages(directory: string) {
     join(directory, 'index.html'),
     app
       .replace('</head>', `${artPreloads}</head>`)
-      .replace('<meta name="theme-color" content="#123d43" />', `<meta name="theme-color" content="#123d43" />${measured.head}`)
+      .replace('</head>', `${measured.head}</head>`)
       .replace('<body>', `<body>${measured.body}`)
       .replace(
         '<div id="root"></div>',
