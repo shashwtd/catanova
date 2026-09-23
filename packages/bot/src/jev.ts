@@ -73,6 +73,40 @@ function confidenceOf(probabilities: Record<string, number> | undefined, probabi
   return Math.max(0, Math.min(1, (ordered[0] ?? 0) - (ordered[1] ?? 0)));
 }
 
+/**
+ * One answer off the wire, or null when it is not one.
+ *
+ * The reply comes from another company's service, so it is read as untrusted
+ * data: a null where an answer should be, a missing choice or a probability
+ * that is not a number is no answer at all. Reading it any other way turned a
+ * bad reply into a TypeError, which the bots treat as a bug rather than as the
+ * service being unavailable, so the seat stopped moving instead of playing on.
+ */
+function readAnswer(raw: unknown): Answer | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const answer = raw as Record<string, unknown>;
+  const probabilities = (
+    answer.probabilities && typeof answer.probabilities === 'object' ? answer.probabilities : {}
+  ) as Record<string, number>;
+  if (answer.type === 'choice') {
+    if (typeof answer.choice !== 'string' && typeof answer.choice !== 'number') return null;
+    return {
+      type: 'choice',
+      choice: String(answer.choice),
+      probabilities,
+      confidence: confidenceOf(probabilities),
+    };
+  }
+  if (answer.type === 'score') {
+    if (typeof answer.score !== 'number' || !Number.isFinite(answer.score)) return null;
+    return { type: 'score', score: answer.score, probabilities, confidence: confidenceOf(probabilities) };
+  }
+  // Anything else is read as a yes/no, as it always has been, but only when it
+  // carries a probability that is actually a number.
+  if (typeof answer.noul !== 'number' || !Number.isFinite(answer.noul)) return null;
+  return { type: 'noul', probability: answer.noul, confidence: confidenceOf(undefined, answer.noul) };
+}
+
 export class JevUnavailable extends Error {}
 
 export type JevClient = {
@@ -120,29 +154,12 @@ export function createJevClient(
       }
 
       const answers: Record<string, Answer> = {};
-      for (const [id, raw] of Object.entries((payload?.answers ?? {}) as Record<string, any>)) {
-        const probabilities = (raw.probabilities ?? {}) as Record<string, number>;
-        if (raw.type === 'choice')
-          answers[id] = {
-            type: 'choice',
-            choice: String(raw.choice),
-            probabilities,
-            confidence: confidenceOf(probabilities),
-          };
-        else if (raw.type === 'score')
-          answers[id] = {
-            type: 'score',
-            score: Number(raw.score),
-            probabilities,
-            confidence: confidenceOf(probabilities),
-          };
-        else {
-          const probability = Number(raw.noul);
-          answers[id] = { type: 'noul', probability, confidence: confidenceOf(undefined, probability) };
-        }
+      const replied = payload?.answers && typeof payload.answers === 'object' ? payload.answers : {};
+      for (const id of Object.keys(questions)) {
+        const answer = readAnswer(Object.hasOwn(replied, id) ? replied[id] : null);
+        if (!answer) throw new JevUnavailable(`no answer for "${id}"`);
+        answers[id] = answer;
       }
-      for (const id of Object.keys(questions))
-        if (!answers[id]) throw new JevUnavailable(`no answer for "${id}"`);
 
       // TypeSafe bills input tokens only and does not return a cost, so it is
       // computed here at the published rate.
