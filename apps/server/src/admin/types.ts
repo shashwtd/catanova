@@ -376,6 +376,114 @@ export type DiceSummary = {
   pValue: number | null;
 };
 
+/** Resource counts by type: Timber (wood), Clay (brick), Sheep, Hay (wheat), Rock (ore). */
+export type ResourceCounts = { wood: number; brick: number; sheep: number; wheat: number; ore: number };
+
+/**
+ * Why a finished game ended: a player reached the target (`points`), everyone
+ * else resigned (`resignation`), or it ended with no winner because the admin
+ * closed it, every person left, only bots were left, or the table stayed
+ * empty until the seats were given up.
+ */
+export type GameEndReason =
+  'points' | 'resignation' | 'closedByAdmin' | 'everyoneLeft' | 'botsOnly' | 'disconnected' | 'abandoned';
+
+/** One seat in a game's analytics. Everything here is what the table could see. */
+export type AnalyticsPlayer = {
+  id: string;
+  name: string;
+  bot: boolean;
+  botLevel: string | null;
+  userId: string | null;
+  accountType: string | null;
+  /** The points the table saw at the end: victory point cards only once a winner revealed them. */
+  points: number;
+  rank: number;
+  winner: boolean;
+  resigned: { turn: number; how: string } | null;
+  pieces: { settlements: number; cities: number; roads: number };
+  knights: number;
+  longestRoad: boolean;
+  largestArmy: boolean;
+  /** Moves made from the seat: by the person, by a bot (the seat's own, or one standing in), by the turn timer. */
+  moves: { own: number; bot: number; timer: number };
+  /** Times a bot took the seat over while its player was away. */
+  standIns: number;
+  /** Seconds from the start of each of its turns to the next, leaving out turns a stand-in played. */
+  turnTime: { turns: number; meanSeconds: number | null; medianSeconds: number | null; botTurns: number };
+  resources: {
+    /** From dice rolls, by type. */
+    produced: ResourceCounts;
+    /** `fromCards`: taken with Year of Plenty or Monopoly. */
+    gained: {
+      production: number;
+      setup: number;
+      trades: number;
+      bank: number;
+      fromCards: number;
+      stolen: number;
+    };
+    spent: {
+      roads: number;
+      settlements: number;
+      cities: number;
+      devCards: number;
+      trades: number;
+      bank: number;
+      discarded: number;
+    };
+    lost: { robbed: number; monopoly: number };
+  };
+  devCards: { bought: number; played: Record<string, number> };
+  robber: { moves: number; steals: number; robbed: number; sevens: number };
+  trades: { withPlayers: number; offers: number; bank: number };
+};
+
+/** How one game went, computed from its journal in the analysis worker. Public information only. */
+export type GameAnalytics = {
+  roomId: string;
+  roomCode: string | null;
+  /** The archived round, or null for the room's current game. */
+  archiveId: string | null;
+  fromRevision: number;
+  toRevision: number;
+  /** The journal starts part way through: the game was imported from before the journal existed. */
+  legacy: boolean;
+  /** Rows whose saved game could not be read, and were skipped. */
+  unreadable: number;
+  status: 'setup' | 'playing' | 'finished';
+  diceMode: string;
+  victoryPoints: number;
+  startedAt: number | null;
+  endedAt: number | null;
+  lastMoveAt: number | null;
+  turns: number;
+  moves: number;
+  end: { reason: GameEndReason; winnerId: string | null; text: string } | null;
+  /** In turn order; points per turn line up with them. */
+  players: AnalyticsPlayer[];
+  /** Each player's points at the end of each turn, turn 0 being setup. */
+  points: { turns: number[]; byPlayer: number[][] };
+  dice: DiceSummary & { sevens: number };
+  awards: {
+    turn: number;
+    award: 'longestRoad' | 'largestArmy';
+    playerId: string | null;
+    fromId: string | null;
+  }[];
+  robberMoves: {
+    turn: number;
+    playerId: string;
+    terrain: string;
+    number: number | null;
+    victimId: string | null;
+    stole: boolean;
+    cause: 'seven' | 'knight';
+  }[];
+  /** Exchanges between players, as the game announced them. */
+  trades: { turn: number; text: string }[];
+};
+
 export type AdminStats = {
   generatedAt: number;
   days: { day: string; started: number; finished: number; abandoned: number; players: number }[];

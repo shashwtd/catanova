@@ -363,6 +363,7 @@ export function LineChart({
   markers = [],
   yMin = 1,
   integer = false,
+  step = false,
   table = true,
 }: {
   /** What the chart shows: its accessible name and the table's caption. */
@@ -389,6 +390,8 @@ export function LineChart({
   yMin?: number;
   /** Counts: every tick a whole number. */
   integer?: boolean;
+  /** Values that hold until the next point, such as a score, drawn as steps rather than slopes. */
+  step?: boolean;
   table?: boolean;
 }) {
   const [frame, width] = useWidth(480);
@@ -423,13 +426,16 @@ export function LineChart({
         return;
       }
       const broken = open && gapAfter !== undefined && x[i]! - x[i - 1]! > gapAfter;
-      d += `${open && !broken ? 'L' : 'M'}${sx(x[i]!).toFixed(1)},${sy(value).toFixed(1)}`;
+      const px = sx(x[i]!).toFixed(1),
+        py = sy(value).toFixed(1);
+      // A step holds the last value across, then rises or falls at the new point.
+      d += open && !broken ? (step ? `H${px}V${py}` : `L${px},${py}`) : `M${px},${py}`;
       open = true;
     });
     return d;
   });
   const wash =
-    area && series.length === 1 && paths[0]
+    area && !step && series.length === 1 && paths[0]
       ? paths[0]
           .split('M')
           .filter(Boolean)

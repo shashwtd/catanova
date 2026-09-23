@@ -11,6 +11,7 @@ import { PAGES, useRoute } from './route.js';
 import { Failure } from './ui.js';
 import { Overview } from './pages/Overview.js';
 import { GameDetail, Games } from './pages/Games.js';
+import { GameRound } from './pages/GameAnalytics.js';
 import { PlayerDetail, Players } from './pages/Players.js';
 import { Stats } from './pages/Stats.js';
 import { Feedback } from './pages/Feedback.js';
@@ -61,7 +62,15 @@ function App() {
         <Failure error={session.error?.code === 'SESSION' ? undefined : session.error} />
         {route.page === 'overview' && <Overview />}
         {route.page === 'games' &&
-          (route.id ? <GameDetail roomId={route.id} /> : <Games params={route.params} />)}
+          (route.id ? (
+            route.params.get('round') ? (
+              <GameRound roomId={route.id} round={route.params.get('round')!} />
+            ) : (
+              <GameDetail roomId={route.id} />
+            )
+          ) : (
+            <Games params={route.params} />
+          ))}
         {route.page === 'players' &&
           (route.id ? <PlayerDetail userId={route.id} /> : <Players params={route.params} />)}
         {route.page === 'stats' && <Stats />}

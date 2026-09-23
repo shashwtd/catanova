@@ -149,6 +149,23 @@ test('line charts are labelled SVG with a legend and a table of every value, and
   assert.match(chart, /<td class="num">—<\/td>/, 'a missing value is shown as missing');
   // Counts get whole-number ticks: a top of three becomes four, halved at two.
   assert.match(chart, />2<\/text>.*>4<\/text>/s);
+  // A score holds until it changes: drawn as steps, never as a slope between turns.
+  const steps = renderToStaticMarkup(
+    createElement(LineChart, {
+      label: 'Points by turn',
+      x: [0, 1, 2],
+      series: [{ name: 'Ann', slot: 1, values: [2, 2, 5] }],
+      ticks: [0, 1, 2],
+      tickLabel: String,
+      pointLabel: (turn: number) => `Turn ${turn}`,
+      format: String,
+      xTitle: 'Turn',
+      yTitle: 'points',
+      step: true,
+    }),
+  );
+  const path = steps.match(/class="chart-line line-1" d="([^"]+)"/)![1]!;
+  assert.match(path, /^M[\d.]+,[\d.]+H[\d.]+V[\d.]+H[\d.]+V[\d.]+$/);
 });
 
 test('time axes tick on round local times, and the day and week start at local midnight and Monday', () => {

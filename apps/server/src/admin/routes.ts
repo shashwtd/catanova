@@ -10,7 +10,15 @@ import type { RuntimeMetrics } from './metrics.js';
 import type { MetricsRange } from './types.js';
 import { overview } from './overview.js';
 import { systemReport } from './system.js';
-import { ROOM_PARAM, endGame, gameDetail, gameHistory, listGames, privateGame } from './rooms.js';
+import {
+  ROOM_PARAM,
+  endGame,
+  gameAnalytics,
+  gameDetail,
+  gameHistory,
+  listGames,
+  privateGame,
+} from './rooms.js';
 import { listPlayers, playerDetail } from './players.js';
 import { feedbackRoutes } from './feedback.js';
 import { RETENTION_DAYS } from './analysis-runner.js';
@@ -60,6 +68,12 @@ export function coreRoutes(
       method: 'GET',
       path: room('/history'),
       handle: ({ params, query }) => gameHistory(context, params[0]!, query),
+    },
+    {
+      // How a game went: public information only, read from the journal in the analysis worker.
+      method: 'GET',
+      path: room('/analytics'),
+      handle: ({ params, query }) => gameAnalytics(context, analysis, params[0]!, query),
     },
     {
       method: 'GET',

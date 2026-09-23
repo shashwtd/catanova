@@ -16,7 +16,6 @@ import { api, ApiError, useApi } from '../api.js';
 import { accountLabel, count, diceLabel, phaseLabel, short, time } from '../format.js';
 import {
   Badge,
-  Columns,
   Empty,
   Failure,
   Json,
@@ -30,7 +29,8 @@ import {
   When,
 } from '../ui.js';
 import type { Tone } from '../ui.js';
-import { FAIR_DICE_SHARE, go } from '../route.js';
+import { go } from '../route.js';
+import { GameAnalyticsView } from './GameAnalytics.js';
 
 const STATUS_TONE: Record<RoomStatus, Tone> = {
   live: 'good',
@@ -721,27 +721,15 @@ export function GameDetail({ roomId }: { roomId: string }) {
           </tbody>
         </Table>
       </Section>
-      {data.statistics && data.statistics.rolls > 0 && (
-        <Section title={`Dice this round (${data.statistics.rolls} rolls)`} className="wide">
-          <Columns
-            label="Rolls of each total this round, against two fair dice"
-            categories={Array.from({ length: 11 }, (_, i) => String(i + 2))}
-            series={[{ name: 'Rolled', slot: 1, values: data.statistics.diceCounts }]}
-            reference={{
-              name: 'Two fair dice',
-              values: FAIR_DICE_SHARE.map((p) => Math.round(p * data.statistics!.rolls * 10) / 10),
-            }}
-          />
-        </Section>
+      {game && (
+        <GameAnalyticsView roomId={data.roomId} live={data.status === 'live' || data.status === 'paused'} />
       )}
-      <Section title="Move history" className="wide">
-        <History roomId={data.roomId} first={data.history} />
-      </Section>
       {data.rounds.length > 0 && (
         <Section title="Earlier rounds in this room" className="wide">
           <Table>
             <thead>
               <tr>
+                <th>Round</th>
                 <th>Started</th>
                 <th>Finished</th>
                 <th className="num">Turns</th>
@@ -751,8 +739,11 @@ export function GameDetail({ roomId }: { roomId: string }) {
             <tbody>
               {data.rounds.map((round) => (
                 <tr key={round.archiveId}>
-                  <td>{time(round.startedAt)}</td>
-                  <td>{time(round.finishedAt)}</td>
+                  <td>
+                    <a href={`#/games/${data.roomId}?round=${round.archiveId}`}>How it went</a>
+                  </td>
+                  <td className="nowrap">{time(round.startedAt)}</td>
+                  <td className="nowrap">{time(round.finishedAt)}</td>
                   <td className="num">{round.turns}</td>
                   <td>{round.winner ?? <span className="muted">no winner</span>}</td>
                 </tr>
@@ -761,6 +752,9 @@ export function GameDetail({ roomId }: { roomId: string }) {
           </Table>
         </Section>
       )}
+      <Section title="Move history" className="wide">
+        <History roomId={data.roomId} first={data.history} />
+      </Section>
       <Section title="Public snapshot" className="wide">
         <details>
           <summary>What a spectator is sent</summary>

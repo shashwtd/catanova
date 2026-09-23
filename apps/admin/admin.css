@@ -932,6 +932,20 @@ details > summary {
   white-space: nowrap;
 }
 
+/* How a game went */
+.result-line {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+td.strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.standings .swatch-line,
+.line-key {
+  vertical-align: 3px;
+}
+
 /* Players: sortable headers, and who is online */
 th button.sort {
   display: inline-flex;

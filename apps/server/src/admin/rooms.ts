@@ -20,7 +20,10 @@ import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRequest } from './api.js';
 import { GAMES_PAGE_SIZE, ROOM_STATUSES, indexRoom } from './room-index.js';
 import type { RoomIndex } from './room-index.js';
+import type { Analysis } from './analysis-runner.js';
 import type {
+  Cached,
+  GameAnalytics,
   GameDetail,
   GameListItem,
   GameResult,
@@ -331,6 +334,43 @@ export function gameHistory(context: AdminContext, reference: string, query: URL
   const before = query.get('before');
   if (before !== null && !/^\d{1,12}$/.test(before)) throw new AdminRequestError(400, 'INVALID_CURSOR');
   return context.store.history(roomId, before === null ? undefined : Number(before));
+}
+
+const ARCHIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * How the room's current game went, or one of its earlier rounds (`round`, an
+ * archived match of this room). Only which rows to read is settled here, with
+ * two indexed lookups; reading them is the analysis worker's job.
+ */
+export function gameAnalytics(
+  context: AdminContext,
+  analysis: Analysis,
+  reference: string,
+  query: URLSearchParams,
+): Promise<Cached<GameAnalytics>> {
+  const { store } = context;
+  const roomId = resolveRoom(store, reference);
+  const round = query.get('round');
+  if (round !== null && !ARCHIVE_ID.test(round)) throw new AdminRequestError(400, 'INVALID_ROUND');
+  let toRevision: number | null;
+  if (round) {
+    const archived = store.db
+      .prepare('SELECT revision FROM archived_matches WHERE room_id = ? AND source_room_id = ?')
+      .get(round.toLowerCase(), roomId) as { revision: number } | undefined;
+    if (!archived) throw new AdminRequestError(404, 'ROUND_NOT_FOUND', 'No such round in this room');
+    toRevision = archived.revision;
+  } else {
+    // The current round's rows: those after it began.
+    toRevision = (
+      store.db
+        .prepare('SELECT max(revision) AS revision FROM game_events WHERE room_id = ? AND revision > ?')
+        .get(roomId, store.round(roomId)) as { revision: number | null }
+    ).revision;
+    if (toRevision === null)
+      throw new AdminRequestError(404, 'NO_GAME', 'This room has no game in this round');
+  }
+  return analysis.game({ roomId, archiveId: round ? round.toLowerCase() : null, toRevision });
 }
 
 /** Hands, deck and dice deck. The view is written to the audit log before anything is returned. */
