@@ -81,9 +81,10 @@ after an interface change.
 
 Direct Google Analytics 4 uses measurement ID `G-NGHVNKN7FZ`. It replaces
 GTM-W4XDJ2N4; the GTM container script and noscript iframe are no longer injected.
-`apps/client/src/analytics.ts` generates `/analytics.js`, which loads Google's
-`gtag/js` and configures GA4. Only the public homepage and guide inject it;
-private app entry routes do not. No Google Tag Manager publication is needed.
+`apps/client/src/analytics.ts` generates `/analytics.js`, which asks for consent
+and only then loads Google's `gtag/js` and configures GA4. Only the public
+homepage and guide inject it; private app entry routes do not. No Google Tag
+Manager publication is needed.
 
 The same-origin loader preserves the inline-script CSP restriction. It skips
 non-production hostnames and sets sanitized page URL defaults before loading
@@ -107,5 +108,25 @@ collect private URLs or inputs; validate any future analytics changes in DebugVi
 No usernames, emails or room codes are deliberately added as event parameters.
 
 `GA_MEASUREMENT_ID=off` disables injection at build time. A different `G-…` value
-selects another property. The former `GTM_ID` setting is retired. Consent UI was
-not added as part of this replacement.
+selects another property. The former `GTM_ID` setting is retired.
+
+### Consent
+
+The loader uses Google Consent Mode v2 in what Google calls basic mode. Before
+anything else it sets `ad_storage`, `ad_user_data`, `ad_personalization` and
+`analytics_storage` to `denied`, and it does not fetch `gtag/js` at all until the
+visitor chooses **Allow analytics**. Without an answer, or after **No thanks**,
+nothing is sent to Google Analytics, not even a cookieless ping. Allowing sends
+`gtag('consent', 'update', { analytics_storage: 'granted' })`, then the usual
+config and tag.
+
+A small banner asks on the loader's pages only. Its styles are `/consent.css`,
+fetched only while there is no answer, and the banner appears once they have
+loaded. The history wrapper removes it as soon as the address leaves those pages,
+so it never shows in a room, the lobby or a game. The answer is kept in
+`localStorage` under `catanova.analytics-consent` (`granted` or `denied`); every
+access is guarded, so a browser that refuses storage is simply asked again next
+time. An answer given after the app has changed the address takes effect from the
+next public page load, because collection never resumes in a document once it has
+been disabled. **No thanks** also expires `_ga` and `_ga_*` cookies left from
+before consent was asked.
