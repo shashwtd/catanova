@@ -120,13 +120,13 @@ nothing is sent to Google Analytics, not even a cookieless ping. Allowing sends
 `gtag('consent', 'update', { analytics_storage: 'granted' })`, then the usual
 config and tag.
 
-A modal dialog asks on the loader's pages only, and the page cannot be used
-until it is answered: **Accept all** is the bright button, **Deny** an equally
-sized, quieter one. Escape does not close it, and if a browser closes it anyway it
-opens again; it asks on every visit until there is an answer. Its styles are
-`/consent.css`, fetched only while there is no answer, and the dialog opens once
-they have loaded. The history wrapper closes it as soon as the address leaves those
-pages, so it never shows in a room, the lobby or a game. The answer is kept in
+A small banner along the bottom asks on the loader's pages only, without
+covering the page: **Accept all** is the bright button, **Deny** a quieter one.
+It has no close button, so it stays until it is answered, and it asks again on
+every visit until there is an answer. Its styles are `/consent.css`, fetched only
+while there is no answer, and the banner appears once they have loaded. The
+history wrapper removes it as soon as the address leaves those pages, so it never
+shows in a room, the lobby or a game. The answer is kept in
 `localStorage` under `catanova.analytics-consent` (`granted` or `denied`); every
 access is guarded, so a browser that refuses storage is simply asked again next
 time. An answer given after the app has changed the address takes effect from the
@@ -134,9 +134,9 @@ next public page load, because collection never resumes in a document once it ha
 been disabled. **Deny** also expires `_ga` and `_ga_*` cookies left from
 before consent was asked.
 
-The dialog links to `/privacy/`, which says what is collected and carries the
+The banner links to `/privacy/`, which says what is collected and carries the
 control for changing the answer later. That control is rendered hidden and the
 loader reveals and wires it, so where the loader does not run (another host, a
 build with measurement off, a blocker) no dead buttons are shown. The page's
 contact address is `PRIVACY_CONTACT` in `apps/client/src/PublicPages.tsx`,
-`privacy@catanova.io`, which Cloudflare Email Routing forwards to the owner.
+`contact@catanova.io`, which Cloudflare Email Routing forwards to the owner.

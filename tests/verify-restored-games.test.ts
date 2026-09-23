@@ -479,9 +479,10 @@ test('the command line reports each room, writes a private JSON report and exits
   assert.equal(JSON.parse(readFileSync(report, 'utf8')).result, 'pass');
   assert.equal(statSync(report).mode & 0o777, 0o600);
   output.length = 0;
+  // Boards are random: the robber starts on the desert, which is sometimes tile 0 already.
   const broken = variant(
     'cli',
-    "UPDATE games SET state = json_set(state, '$.robber', 0) WHERE room_id = ?",
+    "UPDATE games SET state = json_set(state, '$.robber', CASE json_extract(state, '$.robber') WHEN 0 THEN 1 ELSE 0 END) WHERE room_id = ?",
     rooms.setup,
   );
   assert.equal(main([broken, ...waiver]), 1);
