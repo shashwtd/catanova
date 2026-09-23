@@ -55,6 +55,7 @@ import { BoardViewport } from './BoardViewport.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
 import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
+import { hasSavedSession } from './saved-session.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -304,7 +305,13 @@ function App() {
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me && !player?.resigned;
   const matchResults = useMatchResults(room, `${accountIdentity ?? 'anonymous'}:${me ?? 'spectator'}`);
-  const entering = !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite)));
+  // "/" shows the public landing while sign-in loads, unless a saved session is about
+  // to open the player's hub. Later sign-in attempts keep the screen they started on.
+  const authSettled = useRef(false);
+  if (!auth.loading) authSettled.current = true;
+  const returning = !authSettled.current && hasSavedSession(localStorage, auth.config);
+  const entering =
+    !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite || returning)));
   const playerHome = !room && !entering && showPlayerHome(auth, invite);
   const privacy = useAccountPrivacy(
     auth.accessToken,
