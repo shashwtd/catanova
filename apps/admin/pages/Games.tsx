@@ -309,10 +309,10 @@ function History({
   if (!entries.length) return <Empty>No moves recorded in this round.</Empty>;
   return (
     <>
-      <Table className="history">
+      <Table className="history stacked">
         <thead>
           <tr>
-            <th className="num">Rev</th>
+            <th className="num hide-phone">Rev</th>
             <th className="num">Turn</th>
             <th>Kind</th>
             <th>What happened</th>
@@ -322,18 +322,21 @@ function History({
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.revision}>
-              <td className="num">{entry.revision}</td>
-              <td className="num">{entry.turn}</td>
+              <td className="num hide-phone">{entry.revision}</td>
+              <td className="num nowrap">
+                <span className="phone-only muted">turn </span>
+                {entry.turn}
+              </td>
               <td>
                 <code>{entry.kind}</code>
                 {entry.automatic && <span className="muted"> · auto</span>}
               </td>
-              <td>
+              <td className="cell-wide">
                 {entry.lines.map((line, index) => (
                   <div key={index}>{line}</div>
                 ))}
               </td>
-              <td className="nowrap">{time(Date.parse(entry.at))}</td>
+              <td className="nowrap cell-end">{time(Date.parse(entry.at))}</td>
             </tr>
           ))}
         </tbody>

@@ -988,7 +988,8 @@ select {
   background: var(--good);
   vertical-align: 1px;
 }
-.show-phone {
+.show-phone,
+.phone-only {
   display: none;
 }
 .footnote.first-line {
@@ -1004,6 +1005,9 @@ select {
   }
   .show-phone {
     display: block;
+  }
+  .phone-only {
+    display: inline;
   }
   :root {
     font-size: 15px;
