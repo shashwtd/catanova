@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { BotMark, GameIcon, Trophy, WifiOff } from './GameIcons.js';
-import type { GameView } from '../../../packages/rules/src/game.js';
+import type { GameView, PlayerView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
@@ -21,6 +21,28 @@ function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; cou
         size={23}
       />
       <b>{count}</b>
+    </span>
+  );
+}
+
+/**
+ * Road length and Knights played: the race for Longest Road and Largest Army,
+ * on a small plate at the foot of the portrait so the name and the counters
+ * beside it keep their room. The holder's number is gilded like the medal.
+ */
+function AwardCounts({ player, road, army }: { player: PlayerView; road: boolean; army: boolean }) {
+  const roads = `Longest road: ${player.roadLength}${road ? ', holds Longest Road' : ''}`;
+  const knights = `Knights played: ${player.knights}${army ? ', holds Largest Army' : ''}`;
+  return (
+    <span className="profile-award-counts">
+      <span className="profile-road-count" data-held={road} title={roads} aria-label={roads}>
+        <GameIcon name="road" size={17} />
+        <b>{player.roadLength}</b>
+      </span>
+      <span className="profile-knight-count" data-held={army} title={knights} aria-label={knights}>
+        <GameIcon name="swords" size={17} />
+        <b>{player.knights}</b>
+      </span>
     </span>
   );
 }
@@ -159,6 +181,7 @@ export function PlayerRail({
                 now={serverNow}
                 paused={room.paused}
               />
+              <AwardCounts player={p} road={road} army={army} />
             </div>
             <div className="profile-caption">
               <div className="profile-name-row">

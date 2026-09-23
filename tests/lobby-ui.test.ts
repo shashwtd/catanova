@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TurnTimer } from '../apps/client/src/TurnTimer.js';
@@ -299,6 +300,37 @@ test('game profiles retain turn, score, awards and disconnect status without con
   assert.match(html, /aria-label="Disconnected"/);
   assert.ok(!html.includes('profile-pieces'));
   assert.ok(!/>Connected<|>You<|>Playing</.test(html));
+});
+
+const profileCard = (html: string, id: string) =>
+  html.match(new RegExp(`<article[^>]*data-player-profile="${id}"[\\s\\S]*?</article>`))![0];
+
+test('each profile shows its road length and knights played on its portrait, the holders gilded', () => {
+  const room = lobby();
+  const game = gameView(
+    createGame(room.players, 82, () => 0.34),
+    'p0',
+  );
+  game.players[0]!.roadLength = 6;
+  game.players[1]!.knights = 3;
+  game.longestRoad = 'p0';
+  game.largestArmy = 'p1';
+  const html = renderToStaticMarkup(createElement(PlayerRail, { room, game, me: 'p0' }));
+  const first = profileCard(html, 'p0');
+  assert.match(
+    first,
+    /class="profile-road-count" data-held="true" title="Longest road: 6, holds Longest Road"/,
+  );
+  assert.match(first, /class="profile-knight-count" data-held="false" title="Knights played: 0"/);
+  assert.match(profileCard(html, 'p1'), /title="Knights played: 3, holds Largest Army"/);
+  assert.match(profileCard(html, 'p2'), /title="Longest road: 0"/);
+  // On the portrait, so the name and the counters beside it keep their room.
+  assert.ok(first.indexOf('profile-award-counts') < first.indexOf('profile-caption'));
+  const css = readFileSync('apps/client/src/game-feedback-polish.css', 'utf8');
+  assert.ok(
+    css.includes('.playing .profile-portrait:has(> .profile-absence) > .profile-award-counts'),
+    'an absence label, in the same place, takes precedence',
+  );
 });
 
 test('compact profile scores show only projected points and keep a long name available to assistive technology', () => {
