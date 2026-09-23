@@ -23,18 +23,27 @@ import {
   emptyUsage,
   describe,
   profileStyle,
+  rankCorners,
   STYLE_ARCHETYPE,
   STYLE_LABEL,
 } from '../../../packages/bot/src/index.js';
 import type { BotPlan, BotUsage, JevClient, StandInStyle } from '../../../packages/bot/src/index.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { gameView } from '../../../packages/rules/src/game.js';
-import type { Game } from '../../../packages/rules/src/game.js';
+import type { Game, GameAction } from '../../../packages/rules/src/game.js';
+import { timeoutAction } from '../../../packages/rules/src/timeout.js';
 import type { Store } from './store.js';
 
 /** How often the scheduler looks for work. Small, because each room decides for
  *  itself when it is ready to move again. */
 const TICK_MS = 250;
+
+/** A room whose bot could not move waits this long before the next attempt,
+ *  doubling each time, rather than trying again on every tick. */
+const RETRY_MS = { first: 1000, longest: 60_000 } as const;
+/** Failed attempts at one position before the bot stops thinking about it and
+ *  makes the move the turn clock would have made. */
+const RESCUE_AFTER = 3;
 
 /**
  * How long a bot appears to think before each kind of move.
@@ -81,6 +90,8 @@ export type BotDriverDependencies = {
   now?: () => number;
   /** Injectable so tests can make think time deterministic. */
   random?: () => number;
+  /** Injectable so tests can hand the driver a decision that fails. */
+  decide?: typeof decide;
   log?: (event: string, detail: Record<string, unknown>) => void;
 };
 
@@ -96,7 +107,10 @@ export class BotDriver {
   private readonly standInPlans = new Map<string, number>();
   private readonly usage = new Map<string, BotUsage>();
   private readonly busy = new Set<string>();
-  private readonly readyAt = new Map<string, number>();
+  /** When a room that failed to move may be tried again. */
+  private readonly retryAt = new Map<string, number>();
+  /** How many attempts in a row have failed in a room, at which revision. */
+  private readonly failures = new Map<string, { revision: number | null; count: number }>();
   private readonly pending = new Map<
     string,
     {
@@ -142,14 +156,19 @@ export class BotDriver {
   async tick(): Promise<void> {
     const rooms = this.dependencies.store.botRooms();
     for (const roomId of this.pending.keys()) if (!rooms.includes(roomId)) this.pending.delete(roomId);
-    for (const roomId of this.readyAt.keys()) if (!rooms.includes(roomId)) this.readyAt.delete(roomId);
+    for (const roomId of this.retryAt.keys()) if (!rooms.includes(roomId)) this.retryAt.delete(roomId);
+    for (const roomId of this.failures.keys()) if (!rooms.includes(roomId)) this.failures.delete(roomId);
     for (const roomId of rooms) {
-      if (this.busy.has(roomId)) continue;
+      if (this.busy.has(roomId) || (this.retryAt.get(roomId) ?? 0) > this.now()) continue;
       this.busy.add(roomId);
       try {
         await this.playRoom(roomId);
       } catch (error) {
-        this.dependencies.log?.('bot_room_failed', { roomId, error: (error as Error).message });
+        // Whatever broke, the room is tried again later rather than on every
+        // tick, and a room that cannot even be read backs off to once a minute.
+        this.failed(roomId, this.failures.get(roomId)?.revision ?? null, 'bot_room_failed', {
+          error: (error as Error).message,
+        });
       } finally {
         this.busy.delete(roomId);
       }
@@ -158,15 +177,19 @@ export class BotDriver {
 
   private async playRoom(roomId: string): Promise<void> {
     const { store } = this.dependencies;
-    const now = this.dependencies.now?.() ?? Date.now();
+    const now = this.now();
     const game = store.loadGame(roomId);
     const state = store.snapshot(roomId);
     const seat = game && this.owedBy(roomId, game);
     if (!game || game.phase === 'finished' || state.paused || !seat) {
       this.pending.delete(roomId);
-      this.readyAt.delete(roomId);
+      this.retryAt.delete(roomId);
+      this.failures.delete(roomId);
       return;
     }
+    // Failures only count against one position: once anybody has moved, the
+    // next attempt starts from a clean slate.
+    if (this.failures.get(roomId)?.revision !== state.revision) this.failures.delete(roomId);
     // A seat that has gone back to its owner and been dropped again starts
     // from a clean plan: the one the last stand-in was following belonged to a
     // position several turns old.
@@ -183,22 +206,34 @@ export class BotDriver {
     }
     // A player action, disconnect or timeout invalidates any queued decision.
     this.pending.delete(roomId);
-    if ((this.readyAt.get(roomId) ?? 0) > now) return;
+    if ((this.failures.get(roomId)?.count ?? 0) >= RESCUE_AFTER) {
+      this.rescue(roomId, state.revision, game, seat);
+      return;
+    }
     const startedAt = now;
-    // A seat taken over from a person is read once, before the first move: what
-    // were they building, and were they playing against the leader? Everything
-    // the question is built from is what they put on the board, so a stand-in
-    // knows no more about the table than the people still at it.
-    const style = seat.standIn ? await this.styleFor(roomId, seat, game) : undefined;
-    const decision = await decide({
-      view: gameView(game, seat.id),
-      board: game.board,
-      meId: seat.id,
-      plan: this.plans.get(seat.id) ?? this.openingPlan(game.turn, style),
-      jev: this.jev,
-      level: seat.level,
-      ...(style ? { standIn: style } : {}),
-    });
+    let decision: Awaited<ReturnType<typeof decide>>;
+    try {
+      // A seat taken over from a person is read once, before the first move:
+      // what were they building, and were they playing against the leader?
+      // Everything the question is built from is what they put on the board,
+      // so a stand-in knows no more about the table than the people still at it.
+      const style = seat.standIn ? await this.styleFor(roomId, seat, game) : undefined;
+      decision = await (this.dependencies.decide ?? decide)({
+        view: gameView(game, seat.id),
+        board: game.board,
+        meId: seat.id,
+        plan: this.plans.get(seat.id) ?? this.openingPlan(game.turn, style),
+        jev: this.jev,
+        level: seat.level,
+        ...(style ? { standIn: style } : {}),
+      });
+    } catch (error) {
+      this.failed(roomId, state.revision, 'bot_decision_failed', {
+        seat: seat.name,
+        error: (error as Error).message,
+      });
+      return;
+    }
     this.plans.set(seat.id, decision.plan);
     if (seat.standIn) this.standInPlans.set(seat.id, seat.standIn.since);
     addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, decision);
@@ -209,10 +244,64 @@ export class BotDriver {
       game,
       seat,
       decision,
-      readyAt:
-        (this.dependencies.now?.() ?? Date.now()) +
-        this.thinkTime(game.phase, decision.action.kind, startedAt),
+      readyAt: this.now() + this.thinkTime(game.phase, decision.action.kind, startedAt),
     });
+  }
+
+  /**
+   * The move the turn clock would have made, once thinking has failed three
+   * times at the same position.
+   *
+   * Retrying alone cannot get a table unstuck: a bot deciding without the
+   * service decides the same way every time, so a move the rules refuse once
+   * is refused forever, and the turn clock that would otherwise step in is off
+   * by default. This goes through the same commit path as every other bot
+   * move, so it is bound by the same rules, receipts and revision checks.
+   */
+  private rescue(roomId: string, revision: number, game: Game, seat: BotSeat): void {
+    const action = safeMove(game, seat.id, this.random);
+    if (!action) {
+      this.failed(roomId, revision, 'bot_rescue_unavailable', { seat: seat.name, phase: game.phase });
+      return;
+    }
+    this.dependencies.log?.('bot_move_rescued', {
+      roomId,
+      seat: seat.name,
+      action: action.kind,
+      failures: this.failures.get(roomId)?.count ?? 0,
+    });
+    this.commit(roomId, {
+      revision,
+      game,
+      seat,
+      decision: {
+        action,
+        plan: this.plans.get(seat.id) ?? this.openingPlan(game.turn),
+        calls: 0,
+        tokens: 0,
+        costUsd: 0,
+        explain: 'Making the required move.',
+        degraded: true,
+      },
+    });
+  }
+
+  /**
+   * Hold a room back after a failed attempt. Each failure in a row at the same
+   * position doubles the wait, from a second up to a minute, so a room that
+   * keeps failing costs next to nothing instead of an attempt every tick.
+   */
+  private failed(roomId: string, revision: number | null, event: string, detail: Record<string, unknown>) {
+    const previous = this.failures.get(roomId);
+    const count = previous && previous.revision === revision ? previous.count + 1 : 1;
+    const wait = Math.min(RETRY_MS.longest, RETRY_MS.first * 2 ** (count - 1));
+    this.failures.set(roomId, { revision, count });
+    this.retryAt.set(roomId, this.now() + wait);
+    this.dependencies.log?.(event, { roomId, ...detail, failures: count, retryInMs: wait });
+  }
+
+  private now(): number {
+    return this.dependencies.now?.() ?? Date.now();
   }
 
   private commit(
@@ -240,15 +329,15 @@ export class BotDriver {
         'bot',
       );
     } catch (error) {
-      this.readyAt.set(roomId, (this.dependencies.now?.() ?? Date.now()) + 1000);
-      this.dependencies.log?.('bot_move_rejected', {
-        roomId,
+      this.failed(roomId, revision, 'bot_move_rejected', {
         seat: seat.name,
         action: decision.action.kind,
         error: (error as Error).message,
       });
       return;
     }
+    this.failures.delete(roomId);
+    this.retryAt.delete(roomId);
     this.dependencies.log?.('bot_move', {
       roomId,
       seat: seat.name,
@@ -272,7 +361,7 @@ export class BotDriver {
       phase === 'setupSettlement' || phase === 'setupRoad' ? OPENING_MS : (THINK_MS[kind] ?? THINK_DEFAULT);
     let target = pick(base);
     if (this.random() < DISTRACTED_CHANCE) target += pick(DISTRACTED_MS);
-    const spent = (this.dependencies.now?.() ?? Date.now()) - startedAt;
+    const spent = this.now() - startedAt;
     return Math.max(120, Math.round(target - spent));
   }
 
@@ -341,6 +430,22 @@ export class BotDriver {
     if (!active || active.resigned) return null;
     return byId.get(active.id) ?? null;
   }
+}
+
+/**
+ * Only what the rules require of this seat, never spending anything: the turn
+ * clock's own choice wherever it has one. The opening has no clock, so there it
+ * is the corner with the most production and a road beside it, which is also
+ * all the opening asks of anybody.
+ */
+function safeMove(game: Game, seatId: string, random: () => number): GameAction | undefined {
+  const forced = timeoutAction(game, seatId, random);
+  if (forced) return forced;
+  const legal = gameView(game, seatId).legal;
+  const corner = rankCorners(game.board, legal.settlements, 1)[0];
+  if (game.phase === 'setupSettlement' && corner !== undefined) return { kind: 'settlement', vertex: corner };
+  if (game.phase === 'setupRoad' && legal.roads.length) return { kind: 'road', edge: legal.roads[0]! };
+  return undefined;
 }
 
 export const newBotCommandId = () => 'bot-' + randomUUID();
