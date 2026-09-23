@@ -68,7 +68,8 @@ export type AdminOverview = {
     journalRows: number | null;
   };
   disk: { path: string; freeBytes: number; totalBytes: number } | { path: string; error: string };
-  status: { directory: string; backup: StatusFile; watchdog: StatusFile };
+  /** The host's reports (deploy/single-vm/OPERATIONS.md#reading-status): backup, watchdog, restore drill. */
+  status: { directory: string; backup: StatusFile; watchdog: StatusFile; drill: StatusFile };
   errors: ServerErrorEntry[];
   rejections: AuthRejection[];
 };

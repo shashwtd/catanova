@@ -131,6 +131,7 @@ export async function overview(
       directory: config.statusDir,
       backup: await readStatusFile(config.statusDir, 'backup.json'),
       watchdog: await readStatusFile(config.statusDir, 'watchdog.json'),
+      drill: await readStatusFile(config.statusDir, 'drill.json'),
     },
     errors: serverErrors.list(),
     rejections: context.rejections(),

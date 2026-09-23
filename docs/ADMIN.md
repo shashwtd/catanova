@@ -85,7 +85,7 @@ The release that introduces the console will not start without the settings abov
    install -d -m 0755 /srv/catanova/status
    ```
 
-   The scripts should write `backup.json` and `watchdog.json` there as JSON objects, replacing each file atomically (write a temporary file, then rename) with mode `0644` so the container's `node` user can read it. Fields such as `ok`, `status`, `lastSuccessAt`, `lastRunAt` and `message` are shown first; the console shows "Not configured" while a file is absent and the file's own modification time.
+   The backup worker, the watchdog and the weekly restore drill write `backup.json`, `watchdog.json` and `drill.json` there, each replaced atomically with mode `0644` so the container's `node` user can read it ([Reading status](../deploy/single-vm/OPERATIONS.md#reading-status) describes their fields). Overview → Host reports shows each one as **OK** (its last run succeeded), **Failing** (its last run failed, however long ago), **Stale** (not renewed for 35 minutes, 15 minutes or 8 days respectively: the job itself has stopped), **Unreadable**, or **Not configured** while the file is absent.
 
 2. Deploy the reviewed commit exactly as in [Operations](../deploy/single-vm/OPERATIONS.md#deploy-a-reviewed-update). `up -d` pulls the pinned `cloudflare/cloudflared` image the first time.
 3. Check the connector: `catanova_compose ps` lists `cloudflared` as running, `catanova_compose logs --tail=50 cloudflared` shows registered tunnel connections, and the tunnel shows **Healthy** in Zero Trust.
@@ -136,7 +136,7 @@ For live reloading of the interface, run the listener with `ADMIN_ORIGIN=http://
 | `ADMIN_ACCESS_AUD`         | The Access application's AUD tag, 64 hex characters.                                             |
 | `ADMIN_EMAILS`             | Comma-separated addresses allowed in; compared lower-cased.                                      |
 | `ADMIN_ORIGIN`             | The exact browser origin allowed to make changes, such as `https://admin.catanova.io`.           |
-| `STATUS_DIR`               | Where `backup.json` and `watchdog.json` are read from; default `/app/status`.                    |
+| `STATUS_DIR`               | Where `backup.json`, `watchdog.json` and `drill.json` are read from; default `/app/status`.      |
 | `CATANOVA_REVISION`        | Shown on Overview.                                                                               |
 | `TUNNEL_TOKEN`             | Used by the `cloudflared` service only.                                                          |
 
@@ -147,4 +147,4 @@ For live reloading of the interface, run the listener with `ADMIN_ORIGIN=http://
 - **Rotate the tunnel token:** rotate it in the tunnel's settings where the dashboard offers it, or create a replacement tunnel with the same route and delete the old one; then update `TUNNEL_TOKEN` and recreate `cloudflared`.
 - **Signing keys** rotate automatically; nothing to do.
 - **Ending a game** closes it with no winner, as if every remaining player had left, through the same rules-engine path the server uses for an abandoned table. It is journaled (`abandoned`, "Catanova closed this game. There is no winner."), audited, and pushed to anyone connected, who can then leave the room. It cannot be undone.
-- **The retention report** runs `scripts/reporting/retention.ts` against a read-only connection to the live database in a worker. It reads each match's final journal row through `json_extract(state, '$.phase')` and `'$.finishReason'`, so when the journal stops keeping a full state on every row, that query must move to the `phase` column and a recorded finish reason at the same time. Until then an empty `state` makes the report fail with "malformed JSON" (shown in the console), while a missing one would quietly file finished matches as unclassified.
+- **The retention report** runs `scripts/reporting/retention.ts` against a read-only connection to the live database in a worker. It reads each match's final journal row to classify how it ended, decoding compact rows (the deflated state plus the board stored once in `journal_boards`) as well as rows older releases wrote whole.

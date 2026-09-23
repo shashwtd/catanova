@@ -1,53 +1,38 @@
 import type { AdminOverview, StatusFile } from '../../server/src/admin/types.js';
 import { useApi } from '../api.js';
 import { bytes, count, duration, percent, time } from '../format.js';
+import { HIDDEN_FIELDS, HOST_REPORTS, REPORT_FIELDS, reportVerdict, reportedAt } from '../host-reports.js';
 import { Badge, Empty, Failure, Loading, Notice, Section, Stat, Table, When } from '../ui.js';
-import type { Tone } from '../ui.js';
 
-/** Fields a host status report may carry, shown first when present. */
-const KNOWN_FIELDS = [
-  'ok',
-  'status',
-  'state',
-  'lastSuccessAt',
-  'lastRunAt',
-  'lastErrorAt',
-  'message',
-  'error',
-];
-
-function statusTone(file: StatusFile): Tone {
-  if (file.state !== 'ok') return file.state === 'missing' ? 'neutral' : 'critical';
-  const { ok, status } = file.data;
-  if (ok === false || ['failed', 'error', 'critical'].includes(String(status))) return 'critical';
-  if (ok === true || ['ok', 'healthy', 'success'].includes(String(status))) return 'good';
-  return 'warning';
-}
-
-function StatusReport({ name, file, now }: { name: string; file: StatusFile; now: number }) {
-  const tone = statusTone(file);
+function StatusReport({
+  name,
+  every,
+  staleAfterMs,
+  file,
+  now,
+}: {
+  name: string;
+  every: string;
+  staleAfterMs: number;
+  file: StatusFile;
+  now: number;
+}) {
+  const verdict = reportVerdict(file, now, staleAfterMs);
   const fields =
     file.state === 'ok'
-      ? Object.entries(file.data).sort(
-          ([a], [b]) =>
-            (KNOWN_FIELDS.indexOf(a) + 1 || 99) - (KNOWN_FIELDS.indexOf(b) + 1 || 99) || a.localeCompare(b),
-        )
+      ? Object.entries(file.data)
+          .filter(([key]) => !HIDDEN_FIELDS.has(key))
+          .sort(
+            ([a], [b]) =>
+              (REPORT_FIELDS.indexOf(a) + 1 || 99) - (REPORT_FIELDS.indexOf(b) + 1 || 99) ||
+              a.localeCompare(b),
+          )
       : [];
   return (
     <div className="status-report">
       <div className="status-title">
         <strong>{name}</strong>
-        <Badge tone={tone}>
-          {file.state === 'missing'
-            ? 'Not configured'
-            : file.state === 'invalid'
-              ? 'Unreadable'
-              : tone === 'good'
-                ? 'OK'
-                : tone === 'critical'
-                  ? 'Failing'
-                  : 'Reported'}
-        </Badge>
+        <Badge tone={verdict.tone}>{verdict.label}</Badge>
       </div>
       {file.state === 'missing' && <p className="muted">No report yet from the host.</p>}
       {file.state === 'invalid' && (
@@ -59,9 +44,9 @@ function StatusReport({ name, file, now }: { name: string; file: StatusFile; now
       {file.state === 'ok' && (
         <dl className="pairs">
           <div className="pair">
-            <dt>Written</dt>
+            <dt>Ran</dt>
             <dd>
-              <When at={file.modifiedAt} now={now} />
+              <When at={reportedAt(file)} now={now} /> · runs {every}
             </dd>
           </div>
           {fields.slice(0, 12).map(([key, value]) => (
@@ -198,8 +183,16 @@ export function Overview() {
       </div>
       <Section title="Host reports" className="wide">
         <div className="reports">
-          <StatusReport name="Backup" file={data.status.backup} now={data.now} />
-          <StatusReport name="Watchdog" file={data.status.watchdog} now={data.now} />
+          {HOST_REPORTS.map((report) => (
+            <StatusReport
+              key={report.key}
+              name={report.name}
+              every={report.every}
+              staleAfterMs={report.staleAfterMs}
+              file={data.status[report.key]}
+              now={data.now}
+            />
+          ))}
         </div>
         <p className="footnote">
           Read from <code>{data.status.directory}</code>, where the host&rsquo;s scripts write them.

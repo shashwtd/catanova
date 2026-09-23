@@ -178,7 +178,7 @@ Azure cost alerts are separate and still not configured; see [the deployment rec
 
 ## Reading status
 
-Every run of the three jobs atomically replaces one JSON file in `/srv/catanova/status`. The files are world-readable (`0644`) and hold no secrets or game data, so the planned admin console can show them through a **read-only** container mount of that folder. That mount is not in `compose.yaml` yet. Every file has `schema`, `kind`, `timestamp` (UTC), `result` (`success`/`failure`), `reason` and `durationSeconds`.
+Every run of the three jobs atomically replaces one JSON file in `/srv/catanova/status`. The files are world-readable (`0644`) and hold no secrets or game data, so the admin console shows them (Overview → Host reports) through the **read-only** mount of that folder at `/app/status` in `compose.yaml`. Every file has `schema`, `kind`, `timestamp` (UTC), `result` (`success`/`failure`), `reason` and `durationSeconds`.
 
 | File            | Written by                   | Also holds                                                                                                                                         |
 | --------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |

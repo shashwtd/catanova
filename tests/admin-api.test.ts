@@ -245,24 +245,33 @@ test('overview reports the process, sockets, rooms, database, status files and r
   assert.ok('freeBytes' in overview.disk && overview.disk.freeBytes > 0);
   assert.deepEqual(overview.status.backup, { state: 'missing' });
   assert.deepEqual(overview.status.watchdog, { state: 'missing' });
+  assert.deepEqual(overview.status.drill, { state: 'missing' });
   const logged = overview.errors.find((entry) =>
     entry.message.includes('Admin overview test: simulated failure'),
   );
   assert.ok(logged, 'console errors reach the ring buffer');
   assert.match(logged.message, /simulated storage fault/);
-  // The host's scripts report in; a broken report is shown as broken, not hidden.
-  await writeFile(
-    join(statusDir, 'backup.json'),
-    JSON.stringify({ ok: true, lastSuccessAt: '2026-09-23T08:00:00Z' }),
-  );
+  // The host's scripts report in (the shape backup.py and restore_drill.py write);
+  // a broken report is shown as broken, not hidden.
+  const backup = {
+    schema: 1,
+    kind: 'backup',
+    timestamp: '2026-09-23T08:00:00Z',
+    result: 'success',
+    reason: 'uploaded',
+    durationSeconds: 3.2,
+  };
+  await writeFile(join(statusDir, 'backup.json'), JSON.stringify(backup));
   await writeFile(join(statusDir, 'watchdog.json'), '{not json');
+  await writeFile(
+    join(statusDir, 'drill.json'),
+    JSON.stringify({ ...backup, kind: 'drill', result: 'failure', reason: 'game verifier failed' }),
+  );
   overview = await get<AdminOverview>('/api/admin/overview');
   assert.equal(overview.status.backup.state, 'ok');
-  assert.deepEqual(overview.status.backup.state === 'ok' && overview.status.backup.data, {
-    ok: true,
-    lastSuccessAt: '2026-09-23T08:00:00Z',
-  });
+  assert.deepEqual(overview.status.backup.state === 'ok' && overview.status.backup.data, backup);
   assert.equal(overview.status.watchdog.state, 'invalid');
+  assert.equal(overview.status.drill.state === 'ok' && overview.status.drill.data.result, 'failure');
 });
 
 test('games are listed by status and searchable, and a game’s detail shows its public and seat state', async (t) => {
