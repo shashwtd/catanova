@@ -37,6 +37,7 @@ import type { AdminAsset } from './assets.js';
 import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRoute, GameRuntime } from './api.js';
 import { RuntimeMetrics } from './metrics.js';
+import { whoIsOnline } from './online.js';
 import { Analysis } from './analysis-runner.js';
 import { RoomIndex } from './room-index.js';
 import { coreRoutes } from './routes.js';
@@ -173,7 +174,20 @@ export async function startAdminServer(options: AdminServerOptions) {
     now,
     rejections: () => [...rejected].reverse(),
   };
-  const metrics = new RuntimeMetrics();
+  const metrics = new RuntimeMetrics({
+    // Read once a minute for the performance history: sockets, and who is online and playing.
+    gauges: () => {
+      const sockets = runtime.sockets();
+      const online = whoIsOnline(store, runtime, now());
+      return {
+        sockets: sockets.total,
+        players: sockets.players,
+        spectators: sockets.spectators,
+        online: online.counts.online,
+        playing: online.counts.playing,
+      };
+    },
+  });
   const analysis = new Analysis({ databasePath: options.databasePath, db: store.db, now });
   const roomIndex = new RoomIndex({
     databasePath: options.databasePath,
@@ -408,6 +422,8 @@ export async function startAdminServer(options: AdminServerOptions) {
   return {
     port: address.port,
     context,
+    /** The performance history, so a test can close a window without waiting for one. */
+    metrics,
     async close() {
       restoreConsole();
       metrics.stop();

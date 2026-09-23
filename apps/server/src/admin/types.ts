@@ -8,10 +8,25 @@ import type { RoomSettings, TurnClock } from '../../../../packages/protocol/src/
 import type { Metric, Window } from '../../../../scripts/reporting/retention.js';
 import type { AuditEntry } from './audit.js';
 import type { ServerErrorEntry } from './errors.js';
-import type { LoopWindow } from './metrics.js';
+import type { LoopWindow, MetricSample } from './metrics.js';
 import type { FeedbackItem } from '../feedback.js';
 
-export type { AuditEntry, LoopWindow, Metric, ServerErrorEntry };
+export type { AuditEntry, LoopWindow, Metric, MetricSample, ServerErrorEntry };
+
+export type MetricsRange = '1h' | '6h' | '24h';
+
+/** The in-memory performance history (see metrics.ts), for one range. */
+export type MetricsHistory = {
+  now: number;
+  /** When this process started keeping samples: a restart clears the history. */
+  since: number;
+  range: MetricsRange;
+  /** How long each point covers: a minute, or several merged for the longer ranges. */
+  bucketSeconds: number;
+  samples: MetricSample[];
+  /** The latest 30-second window and memory, which the next sample will include. */
+  current: { window: LoopWindow; windowSeconds: number; rssBytes: number; heapUsedBytes: number };
+};
 
 export type AdminSession = {
   actor: string;
