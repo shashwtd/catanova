@@ -13,8 +13,8 @@ import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
-import { isBuildAction, placementValid } from './placement.js';
-import type { PlacementDraft } from './placement.js';
+import { buildShown, isBuildAction, placementValid } from './placement.js';
+import type { BuildAction, PlacementDraft } from './placement.js';
 import { BOARD_THEMES } from './board-theme.js';
 import { usePreferences } from './preferences.js';
 import { dicePresentationGame, useFeedback } from './useFeedback.js';
@@ -346,6 +346,24 @@ function App() {
       !!room?.paused,
     hand = player?.hand ?? emptyHand();
   const presentedGame = room ? dicePresentationGame(room, feedback.board) : undefined;
+  /**
+   * A build the player has confirmed, still drawn as its preview until the board
+   * presents it. The board can be a moment behind the server while a roll's
+   * resources are still landing, and without this the site stood empty between
+   * the click and the piece's arrival: the road seemed to vanish, then appear.
+   */
+  const [submittedBuild, setSubmittedBuild] = useState<BuildAction | null>(null);
+  useEffect(() => {
+    if (!submittedBuild) return;
+    const shown = presentedGame ?? g;
+    if (!shown || buildShown(shown, submittedBuild)) setSubmittedBuild(null);
+  }, [submittedBuild, presentedGame, g]);
+  useEffect(() => {
+    if (!submittedBuild) return;
+    // Never outlive a lost reply or a presentation that was skipped.
+    const timer = setTimeout(() => setSubmittedBuild(null), 5000);
+    return () => clearTimeout(timer);
+  }, [submittedBuild]);
   const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
     feedback.sound.playAttention(cue),
   );
@@ -991,7 +1009,7 @@ function App() {
               disabled={disabled}
               selectedRobberHex={robberHex}
               colors={seatColors}
-              pendingBuild={placementReady ? placement?.action : null}
+              pendingBuild={placementReady ? placement?.action : submittedBuild}
               onAction={onBoardAction}
               onRobber={onBoardRobber}
             />
@@ -1345,7 +1363,10 @@ function App() {
                 if (!placementValid(placement, g, room?.roomId, me)) return;
                 const action = placement.action;
                 setPlacement(null);
-                void act(action);
+                setSubmittedBuild(action);
+                void act(action).then((accepted) => {
+                  if (!accepted) setSubmittedBuild(null);
+                });
               }}
             />
           )}

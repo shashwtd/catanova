@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, gameView, applyAction, emptyHand } from '../packages/rules/src/game.js';
 import type { GameView } from '../packages/rules/src/game.js';
-import { placementValid } from '../apps/client/src/placement.js';
+import { buildShown, placementValid } from '../apps/client/src/placement.js';
 import type { BuildAction, PlacementDraft } from '../apps/client/src/placement.js';
 
 function draft(game: GameView, action: BuildAction): PlacementDraft {
@@ -83,4 +83,17 @@ test('stale legal hints cannot create a confirmation during a non-build phase', 
       ),
     );
   }
+});
+
+test('a confirmed build keeps its preview until the board being shown has the piece', () => {
+  const empty = { roads: {}, buildings: {} };
+  assert.equal(buildShown(empty, { kind: 'road', edge: 12 }), false);
+  assert.equal(buildShown({ roads: { 12: 'me' }, buildings: {} }, { kind: 'road', edge: 12 }), true);
+  assert.equal(buildShown(empty, { kind: 'settlement', vertex: 3 }), false);
+  const settled = { roads: {}, buildings: { 3: { player: 'me', kind: 'settlement' as const } } };
+  assert.equal(buildShown(settled, { kind: 'settlement', vertex: 3 }), true);
+  // A city is only shown once the settlement there has become one.
+  assert.equal(buildShown(settled, { kind: 'city', vertex: 3 }), false);
+  const city = { roads: {}, buildings: { 3: { player: 'me', kind: 'city' as const } } };
+  assert.equal(buildShown(city, { kind: 'city', vertex: 3 }), true);
 });

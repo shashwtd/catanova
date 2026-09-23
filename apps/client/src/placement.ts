@@ -40,3 +40,11 @@ export function placementValid(
       ? game.legal.cities.includes(a.vertex)
       : game.legal.settlements.includes(a.vertex);
 }
+/** Whether a board already shows a confirmed build, so its preview can step aside. */
+export function buildShown(game: Pick<GameView, 'roads' | 'buildings'>, action: BuildAction): boolean {
+  return action.kind === 'road'
+    ? game.roads[action.edge] !== undefined
+    : action.kind === 'city'
+      ? game.buildings[action.vertex]?.kind === 'city'
+      : game.buildings[action.vertex] !== undefined;
+}
