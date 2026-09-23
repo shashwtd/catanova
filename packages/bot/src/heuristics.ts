@@ -129,6 +129,22 @@ export const leaderOf = (view: GameView, meId: string): PlayerView | null => {
 };
 
 /**
+ * Who a player is, as the decision service is told: "me", or "opponent 1" to
+ * "opponent 3" in seat order, which stays the same for the whole game.
+ *
+ * The service is run by another company, and nothing it decides depends on
+ * what anybody is called: the numbers beside a seat matter, the name on it
+ * does not. So usernames never leave this server. What the players read at the
+ * table, the game log and each bot's explanation, is written here and is not
+ * affected.
+ */
+export function seatLabel(view: Pick<GameView, 'players'>, meId: string, id: string | null): string {
+  if (id === meId) return 'me';
+  const at = view.players.filter((p) => p.id !== meId).findIndex((p) => p.id === id);
+  return at === -1 ? 'nobody' : `opponent ${at + 1}`;
+}
+
+/**
  * Hexes worth putting the robber on, best first: block the most production and
  * never block yourself.
  *

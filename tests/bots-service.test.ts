@@ -2,7 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyAction, createGame, gameView } from '../packages/rules/src/game.js';
 import { seededRandom } from '../packages/rules/src/board.js';
-import { createJevClient, decide, initialPlan, JevUnavailable, choice } from '../packages/bot/src/index.js';
+import {
+  createJevClient,
+  decide,
+  initialPlan,
+  JevUnavailable,
+  choice,
+  profileStyle,
+} from '../packages/bot/src/index.js';
 import type { BotPlan, JevClient } from '../packages/bot/src/index.js';
 
 /** A decision service that is down: every request fails, however it is asked. */
@@ -170,4 +177,74 @@ test('after three failures in a row the client stops asking, and tries again aft
   assert.equal((await ask()).ok, true);
   assert.equal((await ask()).ok, true);
   assert.equal(requests, 6);
+});
+
+test('the decision service is never told who is playing', async () => {
+  const names = ['Zelda Quartz', 'Morgan Vale', 'Priya Okafor', 'Tomasz Lind'];
+  const seats = names.map((name, i) => ({ id: `seat-${i}`, name }));
+  const requests: { state: any; questions: any }[] = [];
+  const spy: JevClient = {
+    model: 'spy',
+    async evaluate(state, questions) {
+      requests.push({ state, questions });
+      return { answers: {}, inputTokens: 0, costUsd: 0, latencyMs: 0, model: 'spy' };
+    },
+  };
+  const ask = (game: ReturnType<typeof createGame>) =>
+    decide({
+      view: gameView(game, 'seat-0'),
+      board: game.board,
+      meId: 'seat-0',
+      plan: initialPlan(game.turn),
+      jev: spy,
+      level: 'champ',
+    });
+
+  // The opening, which weighs every corner against the whole table.
+  const opening = createGame(seats, 9, seededRandom(9));
+  await ask(opening);
+
+  // A champion's turn with the table's standings in front of it: everybody
+  // has built, and the third seat leads and holds longest road.
+  const game = createGame(seats, 9, seededRandom(9));
+  const corners = game.board.vertices.filter((v) => v.id % 9 === 0).map((v) => v.id);
+  corners.forEach((vertex, i) => {
+    game.buildings[vertex] = { player: `seat-${i % 4}`, kind: i % 4 === 2 ? 'city' : 'settlement' };
+  });
+  game.longestRoad = 'seat-2';
+  game.phase = 'actions';
+  game.turn = 12;
+  game.players[0]!.hand = { wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 };
+  await ask(game);
+
+  // The robber, weighing tiles by whose buildings they would block.
+  await ask({ ...game, phase: 'robber' });
+
+  // And a stand-in reading how the player whose seat it takes was playing.
+  await profileStyle({ view: gameView(game, 'seat-1'), board: game.board, playerId: 'seat-1', jev: spy });
+
+  assert.equal(requests.length, 4, 'every kind of request was made');
+  for (const request of requests)
+    for (const name of names) assert.ok(!JSON.stringify(request).includes(name), `${name} was sent`);
+
+  // The same facts still reach it, under the same labels in every request.
+  const turn = requests[1]!.state;
+  assert.equal(turn.me.name, 'me');
+  assert.deepEqual(
+    turn.opponents.map((o: { name: string }) => o.name),
+    ['opponent 1', 'opponent 2', 'opponent 3'],
+  );
+  assert.match(turn.leader, /^opponent 2 on \d+$/, 'the leader is the third seat');
+  assert.match(turn.awards.longest_road, /^held by opponent 2; /);
+  const blocks = Object.values(requests[2]!.questions.hex.criteria).flatMap(
+    (tile) => (tile as { blocks: string[] }).blocks,
+  );
+  assert.ok(
+    blocks.some((owner) => /^opponent \d's (settlement|city)$/.test(owner)),
+    `the robber still sees whose buildings it blocks: ${blocks.join(', ')}`,
+  );
+  assert.deepEqual(
+    requests[3]!.state.others.map((o: { name: string }) => o.name),
+    ['opponent 1', 'opponent 2', 'opponent 3'],
+  );
 });

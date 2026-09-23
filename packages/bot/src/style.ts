@@ -22,6 +22,7 @@ import type { Board } from '../../rules/src/board.js';
 import type { GameView } from '../../rules/src/game.js';
 import { choice, noul, JevUnavailable } from './jev.js';
 import type { JevClient } from './jev.js';
+import { seatLabel } from './heuristics.js';
 import type { Archetype } from './plan.js';
 
 /** The five ways people actually play, as a stand-in can act on them. */
@@ -149,7 +150,12 @@ export async function profileStyle(context: {
         their_record: seen,
         others: context.view.players
           .filter((p) => p.id !== context.playerId)
-          .map((p) => ({ name: p.name, points: p.points, knights: p.knights, roads: p.roadLength })),
+          .map((p) => ({
+            name: seatLabel(context.view, context.playerId, p.id),
+            points: p.points,
+            knights: p.knights,
+            roads: p.roadLength,
+          })),
       },
       {
         style: choice(

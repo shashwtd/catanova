@@ -37,6 +37,7 @@ import {
   robberTargets,
   leaderOf,
   handTotal,
+  seatLabel,
 } from './heuristics.js';
 import { ARCHETYPES, describe, initialPlan, planIsStale } from './plan.js';
 import type { Archetype, BotPlan, Focus, Threat } from './plan.js';
@@ -268,12 +269,12 @@ function summarise(ctx: DecideContext) {
   const me = view.players.find((p) => p.id === meId);
   const hand = handOf(view);
   const leader = leaderOf(view, meId);
-  const named = (id: string | null) => view.players.find((p) => p.id === id)?.name ?? 'nobody';
+  const named = (id: string | null) => seatLabel(view, meId, id);
   const best = (field: 'roadLength' | 'knights') =>
     view.players.reduce((n, p) => Math.max(n, p[field] ?? 0), 0);
   return {
     me: {
-      name: me?.name ?? 'bot',
+      name: named(meId),
       points: me?.points ?? 0,
       hand: Object.fromEntries(
         RESOURCES.filter((r) => hand[r]).map((r) => [RESOURCE_NAMES[r].toLowerCase(), hand[r]]),
@@ -287,9 +288,9 @@ function summarise(ctx: DecideContext) {
     },
     opponents: view.players
       .filter((p) => p.id !== meId)
-      .map((p) => ({ name: p.name, points: p.points, cards: p.resourceCount, knights: p.knights })),
+      .map((p) => ({ name: named(p.id), points: p.points, cards: p.resourceCount, knights: p.knights })),
     target_to_win: view.victoryPoints ?? 10,
-    leader: leader ? `${leader.name} on ${leader.points}` : 'nobody yet',
+    leader: leader ? `${named(leader.id)} on ${leader.points}` : 'nobody yet',
     my_plan: {
       strategy: plan.archetype,
       saving_for: plan.focus,
@@ -314,8 +315,8 @@ function summarise(ctx: DecideContext) {
     ...(contests(ctx.level, ctx.standIn).readsTheTable
       ? {
           awards: {
-            longest_road: `${named(view.longestRoad)} holds it; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
-            largest_army: `${named(view.largestArmy)} holds it; most knights played is ${best('knights')}, mine is ${me?.knights ?? 0}`,
+            longest_road: `held by ${named(view.longestRoad)}; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
+            largest_army: `held by ${named(view.largestArmy)}; most knights played is ${best('knights')}, mine is ${me?.knights ?? 0}`,
           },
           points_still_needed: (view.victoryPoints ?? 10) - (me?.points ?? 0),
         }
@@ -490,7 +491,9 @@ async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision>
       const on = hex.vertices
         .map((v) => view.buildings[v])
         .filter(Boolean)
-        .map((b) => `${view.players.find((p) => p.id === b!.player)?.name ?? '?'}'s ${b!.kind}`);
+        .map((b) =>
+          b!.player === meId ? `my ${b!.kind}` : `${seatLabel(view, meId, b!.player)}'s ${b!.kind}`,
+        );
       return [
         String(id),
         {
