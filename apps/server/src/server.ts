@@ -66,6 +66,20 @@ export async function startServer(
   const hubRequests = new RoomAccessLimit(120);
   const historyRequests = new RoomAccessLimit(30);
   const presenceRequests = new RoomAccessLimit(12);
+  // Every other account route reaches Supabase too; generous, but not unlimited.
+  const accountRequests = new RoomAccessLimit(120);
+  // Resuming a saved seat bypasses the code-guessing limit so a flaky network
+  // never strands a player, but each attempt still asks Supabase who they are.
+  const resumes = new RoomAccessLimit(120);
+  // A socket that has not joined a room yet holds a slot for up to twelve
+  // seconds. Without a cap one client, signed in or not, could hold all of them
+  // and lock everybody else out. Joined sockets are not counted per address, so
+  // friends behind one home router or mobile carrier are unaffected.
+  const maxSockets = Number(process.env.MAX_SOCKETS ?? 400);
+  const UNJOINED_PER_ADDRESS = 12,
+    UNJOINED_TOTAL = Math.max(24, Math.floor(maxSockets / 4));
+  const unjoinedByAddress = new Map<string, number>();
+  let unjoined = 0;
   const accountPresence = new AccountPresence();
   const siteKey =
     options.captcha === null
@@ -108,6 +122,12 @@ export async function startServer(
           url.pathname.startsWith('/api/account/matches/')
         ) {
           const access = hubRequests.consume(clientAddress(request), now());
+          if (!access.allowed) {
+            response.setHeader('Retry-After', String(access.retryAfter));
+            throw accountFailure('ACCOUNT_RATE_LIMIT');
+          }
+        } else {
+          const access = accountRequests.consume(clientAddress(request), now());
           if (!access.allowed) {
             response.setHeader('Retry-After', String(access.retryAfter));
             throw accountFailure('ACCOUNT_RATE_LIMIT');
@@ -458,16 +478,34 @@ export async function startServer(
     if (
       closing ||
       request.url !== '/ws' ||
-      wss.clients.size >= 400 ||
+      wss.clients.size >= maxSockets ||
       (origin && !sameOrigin && !origins.includes(origin))
     ) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    if (
+      unjoined >= UNJOINED_TOTAL ||
+      (unjoinedByAddress.get(clientAddress(request)) ?? 0) >= UNJOINED_PER_ADDRESS
+    ) {
+      socket.end('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 5\r\nConnection: close\r\n\r\n');
       return;
     }
     wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
   });
   wss.on('connection', (ws, request) => {
     const address = clientAddress(request);
+    let waitingToJoin = true;
+    unjoined++;
+    unjoinedByAddress.set(address, (unjoinedByAddress.get(address) ?? 0) + 1);
+    const joined = () => {
+      if (!waitingToJoin) return;
+      waitingToJoin = false;
+      unjoined--;
+      const left = unjoinedByAddress.get(address)! - 1;
+      if (left) unjoinedByAddress.set(address, left);
+      else unjoinedByAddress.delete(address);
+    };
     alive.add(ws);
     ws.on('error', () => ws.terminate());
     ws.on('pong', () => {
@@ -574,7 +612,7 @@ export async function startServer(
           // A saved seat uses a strong token plus its permanent ID. Code-guessing limits must
           // never strand admitted players reconnecting through the same unreliable network.
           const savedResume = message.type === 'resume' && message.roomId && !isShortRoomCode(message.roomId);
-          if (!savedResume && !admissions.consume(address, now()).allowed)
+          if (!(savedResume ? resumes : admissions).consume(address, now()).allowed)
             throw new ProtocolError(
               'ROOM_RATE_LIMIT',
               'Too many attempts to join a room. Wait a minute and try again.',
@@ -605,6 +643,7 @@ export async function startServer(
               setAuthDeadline();
             }
             spectators.set(ws, roomId);
+            joined();
             if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
             clearTimeout(handshakeTimeout);
             send(ws, {
@@ -637,6 +676,7 @@ export async function startServer(
             oldSocket.close(4001, 'Seat resumed elsewhere');
           }
           sessions.set(ws, seat);
+          joined();
           if (message.preloadGame) preloadClients.add(ws);
           activeSeats.set(seat.id, ws);
           if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
@@ -929,6 +969,7 @@ export async function startServer(
       }
     });
     ws.on('close', () => {
+      joined();
       spectators.delete(ws);
       clearTimeout(handshakeTimeout);
       clearTimeout(authExpiry);

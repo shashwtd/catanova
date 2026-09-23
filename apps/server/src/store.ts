@@ -234,6 +234,13 @@ export class Store {
         PRIMARY KEY(room_id, player_id)
       );
       CREATE INDEX IF NOT EXISTS standins_room ON seat_standins(room_id);
+      /* Accounts the host removed from a room. They cannot rejoin until the room
+         starts its next round; removing someone meant nothing when they could
+         walk straight back in with the same code. */
+      CREATE TABLE IF NOT EXISTS room_removals (
+        room_id TEXT NOT NULL REFERENCES rooms(id), user_id TEXT NOT NULL, round INTEGER NOT NULL,
+        PRIMARY KEY(room_id, user_id)
+      );
     `);
     if (
       !this.db
@@ -441,6 +448,17 @@ export class Store {
       }
       if (mode === 'resume') throw new ProtocolError('INVALID_SESSION', 'This seat cannot be resumed');
       if (identity) this.assertAccountAvailable(identity.id, roomId);
+      if (
+        identity &&
+        roomId &&
+        (
+          this.db
+            .prepare('SELECT round FROM room_removals WHERE room_id = ? AND user_id = ?')
+            .get(roomId, identity.id) as { round: number } | undefined
+        )?.round === this.round(roomId)
+      )
+        throw new ProtocolError('REMOVED_BY_HOST', 'The host removed you from this room.');
+      if (mode === 'create' && identity) this.retireSoloLobbies(identity.id);
       if (mode === 'create') {
         roomId = randomUUID();
         this.db.prepare('INSERT INTO rooms(id) VALUES (?)').run(roomId);
@@ -578,6 +596,50 @@ export class Store {
     if (!row) return null;
     const roomCode = this.roomCode(row.room_id);
     return { roomId: row.room_id, ...(roomCode ? { roomCode } : {}) };
+  }
+  /**
+   * Lobbies this account opened that nobody else has joined. Creating another
+   * room leaves them: one person waits in one empty room at a time, and an
+   * abandoned lobby otherwise held its room code and island for thirty days —
+   * enough, repeated, to use up every code.
+   */
+  private retireSoloLobbies(userId: string) {
+    const rooms = this.db
+      .prepare(
+        `SELECT s.room_id FROM seats s
+         WHERE s.user_id = ? AND s.departed = 0
+           AND NOT EXISTS (SELECT 1 FROM games g WHERE g.room_id = s.room_id)
+           AND NOT EXISTS (
+             SELECT 1 FROM seats o WHERE o.room_id = s.room_id AND o.departed = 0 AND o.bot = 0 AND o.id <> s.id
+           )`,
+      )
+      .all(userId) as { room_id: string }[];
+    for (const { room_id } of rooms) {
+      this.db
+        .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE room_id = ? AND user_id = ?')
+        .run(room_id, userId);
+      this.db.prepare('UPDATE rooms SET revision = revision + 1 WHERE id = ?').run(room_id);
+      this.closeEmptyLobby(room_id);
+    }
+  }
+  /**
+   * A lobby that never started and has no person left in it gives back its room
+   * code and its island. Rooms that have played a game keep their code, so
+   * friends returning to the same link later still find their room.
+   */
+  private closeEmptyLobby(roomId: string): boolean {
+    if (
+      this.db.prepare('SELECT 1 FROM games WHERE room_id = ?').get(roomId) ||
+      this.db.prepare('SELECT 1 FROM room_rounds WHERE room_id = ?').get(roomId) ||
+      this.db.prepare('SELECT 1 FROM seats WHERE room_id = ? AND departed = 0 AND bot = 0').get(roomId)
+    )
+      return false;
+    this.db
+      .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE room_id = ? AND departed = 0')
+      .run(roomId);
+    this.db.prepare('DELETE FROM room_codes WHERE room_id = ?').run(roomId);
+    this.db.prepare('DELETE FROM room_boards WHERE room_id = ?').run(roomId);
+    return true;
   }
   private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
     const conflict = this.db
@@ -720,7 +782,7 @@ export class Store {
           'INSERT INTO leave_receipts(room_id, player_id, command_id, expected_revision, revision, counter, released) VALUES (?, ?, ?, ?, ?, ?, ?)',
         )
         .run(seat.room_id, seat.id, commandId, expectedRevision, revision, room.counter, 1);
-      this.renewRoomCode(seat.room_id);
+      if (!this.closeEmptyLobby(seat.room_id)) this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, released: true, duplicate: false };
     });
     // The transport is retired only after the entire resignation and receipt commit.
@@ -1008,6 +1070,14 @@ export class Store {
         this.db
           .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE id = ? AND room_id = ?')
           .run(kickPlayerId, seat.room_id);
+        const removed = this.db.prepare('SELECT user_id FROM seats WHERE id = ?').get(kickPlayerId) as
+          { user_id: string | null } | undefined;
+        if (removed?.user_id)
+          this.db
+            .prepare(
+              'INSERT INTO room_removals(room_id, user_id, round) VALUES (?, ?, ?) ON CONFLICT(room_id, user_id) DO UPDATE SET round = excluded.round',
+            )
+            .run(seat.room_id, removed.user_id, this.round(seat.room_id));
         botRemoved = kickPlayerId;
       }
       if (addBot) {

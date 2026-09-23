@@ -53,6 +53,7 @@ const TRANSIENT_ERRORS = new Set([
   'ACCOUNT_UNAVAILABLE',
   'ACCOUNT_BUSY',
   'STORAGE_ERROR',
+  'ROOM_RATE_LIMIT',
 ]);
 /** Accepted moves remain pending until the corresponding authoritative snapshot is installed. */
 export class Connection {
