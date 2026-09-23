@@ -406,7 +406,7 @@ Reach '''10 or more points during your own turn''' to win immediately. Hidden [[
       <origin>8</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2043" sha1="c770fhhm85wwkvy5x2ubveedry0jo6t">'''Balanced islands''' are Catanova's current map preset. Every island has 19 land hexes arranged in rows of 3, 4, 5, 4, and 3, with nine [[Trading and ports|ports]]. The goal is useful variety without making every starting spot equal.
+      <text xml:space="preserve" bytes="2191" sha1="jo0aephfzis5w2pbn0ums06irjhych4">'''Balanced islands''' are Catanova's current map preset. Every island has 19 land hexes arranged in rows of 3, 4, 5, 4, and 3, with nine [[Trading and ports|ports]]. The goal is useful variety without making every starting spot equal.
 
 {| class="wikitable"
 ! Terrain !! Hexes
@@ -448,7 +448,7 @@ The four general ports and five specialized ports are shuffled independently ove
 | 6 or 8 || 5 out of 36 || 5
 |}
 
-Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. There is no forced dice balancing or catch-up production bonus.
+Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. New rooms use Balanced dice, which draw from a deck of the 36 dice combinations so short games stay closer to the usual curve; the host can choose Natural dice instead. Neither gives any player a catch-up bonus.
 
 == Preset status ==
 This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.
@@ -472,7 +472,7 @@ This is a Catanova preset, separate from the official spiral-number setup or fix
       <origin>9</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="1995" sha1="5h2xjy434sjz16wqiinwzm3csic5vjj">The '''turn timer''' is an optional Catanova house rule. It is '''off by default'''. The host may enable it before the game begins; setup placements remain untimed.
+      <text xml:space="preserve" bytes="2030" sha1="efzryp0jy1gq4ugv26zzigtryk3m1b9">The '''turn timer''' is an optional Catanova house rule. New rooms start with a '''90-second''' timer; the host can change it or switch it off before the game begins. Setup placements remain untimed.
 
 {| class="wikitable"
 ! Available durations

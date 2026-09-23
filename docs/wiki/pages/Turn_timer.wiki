@@ -1,4 +1,4 @@
-The '''turn timer''' is an optional Catanova house rule. It is '''off by default'''. The host may enable it before the game begins; setup placements remain untimed.
+The '''turn timer''' is an optional Catanova house rule. New rooms start with a '''90-second''' timer; the host can change it or switch it off before the game begins. Setup placements remain untimed.
 
 {| class="wikitable"
 ! Available durations
