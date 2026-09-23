@@ -1,6 +1,7 @@
 /**
- * The admin API. Reads are GET; the two changes, ending a game and generating
- * a report, are POST and pass the listener's origin and CSRF checks first.
+ * The admin API. Reads are GET; ending a game, resolving feedback and
+ * generating a report are POST and pass the listener's origin and CSRF checks
+ * first.
  */
 import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRoute } from './api.js';
@@ -8,6 +9,7 @@ import type { RuntimeMetrics } from './metrics.js';
 import { overview } from './overview.js';
 import { ROOM_PARAM, endGame, gameDetail, gameHistory, listGames, privateGame } from './rooms.js';
 import { playerDetail, searchPlayers } from './players.js';
+import { feedbackRoutes } from './feedback.js';
 import { RETENTION_DAYS } from './analysis-runner.js';
 import type { Analysis } from './analysis-runner.js';
 
@@ -21,6 +23,7 @@ function retentionDays(value: unknown): number {
 export function coreRoutes(context: AdminContext, metrics: RuntimeMetrics, analysis: Analysis): ApiRoute[] {
   const room = (suffix = '') => new RegExp(`^/api/admin/games/${ROOM_PARAM}${suffix}$`);
   return [
+    ...feedbackRoutes(context),
     { method: 'GET', path: /^\/api\/admin\/overview$/, handle: () => overview(context, metrics) },
     { method: 'GET', path: /^\/api\/admin\/games$/, handle: ({ query }) => listGames(context, query) },
     { method: 'GET', path: room(), handle: ({ params }) => gameDetail(context, params[0]!) },

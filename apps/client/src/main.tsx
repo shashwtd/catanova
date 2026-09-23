@@ -22,6 +22,7 @@ import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
 import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
+import { SendFeedback, useLastMessage } from './SendFeedback.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -103,6 +104,7 @@ import './room-experience.css';
 import './landing.css';
 import './hud-layout.css';
 import './settings.css';
+import './send-feedback.css';
 import './trade-polish.css';
 import './awards.css';
 import './game-guidance.css';
@@ -289,9 +291,12 @@ function App() {
       | 'editProfile'
       | 'invite'
       | 'friends'
+      | 'feedback'
       | null
     >(null);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
+  // Feedback can attach the last error a player saw, even after it was dismissed.
+  const lastError = useLastMessage(error || auth.error);
   const [robberHex, setRobberHex] = useState<number | null>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
   const [isFullscreen, setFullscreen] = useState(!!document.fullscreenElement);
@@ -1098,6 +1103,7 @@ function App() {
           onEditProfile={() => setPanel('editProfile')}
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
+          onFeedback={() => setPanel('feedback')}
           onSignOut={() => setPanel('signOut')}
         />
       )}
@@ -1407,6 +1413,20 @@ function App() {
             privacy={privacy.value}
             savePrivacy={privacy.save}
             previewSound={() => feedback.sound.play('settlement')}
+          />
+        </Dialog>
+      )}
+      {panel === 'feedback' && (
+        <Dialog side={!!g} tool="feedback" title="Send feedback" compact onClose={() => setPanel(null)}>
+          <SendFeedback
+            details={{
+              roomCode: room?.roomCode,
+              revision: room?.revision,
+              connection: room ? status : undefined,
+              lastError,
+            }}
+            {...(auth.config?.mode === 'authenticated' ? { accessToken: auth.accessToken } : {})}
+            onClose={() => setPanel(null)}
           />
         </Dialog>
       )}

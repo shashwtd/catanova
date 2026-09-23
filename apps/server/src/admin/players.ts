@@ -166,5 +166,14 @@ export function playerDetail(context: AdminContext, userId: string): PlayerDetai
     record: record(context, userId),
     matches,
     seats,
+    feedback: store.db
+      .prepare('SELECT id, at, category, status FROM feedback WHERE user_id = ? ORDER BY id DESC LIMIT 10')
+      .all(userId)
+      .map((row) => ({
+        id: row.id as number,
+        at: row.at as number,
+        category: row.category as string,
+        status: row.status as string,
+      })),
   };
 }

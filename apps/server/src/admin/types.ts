@@ -8,6 +8,7 @@ import type { Metric, Window } from '../../../../scripts/reporting/retention.js'
 import type { AuditEntry } from './audit.js';
 import type { ServerErrorEntry } from './errors.js';
 import type { LoopWindow } from './metrics.js';
+import type { FeedbackItem } from '../feedback.js';
 
 export type { AuditEntry, LoopWindow, Metric, ServerErrorEntry };
 
@@ -168,6 +169,7 @@ export type PlayerDetail = {
   };
   matches: PlayerMatch[];
   seats: { roomId: string; roomCode: string | null; name: string; departed: boolean }[];
+  feedback: { id: number; at: number; category: string; status: string }[];
 };
 
 export type DiceSummary = {
@@ -193,6 +195,14 @@ export type AdminStats = {
     accounts: number;
     unindexedGames: number;
   };
+};
+
+export type { FeedbackItem } from '../feedback.js';
+
+export type FeedbackPage = {
+  items: FeedbackItem[];
+  nextBefore: number | null;
+  counts: { new: number; resolved: number };
 };
 
 export type RetentionReport = {

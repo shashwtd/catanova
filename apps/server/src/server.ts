@@ -23,6 +23,7 @@ import { AccountPresence } from './account-presence.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { BotDriver } from './bots.js';
 import { serverErrors } from './admin/errors.js';
+import { PlayerFeedback } from './feedback.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
 function validationCommandId(input: string): string | undefined {
@@ -75,6 +76,14 @@ export async function startServer(
   const captcha = siteKey ? { siteKey } : undefined;
   const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now, trackPresence: true });
   const roomInvites = accounts ? new RoomInviteService(store, accounts, now) : undefined;
+  const feedback = new PlayerFeedback({
+    store,
+    authenticated: !!verify,
+    ...(accounts ? { accounts } : {}),
+    now,
+    clientAddress,
+    allowedOrigins: options.allowedOrigins ?? [],
+  });
   let closing = false;
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -336,6 +345,8 @@ export async function startServer(
             JSON.stringify({ error: error instanceof ProtocolError ? error.message : 'Room unavailable' }),
           );
       }
+    } else if (request.url === '/api/feedback') {
+      await feedback.handle(request, response);
     } else {
       void serveClient(request, response, options.clientDirectory ?? 'dist/client', auth?.url, !!captcha);
     }
