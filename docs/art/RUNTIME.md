@@ -36,6 +36,23 @@ Use `scripts/export-branding.mjs` only when deliberately regenerating browser ic
 
 These are byte-size and behavior improvements, not a claim that an actual throttled-device benchmark or maximum player capacity has been measured.
 
+## Landing thumbnails
+
+The signed-out landing shows four avatars and two resources below the fold. It used to draw them from the full avatar and sprite atlases through inline SVG `<image>` elements, which download eagerly: 863,364 bytes on every first visit for six small pictures. The landing now has its own crops, loaded with `loading="lazy"`:
+
+| File               | Master                | Region (x, y, width, height) | Output          |
+| ------------------ | --------------------- | ---------------------------- | --------------- |
+| `landing-avatar-0` | `avatars-fantasy.png` | 6, 0, 350, 350               | 192 × 192, q 80 |
+| `landing-avatar-1` | `avatars-fantasy.png` | 368, 0, 350, 350             | 192 × 192, q 80 |
+| `landing-avatar-3` | `avatars-fantasy.png` | 1092, 0, 350, 350            | 192 × 192, q 80 |
+| `landing-avatar-5` | `avatars-fantasy.png` | 369, 350, 348, 348           | 192 × 192, q 80 |
+| `landing-timber`   | `sprites-fantasy.png` | 0, 0, 443.5, 443.5           | 72 × 72, q 90   |
+| `landing-rock`     | `sprites-fantasy.png` | 0, 443.5, 443.5, 443.5       | 72 × 72, q 90   |
+
+Each region is exactly what the game shows: the square that the avatar's `slice` viewBox keeps of its 362-pixel-wide cell, and one 512-unit sprite cell, which is 443.5 pixels of the 1774 × 887 master. Outputs are twice the largest display size (a 95 px medallion on a wide screen; the 36 px `.sprite` the trade icons have always been drawn at), which also covers a three-times phone showing the 57 px medallion. The six files total 49,582 bytes. On a production build, a first visit to `/` fell from 1,869,213 to 1,056,737 transferred bytes at 1440 × 900; on a 375 × 812 phone it is 1,047,513 until the trade example scrolls near.
+
+`optimize-art.mjs` exports whole images only and Sharp is not installed in the repository, so these were made once in Chromium: a Lanczos-3 resample of the PNG master on premultiplied RGBA, then `canvas.toBlob(…, 'image/webp', quality)`. Alpha survived encoding exactly. Against the atlas rendering at display size, the mean channel difference is 3–4 of 255 for the avatars and 2–3 for the resources; the atlas itself differs from its master by up to 1.5. The files are named by the first twelve hex digits of their SHA-256, like the other optimized art, but are deliberately not in `runtime-art.json`, whose export would rebuild them at full size. To remake one with Sharp instead, use `extract` with the region (rounded to whole pixels), `resize(size, size, { kernel: 'lanczos3' })` and `webp({ quality })`, then rename it by hash and update `apps/client/src/LandingFeatures.tsx`.
+
 ## Current development cards
 
 The September 2026 [readability pass](development-cards-readable.md) uses a new, smaller 768px atlas (96,886 bytes). The full-resolution table above and `runtime-art.json` record the legacy art exports, which remain available for old PNG URLs.

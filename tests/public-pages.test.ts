@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
+import { LandingFeatures } from '../apps/client/src/LandingFeatures.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
 import { REACTIONS, REACTION_LIST } from '../packages/protocol/src/reactions.js';
 import { publicPath } from '../apps/client/src/analytics.js';
@@ -259,6 +261,40 @@ test('the production entry is readable before JavaScript and only public pages e
   for (const match of guide.matchAll(/href="#([^"]+)"/g)) assert.ok(guide.includes(`id="${match[1]}"`));
 });
 
+/** Width and height from a WebP header: the extended (VP8X) or simple lossy (VP8) layout. */
+function webpSize(data: Buffer): [number, number] {
+  assert.equal(data.subarray(0, 4).toString(), 'RIFF');
+  assert.equal(data.subarray(8, 12).toString(), 'WEBP');
+  const chunk = data.subarray(12, 16).toString();
+  if (chunk === 'VP8X') return [data.readUIntLE(24, 3) + 1, data.readUIntLE(27, 3) + 1];
+  assert.equal(chunk, 'VP8 ', `unexpected WebP chunk ${chunk}`);
+  return [data.readUInt16LE(26) & 0x3fff, data.readUInt16LE(28) & 0x3fff];
+}
+
+test('the landing shows its six small pictures from small lazy files, never the full atlases', async () => {
+  const html = renderToStaticMarkup(createElement(LandingFeatures, { onPlay: () => {} }));
+  // An inline SVG <image> downloads eagerly and these atlases are 860 KB
+  // between them; four faces and two resources are not worth that on a first visit.
+  assert.ok(!html.includes('avatars-fantasy') && !html.includes('sprites-fantasy'));
+  const thumbnails = [...html.matchAll(/<img ([^>]*src="\/art\/optimized\/landing-[^"]+"[^>]*)\/>/g)].map(
+    (match) => match[1]!,
+  );
+  assert.equal(thumbnails.length, 6, 'four avatars and two resources');
+  for (const attributes of thumbnails) {
+    const attribute = (name: string) => new RegExp(` ?${name}="([^"]*)"`).exec(attributes)?.[1];
+    const src = attribute('src')!;
+    assert.equal(attribute('loading'), 'lazy', src);
+    assert.equal(attribute('decoding'), 'async', src);
+    assert.ok(attribute('alt'), `${src} is described`);
+    const match = /^\/art\/optimized\/[a-z0-9-]+\.([a-f0-9]{12})\.webp$/.exec(src);
+    assert.ok(match, `${src} is content-hashed like the other optimized art`);
+    const data = await readFile(join('apps/client/public', src));
+    assert.equal(createHash('sha256').update(data).digest('hex').slice(0, 12), match[1], src);
+    assert.deepEqual(webpSize(data), [Number(attribute('width')), Number(attribute('height'))], src);
+    assert.ok(data.length < 12_000, `${src} is ${data.length} bytes`);
+  }
+});
+
 test('discovery assets are real files with declared icon and social dimensions', async () => {
   const root = resolve('apps/client/public');
   const manifest = JSON.parse(await readFile(join(root, 'site.webmanifest'), 'utf8')) as {
@@ -296,4 +332,3 @@ test('discovery assets are real files with declared icon and social dimensions',
   }
   assert.deepEqual(dimensions, [1200, 630]);
 });
-
