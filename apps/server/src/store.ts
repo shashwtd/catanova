@@ -1762,4 +1762,50 @@ export class Store {
   close() {
     this.db.close();
   }
+  /* ---- Admin console (apps/server/src/admin): one appended block. ---- */
+  /**
+   * Close a stuck or abandoned game with no winner. Every seat still playing
+   * resigns through the rules engine, which is what finishes a game as
+   * `abandoned`, and the result is journaled through the same lifecycle path
+   * as any other departure. Only the wording is ours: the engine would say each
+   * player "resigned after not reconnecting", which is not what happened.
+   * `audit` runs inside this transaction, so the change and its record commit
+   * or roll back together.
+   */
+  adminEndGame(
+    roomId: string,
+    commandId: string,
+    audit: (result: { revision: number; previous: Game; game: Game }) => void,
+  ): { revision: number } {
+    return this.transaction(() => {
+      const current = this.loadGame(roomId);
+      if (!current) throw new ProtocolError('NOT_STARTED', 'This room has no game in progress');
+      if (current.phase === 'finished')
+        throw new ProtocolError('GAME_FINISHED', 'This game has already finished');
+      const next = resignPlayers(
+        current,
+        current.players.filter((player) => !player.resigned).map((player) => player.id),
+      );
+      if (next.phase !== 'finished' || next.finishReason !== 'abandoned')
+        throw new ProtocolError('END_FAILED', 'The game could not be closed');
+      next.log = [
+        ...current.log,
+        { id: current.nextLog, text: 'Catanova closed this game. There is no winner.' },
+      ];
+      if (next.log.length > 80) next.log.splice(0, next.log.length - 80);
+      next.nextLog = current.nextLog + 1;
+      const revision = this.saveLifecycle(
+        roomId,
+        current,
+        next,
+        commandId,
+        null,
+        { kind: 'adminEnd' },
+        'abandoned',
+        false,
+      );
+      audit({ revision, previous: current, game: next });
+      return { revision };
+    });
+  }
 }

@@ -22,6 +22,7 @@ import { RoomInviteService } from './room-invites.js';
 import { AccountPresence } from './account-presence.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { BotDriver } from './bots.js';
+import { serverErrors } from './admin/errors.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
 function validationCommandId(input: string): string | undefined {
@@ -878,6 +879,8 @@ export async function startServer(
             : error instanceof SyntaxError || (error instanceof Error && !('code' in error))
               ? 'INVALID_MESSAGE'
               : 'STORAGE_ERROR';
+        // A failed save is the server's fault, not the player's: keep it for the admin console.
+        if (code === 'STORAGE_ERROR') serverErrors.record('websocket', error);
         send(ws, {
           type: 'error',
           code,

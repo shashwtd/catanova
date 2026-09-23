@@ -31,11 +31,18 @@ import { isLoopbackHost } from './config.js';
 import { AdminAuthError, createAccessVerifier } from './access.js';
 import type { AccessVerifier } from './access.js';
 import { AdminAudit } from './audit.js';
-import type { AuditInput } from './audit.js';
 import { captureConsoleErrors, serverErrors } from './errors.js';
 import { loadAdminAssets } from './assets.js';
 import type { AdminAsset } from './assets.js';
+import { AdminRequestError } from './api.js';
+import type { AdminContext, ApiRoute, GameRuntime } from './api.js';
+import { RuntimeMetrics } from './metrics.js';
+import { Analysis } from './analysis-runner.js';
+import { coreRoutes } from './routes.js';
 import type { AdminSession, AuthRejection } from './types.js';
+
+export { AdminRequestError };
+export type { AdminContext, ApiRequest, ApiRoute, GameRuntime } from './api.js';
 
 export const ADMIN_CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
@@ -45,50 +52,6 @@ export const ADMIN_BODY_LIMIT = 16 * 1024;
 export const ADMIN_READS_PER_MINUTE = 240;
 /** Changes per actor per minute. Ending games and resolving feedback are deliberate, one at a time. */
 export const ADMIN_WRITES_PER_MINUTE = 20;
-
-/** What the game server exposes to the admin listener: live socket counts and a way to push a room. */
-export type GameRuntime = {
-  sockets(): { total: number; players: number; spectators: number; seats: string[] };
-  broadcast(roomId: string): void;
-};
-
-export class AdminRequestError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message = code,
-  ) {
-    super(message);
-  }
-}
-
-export type ApiRequest = {
-  actor: string;
-  params: string[];
-  query: URLSearchParams;
-  body: Record<string, unknown>;
-  /** Written into audit rows. */
-  audit: (entry: Omit<AuditInput, 'at' | 'actor' | 'ip' | 'requestId'>) => number;
-  requestId: string;
-  ip: string | null;
-  ray: string | null;
-};
-
-export type ApiRoute = {
-  method: 'GET' | 'POST';
-  path: RegExp;
-  handle: (request: ApiRequest) => unknown;
-};
-
-export type AdminContext = {
-  config: AdminConfig;
-  store: Store;
-  runtime: GameRuntime;
-  audit: AdminAudit;
-  databasePath: string;
-  now: () => number;
-  rejections: () => AuthRejection[];
-};
 
 export type AdminServerOptions = {
   config: AdminConfig;
@@ -209,6 +172,8 @@ export async function startAdminServer(options: AdminServerOptions) {
     now,
     rejections: () => [...rejected].reverse(),
   };
+  const metrics = new RuntimeMetrics();
+  const analysis = new Analysis({ databasePath: options.databasePath, db: store.db, now });
   const routes: ApiRoute[] = [
     {
       method: 'GET',
@@ -228,6 +193,7 @@ export async function startAdminServer(options: AdminServerOptions) {
         });
       },
     },
+    ...coreRoutes(context, metrics, analysis),
     ...(options.routes?.(context) ?? []),
   ];
 
@@ -419,6 +385,7 @@ export async function startAdminServer(options: AdminServerOptions) {
   server.keepAliveTimeout = 5_000;
   server.maxHeadersCount = 64;
   const restoreConsole = captureConsoleErrors();
+  metrics.start();
   try {
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
@@ -426,6 +393,7 @@ export async function startAdminServer(options: AdminServerOptions) {
     });
   } catch (error) {
     restoreConsole();
+    metrics.stop();
     throw error;
   }
   const address = server.address();
@@ -435,6 +403,7 @@ export async function startAdminServer(options: AdminServerOptions) {
     context,
     async close() {
       restoreConsole();
+      metrics.stop();
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
