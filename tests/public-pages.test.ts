@@ -11,6 +11,7 @@ import { LandingFeatures } from '../apps/client/src/LandingFeatures.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
 import { REACTIONS, REACTION_LIST } from '../packages/protocol/src/reactions.js';
 import { publicPath } from '../apps/client/src/analytics.js';
+import { DEFAULT_ROOM_SETTINGS, DEFAULT_TURN_TIMER_SECONDS } from '../packages/protocol/src/settings.js';
 import {
   GUIDE_FAQ,
   GUIDE_SECTIONS,
@@ -119,6 +120,14 @@ test('the production entry is readable before JavaScript and only public pages e
     ['id="glossary"', 'Largest Army'],
   ] as const)
     assert.ok(guide.includes(anchor) && guide.includes(phrase), anchor);
+  // The room settings table states the defaults a new room is actually created with.
+  const dice = DEFAULT_ROOM_SETTINGS.diceMode === 'classic' ? 'Natural' : 'Balanced';
+  assert.ok(guide.includes(`Natural or balanced dice</th><td>${dice}</td>`), `dice default is ${dice}`);
+  // New rooms start with the slider's own default from 23 September 2026 (the
+  // change to settings.ts itself lands separately); existing rooms keep theirs.
+  assert.equal(DEFAULT_TURN_TIMER_SECONDS, 90);
+  assert.ok(guide.includes(`Turn timer</th><td>${DEFAULT_TURN_TIMER_SECONDS} seconds</td>`));
+  assert.ok(!guide.includes('leave it off'), 'the timer is no longer off by default');
   // A reference page is only useful if its own contents list works.
   const navigable = [...guide.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
   assert.ok(navigable.length >= 12, `only ${navigable.length} anchors`);

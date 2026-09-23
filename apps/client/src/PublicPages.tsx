@@ -772,10 +772,10 @@ export function PublicGuide() {
             <details className="guide-detail">
               <summary>The optional turn timer</summary>
               <p>
-                The host can leave it off or choose 40, 65, 90, 115 or 140 seconds. When a turn expires the
-                server completes whatever the rules require, using valid defaults, and ends the turn. It does
-                not buy pieces or accept trades on your behalf. Setup placements are untimed, and a required
-                discard has its own countdown.
+                New rooms start at 90 seconds; the host can choose 40, 65, 115 or 140 instead, or switch it
+                off. When a turn expires the server completes whatever the rules require, using valid
+                defaults, and ends the turn. It does not buy pieces or accept trades on your behalf. Setup
+                placements are untimed, and a required discard has its own countdown.
               </p>
             </details>
           </section>
@@ -1091,10 +1091,10 @@ export function PublicGuide() {
                         </span>
                         Turn timer
                       </th>
-                      <td>Off</td>
+                      <td>90 seconds</td>
                       <td>
-                        Switched on, a turn lasts 40, 65, 90, 115 or 140 seconds, and the game plays a
-                        sensible move for anyone who runs out.
+                        A turn lasts 40, 65, 90, 115 or 140 seconds, or the host switches the timer off. The
+                        game plays a sensible move for anyone who runs out.
                       </td>
                     </tr>
                     <tr>
@@ -1104,7 +1104,7 @@ export function PublicGuide() {
                         </span>
                         Natural or balanced dice
                       </th>
-                      <td>Natural</td>
+                      <td>Balanced</td>
                       <td>
                         Natural is two ordinary dice: every roll independent, seven the most common total.
                         Balanced draws from a deck of all thirty-six dice pairs, removing each drawn pair
