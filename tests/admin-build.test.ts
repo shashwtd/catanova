@@ -9,7 +9,9 @@ import { build } from 'vite';
 import { loadAdminAssets } from '../apps/server/src/admin/assets.js';
 import { Columns, PlayerColour } from '../apps/admin/ui.js';
 import { parseRoute } from '../apps/admin/route.js';
-import { accountLabel } from '../apps/admin/format.js';
+import { accountLabel, diceLabel } from '../apps/admin/format.js';
+import { fairness } from '../apps/admin/pages/Stats.js';
+import { diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
 import { PLAYER_COLORS } from '../packages/protocol/src/colors.js';
 
 test('npm run build produces dist/admin, beside and separate from the game client', async () => {
@@ -95,4 +97,18 @@ test('a seat colour is the game’s own swatch and name, with no inline style', 
   assert.equal(accountLabel('permanent'), 'Google');
   assert.equal(accountLabel('guest'), 'Guest');
   assert.equal(accountLabel(null), null);
+});
+
+test('dice are only called fair or not where a test can say so', () => {
+  const counts = FAIR_DICE.map((p) => p * 360);
+  assert.match(
+    fairness(diceSummary(counts, 'classic')),
+    /^χ² 0 over 10 degrees of freedom, p = 1\. Consistent with fair, independent dice\.$/,
+  );
+  assert.match(fairness(diceSummary(counts, 'balanced')), /deck of all 36 pairs.*does not apply/);
+  assert.doesNotMatch(fairness(diceSummary(counts, 'balanced')), /Consistent|Unlikely/);
+  assert.match(fairness(diceSummary(counts, { classic: 180, balanced: 180 })), /no single test applies/);
+  assert.match(fairness(diceSummary(Array(11).fill(0))), /No rolls yet/);
+  assert.equal(diceLabel('classic'), 'Natural');
+  assert.equal(diceLabel('balanced'), 'Balanced');
 });

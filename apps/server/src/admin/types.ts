@@ -214,10 +214,18 @@ export type PlayerDetail = {
   feedback: { id: number; at: number; category: string; status: string }[];
 };
 
+/**
+ * Rolls of each total from 2 to 12 against what their dice should give.
+ * `model` says what `expected` is: two independent fair dice (Natural), a deck
+ * of all 36 pairs (Balanced, which follows the same curve by design, so no
+ * χ² test applies), equally likely totals (the retired Flat rule), or a
+ * mixture of modes (no single test applies). χ² is null where it means nothing.
+ */
 export type DiceSummary = {
   rolls: number;
   counts: number[];
   expected: number[];
+  model: 'two-dice' | 'deck' | 'flat' | 'mixed';
   chiSquare: number | null;
   pValue: number | null;
 };

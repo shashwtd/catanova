@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { startServer } from '../apps/server/src/server.js';
-import type { Store } from '../apps/server/src/store.js';
+import { Store } from '../apps/server/src/store.js';
 import type { Identity } from '../apps/server/src/auth.js';
 import { startAdminServer } from '../apps/server/src/admin/listener.js';
 import type { AdminConfig } from '../apps/server/src/admin/config.js';
@@ -68,7 +68,7 @@ function choose(g: Game): { player: string; action: GameAction } {
   return { player, action };
 }
 
-function play(store: Store, roomId: string, moves: number) {
+function play(store: Store, roomId: string, moves: number, prefix = 'admin-test') {
   for (let i = 0; i < moves; i++) {
     const game = store.loadGame(roomId)!;
     if (game.phase === 'finished') return;
@@ -76,7 +76,7 @@ function play(store: Store, roomId: string, moves: number) {
     const seat = store.snapshot(roomId).players.find((p) => p.id === next.player)!;
     store.action(
       { id: seat.id, name: seat.name, room_id: roomId },
-      `admin-test-${i}`,
+      `${prefix}-${i}`,
       store.snapshot(roomId).revision,
       next.action,
     );
@@ -636,7 +636,74 @@ test('dice statistics compare fairly with two fair dice', () => {
     rolls: 0,
     counts: Array(11).fill(0),
     expected: Array(11).fill(0),
+    model: 'two-dice',
     chiSquare: null,
     pValue: null,
   });
+  // Balanced dice follow the curve by design, so they get no χ² test; flat totals expect every total alike.
+  const deck = diceSummary(
+    FAIR_DICE.map((p) => p * 360),
+    'balanced',
+  );
+  assert.equal(deck.model, 'deck');
+  assert.equal(deck.chiSquare, null);
+  assert.deepEqual(
+    deck.expected,
+    exact.expected.map((e) => e / 10),
+  );
+  const flat = diceSummary(Array(11).fill(10), 'flat');
+  assert.equal(flat.model, 'flat');
+  assert.deepEqual(flat.expected, Array(11).fill(10));
+  assert.equal(flat.chiSquare, 0);
+  // A mixture expects the sum of its modes' expectations, and no single test applies.
+  const mixed = diceSummary(
+    Array(11)
+      .fill(0)
+      .map((_, i) => (i === 5 ? 22 : 2)),
+    { classic: 36, flat: 11 },
+  );
+  assert.equal(mixed.model, 'mixed');
+  assert.equal(mixed.pValue, null);
+  assert.deepEqual(
+    mixed.expected,
+    FAIR_DICE.map((p) => Math.round((p * 36 + 1) * 100) / 100),
+  );
+});
+
+test('dice count under the mode each game was played with, not the room’s current setting', (t) => {
+  const store = new Store(':memory:');
+  t.after(() => store.close());
+  {
+    const host = store.enter('create', newSession('Uma').token, 'Uma');
+    const guest = store.enter('join', newSession('Vic').token, 'Vic', host.room_id);
+    const room = host.room_id;
+    const natural = { turnTimerSeconds: null, diceMode: 'classic' as const };
+    store.configureSettings(host, 'natural', store.snapshot(room).revision, natural);
+    store.action(host, 'start-1', readyLobby(store, room), { kind: 'start' });
+    play(store, room, 60, 'first');
+    const rolls = () =>
+      store.db
+        .prepare("SELECT count(*) AS n FROM game_events WHERE json_extract(public_entry, '$.kind') = 'roll'")
+        .get()!.n as number;
+    const naturalRolls = rolls();
+    assert.ok(naturalRolls > 3, 'the first game rolled');
+    store.leave(guest, 'vic-leaves', store.snapshot(room).revision);
+    store.action(host, 'back', store.snapshot(room).revision, { kind: 'returnToLobby' });
+    // The room switches to balanced dice for its next game.
+    store.configureSettings(host, 'balanced', store.snapshot(room).revision, {
+      ...natural,
+      diceMode: 'balanced',
+    });
+    store.lobby(host, 'add-bot', store.snapshot(room).revision, false, undefined, undefined, true);
+    store.action(host, 'start-2', store.snapshot(room).revision, { kind: 'start' });
+    play(store, room, 60, 'second');
+    assert.ok(rolls() > naturalRolls, 'the second game rolled');
+    const { dice } = computeStats(store.db, Date.now());
+    assert.equal(dice.byMode.classic!.rolls, naturalRolls);
+    assert.equal(dice.byMode.balanced!.rolls, rolls() - naturalRolls);
+    assert.equal(dice.byMode.balanced!.model, 'deck');
+    assert.equal(dice.byMode.classic!.model, 'two-dice');
+    assert.equal(dice.overall.model, 'mixed');
+    assert.equal(dice.overall.chiSquare, null);
+  }
 });
