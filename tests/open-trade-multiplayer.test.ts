@@ -166,9 +166,14 @@ test('four real clients publish proposals, reconnect privately, and recover one 
   }
   assert.equal(actor.state!.game!.trade!.proposals!.length, 3);
   const beforeRestart = structuredClone(server.store.loadGame(roomId)!);
+  const reconnects = clients.map((client) => client.metrics.reconnects);
   await server.close();
   server = await startServer({ port, databasePath: path, auth: null });
-  await until(() => clients.every((client) => client.status === 'connected'));
+  // Wait for each client to notice the restart and come back, not for a status
+  // that may still describe the socket the old server just closed.
+  await until(() =>
+    clients.every((client, i) => client.metrics.reconnects > reconnects[i]! && client.status === 'connected'),
+  );
   for (const client of clients) {
     assert.deepEqual(client.state!.game!.trade, beforeRestart.trade);
     for (const player of client.state!.game!.players)

@@ -359,7 +359,19 @@ export async function startServer(
       void serveClient(request, response, options.clientDirectory ?? 'dist/client', auth?.url, !!captcha);
     }
   });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 24576, perMessageDeflate: false });
+  // Every update is a whole snapshot of mostly repeated JSON. Compressed, with the
+  // previous message as context, a typical update shrinks to a small fraction of
+  // its size — which matters most on the slow mobile connections this game was
+  // started for. About 200 KB of zlib state per socket; tiny messages go as-is.
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: 24576,
+    perMessageDeflate: {
+      threshold: 1024,
+      zlibDeflateOptions: { level: 3, memLevel: 7 },
+      concurrencyLimit: 4,
+    },
+  });
   const sessions = new Map<WebSocket, Seat>();
   // Watchers never acquire a seat, presence deadline, or authority to send moves.
   const spectators = new Map<WebSocket, string>();
@@ -382,9 +394,12 @@ export async function startServer(
   const friendLastSeen = (userId: string) =>
     store.accountPrivacy(userId).shareLastSeen ? store.lastSeen(userId) : null;
   function snapshot(roomId: string, viewer: string): RoomState {
-    const state = store.snapshot(roomId, viewer);
+    const { board, ...state } = store.snapshot(roomId, viewer);
     return {
       ...state,
+      // A game carries its own copy of the board, so sending the room's as well
+      // put the same 11 KB into every update twice.
+      ...(state.game ? {} : { board }),
       ...(launches.view(roomId) ? { launch: launches.view(roomId) } : {}),
       players: state.players.map((p) => ({
         ...p,
