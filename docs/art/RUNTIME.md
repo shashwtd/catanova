@@ -138,5 +138,5 @@ The dialog links to `/privacy/`, which says what is collected and carries the
 control for changing the answer later. That control is rendered hidden and the
 loader reveals and wires it, so where the loader does not run (another host, a
 build with measurement off, a blocker) no dead buttons are shown. The page's
-contact address is the placeholder `PRIVACY_CONTACT` in
-`apps/client/src/PublicPages.tsx`; the build warns until it is replaced.
+contact address is `PRIVACY_CONTACT` in `apps/client/src/PublicPages.tsx`,
+`privacy@catanova.io`, which Cloudflare Email Routing forwards to the owner.
