@@ -16,8 +16,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   REACTIONS,
   REACTION_LIST,
-  REACTION_MIN_GAP_MS,
-  reactionAllowedAt,
+  REACTION_WINDOW_MS,
+  reactionWaitMs,
 } from '../../../packages/protocol/src/reactions.js';
 import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
 import { ReactionFace } from './ReactionArt.js';
@@ -100,8 +100,9 @@ export function ReactionButton({
   const [open, setOpen] = useState(false);
   /** The last reaction sent, kept only to flash the face that was pressed. */
   const [sent, setSent] = useState<{ reaction: ReactionName; id: number } | null>(null);
-  /** True while the shared rate limit says the next reaction must wait. */
-  const [resting, setResting] = useState(false);
+  /** When the cooldown after a full burst ends, or 0 while reactions can go. */
+  const [restUntil, setRestUntil] = useState(0);
+  const resting = restUntil > 0;
   const history = useRef<number[]>([]);
   const root = useRef<HTMLDivElement>(null);
   const tray = useRef<HTMLDivElement>(null);
@@ -178,27 +179,27 @@ export function ReactionButton({
     };
   }, [open]);
 
-  // While resting, wake up once the gate is expected to reopen rather than
-  // polling: the shortest wait the limit can impose is the gap between calls.
+  // Wake once, when the cooldown is due to end, and clear it outright rather
+  // than asking the rule again: the faces must never be left asleep. A tap a
+  // moment too early just starts the rest of the wait.
   useEffect(() => {
-    if (!resting) return;
-    const timer = setTimeout(
-      () => setResting(!reactionAllowedAt(history.current, now())),
-      REACTION_MIN_GAP_MS,
-    );
+    if (!restUntil) return;
+    const timer = setTimeout(() => setRestUntil(0), Math.max(0, restUntil - now()));
     return () => clearTimeout(timer);
-  }, [resting, sent, now]);
+  }, [restUntil, now]);
 
   function send(reaction: ReactionName) {
     const at = now();
-    if (!reactionAllowedAt(history.current, at)) {
-      setResting(true);
+    const wait = reactionWaitMs(history.current, at);
+    if (wait > 0) {
+      setRestUntil(at + wait);
       return;
     }
-    history.current = [...history.current.slice(-8), at];
+    history.current = [...history.current.filter((time) => at - time < REACTION_WINDOW_MS), at];
     onReact(reaction);
     setSent({ reaction, id: at });
-    setResting(!reactionAllowedAt(history.current, at));
+    const next = reactionWaitMs(history.current, at);
+    if (next > 0) setRestUntil(at + next);
   }
 
   return (

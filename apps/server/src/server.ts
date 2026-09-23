@@ -479,9 +479,9 @@ export async function startServer(
     for (const [ws, seat] of sessions) if (seat.room_id === roomId) send(ws, message);
   }
   /** Reactions are chat, not moves, so they are rate limited here rather than
-   *  receipted in the store. A burst is fine; a stream is not. The picker
-   *  applies the same shared rule, so a player sees the control rest for a beat
-   *  instead of sending calls that are dropped on arrival. */
+   *  receipted in the store. A run of taps is fine; a stream waits out a short
+   *  cooldown. The picker applies the same shared rule, so a player sees the
+   *  faces rest instead of sending calls that are dropped on arrival. */
   const reactionRate = new Map<string, number[]>();
   let nextReactionSweep = 0;
   function reactionAllowed(seatId: string) {

@@ -44,22 +44,32 @@ export const REACTION_LIST = Object.keys(REACTIONS) as ReactionName[];
 export const isReaction = (value: unknown): value is ReactionName =>
   typeof value === 'string' && Object.prototype.hasOwnProperty.call(REACTIONS, value);
 
-/** Two a second is plenty for delight and short of a nuisance. */
-export const REACTION_MIN_GAP_MS = 500;
-/** A short burst is fine; a stream is not. */
-export const REACTION_BURST = 4;
-export const REACTION_WINDOW_MS = 6000;
+/**
+ * Tapping away at a laugh is the point, so the limit is only there to stop a
+ * stuck key or a script from burying the board: ten in a row as fast as a
+ * thumb can go, and then a short cooldown until the first of them is four
+ * seconds old. Nobody is held for longer than that.
+ */
+export const REACTION_BURST = 10;
+export const REACTION_WINDOW_MS = 4000;
 
 /**
- * Whether one more reaction is allowed, given when the previous ones were sent.
+ * How long until one more reaction is allowed, given when the previous ones
+ * were sent: 0 when it can go now, otherwise the rest of the cooldown, which is
+ * never longer than the window. Times ahead of `now` are left out, so a clock
+ * that jumped back cannot hold anyone.
  *
  * The server holds the authoritative copy of this gate, and the picker uses the
- * same rule so a player can see the control rest for a beat rather than send
- * reactions that are quietly dropped on the way out.
+ * same rule so a player can see the faces rest for the cooldown rather than
+ * send reactions that are quietly dropped on the way out.
  */
-export function reactionAllowedAt(sentAt: readonly number[], now: number): boolean {
-  const recent = sentAt.filter((time) => now - time < REACTION_WINDOW_MS);
-  if (recent.length >= REACTION_BURST) return false;
-  const last = recent[recent.length - 1];
-  return last === undefined || now - last >= REACTION_MIN_GAP_MS;
+export function reactionWaitMs(sentAt: readonly number[], now: number): number {
+  const recent = sentAt
+    .filter((time) => time <= now && now - time < REACTION_WINDOW_MS)
+    .sort((a, b) => a - b);
+  if (recent.length < REACTION_BURST) return 0;
+  return recent[recent.length - REACTION_BURST]! + REACTION_WINDOW_MS - now;
 }
+
+export const reactionAllowedAt = (sentAt: readonly number[], now: number): boolean =>
+  reactionWaitMs(sentAt, now) === 0;
