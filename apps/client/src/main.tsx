@@ -60,6 +60,7 @@ import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { mountApp } from './mount-app.js';
 import {
   GameIcon,
@@ -1521,5 +1522,7 @@ if (resultsPreview) {
 } else if (designPreview) {
   void import('./dev/LoungePreview.js').then(({ LoungePreview }) => root.render(<LoungePreview />));
 } else {
-  root.render(<App />);
+  // mountApp has just removed the prerendered landing: commit in this same task, so no
+  // frame paints an empty page in between.
+  flushSync(() => root.render(<App />));
 }
