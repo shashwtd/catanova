@@ -113,7 +113,26 @@ export function topology(): Omit<Board, 'seed' | 'preset' | 'ports'> {
   return { hexes, vertices, edges };
 }
 
-/** Inspectable constraints: fairness means bounded extremes, not identical starting spots. */
+const red = (n: number) => n === 6 || n === 8;
+/**
+ * Numbers that may not share a border, and the issue each pairing raises. Red numbers together stack the
+ * likeliest rolls in one place, equal numbers pay out twice to every corner they share, and a 2 beside the 12
+ * leaves a patch of island that almost never produces. The official A–R number spiral never does any of these.
+ */
+const BORDER_RULES: [issue: string, clash: (a: number, b: number) => boolean][] = [
+  ['Adjacent red numbers', (a, b) => red(a) && red(b)],
+  ['Adjacent equal numbers', (a, b) => a > 0 && a === b],
+  ['Adjacent 2 and 12', (a, b) => (a === 2 && b === 12) || (a === 12 && b === 2)],
+];
+/** The generator tests these rules for every token it deals, so it reads them from a table by number pair. */
+const CLASHES = Array.from({ length: 13 }, (_, a) =>
+  Array.from({ length: 13 }, (_, b) => BORDER_RULES.some(([, clash]) => clash(a, b))),
+);
+
+/**
+ * Inspectable constraints: fairness means bounded extremes, not identical starting spots. These are the
+ * balanced-v2 rules; balanced-v1 boards in saved games predate the equal-number and 2/12 rules.
+ */
 export function fairnessIssues(board: Pick<Board, 'hexes' | 'vertices'>): string[] {
   const issues: string[] = [];
   for (const resource of RESOURCES) {
@@ -142,16 +161,32 @@ export function fairnessIssues(board: Pick<Board, 'hexes' | 'vertices'>): string
     if (production < Math.ceil(tiles.length * 2.5) || production > tiles.length * 4)
       issues.push(`${resource}: production outside range`);
   }
-  for (const h of board.hexes)
-    if (
-      (h.number === 6 || h.number === 8) &&
-      h.neighbors.some((n) => [6, 8].includes(board.hexes[n]!.number))
-    )
-      issues.push('Adjacent red numbers');
+  for (const [issue, clash] of BORDER_RULES)
+    for (const h of board.hexes)
+      if (h.neighbors.some((n) => clash(h.number, board.hexes[n]!.number))) issues.push(issue);
   for (const v of board.vertices)
     if (v.hexes.reduce((sum, h) => sum + pips(board.hexes[h]!.number), 0) > 11)
       issues.push('Intersection above 11 pips');
   return issues;
+}
+
+/**
+ * Deals the number tokens onto `land` in a uniformly random order, giving up as soon as a token lands beside one
+ * it may not touch. Every deal abandoned here would fail fairnessIssues anyway, so accepted numberings stay
+ * uniformly random among the valid ones, exactly as with whole shuffles; most failures just cost a few draws
+ * instead of a full check. Returns whether the deal completed.
+ */
+function dealNumbers(hexes: readonly Hex[], land: readonly Hex[], random: () => number): boolean {
+  const tokens: number[] = [...NUMBER_SPIRAL];
+  for (const h of land) h.number = 0;
+  for (let i = 0; i < land.length; i++) {
+    const j = i + Math.floor(random() * (tokens.length - i));
+    [tokens[i], tokens[j]] = [tokens[j]!, tokens[i]!];
+    const token = tokens[i]!;
+    if (land[i]!.neighbors.some((n) => CLASHES[token]![hexes[n]!.number])) return false;
+    land[i]!.number = token;
+  }
+  return true;
 }
 
 export function generateBoard(seed: number): Board {
@@ -170,11 +205,9 @@ export function generateBoard(seed: number): Board {
     }
     if (fairnessIssues(graph).some((issue) => issue.includes('cluster') || issue.includes('spread')))
       continue;
+    const land = graph.hexes.filter((h) => h.terrain !== 'desert');
     for (let attempt = 0; attempt < 20000; attempt++) {
-      const numbers = shuffle(NUMBER_SPIRAL, random);
-      let n = 0;
-      for (const h of graph.hexes) h.number = h.terrain === 'desert' ? 0 : numbers[n++]!;
-      if (fairnessIssues(graph).length) continue;
+      if (!dealNumbers(graph.hexes, land, random) || fairnessIssues(graph).length) continue;
       const coast = graph.edges
         .filter((e) => e.hexes.length === 1)
         .sort((a, b) => {
