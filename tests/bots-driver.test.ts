@@ -168,7 +168,8 @@ test('a move the rules refuse is tried three times, then replaced by the require
     assert.ok(attempts[1]! - attempts[0]! < attempts[2]! - attempts[1]!, 'each retry waits longer');
     assert.equal(store.snapshot(roomId).revision, before + 1);
     const game = store.loadGame(roomId)!;
-    assert.ok(game.dice, 'the bot rolled, which is all the rules require of it here');
+    assert.equal(game.players[game.active]!.id, bot.id);
+    assert.notEqual(game.phase, 'roll', 'the bot rolled, which is all the rules require of it here');
     assert.deepEqual(
       log.map((entry) => entry.event),
       ['bot_move_rejected', 'bot_move_rejected', 'bot_move_rejected', 'bot_move_rescued', 'bot_move'],
