@@ -70,6 +70,13 @@ export const STANDIN_AFTER_MS = 30 * 1000;
 export const STANDIN_LEVEL: BotLevel = 'sharp';
 type Absence = { disconnectedAt: number; resignAt: number };
 type JournalRow = { state: string; state_z: Uint8Array | null; board_hash: string | null };
+/**
+ * What a compact row keeps in its `state` column. Valid JSON on purpose: a
+ * server rolled back to a version from before compaction reads this column
+ * with json_extract, which fails outright on an empty string (breaking Return
+ * to Lobby) but just finds nothing in an empty object.
+ */
+const COMPACT_STATE = '{}';
 type Presence = { version?: 2; pausedAt?: number; seats: Record<string, Absence> };
 /**
  * A table nobody is sitting at is abandoned only once it has been empty for the
@@ -285,16 +292,17 @@ export class Store {
       CREATE TABLE IF NOT EXISTS journal_boards (hash TEXT PRIMARY KEY, board TEXT NOT NULL);
       /* Only rows still holding a whole game, so compaction finds the next batch
          without reading past every row it has already rewritten; empty once done. */
-      CREATE INDEX IF NOT EXISTS game_events_whole ON game_events(room_id, revision)
-        WHERE state <> '' AND state_z IS NULL;
+      DROP INDEX IF EXISTS game_events_whole;
+      CREATE INDEX IF NOT EXISTS game_events_whole_state ON game_events(room_id, revision)
+        WHERE state_z IS NULL;
     `);
     // The two facts anything outside the live game ever asked a journal row for.
     // Kept as plain columns so statistics and match records never have to open
     // a saved state; older rows are filled in once from the state they carry.
     this.db.exec(`
-      UPDATE game_events SET phase = json_extract(state, '$.phase') WHERE phase IS NULL AND state <> '';
+      UPDATE game_events SET phase = json_extract(state, '$.phase') WHERE phase IS NULL AND state_z IS NULL;
       UPDATE game_events SET dice_total = json_extract(state, '$.dice[0]') + json_extract(state, '$.dice[1]')
-        WHERE dice_total IS NULL AND state <> '' AND json_extract(public_entry, '$.kind') = 'roll';
+        WHERE dice_total IS NULL AND state_z IS NULL AND json_extract(public_entry, '$.kind') = 'roll';
     `);
     // Which rooms still have a game in play is asked several times a second by the
     // bot driver and again on every join; answering it from the saved state meant
@@ -857,7 +865,7 @@ export class Store {
         JSON.stringify(action),
         this.eventHead(roomId)?.state_hash ?? null,
         encoded.stateHash,
-        '',
+        COMPACT_STATE,
         encoded.compact,
         encoded.boardHash,
         JSON.stringify(entry),
@@ -886,7 +894,7 @@ export class Store {
   }
   /** A row's game as the exact JSON its hash was taken over. Older rows still carry it whole. */
   private journalText(row: JournalRow): string {
-    if (row.state !== '') return row.state;
+    if (row.state !== COMPACT_STATE && row.state !== '') return row.state;
     const board = this.db.prepare('SELECT board FROM journal_boards WHERE hash = ?').get(row.board_hash) as
       { board: string } | undefined;
     if (!row.state_z || !board)
@@ -938,7 +946,7 @@ export class Store {
     return this.transaction(() => {
       const rows = this.db
         .prepare(
-          "SELECT room_id, revision, state, state_hash FROM game_events WHERE state <> '' AND state_z IS NULL ORDER BY room_id, revision LIMIT ?",
+          'SELECT room_id, revision, state, state_hash FROM game_events WHERE state_z IS NULL ORDER BY room_id, revision LIMIT ?',
         )
         .all(limit) as { room_id: string; revision: number; state: string; state_hash: string }[];
       let compacted = 0;
@@ -956,9 +964,9 @@ export class Store {
           .run(encoded.boardHash, encoded.board);
         this.db
           .prepare(
-            "UPDATE game_events SET state = '', state_z = ?, board_hash = ? WHERE room_id = ? AND revision = ?",
+            'UPDATE game_events SET state = ?, state_z = ?, board_hash = ? WHERE room_id = ? AND revision = ?',
           )
-          .run(encoded.compact, encoded.boardHash, row.room_id, row.revision);
+          .run(COMPACT_STATE, encoded.compact, encoded.boardHash, row.room_id, row.revision);
         compacted++;
       }
       return { scanned: rows.length, compacted };

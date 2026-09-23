@@ -83,14 +83,13 @@ export function readMatches(db: DatabaseSync): {
     const row = endQuery.get(roomId, revision, floor) as
       { state: string; state_z: Uint8Array | null; board_hash: string | null } | undefined;
     if (!row) return undefined;
-    const board =
-      row.state === '' ? (boardQuery?.get(row.board_hash)?.board as string | undefined) : undefined;
-    const game =
-      row.state !== ''
-        ? (JSON.parse(row.state) as { phase?: string; finishReason?: string })
-        : row.state_z && board
-          ? decodeState(row.state_z, board)
-          : undefined;
+    const compactRow = row.state === '' || row.state === '{}';
+    const board = compactRow ? (boardQuery?.get(row.board_hash)?.board as string | undefined) : undefined;
+    const game = !compactRow
+      ? (JSON.parse(row.state) as { phase?: string; finishReason?: string })
+      : row.state_z && board
+        ? decodeState(row.state_z, board)
+        : undefined;
     return game ? { phase: game.phase, reason: game.finishReason } : undefined;
   };
   const actionsQuery =

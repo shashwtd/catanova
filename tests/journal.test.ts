@@ -134,7 +134,7 @@ test('each move is stored without its board, compressed, and reads back as exact
   }[];
   assert.ok(rows.length > 150);
   for (const row of rows) {
-    assert.equal(row.state, '', 'no row keeps a whole game');
+    assert.equal(row.state, '{}', 'no row keeps a whole game');
     const text = JSON.stringify(store.journalState(roomId, row.revision));
     assert.equal(createHash('sha256').update(text).digest('hex'), row.state_hash, `revision ${row.revision}`);
   }
