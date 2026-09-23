@@ -124,10 +124,14 @@
   border: 2px solid #c7aa70;
   overflow: hidden;
 }
-.feature-avatars svg {
+/* Laid out exactly as the game's .avatar-medallion svg, which this picture replaces. */
+.feature-avatars .avatar-medallion img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  border-radius: 9%;
 }
 .feature-crew figcaption {
   text-align: center;
@@ -232,11 +236,11 @@
   color: #70624c;
   font-weight: 600;
 }
-.feature-trade .resource-icon {
-  width: 72px;
-  height: 72px;
-  max-width: 100%;
-  justify-self: end;
+/* The size the game's .sprite gave these icons before they had their own files. */
+.feature-trade .feature-resource {
+  display: block;
+  width: 36px;
+  height: 36px;
 }
 .feature-trade b {
   font-size: 32px;

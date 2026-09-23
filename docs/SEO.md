@@ -10,7 +10,7 @@ Updated 11 September 2026. Catanova is live at **https://catanova.io**. The owne
 4. Use **URL inspection** for `https://catanova.io/` and `https://catanova.io/guide/`. Run the live test, check that fetching and indexing are allowed, and request indexing for these updated pages. Check the selected canonical URL after Google processes them.
 5. In **Performance → Search results**, watch queries, impressions, clicks and click-through rate over time. Check **Page indexing** for concrete errors before changing copy again.
 
-Do not upload an XML file to Google or submit room/invite links. The sitemap already lives on the server and is linked from `robots.txt`. Its two URLs are the public home and guide pages. No fabricated `lastmod`, priority or daily update claims are included. [Google sitemap submission](https://support.google.com/webmasters/answer/7451001), [URL inspection](https://support.google.com/webmasters/answer/9012289).
+Do not upload an XML file to Google or submit room/invite links. The sitemap already lives on the server and is linked from `robots.txt`. Its three URLs are the public home, guide and privacy pages. No fabricated `lastmod`, priority or daily update claims are included. [Google sitemap submission](https://support.google.com/webmasters/answer/7451001), [URL inspection](https://support.google.com/webmasters/answer/9012289).
 
 Also add or import the verified site in free [Bing Webmaster Tools](https://www.bing.com/webmasters/), submit that same sitemap, and inspect the two public URLs there. Submit changed public content; there is no reason to notify search engines about game turns. [Bing sitemap help](https://www.bing.com/webmasters/help/sitemaps-3b5cf6ed), [Bing URL inspection](https://www.bing.com/webmasters/help/url-inspection-55a30305).
 
@@ -34,10 +34,10 @@ Google says ordinary SEO practices also apply to its AI search features and requ
 
 ## Technical behavior to preserve
 
-- The production build prerenders the actual homepage. The guide is a standalone HTML page with no game bundle.
+- The production build prerenders the actual homepage. The guide and the privacy page are standalone HTML pages with no game bundle.
 - Each public page has its own title, description and canonical, plus Open Graph/large-card preview metadata. The code-composed, optimized 1200 × 630 social image at `/branding/social-card-v3.jpg` can be fetched without authentication. Its alt text is “Catanova — Build. Trade. Settle. Golden logo above a sunny island coast.”
 - Room URLs, legacy `?room=` invitations, authentication callbacks, APIs and health checks retain `X-Robots-Tag: noindex, nofollow`. Search directives do not replace authentication.
-- Unknown URLs return 404. `/guide` and alternate index paths redirect to their canonical addresses. Compression, cache validators and optimized art remain enabled.
+- Unknown URLs return 404. `/guide`, `/privacy` and alternate index paths redirect to their canonical addresses. Compression, cache validators and optimized art remain enabled.
 - No cookies, usernames, saved-room identifiers or Supabase credentials are embedded into public HTML or the sitemap. Keep development/staging sites private or host-wide noindex.
 
 Implementation: `apps/client/src/PublicPages.tsx`, `apps/client/src/EntryScreen.tsx`, `scripts/render-public-pages.ts` and `apps/server/src/static.ts`. Public-page tests check branding, rendered answers, metadata, icons and sitemap membership; HTTP tests check equal public responses for search user agents and private-route indexing headers.

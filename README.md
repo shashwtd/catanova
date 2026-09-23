@@ -24,7 +24,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all two to four seats are connected and everyone else is ready. The host can configure an optional turn timer in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all two to four seats are connected and everyone else is ready. New rooms start with a 90-second turn timer, which the host can change or switch off in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
 Game and construction tools sit at top left; settings and leave sit at bottom left during play. Player portraits on the right share the brighter piece colors through banners and edges, with prominent points, card counts, awards and a current-turn marker. An offline symbol covers a disconnected player's portrait. Glossy resource cards and the development hand share the bottom shelf, with Trade to the left of Roll/End. Both actions follow your turn; opponents answer live offers through a separate notice. Scroll/pinch to zoom the flat board, or drag to pan the island and wood table together. Each harbor has two bridges to its eligible coastal corners.
 
@@ -62,7 +62,7 @@ The default **balanced-v2** preset keeps the standard resource and number suppli
 - Each resource gets a reasonable share of production numbers: 2.5–4 pips per tile on average.
 - Nine separated ports with the familiar ratios, alternating with open sea around the coast like the official frame.
 
-Strong three-resource placements remain possible. Dice are independently random; there are no catch-up rolls. This is a named custom setup, separate from the official spiral/fixed presets. [Generation rules and tests](docs/MAP_GENERATION.md).
+Strong three-resource placements remain possible. New rooms use Balanced dice: each roll is drawn from a deck of the 36 dice combinations, refreshed after 24 rolls, and pairs matching the previous total are less likely, so rolls are not independent. The host can switch to Natural dice, which roll independently. Neither mode adjusts rolls for any player; there are no catch-up rolls. This is a named custom setup, separate from the official spiral/fixed presets. [Generation rules and tests](docs/MAP_GENERATION.md).
 
 ## One self-hostable distribution
 
