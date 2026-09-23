@@ -10,6 +10,8 @@ import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { Account, PublicAccount } from '../packages/protocol/src/profile.js';
 import { accountFailure } from '../apps/server/src/accounts.js';
 import { Connection, newSession } from '../apps/client/src/connection.js';
+import { PresenceSocket } from '../apps/client/src/presence-socket.js';
+import type { FriendPresenceChange } from '../packages/protocol/src/player-hub.js';
 import type { Identity } from '../apps/server/src/auth.js';
 
 async function fixture(t: TestContext) {
@@ -88,6 +90,7 @@ async function fixture(t: TestContext) {
     databasePath: ':memory:',
     now: () => now,
     heartbeatMs: 100,
+    presenceGraceMs: 500,
     auth: { url: `http://127.0.0.1:${address.port}`, publishableKey: 'sb_publishable_fixture' },
     verifyIdentity: verify,
   });
@@ -242,31 +245,18 @@ test('history and presence have per-account limits and unauthenticated floods ar
   assert.equal((await f.request('/api/account/presence', 'Captain', 'POST')).status, 200);
 });
 
-test('authenticated game sockets also keep their owner online while playing', async (t) => {
+test('an open game socket keeps its owner online, and closing it takes them offline after the grace', async (t) => {
   const f = await fixture(t);
-  // Wait for the heartbeat's refresh itself, not a guess at how long one takes on a busy machine.
-  const touchedAt: number[] = [];
-  const touch = AccountPresence.prototype.touch;
-  AccountPresence.prototype.touch = function (this: AccountPresence, ...args: Parameters<typeof touch>) {
-    touchedAt.push(args[1]);
-    return touch.apply(this, args);
-  };
-  t.after(() => {
-    AccountPresence.prototype.touch = touch;
-  });
   const client = new Connection(f.server.url, newSession('Builder'), { accessToken: async () => 'Builder' });
   t.after(() => client.stop());
   client.start();
   await until(() => client.status === 'connected');
-  let friends = await (await f.request('/api/friends', 'Captain')).json();
-  assert.equal(friends.friends[0].online, true);
-  f.advance(ACCOUNT_PRESENCE_TTL_MS - 1);
-  const advanced = f.now();
-  await until(() => touchedAt.includes(advanced));
-  f.advance(2);
-  friends = await (await f.request('/api/friends', 'Captain')).json();
-  assert.equal(friends.friends[0].online, true, 'transport pongs refresh authenticated presence');
-  // Observe authoritative transport closure before advancing the simulated clock.
+  const builder = async () => (await (await f.request('/api/friends', 'Captain')).json()).friends[0];
+  assert.equal((await builder()).online, true);
+  // No heartbeat is needed while the socket is open, however much time passes.
+  f.advance(ACCOUNT_PRESENCE_TTL_MS * 10);
+  assert.equal((await builder()).online, true, 'an open socket is presence enough');
+  // Observe authoritative transport closure before looking again.
   const closed = new Promise<void>((resolve) => {
     const original = f.server.store.setConnected.bind(f.server.store);
     f.server.store.setConnected = (seat, connected) => {
@@ -276,9 +266,108 @@ test('authenticated game sockets also keep their owner online while playing', as
   });
   client.stop();
   await closed;
-  f.advance(ACCOUNT_PRESENCE_TTL_MS + 1);
-  friends = await (await f.request('/api/friends', 'Captain')).json();
-  assert.equal(friends.friends[0].online, false);
+  assert.equal((await builder()).online, true, 'a reload within the grace does not flicker offline');
+  const deadline = Date.now() + 5000;
+  while ((await builder()).online) {
+    if (Date.now() > deadline) throw new Error('Still online after the grace');
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.equal(
+    (await builder()).lastSeenAt,
+    f.now(),
+    'last seen is when they left, not their last heartbeat',
+  );
+});
+
+test('friends hear each other arrive and leave over the presence socket, as it happens', async (t) => {
+  const f = await fixture(t);
+  const builderId = f.accounts.get('Builder')!.id;
+  const heard: FriendPresenceChange[] = [];
+  const captain = new PresenceSocket({
+    url: f.server.url,
+    accessToken: async () => 'Captain',
+    onFriend: (change) => heard.push(change),
+  });
+  t.after(() => captain.stop());
+  captain.start();
+  // The snapshot follows the accepted socket once the friends list has loaded.
+  await until(() => heard.length > 0);
+  assert.deepEqual(heard, [{ id: builderId, online: false }], 'told where each friend is on joining');
+  const builder = new PresenceSocket({
+    url: f.server.url,
+    accessToken: async () => 'Builder',
+    onFriend: () => {},
+  });
+  t.after(() => builder.stop());
+  builder.start();
+  await until(() => heard.some((change) => change.id === builderId && change.online));
+  assert.equal((await (await f.request('/api/friends', 'Captain')).json()).friends[0].online, true);
+  assert.deepEqual(
+    f.server.runtime.online().map(({ name, guest, tabs }) => ({ name, guest, tabs })),
+    [
+      { name: 'Captain', guest: false, tabs: 1 },
+      { name: 'Builder', guest: false, tabs: 1 },
+    ],
+    'the admin console sees who is here',
+  );
+  f.advance(3_600_000 - 1);
+  builder.stop();
+  await until(() => heard.at(-1)?.online === false);
+  assert.deepEqual(heard.at(-1), { id: builderId, online: false, lastSeenAt: f.now() });
+  assert.equal((await (await f.request('/api/friends', 'Captain')).json()).friends[0].online, false);
+});
+
+test('a friend starting or finishing a game reaches friends as a watch link at once', async (t) => {
+  const f = await fixture(t);
+  const builderId = f.accounts.get('Builder')!.id;
+  const heard: FriendPresenceChange[] = [];
+  const captain = new PresenceSocket({
+    url: f.server.url,
+    accessToken: async () => 'Captain',
+    onFriend: (change) => heard.push(change),
+  });
+  const builder = new PresenceSocket({
+    url: f.server.url,
+    accessToken: async () => 'Builder',
+    onFriend: () => {},
+  });
+  t.after(() => {
+    captain.stop();
+    builder.stop();
+  });
+  captain.start();
+  await until(() => captain.isConnected);
+  builder.start();
+  await until(() => heard.some((change) => change.id === builderId && change.online));
+  const roomId = await f.room(['Builder', 'Trader']);
+  f.server.runtime.broadcast(roomId);
+  await until(() => heard.at(-1)?.watchable !== undefined);
+  assert.deepEqual(heard.at(-1), {
+    id: builderId,
+    online: true,
+    watchable: { roomId, roomCode: f.server.store.roomCode(roomId) },
+  });
+  const game = f.server.store.loadGame(roomId)!;
+  game.phase = 'finished';
+  f.server.store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(JSON.stringify(game), roomId);
+  f.server.runtime.broadcast(roomId);
+  await until(() => heard.at(-1)?.watchable === undefined);
+  assert.deepEqual(heard.at(-1), { id: builderId, online: true });
+});
+
+test('a server without accounts turns presence sockets away once, without retrying', async (t) => {
+  const server = await startServer({ port: 0, databasePath: ':memory:', auth: null });
+  t.after(() => server.close());
+  const socket = new PresenceSocket({
+    url: server.url,
+    accessToken: async () => 'anyone',
+    onFriend: () => {},
+  });
+  t.after(() => socket.stop());
+  socket.start();
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  assert.equal(socket.isConnected, false);
+  assert.deepEqual(server.runtime.online(), []);
 });
 
 test('presence entries are bounded and never outlive a verified identity deadline', () => {

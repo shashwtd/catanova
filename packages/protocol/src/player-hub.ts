@@ -35,6 +35,14 @@ export function parseAccountPrivacy(value: unknown): AccountPrivacy {
   const v = value && typeof value === 'object' ? (value as Partial<AccountPrivacy>) : {};
   return { shareLastSeen: typeof v.shareLastSeen === 'boolean' ? v.shareLastSeen : true };
 }
+/** One friend's presence as it changes, pushed over the presence socket. */
+export type FriendPresenceChange = {
+  id: string;
+  online: boolean;
+  /** As in `FriendPresenceState`: only when offline, and only if they share it. */
+  lastSeenAt?: number;
+  watchable?: { roomId: string; roomCode?: string };
+};
 export type FriendPresenceState = Omit<FriendsState, 'friends'> & {
   friends: (PublicAccount & {
     online: boolean;

@@ -3,7 +3,8 @@ import type { FriendPresenceState } from '../../../packages/protocol/src/player-
 
 export const ACCOUNT_PRESENCE_TTL_MS = 75_000;
 /**
- * Online means a verified app/socket heartbeat was received recently.
+ * Online means an open socket (see `PresenceHub`, passed in as `live`) or, from
+ * an older client that still sends them, a verified heartbeat received recently.
  *
  * Presence itself still holds no room data and no history: what a friend is
  * allowed to know about someone who is *not* online — whether they were here
@@ -13,7 +14,10 @@ export const ACCOUNT_PRESENCE_TTL_MS = 75_000;
 export class AccountPresence {
   private readonly deadlines = new Map<string, number>();
   private nextSweep = 0;
-  constructor(private readonly maxAccounts = 10_000) {}
+  constructor(
+    private readonly maxAccounts = 10_000,
+    private readonly live?: (userId: string) => boolean,
+  ) {}
   touch(userId: string, now: number, validUntil = Infinity) {
     if (now >= this.nextSweep || this.deadlines.size >= this.maxAccounts) {
       for (const [id, deadline] of this.deadlines) if (deadline <= now) this.deadlines.delete(id);
@@ -24,6 +28,10 @@ export class AccountPresence {
     this.deadlines.set(userId, Math.min(now + ACCOUNT_PRESENCE_TTL_MS, validUntil));
   }
   online(userId: string, now: number) {
+    return (this.live?.(userId) ?? false) || this.heartbeat(userId, now);
+  }
+  /** A heartbeat alone, without the live sockets. */
+  heartbeat(userId: string, now: number) {
     return (this.deadlines.get(userId) ?? 0) > now;
   }
   /** `watchable` and `lastSeen` are supplied by the caller, which owns the
