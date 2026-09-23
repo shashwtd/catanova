@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from 'react';
 import type {
   GameDetail as Detail,
   GameListItem,
+  GameResult,
   GamesPage,
   PrivateGameState,
   RoomStatus,
@@ -52,33 +53,63 @@ export function StatusBadge({ status }: { status: RoomStatus }) {
   return <Badge tone={STATUS_TONE[status]}>{status}</Badge>;
 }
 
-/** A seat as a compact chip: name plus what is going on with it. */
-export function SeatChip({ seat }: { seat: SeatSummary }) {
+/**
+ * A seat as a compact chip: name, points once a game is on, and what is going
+ * on with it. Connection only matters while a game can still be played, so a
+ * finished game's seats are never flagged offline.
+ */
+export function SeatChip({
+  seat,
+  points,
+  winner = false,
+  over = false,
+}: {
+  seat: SeatSummary;
+  points?: number | null;
+  winner?: boolean;
+  over?: boolean;
+}) {
   const flags = [
     seat.bot ? `bot${seat.botLevel ? ` · ${seat.botLevel}` : ''}` : null,
-    seat.standIn ? 'bot standing in' : null,
+    !over && seat.standIn ? 'bot standing in' : null,
     seat.resigned ? 'resigned' : null,
     seat.departed ? 'left' : null,
-    !seat.bot && !seat.connected && !seat.resigned && !seat.departed ? 'offline' : null,
+    !over && !seat.bot && !seat.connected && !seat.resigned && !seat.departed ? 'offline' : null,
   ].filter(Boolean);
   const state =
     seat.resigned || seat.departed
       ? 'gone'
-      : seat.bot || seat.standIn
+      : seat.bot || (!over && seat.standIn)
         ? 'bot'
-        : seat.connected
-          ? 'on'
-          : 'off';
+        : over
+          ? 'done'
+          : seat.connected
+            ? 'on'
+            : 'off';
   return (
-    <span className={`seat seat-${state}`} title={flags.join(', ') || 'connected'}>
+    <span className={`seat seat-${state}`} title={flags.join(', ') || (over ? 'played' : 'connected')}>
       <i aria-hidden="true" />
       {seat.name}
+      {points !== undefined && points !== null && (
+        <span className="seat-points" title={`${points} points`}>
+          {points}
+          {winner && ' ★'}
+        </span>
+      )}
       {flags.length > 0 && <span className="seat-flags">{flags.join(' · ')}</span>}
     </span>
   );
 }
 
+const RESULT_TEXT: Record<GameResult['reason'], (winner: string | null) => string> = {
+  points: (winner) => `${winner ?? 'Someone'} won`,
+  resignation: (winner) => `${winner ?? 'Someone'} won by resignation`,
+  abandoned: () => 'No winner',
+};
+
 function GameRow({ game, now }: { game: GameListItem; now: number }) {
+  const over = game.status === 'finished';
+  const seated = game.players.length;
   return (
     <tr>
       <td>
@@ -90,18 +121,35 @@ function GameRow({ game, now }: { game: GameListItem; now: number }) {
         <StatusBadge status={game.status} />
         {game.error && <Badge tone="critical">{game.error}</Badge>}
       </td>
-      <td className="seats">
-        {game.players.map((seat) => (
-          <SeatChip key={seat.id} seat={seat} />
-        ))}
+      <td className="cell-wide">
+        <div className="seats">
+          {game.players.map((seat) => (
+            <SeatChip
+              key={seat.id}
+              seat={seat}
+              points={seat.points}
+              winner={game.result?.winnerId === seat.id}
+              over={over}
+            />
+          ))}
+        </div>
       </td>
-      <td>{game.phase ?? '—'}</td>
-      <td className="num">{game.turn ?? '—'}</td>
-      <td className="num">{game.revision}</td>
-      <td className="nowrap">
+      <td className="nowrap cell-wide">
+        {game.result ? (
+          RESULT_TEXT[game.result.reason](game.result.winner)
+        ) : game.turn !== null ? (
+          <>
+            Turn {game.turn}
+            <span className="muted"> · {phaseLabel(game.phase).toLowerCase()}</span>
+          </>
+        ) : (
+          <span className="muted">{seated} seated</span>
+        )}
+      </td>
+      <td className="nowrap hide-phone">
         <When at={game.createdAt} now={now} />
       </td>
-      <td className="nowrap">
+      <td className="nowrap cell-end">
         <When at={game.lastActivity} now={now} />
       </td>
     </tr>
@@ -180,16 +228,14 @@ export function Games({ params }: { params: URLSearchParams }) {
           actions={loading ? <span className="muted">Refreshing…</span> : undefined}
           className="wide"
         >
-          <Table className="games">
+          <Table className="games stacked">
             <thead>
               <tr>
                 <th>Room</th>
                 <th>Status</th>
                 <th>Players</th>
-                <th>Phase</th>
-                <th className="num">Turn</th>
-                <th className="num">Rev</th>
-                <th>Started</th>
+                <th>Game</th>
+                <th className="hide-phone">Started</th>
                 <th>Active</th>
               </tr>
             </thead>
@@ -650,7 +696,8 @@ export function GameDetail({ roomId }: { roomId: string }) {
               return (
                 <tr key={seat.id}>
                   <td>
-                    <SeatChip seat={seat} />
+                    <SeatChip seat={seat} over={data.status === 'finished'} />
+                    {game?.winner === seat.id && <span className="seat-points"> ★ winner</span>}
                     {!game && seat.ready && <Badge tone="good">ready</Badge>}
                   </td>
                   <td>

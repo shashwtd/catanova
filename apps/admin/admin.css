@@ -516,6 +516,13 @@ table.metrics .metric-share {
 .seat-bot i {
   background: var(--series-1);
 }
+.seat-done i {
+  background: var(--muted);
+}
+.seat-points {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
 .seat-gone {
   color: var(--muted);
   text-decoration: line-through;
@@ -697,6 +704,9 @@ details > summary {
 
 /* Phones */
 @media (max-width: 700px) {
+  .hide-phone {
+    display: none;
+  }
   :root {
     font-size: 15px;
   }
@@ -731,5 +741,34 @@ details > summary {
   dl.pairs .pair {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+  /* A stacked table's rows become small cards: its first cells side by side,
+     the end cell at the right of that line, and wide cells on lines below. */
+  table.stacked,
+  table.stacked tbody {
+    display: block;
+  }
+  table.stacked thead {
+    display: none;
+  }
+  table.stacked tr {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 9px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.stacked td {
+    padding: 0;
+    border: 0;
+  }
+  table.stacked .cell-wide {
+    grid-column: 1 / -1;
+  }
+  table.stacked .cell-end {
+    grid-row: 1;
+    grid-column: 3;
+    text-align: right;
   }
 }

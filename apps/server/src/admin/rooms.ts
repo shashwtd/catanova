@@ -10,6 +10,7 @@
  */
 import type { Store } from '../store.js';
 import { ProtocolError, ROOM_CODE_LEASE_MS, STANDIN_AFTER_MS } from '../store.js';
+import { score } from '../../../../packages/rules/src/game.js';
 import type { Game } from '../../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
 import { isPlayerColor, seatColors } from '../../../../packages/protocol/src/colors.js';
@@ -22,6 +23,7 @@ import type { RoomIndex } from './room-index.js';
 import type {
   GameDetail,
   GameListItem,
+  GameResult,
   GamesPage,
   PrivateGameState,
   RoomStatus,
@@ -96,6 +98,16 @@ function tableColors(seats: SeatRow[], game: Game | undefined): Map<string, Play
   );
   const colors = seatColors(table);
   return new Map(table.map((seat, index) => [seat.id, colors[index]!]));
+}
+
+/** How a finished game ended, as its table was told; null while it is still being played. */
+export function gameResult(game: Game): GameResult | null {
+  if (game.phase !== 'finished') return null;
+  return {
+    winner: game.players.find((player) => player.id === game.winner)?.name ?? null,
+    winnerId: game.winner,
+    reason: !game.winner ? 'abandoned' : game.finishReason === 'resignation' ? 'resignation' : 'points',
+  };
 }
 
 /** A started game's players in turn order; a lobby's seats still in it. */
@@ -176,7 +188,11 @@ export async function listGames(
       revision: room.revision,
       createdAt: roundStartedAt(store, room.id),
       lastActivity: room.lastActivity,
-      players: tableSeats(seatRows(store, room.id), game, live),
+      players: tableSeats(seatRows(store, room.id), game, live).map((seat) => {
+        const player = game?.players.find((candidate) => candidate.id === seat.id);
+        return { ...seat, points: game && player ? score(game, player, !!game.winner) : null };
+      }),
+      result: game ? gameResult(game) : null,
       ...(error ? { error } : {}),
     };
   });

@@ -25,7 +25,7 @@ import type {
 import { Connection, newSession } from '../apps/client/src/connection.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../packages/protocol/src/index.js';
-import { emptyHand, gameView, robberVictims } from '../packages/rules/src/game.js';
+import { emptyHand, gameView, robberVictims, score } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { readyLobby } from './helpers.js';
@@ -301,6 +301,18 @@ test('games are listed by status and searchable, and a game’s detail shows its
   const pausedItem = (await get<GamesPage>('/api/admin/games?status=paused')).items[0]!;
   assert.equal(pausedItem.roomId, paused);
   assert.ok(pausedItem.players.every((player) => !player.connected && player.userId));
+  // Points are what the table sees: no hidden victory point cards before a winner reveals them.
+  const pausedGame = store.loadGame(paused)!;
+  assert.deepEqual(
+    pausedItem.players.map((player) => player.points),
+    pausedGame.players.map((player) => score(pausedGame, player, false)),
+  );
+  assert.equal(pausedItem.result, null);
+  assert.ok(
+    (await get<GamesPage>('/api/admin/games?status=lobby')).items[0]!.players.every(
+      (player) => player.points === null,
+    ),
+  );
   // Search by room code, by player name, by a fragment, and for nobody.
   for (const q of [
     store.roomCode(paused)!,
@@ -497,8 +509,10 @@ test('ending a game finishes it as abandoned, journals and audits it, and pushes
   // Both connected players are sent the finished game.
   await until(() => clients.every((client) => client.state?.game?.phase === 'finished'), 'the finished game');
   assert.ok(clients.every((client) => client.state!.game!.finishReason === 'abandoned'));
-  // The room is now listed as finished and cannot be ended twice; a lobby has nothing to end.
-  assert.equal((await get<GamesPage>('/api/admin/games?status=finished')).items[0]!.roomId, live);
+  // The room is now listed as finished, with no winner, and cannot be ended twice; a lobby has nothing to end.
+  const finishedItem = (await get<GamesPage>('/api/admin/games?status=finished')).items[0]!;
+  assert.equal(finishedItem.roomId, live);
+  assert.deepEqual(finishedItem.result, { winner: null, winnerId: null, reason: 'abandoned' });
   assert.equal((await get<GameDetail>(`/api/admin/games/${live}`)).canEnd, false);
   await post(`/api/admin/games/${live}/end`, { confirm: code }, 409);
   await post(`/api/admin/games/${lobby}/end`, { confirm: store.roomCode(lobby) }, 409);

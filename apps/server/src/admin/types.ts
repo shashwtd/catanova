@@ -90,6 +90,13 @@ export type SeatSummary = {
   accountType: string | null;
 };
 
+/** How a finished game ended, as the table was told: by points, because everyone else resigned, or with no winner. */
+export type GameResult = {
+  winner: string | null;
+  winnerId: string | null;
+  reason: 'points' | 'resignation' | 'abandoned';
+};
+
 export type GameListItem = {
   roomId: string;
   roomCode: string | null;
@@ -97,9 +104,12 @@ export type GameListItem = {
   phase: string | null;
   turn: number | null;
   revision: number;
+  /** When this round's game started. */
   createdAt: number | null;
   lastActivity: number | null;
-  players: SeatSummary[];
+  /** `points` are what the table sees: victory point cards count once a winner reveals them. */
+  players: (SeatSummary & { points: number | null })[];
+  result: GameResult | null;
   error?: string;
 };
 
