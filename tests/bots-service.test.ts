@@ -106,3 +106,68 @@ test('a bot whose decision service is down plays exactly as a bot with no servic
   assert.deepEqual(outage.moves, offline.moves, 'every move matches the keyless bot');
   assert.equal(outage.game.winner, offline.game.winner);
 });
+
+test('after three failures in a row the client stops asking, and tries again after a minute', async () => {
+  const question = { move: choice('Which?', { a: 1, b: 2 }) };
+  let clock = 0,
+    requests = 0,
+    answering = false;
+  const client = createJevClient({
+    route: { url: 'https://stub.invalid', model: 'stub', key: 'stub' },
+    timeoutMs: 150,
+    now: () => clock,
+    // A hung service: nothing comes back until the client gives up waiting.
+    fetchImpl: ((_url: string, init: RequestInit) => {
+      requests++;
+      if (answering)
+        return Promise.resolve(
+          new Response(JSON.stringify({ answers: { move: { type: 'choice', choice: 'a' } } })),
+        );
+      return new Promise((_, reject) =>
+        init.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))),
+      );
+    }) as typeof fetch,
+  })!;
+  const ask = async () => {
+    const started = performance.now();
+    const ok = await client.evaluate({}, question).then(
+      () => true,
+      (error) => {
+        assert.ok(error instanceof JevUnavailable, 'every failure is the service being unavailable');
+        return false;
+      },
+    );
+    return { ok, ms: performance.now() - started };
+  };
+
+  // The first three each wait out the whole timeout, as every request used to.
+  for (let i = 0; i < 3; i++) {
+    const asked = await ask();
+    assert.equal(asked.ok, false);
+    assert.ok(asked.ms >= 100, `a hung request waits for the timeout (${asked.ms.toFixed(0)} ms)`);
+  }
+  // Then the client stops asking: no request goes out and nothing waits.
+  for (let i = 0; i < 50; i++) {
+    const asked = await ask();
+    assert.equal(asked.ok, false);
+    assert.ok(asked.ms < 100, `a resting client answers at once (${asked.ms.toFixed(0)} ms)`);
+  }
+  assert.equal(requests, 3, 'nothing was sent while resting');
+
+  // A minute later exactly one request goes out to see whether it is back,
+  // and a decision that comes along meanwhile is not held up behind it.
+  clock += 60_000;
+  const [probe, meanwhile] = await Promise.all([ask(), ask()]);
+  assert.equal(requests, 4, 'one probe');
+  assert.equal(probe.ok, false);
+  assert.ok(meanwhile.ms < 100, 'nobody waits behind the probe');
+  assert.equal((await ask()).ok, false);
+  assert.equal(requests, 4, 'a failed probe starts another rest');
+
+  // Once the service answers again, so does the client, every time.
+  answering = true;
+  clock += 60_000;
+  assert.equal((await ask()).ok, true);
+  assert.equal((await ask()).ok, true);
+  assert.equal(requests, 6);
+});

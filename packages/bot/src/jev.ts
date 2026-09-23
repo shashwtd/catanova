@@ -116,14 +116,20 @@ export type JevClient = {
 };
 
 export function createJevClient(
-  options: { route?: Route | null; timeoutMs?: number; fetchImpl?: typeof fetch } = {},
+  options: {
+    route?: Route | null;
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+    /** Injectable so tests can move through the breaker's rest. */
+    now?: () => number;
+  } = {},
 ): JevClient | null {
   const chosen = options.route === undefined ? route() : options.route;
   if (!chosen) return null;
   const timeoutMs = options.timeoutMs ?? 8000;
   const doFetch = options.fetchImpl ?? fetch;
 
-  return {
+  return withBreaker(options.now ?? Date.now, {
     model: chosen.model,
     async evaluate(state, questions) {
       const headers = {
@@ -171,6 +177,49 @@ export function createJevClient(
         latencyMs: Date.now() - started,
         model: String(payload?.model ?? chosen.model),
       };
+    },
+  });
+}
+
+/** Failures in a row before the client stops asking, and for how long. */
+const BREAKER = { failures: 3, restMs: 60_000 } as const;
+
+/**
+ * Stop asking a service that has stopped answering.
+ *
+ * A request to a service that hangs holds the bot's move for the whole
+ * timeout, and in an outage every decision that needed judgement paid it:
+ * eight seconds at a time, well over a hundred times in a game of four bots.
+ * So after a few failures in a row this fails at once, without a request, and
+ * the bots play from their own judgement at full speed. When the rest is over
+ * one request is let through to see whether the service is back: a success
+ * opens it up again, another failure starts another rest.
+ *
+ * The count is shared by every seat the client serves, which on the server is
+ * every bot, so one table finding the service down spares all the others.
+ */
+function withBreaker(now: () => number, client: JevClient): JevClient {
+  let failures = 0;
+  let restingUntil = 0;
+  let probing = false;
+  return {
+    model: client.model,
+    async evaluate(state, questions) {
+      const tripped = failures >= BREAKER.failures;
+      if (tripped && (probing || now() < restingUntil))
+        throw new JevUnavailable(`decision service skipped after ${failures} failures in a row`);
+      if (tripped) probing = true;
+      try {
+        const evaluation = await client.evaluate(state, questions);
+        failures = 0;
+        return evaluation;
+      } catch (error) {
+        if (error instanceof JevUnavailable && ++failures >= BREAKER.failures)
+          restingUntil = now() + BREAKER.restMs;
+        throw error;
+      } finally {
+        if (tripped) probing = false;
+      }
     },
   };
 }
