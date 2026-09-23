@@ -179,3 +179,86 @@ test('a move the rules refuse is tried three times, then replaced by the require
     store.close();
   }
 });
+
+/** The store as the driver sees it, counting every call the driver makes, and
+ *  listing exactly the rooms given whatever the store's own query would say. */
+function counted(store: Store, rooms: string[]) {
+  const calls: Record<string, number> = {};
+  const count = (name: string) => (calls[name] = (calls[name] ?? 0) + 1);
+  const proxy = new Proxy(store, {
+    get(target, key) {
+      if (key === 'botRooms')
+        return () => {
+          count('botRooms');
+          return rooms;
+        };
+      const value = Reflect.get(target, key);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        count(String(key));
+        return value.apply(target, args);
+      };
+    },
+  });
+  return { store: proxy, calls };
+}
+
+test('a finished or paused room costs a read or two a tick, and nothing else', async () => {
+  const decisions: string[] = [];
+  const driverFor = (store: Store) =>
+    new BotDriver({
+      store,
+      changed: () => {},
+      jev: null,
+      now: () => 0,
+      decide: async () => {
+        decisions.push('asked');
+        throw new Error('a dead room is never thought about');
+      },
+    });
+
+  // A finished game: the host left, so the bot won by resignation.
+  const finished = new Store(':memory:');
+  try {
+    const host = finished.enter('create', newSession('A').token, 'A');
+    finished.lobby(
+      host,
+      'add-bot',
+      finished.snapshot(host.room_id).revision,
+      false,
+      undefined,
+      undefined,
+      true,
+    );
+    finished.action(host, 'start', finished.snapshot(host.room_id).revision, { kind: 'start' });
+    finished.leave(host, 'leave', finished.snapshot(host.room_id).revision);
+    assert.equal(finished.loadGame(host.room_id)!.phase, 'finished');
+    const { store, calls } = counted(finished, [host.room_id]);
+    const driver = driverFor(store);
+    await driver.tick();
+    await driver.tick();
+    assert.deepEqual(calls, { botRooms: 2, loadGame: 2 }, 'the game alone shows it is over');
+  } finally {
+    finished.close();
+  }
+
+  // A paused table: the only person there disconnected.
+  const paused = new Store(':memory:', { trackPresence: true });
+  try {
+    const host = paused.enter('create', newSession('A').token, 'A');
+    paused.lobby(host, 'add-bot', paused.snapshot(host.room_id).revision, false, undefined, undefined, true);
+    paused.setConnected(host, true);
+    paused.action(host, 'start', paused.snapshot(host.room_id).revision, { kind: 'start' });
+    paused.setConnected(host, false);
+    assert.ok(paused.snapshot(host.room_id).paused);
+    const { store, calls } = counted(paused, [host.room_id]);
+    const driver = driverFor(store);
+    await driver.tick();
+    await driver.tick();
+    assert.deepEqual(calls, { botRooms: 2, loadGame: 2, snapshot: 2 }, 'no seat lookup behind the pause');
+  } finally {
+    paused.close();
+  }
+
+  assert.deepEqual(decisions, [], 'and neither was ever thought about');
+});

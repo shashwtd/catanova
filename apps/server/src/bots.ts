@@ -154,15 +154,16 @@ export class BotDriver {
 
   /** One pass over every room that currently owes a bot move. */
   async tick(): Promise<void> {
-    const rooms = this.dependencies.store.botRooms();
-    for (const roomId of this.pending.keys()) if (!rooms.includes(roomId)) this.pending.delete(roomId);
-    for (const roomId of this.retryAt.keys()) if (!rooms.includes(roomId)) this.retryAt.delete(roomId);
-    for (const roomId of this.failures.keys()) if (!rooms.includes(roomId)) this.failures.delete(roomId);
+    const rooms = new Set(this.dependencies.store.botRooms());
+    for (const roomId of [...this.pending.keys(), ...this.retryAt.keys(), ...this.failures.keys()])
+      if (!rooms.has(roomId)) this.forget(roomId);
     for (const roomId of rooms) {
       if (this.busy.has(roomId) || (this.retryAt.get(roomId) ?? 0) > this.now()) continue;
       this.busy.add(roomId);
       try {
-        await this.playRoom(roomId);
+        const live = this.live(roomId);
+        if (live) await this.playRoom(roomId, live.game, live.revision);
+        else this.forget(roomId);
       } catch (error) {
         // Whatever broke, the room is tried again later rather than on every
         // tick, and a room that cannot even be read backs off to once a minute.
@@ -175,21 +176,40 @@ export class BotDriver {
     }
   }
 
-  private async playRoom(roomId: string): Promise<void> {
+  /**
+   * The game and revision of a room that could owe a bot a move, or null for
+   * one that cannot: a finished game, or a table the store has paused because
+   * nobody is sitting at it. This runs before any other work for the room, and
+   * as cheaply as the store allows: the game alone shows it is finished, and
+   * only a running game pays for the snapshot that says whether it is paused.
+   * So a dead room costs a read or two a tick, whatever lists it, and never a
+   * seat lookup, a decision or a queued move.
+   */
+  private live(roomId: string): { game: Game; revision: number } | null {
     const { store } = this.dependencies;
-    const now = this.now();
     const game = store.loadGame(roomId);
+    if (!game || game.phase === 'finished') return null;
     const state = store.snapshot(roomId);
-    const seat = game && this.owedBy(roomId, game);
-    if (!game || game.phase === 'finished' || state.paused || !seat) {
-      this.pending.delete(roomId);
-      this.retryAt.delete(roomId);
-      this.failures.delete(roomId);
+    return state.paused ? null : { game, revision: state.revision };
+  }
+
+  /** Drop everything held for a room that owes no move. */
+  private forget(roomId: string): void {
+    this.pending.delete(roomId);
+    this.retryAt.delete(roomId);
+    this.failures.delete(roomId);
+  }
+
+  private async playRoom(roomId: string, game: Game, revision: number): Promise<void> {
+    const now = this.now();
+    const seat = this.owedBy(roomId, game);
+    if (!seat) {
+      this.forget(roomId);
       return;
     }
     // Failures only count against one position: once anybody has moved, the
     // next attempt starts from a clean slate.
-    if (this.failures.get(roomId)?.revision !== state.revision) this.failures.delete(roomId);
+    if (this.failures.get(roomId)?.revision !== revision) this.failures.delete(roomId);
     // A seat that has gone back to its owner and been dropped again starts
     // from a clean plan: the one the last stand-in was following belonged to a
     // position several turns old.
@@ -198,7 +218,7 @@ export class BotDriver {
       this.standInPlans.delete(seat.id);
     }
     const waiting = this.pending.get(roomId);
-    if (waiting && waiting.revision === state.revision && waiting.seat.id === seat.id) {
+    if (waiting && waiting.revision === revision && waiting.seat.id === seat.id) {
       if (waiting.readyAt > now) return;
       this.pending.delete(roomId);
       this.commit(roomId, waiting);
@@ -207,7 +227,7 @@ export class BotDriver {
     // A player action, disconnect or timeout invalidates any queued decision.
     this.pending.delete(roomId);
     if ((this.failures.get(roomId)?.count ?? 0) >= RESCUE_AFTER) {
-      this.rescue(roomId, state.revision, game, seat);
+      this.rescue(roomId, revision, game, seat);
       return;
     }
     const startedAt = now;
@@ -228,7 +248,7 @@ export class BotDriver {
         ...(style ? { standIn: style } : {}),
       });
     } catch (error) {
-      this.failed(roomId, state.revision, 'bot_decision_failed', {
+      this.failed(roomId, revision, 'bot_decision_failed', {
         seat: seat.name,
         error: (error as Error).message,
       });
@@ -240,7 +260,7 @@ export class BotDriver {
     // Wait before committing, including the very first bot move. Keep the
     // decision so scheduler ticks during the pause never spend more API tokens.
     this.pending.set(roomId, {
-      revision: state.revision,
+      revision,
       game,
       seat,
       decision,
