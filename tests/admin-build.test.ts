@@ -11,6 +11,7 @@ import { Columns, LineChart, PlayerColour } from '../apps/admin/ui.js';
 import { parseRoute } from '../apps/admin/route.js';
 import { accountLabel, clock, diceLabel, localWindows, timeTicks } from '../apps/admin/format.js';
 import { fairness } from '../apps/admin/pages/Stats.js';
+import { detailPairs } from '../apps/admin/pages/Audit.js';
 import { diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
 import { PLAYER_COLORS } from '../packages/protocol/src/colors.js';
 
@@ -185,4 +186,26 @@ test('time axes tick on round local times, and the day and week start at local m
   const { day, week } = localWindows(new Date(2026, 8, 24, 15, 30).getTime());
   assert.equal(day, new Date(2026, 8, 24).getTime());
   assert.equal(week, new Date(2026, 8, 21).getTime(), '24 September 2026 is a Thursday');
+});
+
+test('an audit entry names its game by room code and each detail in words, not as JSON', () => {
+  const entry = {
+    id: 1,
+    at: 0,
+    actor: 'owner@example.com',
+    action: 'game.end',
+    target: '8303bc14-a54a-41d1-89d1-020afa8050a8',
+    detail: { roomCode: '5WMC', revision: 51, previousPhase: 'roll', players: ['Ann', 'Bo'], from: null },
+    ip: null,
+    requestId: 'r',
+  };
+  assert.deepEqual(detailPairs(entry), [
+    ['revision', '51'],
+    ['previous phase', 'roll'],
+    ['players', 'Ann, Bo'],
+    ['from', '—'],
+  ]);
+  // Only a room target is shown by its code; anywhere else the code stays among the details.
+  assert.deepEqual(detailPairs({ ...entry, target: null })[0], ['room code', '5WMC']);
+  assert.deepEqual(detailPairs({ ...entry, detail: { nested: { a: 1 } } }), [['nested', '{"a":1}']]);
 });

@@ -1076,4 +1076,12 @@ select {
     grid-column: 3;
     text-align: right;
   }
+  /* Placed first on its card's first line, wherever its column is. */
+  table.stacked .cell-first {
+    order: -1;
+  }
+  /* Beside the cell before it, to the end of the line. */
+  table.stacked .cell-rest {
+    grid-column: 2 / -1;
+  }
 }
