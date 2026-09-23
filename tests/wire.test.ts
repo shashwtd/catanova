@@ -33,8 +33,10 @@ test('updates are compressed on the wire and a game update carries its board onc
   });
   messages.length = 0;
   ws.send(JSON.stringify({ type: 'sync' }));
-  while (!messages.some((m) => m.type === 'state')) await new Promise((r) => setTimeout(r, 5));
-  const update = messages.find((m) => m.type === 'state') as Extract<ServerMessage, { type: 'state' }>;
+  // The lobby's own broadcast after joining can still be arriving; wait for the game's update.
+  const gameUpdate = (m: ServerMessage) => m.type === 'state' && !!m.state.game;
+  while (!messages.some(gameUpdate)) await new Promise((r) => setTimeout(r, 5));
+  const update = messages.find(gameUpdate) as Extract<ServerMessage, { type: 'state' }>;
   assert.ok(update.state.game!.board.hexes.length === 19);
   assert.equal(update.state.board, undefined, 'the board is not sent a second time beside the game');
 });
