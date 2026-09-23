@@ -456,14 +456,19 @@ export function noteStandIn(state: Game, playerId: string, taking: boolean): Gam
 export function resignPlayers(
   state: Game,
   playerIds: string[],
-  options: { reason?: 'disconnect' | 'leave'; winnerEligibleIds?: string[] } = {},
+  options: { reason?: 'disconnect' | 'leave'; winnerEligibleIds?: string[]; botIds?: string[] } = {},
 ): Game {
   if (state.phase === 'finished') return state;
   const departing = state.players.filter((p) => !p.resigned && playerIds.includes(p.id));
   const survivors = state.players.filter((p) => !p.resigned && !playerIds.includes(p.id));
   const eligible = (id: string) =>
     options.winnerEligibleIds === undefined || options.winnerEligibleIds.includes(id);
-  if (!departing.length && !(survivors.length === 1 && eligible(survivors[0]!.id))) return state;
+  // Bots keep a table going for the people at it; they are not a table of their
+  // own. Once nobody but bots is left the game is over, rather than paused for good.
+  const bot = (id: string) => !!options.botIds?.includes(id);
+  const onlyBotsLeft = survivors.length > 0 && survivors.every((p) => bot(p.id));
+  if (!departing.length && !onlyBotsLeft && !(survivors.length === 1 && eligible(survivors[0]!.id)))
+    return state;
   const g = structuredClone(state);
   for (const p of g.players)
     if (departing.some((other) => other.id === p.id)) {
@@ -490,7 +495,7 @@ export function resignPlayers(
   }
   updateAwards(g);
   const remaining = g.players.filter((p) => !p.resigned);
-  if (!remaining.length) {
+  if (!remaining.length || remaining.every((p) => bot(p.id))) {
     g.winner = null;
     g.finishReason = 'abandoned';
     g.phase = 'finished';
@@ -498,7 +503,12 @@ export function resignPlayers(
     g.discards = {};
     g.freeRoads = 0;
     g.setupVertex = null;
-    log(g, 'The game ended with no winner: every player left.');
+    log(
+      g,
+      remaining.length
+        ? 'The game ended with no winner: only bots were left at the table.'
+        : 'The game ended with no winner: every player left.',
+    );
     return g;
   }
   if (remaining.length === 1) {

@@ -68,6 +68,20 @@ export const STANDIN_AFTER_MS = 30 * 1000;
 export const STANDIN_LEVEL: BotLevel = 'sharp';
 type Absence = { disconnectedAt: number; resignAt: number };
 type Presence = { version?: 2; pausedAt?: number; seats: Record<string, Absence> };
+/**
+ * A table nobody is sitting at is abandoned only once it has been empty for the
+ * whole grace period. A seat's own deadline dates from when that player left,
+ * and while a bot is covering them that date quietly passes; without this, the
+ * first half-second nobody else was connected — one person reloading, a server
+ * restart, a shared Wi-Fi blip — resigned every covered seat on the spot and
+ * handed the game to whoever came back first.
+ */
+function holdFromPause(state: Presence): Presence {
+  if (state.pausedAt !== undefined)
+    for (const seat of Object.values(state.seats))
+      seat.resignAt = Math.max(seat.resignAt, state.pausedAt + RECONNECT_GRACE_MS);
+  return state;
+}
 const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
 function codeForSlot(slot: number): string {
   let code = '';
@@ -261,6 +275,30 @@ export class Store {
       UPDATE game_events SET phase = json_extract(state, '$.phase') WHERE phase IS NULL AND state <> '';
       UPDATE game_events SET dice_total = json_extract(state, '$.dice[0]') + json_extract(state, '$.dice[1]')
         WHERE dice_total IS NULL AND state <> '' AND json_extract(public_entry, '$.kind') = 'roll';
+    `);
+    // Which rooms still have a game in play is asked several times a second by the
+    // bot driver and again on every join; answering it from the saved state meant
+    // parsing a whole game each time. A side table keeps the answer, and triggers
+    // keep it in step with every write of a game, whoever makes it — including an
+    // older server version after a rollback, since triggers live in the file. The
+    // games table itself keeps its shape. Rebuilt in full on every start. (An upsert
+    // rather than INSERT OR REPLACE: a trigger's own conflict policy is overridden
+    // by the statement that fired it.)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS game_phases (room_id TEXT PRIMARY KEY, phase TEXT);
+      CREATE TRIGGER IF NOT EXISTS game_phases_insert AFTER INSERT ON games BEGIN
+        INSERT INTO game_phases(room_id, phase) VALUES (NEW.room_id, json_extract(NEW.state, '$.phase'))
+          ON CONFLICT(room_id) DO UPDATE SET phase = excluded.phase;
+      END;
+      CREATE TRIGGER IF NOT EXISTS game_phases_update AFTER UPDATE OF state ON games BEGIN
+        INSERT INTO game_phases(room_id, phase) VALUES (NEW.room_id, json_extract(NEW.state, '$.phase'))
+          ON CONFLICT(room_id) DO UPDATE SET phase = excluded.phase;
+      END;
+      CREATE TRIGGER IF NOT EXISTS game_phases_delete AFTER DELETE ON games BEGIN
+        DELETE FROM game_phases WHERE room_id = OLD.room_id;
+      END;
+      DELETE FROM game_phases;
+      INSERT INTO game_phases(room_id, phase) SELECT room_id, json_extract(state, '$.phase') FROM games;
     `);
     this.records = new PlayerRecords(this.db);
     for (const row of this.db.prepare('SELECT id FROM seats WHERE bot = 1 AND departed = 0').all())
@@ -523,9 +561,9 @@ export class Store {
     const row = this.db
       .prepare(
         `
-      SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
+      SELECT s.room_id FROM seats s JOIN game_phases g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0
-        AND json_extract(g.state,'$.phase')<>'finished'
+        AND coalesce(g.phase,'')<>'finished'
       LIMIT 1
     `,
       )
@@ -538,9 +576,10 @@ export class Store {
     const conflict = this.db
       .prepare(
         `
-      SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
+      SELECT s.room_id FROM seats s JOIN game_phases p ON p.room_id=s.room_id
+      JOIN games g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0 AND s.room_id<>?
-        AND json_extract(g.state,'$.phase')<>'finished'
+        AND coalesce(p.phase,'')<>'finished'
         AND EXISTS (SELECT 1 FROM json_each(g.state,'$.players') p
           WHERE json_extract(p.value,'$.id')=s.id
             AND coalesce(json_extract(p.value,'$.resigned'),0)=0)
@@ -657,6 +696,7 @@ export class Store {
             current,
             resignPlayers(current, [seat.id], {
               reason: 'leave',
+              botIds: [...this.botSeats],
               ...(this.trackPresence ? { winnerEligibleIds: [...connected] } : {}),
             }),
             commandId,
@@ -920,17 +960,24 @@ export class Store {
       return { revision, counter: room.counter, duplicate: false };
     });
   }
-  /** Rooms with a game still running and at least one seat a bot owes a move
-   *  for: a bot the host added, or a seat a bot is holding for somebody who
-   *  dropped out. Kept as a query rather than a subscription so a restart needs
-   *  no rebuilding. */
+  /** Rooms with a game still running, not paused, and at least one seat a bot
+   *  owes a move for: a bot the host added, or a seat a bot is holding for
+   *  somebody who dropped out. Kept as a query rather than a subscription so a
+   *  restart needs no rebuilding. Finished and paused rooms are left out here:
+   *  the driver asks four times a second, and every room it is handed costs a
+   *  full load of the game even when no bot can move. */
   botRooms(): string[] {
     return this.db
       .prepare(
-        `SELECT DISTINCT room_id FROM (
-           SELECT s.room_id AS room_id FROM seats s JOIN games g ON g.room_id = s.room_id
-           WHERE s.bot = 1 AND s.departed = 0
-           UNION SELECT i.room_id AS room_id FROM seat_standins i JOIN games g ON g.room_id = i.room_id
+        `SELECT DISTINCT r.room_id AS room_id FROM (
+           SELECT s.room_id AS room_id FROM seats s JOIN game_phases g ON g.room_id = s.room_id
+           WHERE s.bot = 1 AND s.departed = 0 AND coalesce(g.phase, '') <> 'finished'
+           UNION SELECT i.room_id AS room_id FROM seat_standins i JOIN game_phases g ON g.room_id = i.room_id
+           WHERE coalesce(g.phase, '') <> 'finished'
+         ) r
+         WHERE NOT EXISTS (
+           SELECT 1 FROM room_presence p
+           WHERE p.room_id = r.room_id AND json_extract(p.state, '$.pausedAt') IS NOT NULL
          )`,
       )
       .all()
@@ -1100,9 +1147,29 @@ export class Store {
           this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
           continue;
         }
+        // A table only bots are still sitting at can never be played again. Settle it
+        // now rather than leave it paused, and in friends' Watch lists, for good.
+        const settled = resignPlayers(game, [], { winnerEligibleIds: [], botIds: [...this.botSeats] });
+        if (settled !== game) {
+          this.saveLifecycle(
+            roomId,
+            game,
+            settled,
+            'bots-only-' +
+              hash(JSON.stringify({ roomId, revision: this.snapshot(roomId).revision })).slice(0, 48),
+            null,
+            { kind: 'abandon', reason: 'botsOnly' },
+            'abandoned',
+            true,
+            new Set(),
+          );
+          continue;
+        }
         const old = this.presence(roomId);
         // Old paused saves never had a running absence deadline. Migrate them once with
-        // a full grace. In v2, an already disconnected player's deadline survives restarts.
+        // a full grace. A table that was already empty before the restart keeps the
+        // moment it emptied, so its deadlines survive restarts; a table people were
+        // still playing at only empties now, and its covered seats get the full grace.
         const previous = old?.version === 2 ? old : undefined;
         const state: Presence = { version: 2, pausedAt: previous?.pausedAt ?? now, seats: {} };
         for (const player of game.players.filter((p) => !p.resigned && !this.botSeats.has(p.id)))
@@ -1110,7 +1177,7 @@ export class Store {
             disconnectedAt: now,
             resignAt: now + RECONNECT_GRACE_MS,
           };
-        this.writePresence(roomId, state);
+        this.writePresence(roomId, holdFromPause(state));
       }
     });
   }
@@ -1157,7 +1224,7 @@ export class Store {
           resignAt: now + RECONNECT_GRACE_MS,
         };
       }
-    this.writePresence(roomId, state);
+    this.writePresence(roomId, holdFromPause(state));
     if (resumed) {
       // Nobody owes an immediate automatic move for time when nobody could see the game.
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
@@ -1179,7 +1246,10 @@ export class Store {
       this.transaction(() => {
         const game = this.loadGame(seat.room_id);
         if (game) {
-          const next = resignPlayers(game, [], { winnerEligibleIds: [...nextConnected] });
+          const next = resignPlayers(game, [], {
+            winnerEligibleIds: [...nextConnected],
+            botIds: [...this.botSeats],
+          });
           if (next !== game) {
             this.saveLifecycle(
               seat.room_id,
@@ -1245,6 +1315,7 @@ export class Store {
         const next = resignPlayers(current, abandoned, {
           reason: 'disconnect',
           winnerEligibleIds: [...this.connectedSeats],
+          botIds: [...this.botSeats],
         });
         if (next === current) {
           this.updatePresence(roomId, current);

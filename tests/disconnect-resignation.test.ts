@@ -191,7 +191,7 @@ test('all players offline freezes gameplay but continuous grace closes the match
   }
 });
 
-test('a return before the deadline gives a fresh turn clock without renewing anyone else’s absence', () => {
+test('a return gives a fresh turn clock, and an emptied table restarts its grace instead of ending', () => {
   let now = 1000000;
   const store = new Store(':memory:', { now: () => now, trackPresence: true });
   try {
@@ -204,9 +204,13 @@ test('a return before the deadline gives a fresh turn clock without renewing any
     assert.equal(store.clock(roomId)!.deadlineAt, now + 90000);
     assert.equal(presenceOf(store, seats[1]!).resignAt, deadline);
     store.setConnected(seats[0]!, false);
+    // The table is empty again, so it gets the whole grace from this moment: a
+    // quick reload must never find everyone else's time already run out.
+    const extended = now + RECONNECT_GRACE_MS;
+    assert.equal(presenceOf(store, seats[1]!).resignAt, extended);
     now += 30000;
     store.setConnected(seats[0]!, true);
-    assert.equal(presenceOf(store, seats[1]!).resignAt, deadline);
+    assert.equal(presenceOf(store, seats[1]!).resignAt, extended);
     // Somebody is at the table again, so the other two seats are covered rather
     // than surrendered, however long their deadline has been running.
     now = deadline!;
@@ -646,7 +650,7 @@ test('a real dropped socket hands the seat to a bot over the wire, and gets it b
   assert.deepEqual(server.store.standInIds(roomId), []);
 });
 
-test('staggered all-offline deadlines never hand an absent survivor an arbitrary win', () => {
+test('staggered departures end together once the table has been empty for the grace, with no winner', () => {
   let now = 1000000;
   const store = new Store(':memory:', { now: () => now, trackPresence: true });
   try {
@@ -656,16 +660,16 @@ test('staggered all-offline deadlines never hand an absent survivor an arbitrary
     now += 60000;
     store.setConnected(seats[1]!, false);
     const lastDeadline = presenceOf(store, seats[1]!).resignAt!;
+    // The first seat left earlier, but the table only emptied a minute later; it
+    // is that moment the grace counts from, for everyone at once.
+    assert.equal(presenceOf(store, seats[0]!).resignAt, lastDeadline);
     now = firstDeadline;
-    store.expireRoom(roomId);
+    assert.equal(store.expireRoom(roomId), false);
     const waiting = store.loadGame(roomId)!;
-    assert.equal(waiting.players[0]!.resigned, true);
+    assert.equal(waiting.players.filter((p) => p.resigned).length, 0);
     assert.equal(waiting.winner, null);
     assert.notEqual(waiting.phase, 'finished');
     assert.equal(store.snapshot(roomId).paused, true);
-    assert.equal(presenceOf(store, seats[1]!).resignAt, lastDeadline);
-    store.setConnected(seats[0]!, true);
-    assert.equal(store.snapshot(roomId).paused, true, 'a resigned spectator cannot restart autoplay');
     now = lastDeadline;
     store.expireRoom(roomId);
     assert.equal(store.loadGame(roomId)!.winner, null);
@@ -676,7 +680,7 @@ test('staggered all-offline deadlines never hand an absent survivor an arbitrary
   }
 });
 
-test('a sole surviving player returning before their own deadline wins by resignation, without rolling', () => {
+test('returning to a briefly empty table resumes the game, with the absent seat covered rather than surrendered', () => {
   let now = 1000000;
   const store = new Store(':memory:', { now: () => now, trackPresence: true });
   try {
@@ -688,9 +692,14 @@ test('a sole surviving player returning before their own deadline wins by resign
     store.expireRoom(roomId);
     assert.equal(store.loadGame(roomId)!.winner, null);
     store.setConnected(seats[1]!, true);
-    assert.equal(store.loadGame(roomId)!.winner, seats[1]!.id);
-    assert.equal(store.loadGame(roomId)!.finishReason, 'resignation');
-    assert.equal(store.clock(roomId), undefined);
+    // Nobody wins because somebody else's clock happened to run out during a
+    // moment when the table was empty; the game simply carries on.
+    const resumed = store.loadGame(roomId)!;
+    assert.equal(resumed.winner, null);
+    assert.notEqual(resumed.phase, 'finished');
+    assert.equal(resumed.players.filter((p) => p.resigned).length, 0);
+    assert.equal(store.expireRoom(roomId), true);
+    assert.deepEqual(store.standInIds(roomId), [seats[0]!.id]);
     assert.equal(store.history(roomId).entries.filter((e) => e.automatic && e.kind === 'roll').length, 0);
   } finally {
     store.close();
