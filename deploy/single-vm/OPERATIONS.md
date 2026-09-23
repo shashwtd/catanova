@@ -292,6 +292,26 @@ Run everything as root on the VM with the `catanova_compose` helper from [Connec
 
 To undo, stop the game again, copy `probe.sqlite`, `-wal` and `-shm` back from `$saved` together with `cp -a`, and start the game.
 
+## Journal size and compaction
+
+Every move is journaled. Since the release that introduced compact journal rows, a move is stored without the board and deflated (about 1.4 KB instead of about 18 KB); the board is stored once per game in `journal_boards`. Rows written by older releases are rewritten in the background by the running server, about 40 a second, until none remain. That needs no action and no downtime.
+
+The file does not shrink on its own: SQLite reuses the freed pages for new moves. To hand the space back to the disk, run the offline command during a planned update, after a fresh backup, with the game container stopped:
+
+```sh
+systemctl start catanova-backup.service
+systemctl show catanova-backup.service -p Result -p ExecMainStatus
+catanova_compose stop game
+docker run --rm -v catanova-game-data:/app/data catanova-local:"$(grep '^CATANOVA_REVISION=' /etc/catanova/production.env | cut -d= -f2)" \
+  node dist/scripts/compact-database.js --database /app/data/probe.sqlite
+catanova_compose up -d --no-build
+curl --fail --show-error https://catanova.io/healthz
+```
+
+It prints how many rows it compacted and the size before and after. Rows whose saved state does not match its hash are never rewritten; they are left exactly as written and reported, so run a restore drill (or `verifyJournal` from the admin view) if that count is not zero.
+
+Rollback: a release from before compaction can still read a compacted database. Its roll statistics count no rolls for compacted rows until the newer release is back; nothing else is affected.
+
 ## DNS and VM power
 
 The apex **A record for `catanova.io`** targets `74.225.248.124`; ordinary DNS-based HTTPS passed. If the VM's public IP resource is deliberately replaced, update the A record to the verified replacement IP and check propagation. Do not publish an AAAA record without a working IPv6 listener. The same hostname remains in `CATANOVA_DOMAIN`, Supabase redirect settings, and Turnstile's allowed hostnames. Keep TCP 80/443 reachable for Caddy.
