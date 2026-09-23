@@ -24,7 +24,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 import type { Store } from '../store.js';
-import { ProtocolError } from '../store.js';
+import { ProtocolError, ROOM_CODE_LEASE_MS } from '../store.js';
 import { RoomAccessLimit } from '../room-access.js';
 import type { AdminConfig } from './config.js';
 import { isLoopbackHost } from './config.js';
@@ -38,6 +38,7 @@ import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRoute, GameRuntime } from './api.js';
 import { RuntimeMetrics } from './metrics.js';
 import { Analysis } from './analysis-runner.js';
+import { RoomIndex } from './room-index.js';
 import { coreRoutes } from './routes.js';
 import type { AdminSession, AuthRejection } from './types.js';
 
@@ -174,6 +175,11 @@ export async function startAdminServer(options: AdminServerOptions) {
   };
   const metrics = new RuntimeMetrics();
   const analysis = new Analysis({ databasePath: options.databasePath, db: store.db, now });
+  const roomIndex = new RoomIndex({
+    databasePath: options.databasePath,
+    db: store.db,
+    leaseMs: ROOM_CODE_LEASE_MS,
+  });
   const routes: ApiRoute[] = [
     {
       method: 'GET',
@@ -193,7 +199,7 @@ export async function startAdminServer(options: AdminServerOptions) {
         });
       },
     },
-    ...coreRoutes(context, metrics, analysis),
+    ...coreRoutes(context, metrics, analysis, roomIndex),
     ...(options.routes?.(context) ?? []),
   ];
 
@@ -394,6 +400,7 @@ export async function startAdminServer(options: AdminServerOptions) {
   } catch (error) {
     restoreConsole();
     metrics.stop();
+    roomIndex.close();
     throw error;
   }
   const address = server.address();
@@ -404,6 +411,7 @@ export async function startAdminServer(options: AdminServerOptions) {
     async close() {
       restoreConsole();
       metrics.stop();
+      roomIndex.close();
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },

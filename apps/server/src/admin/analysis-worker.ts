@@ -11,8 +11,8 @@ import type { AnalysisJob } from './analysis-runner.js';
 const { databasePath, job } = workerData as { databasePath: string; job: AnalysisJob };
 let db: DatabaseSync | undefined;
 try {
-  db = new DatabaseSync(databasePath, { readOnly: true });
-  db.exec('PRAGMA query_only = ON; PRAGMA busy_timeout = 5000; BEGIN');
+  db = new DatabaseSync(databasePath, { readOnly: true, timeout: 5000 });
+  db.exec('PRAGMA query_only = ON; BEGIN');
   const result = job.kind === 'stats' ? computeStats(db, job.now) : computeRetention(db, job.now, job.days);
   db.exec('COMMIT');
   parentPort!.postMessage({ ok: true, result });

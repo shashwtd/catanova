@@ -12,6 +12,7 @@ import { playerDetail, searchPlayers } from './players.js';
 import { feedbackRoutes } from './feedback.js';
 import { RETENTION_DAYS } from './analysis-runner.js';
 import type { Analysis } from './analysis-runner.js';
+import type { RoomIndex } from './room-index.js';
 
 function retentionDays(value: unknown): number {
   const days = typeof value === 'string' ? Number(value) : value;
@@ -20,12 +21,17 @@ function retentionDays(value: unknown): number {
   return days;
 }
 
-export function coreRoutes(context: AdminContext, metrics: RuntimeMetrics, analysis: Analysis): ApiRoute[] {
+export function coreRoutes(
+  context: AdminContext,
+  metrics: RuntimeMetrics,
+  analysis: Analysis,
+  rooms: RoomIndex,
+): ApiRoute[] {
   const room = (suffix = '') => new RegExp(`^/api/admin/games/${ROOM_PARAM}${suffix}$`);
   return [
     ...feedbackRoutes(context),
-    { method: 'GET', path: /^\/api\/admin\/overview$/, handle: () => overview(context, metrics) },
-    { method: 'GET', path: /^\/api\/admin\/games$/, handle: ({ query }) => listGames(context, query) },
+    { method: 'GET', path: /^\/api\/admin\/overview$/, handle: () => overview(context, metrics, rooms) },
+    { method: 'GET', path: /^\/api\/admin\/games$/, handle: ({ query }) => listGames(context, rooms, query) },
     { method: 'GET', path: room(), handle: ({ params }) => gameDetail(context, params[0]!) },
     {
       method: 'GET',
@@ -40,9 +46,13 @@ export function coreRoutes(context: AdminContext, metrics: RuntimeMetrics, analy
     {
       method: 'POST',
       path: room('/end'),
-      handle: (request) => endGame(context, request.params[0]!, request),
+      handle: (request) => endGame(context, rooms, request.params[0]!, request),
     },
-    { method: 'GET', path: /^\/api\/admin\/players$/, handle: ({ query }) => searchPlayers(context, query) },
+    {
+      method: 'GET',
+      path: /^\/api\/admin\/players$/,
+      handle: ({ query }) => searchPlayers(context, rooms, query),
+    },
     {
       method: 'GET',
       path: /^\/api\/admin\/players\/([A-Za-z0-9_-]{1,128})$/,

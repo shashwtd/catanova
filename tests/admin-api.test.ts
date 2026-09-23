@@ -229,10 +229,11 @@ test('overview reports the process, sockets, rooms, database, status files and r
   assert.ok(overview.load.window.eventLoop.maxMs >= 0 && overview.load.cores >= 1);
   assert.deepEqual(overview.sockets, { total: 2, players: 2, spectators: 0, pending: 0 });
   assert.deepEqual(overview.players, { connectedSeats: 2, distinctPlayers: 2 });
-  assert.deepEqual(
-    { ...overview.rooms, total: undefined },
-    { lobbies: 1, live: 1, paused: 1, finished: 0, empty: 0, total: undefined },
-  );
+  // Counted by the room index's worker on its own read-only connection.
+  assert.ok(!('error' in overview.rooms), 'room counts are available');
+  const { countedAt, ...rooms } = overview.rooms;
+  assert.deepEqual(rooms, { lobbies: 1, live: 1, paused: 1, finished: 0, empty: 0, total: 3 });
+  assert.ok(countedAt <= overview.now);
   assert.equal(overview.bots.seatsInLiveGames, 1);
   assert.equal(overview.bots.standIns, 0);
   assert.equal(

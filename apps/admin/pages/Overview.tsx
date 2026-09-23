@@ -1,7 +1,7 @@
 import type { AdminOverview, StatusFile } from '../../server/src/admin/types.js';
 import { useApi } from '../api.js';
 import { bytes, count, duration, percent, time } from '../format.js';
-import { Badge, Empty, Failure, Loading, Section, Stat, Table, When } from '../ui.js';
+import { Badge, Empty, Failure, Loading, Notice, Section, Stat, Table, When } from '../ui.js';
 import type { Tone } from '../ui.js';
 
 /** Fields a host status report may carry, shown first when present. */
@@ -136,18 +136,28 @@ export function Overview() {
           </div>
         </Section>
         <Section title="Rooms">
-          <div className="stats">
-            <Stat label="Live" value={<a href="#/games?status=live">{count(rooms.live)}</a>} />
-            <Stat label="Paused" value={<a href="#/games?status=paused">{count(rooms.paused)}</a>} />
-            <Stat label="Lobbies" value={<a href="#/games?status=lobby">{count(rooms.lobbies)}</a>} />
-            <Stat
-              label="Finished"
-              value={<a href="#/games?status=finished">{count(rooms.finished)}</a>}
-              hint="awaiting return"
-            />
-            <Stat label="Empty" value={count(rooms.empty)} />
-            <Stat label="All rooms" value={count(rooms.total)} />
-          </div>
+          {'error' in rooms ? (
+            <Notice tone="critical">Room counts are unavailable: {rooms.error}</Notice>
+          ) : (
+            <>
+              <div className="stats">
+                <Stat label="Live" value={<a href="#/games?status=live">{count(rooms.live)}</a>} />
+                <Stat label="Paused" value={<a href="#/games?status=paused">{count(rooms.paused)}</a>} />
+                <Stat label="Lobbies" value={<a href="#/games?status=lobby">{count(rooms.lobbies)}</a>} />
+                <Stat
+                  label="Finished"
+                  value={<a href="#/games?status=finished">{count(rooms.finished)}</a>}
+                  hint="awaiting return"
+                />
+                <Stat label="Empty" value={count(rooms.empty)} />
+                <Stat label="All rooms" value={count(rooms.total)} />
+              </div>
+              <p className="footnote">
+                Counted <When at={rooms.countedAt} now={data.now} /> on a background thread, at most every few
+                seconds.
+              </p>
+            </>
+          )}
         </Section>
         <Section title="Database">
           <div className="stats">

@@ -41,9 +41,21 @@ export type AdminOverview = {
   };
   load: { window: LoopWindow; windowSeconds: number; loadAverage: number[]; cores: number };
   sockets: { total: number; players: number; spectators: number; pending: number };
-  rooms: { lobbies: number; live: number; paused: number; finished: number; empty: number; total: number };
+  /** Counted off the game's thread, at most a few seconds before `now`; an error if that failed. */
+  rooms:
+    | {
+        lobbies: number;
+        live: number;
+        paused: number;
+        finished: number;
+        empty: number;
+        total: number;
+        countedAt: number;
+      }
+    | { error: string };
   players: { connectedSeats: number; distinctPlayers: number };
-  bots: { seatsInLiveGames: number; standIns: number };
+  /** `seatsInLiveGames` comes with the room counts and is null without them. */
+  bots: { seatsInLiveGames: number | null; standIns: number };
   database: {
     path: string;
     fileBytes: number | null;
@@ -52,7 +64,8 @@ export type AdminOverview = {
     pageCount: number;
     pageSize: number;
     freelistPages: number;
-    journalRows: number;
+    /** Counted with the rooms; null without them. */
+    journalRows: number | null;
   };
   disk: { path: string; freeBytes: number; totalBytes: number } | { path: string; error: string };
   status: { directory: string; backup: StatusFile; watchdog: StatusFile };
@@ -90,10 +103,12 @@ export type GameListItem = {
 
 export type GamesPage = {
   items: GameListItem[];
+  /** Matches, order and counts are from the room index's pass at `indexedAt`; items are read fresh. */
   total: number;
   page: number;
   pageSize: number;
   counts: Record<RoomStatus, number>;
+  indexedAt: number;
 };
 
 export type GameDetail = {

@@ -7,9 +7,8 @@
  */
 import type { AdminContext } from './api.js';
 import { AdminRequestError } from './api.js';
+import type { RoomIndex } from './room-index.js';
 import type { PlayerDetail, PlayerMatch, PlayerSummary } from './types.js';
-
-const UUID_PREFIX = /^[0-9a-f-]{8,36}$/i;
 
 const ALL_MATCHES = `WITH all_matches AS (
     SELECT room_id, room_id AS source_room_id, started_at, finished_at, sort_at, turns, winner, players, 0 AS archived
@@ -38,30 +37,22 @@ function record(context: AdminContext, userId: string) {
   };
 }
 
-export function searchPlayers(context: AdminContext, query: URLSearchParams): { players: PlayerSummary[] } {
+/**
+ * Accounts matching a name fragment or id prefix. Finding them scans every
+ * seat, so that part runs on the room index's worker; the at most 50 found
+ * are then described here with indexed lookups.
+ */
+export async function searchPlayers(
+  context: AdminContext,
+  index: RoomIndex,
+  query: URLSearchParams,
+): Promise<{ players: PlayerSummary[] }> {
   const q = (query.get('q') ?? '').trim();
   if (q.length < 2 || q.length > 64)
     throw new AdminRequestError(400, 'INVALID_QUERY', 'Search with 2 to 64 characters');
   const { store } = context;
-  const escaped = q.replace(/[\\%_]/g, (c) => '\\' + c);
-  const like = `%${escaped}%`;
-  // An id is matched by prefix only; an empty pattern matches nothing.
-  const idLike = UUID_PREFIX.test(q) ? `${escaped.toLowerCase()}%` : '';
-  // Seats carry every account that ever sat down; the local profile table covers
-  // accounts that only ever saved a profile.
-  const ids = store.db
-    .prepare(
-      `SELECT user_id AS userId, max(rowid) AS latest FROM seats
-       WHERE user_id IS NOT NULL AND (name LIKE ? ESCAPE '\\' OR user_id LIKE ? ESCAPE '\\')
-       GROUP BY user_id
-       UNION
-       SELECT user_id, 0 FROM profiles
-       WHERE json_extract(profile, '$.name') LIKE ? ESCAPE '\\' OR user_id LIKE ? ESCAPE '\\'
-       ORDER BY latest DESC LIMIT 200`,
-    )
-    .all(like, idLike, like, idLike)
-    .map((row) => row.userId as string);
-  const players = [...new Set(ids)].slice(0, 50).map((userId): PlayerSummary => {
+  const ids = await index.accounts(q);
+  const players = ids.map((userId): PlayerSummary => {
     const latest = store.db
       .prepare('SELECT name, account_type FROM seats WHERE user_id = ? ORDER BY rowid DESC LIMIT 1')
       .get(userId) as { name: string; account_type: string | null } | undefined;

@@ -1,13 +1,15 @@
 /**
  * Live operations at a glance: the process, its sockets and rooms, the
  * database and its disk, the host's backup and watchdog reports, and recent
- * errors. Everything here is cheap enough to read every ten seconds: PRAGMAs,
- * file sizes, one indexed count and the room index.
+ * errors. What runs on the game's thread is cheap enough to read every ten
+ * seconds: PRAGMAs, file sizes and a few primary-key lookups. Anything that
+ * grows with the database (room counts, journal rows) comes from the room
+ * index's worker, and the page still loads if that is unavailable.
  */
 import { readFile, stat, statfs } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import type { AdminContext } from './api.js';
-import { countStatuses, indexRooms } from './rooms.js';
+import type { RoomIndex, RoomSummary } from './room-index.js';
 import { serverErrors } from './errors.js';
 import type { RuntimeMetrics } from './metrics.js';
 import type { AdminOverview, StatusFile } from './types.js';
@@ -45,33 +47,26 @@ async function size(path: string): Promise<number | null> {
   }
 }
 
-const journalCounts = new WeakMap<object, { at: number; rows: number }>();
-
-export async function overview(context: AdminContext, metrics: RuntimeMetrics): Promise<AdminOverview> {
+export async function overview(
+  context: AdminContext,
+  metrics: RuntimeMetrics,
+  index: RoomIndex,
+): Promise<AdminOverview> {
   const { store, runtime, config } = context;
   const now = context.now();
+  let summary: RoomSummary | null = null;
+  let indexError = '';
+  try {
+    summary = await index.summary(now);
+  } catch (error) {
+    indexError = error instanceof Error ? error.message : 'Unavailable';
+  }
   const sockets = runtime.sockets();
-  const rooms = indexRooms(store, now);
-  const counts = countStatuses(rooms);
   // Distinct people behind the open seats: accounts where there are accounts, seats otherwise.
   const account = store.db.prepare('SELECT user_id FROM seats WHERE id = ?');
   const people = new Set(sockets.seats.map((seat) => (account.get(seat)?.user_id as string | null) ?? seat));
-  const inPlay = new Set(rooms.filter((room) => room.status === 'live').map((room) => room.id));
-  const botRooms = store.db
-    .prepare('SELECT room_id FROM seats WHERE bot = 1 AND departed = 0')
-    .all()
-    .map((row) => row.room_id as string);
   const pragma = (name: string) =>
     Number(Object.values(store.db.prepare(`PRAGMA ${name}`).get() ?? {})[0] ?? 0);
-  // A covering-index count; still, no need to repeat it on every ten-second refresh.
-  let journalCount = journalCounts.get(store);
-  if (!journalCount || now - journalCount.at > 15_000) {
-    journalCount = {
-      at: now,
-      rows: store.db.prepare('SELECT count(*) AS n FROM game_events').get()!.n as number,
-    };
-    journalCounts.set(store, journalCount);
-  }
   const file = context.databasePath === ':memory:' ? null : resolve(context.databasePath);
   let disk: AdminOverview['disk'];
   const diskPath = file ? dirname(file) : process.cwd();
@@ -104,17 +99,21 @@ export async function overview(context: AdminContext, metrics: RuntimeMetrics): 
       spectators: sockets.spectators,
       pending: Math.max(0, sockets.total - sockets.players - sockets.spectators),
     },
-    rooms: {
-      lobbies: counts.lobby,
-      live: counts.live,
-      paused: counts.paused,
-      finished: counts.finished,
-      empty: counts.empty,
-      total: rooms.length,
-    },
+    rooms: summary
+      ? {
+          lobbies: summary.counts.lobby,
+          live: summary.counts.live,
+          paused: summary.counts.paused,
+          finished: summary.counts.finished,
+          empty: summary.counts.empty,
+          total: summary.total,
+          countedAt: summary.indexedAt,
+        }
+      : { error: indexError },
     players: { connectedSeats: sockets.seats.length, distinctPlayers: people.size },
     bots: {
-      seatsInLiveGames: botRooms.filter((roomId) => inPlay.has(roomId)).length,
+      seatsInLiveGames: summary?.liveBotSeats ?? null,
+      // Rows exist only while a bot is holding a seat, so this stays small.
       standIns: store.db.prepare('SELECT count(*) AS n FROM seat_standins').get()!.n as number,
     },
     database: {
@@ -125,7 +124,7 @@ export async function overview(context: AdminContext, metrics: RuntimeMetrics): 
       pageCount: pragma('page_count'),
       pageSize: pragma('page_size'),
       freelistPages: pragma('freelist_count'),
-      journalRows: journalCount.rows,
+      journalRows: summary?.journalRows ?? null,
     },
     disk,
     status: {
