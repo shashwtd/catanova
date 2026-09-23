@@ -22,6 +22,8 @@ import { RoomInviteService } from './room-invites.js';
 import { AccountPresence } from './account-presence.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { BotDriver } from './bots.js';
+import { serverErrors } from './admin/errors.js';
+import { PlayerFeedback } from './feedback.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
 function validationCommandId(input: string): string | undefined {
@@ -88,6 +90,14 @@ export async function startServer(
   const captcha = siteKey ? { siteKey } : undefined;
   const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now, trackPresence: true });
   const roomInvites = accounts ? new RoomInviteService(store, accounts, now) : undefined;
+  const feedback = new PlayerFeedback({
+    store,
+    authenticated: !!verify,
+    ...(accounts ? { accounts } : {}),
+    now,
+    clientAddress,
+    allowedOrigins: options.allowedOrigins ?? [],
+  });
   let closing = false;
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -355,6 +365,8 @@ export async function startServer(
             JSON.stringify({ error: error instanceof ProtocolError ? error.message : 'Room unavailable' }),
           );
       }
+    } else if (request.url === '/api/feedback') {
+      await feedback.handle(request, response);
     } else {
       void serveClient(request, response, options.clientDirectory ?? 'dist/client', auth?.url, !!captcha);
     }
@@ -967,6 +979,8 @@ export async function startServer(
             : error instanceof SyntaxError || (error instanceof Error && !('code' in error))
               ? 'INVALID_MESSAGE'
               : 'STORAGE_ERROR';
+        // A failed save is the server's fault, not the player's: keep it for the admin console.
+        if (code === 'STORAGE_ERROR') serverErrors.record('websocket', error);
         send(ws, {
           type: 'error',
           code,
@@ -1103,6 +1117,16 @@ export async function startServer(
     port: address.port,
     url: `ws://127.0.0.1:${address.port}/ws`,
     store,
+    /** Read-only socket counts and a room push, for the admin listener (apps/server/src/admin). */
+    runtime: {
+      sockets: () => ({
+        total: wss.clients.size,
+        players: sessions.size,
+        spectators: spectators.size,
+        seats: [...activeSeats].filter(([, ws]) => ws.readyState === WebSocket.OPEN).map(([id]) => id),
+      }),
+      broadcast,
+    },
     async close() {
       closing = true;
       bots.stop();

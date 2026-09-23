@@ -10,4 +10,6 @@ Production fails startup if auth is missing unless isolated local playtesting is
 
 Private event history contains full game states, including hidden hands and deck outcomes. Only filtered public entries are exposed by the history endpoint to joined seats. Treat the database and its backups as private. State hashes detect a mismatching current snapshot; they do not authenticate a database against a malicious operator or protect against losing the disk.
 
+The operator console is a separate listener that is never published on the host. Production reaches it only through a Cloudflare Tunnel behind Cloudflare Access, and the server verifies Cloudflare's signed token, audience, issuer, expiry and an email allowlist on every request, refusing to start without that configuration. Changes and views of private game state are written to an append-only audit table. See [the admin console guide](docs/ADMIN.md) for its threat model.
+
 If you find a vulnerability, use GitHub's private vulnerability reporting when enabled for this repository. Do not post exploitable details or secrets in a public issue. If that channel is unavailable, contact the repository owner privately through a contact method they have published; no private security mailbox is currently operated by this project.

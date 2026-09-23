@@ -42,6 +42,13 @@ type LockEntry = {
 
 /** Variables that change what the app builds or how tests behave. A clean GitHub runner had none. */
 export const SCRUBBED_VARIABLES = [
+  'ADMIN_ACCESS_AUD',
+  'ADMIN_ACCESS_TEAM_DOMAIN',
+  'ADMIN_AUTH',
+  'ADMIN_EMAILS',
+  'ADMIN_HOST',
+  'ADMIN_ORIGIN',
+  'ADMIN_PORT',
   'ALLOW_LOCAL_PLAYTEST',
   'ALLOWED_ORIGINS',
   'CATANOVA_BOT_MODEL',
@@ -53,15 +60,17 @@ export const SCRUBBED_VARIABLES = [
   'NODE_ENV',
   'PORT',
   'REQUIRE_AUTH',
+  'STATUS_DIR',
   'SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_URL',
   'TRUSTED_PROXY_CIDRS',
+  'TUNNEL_TOKEN',
   'TURNSTILE_SITE_KEY',
   'TYPESAFE_API_KEY',
   'TYPESAFE_BASE_URL',
 ];
 
-/** The placeholder values .github/workflows/ci.yml used to validate the production Compose file. */
+/** Placeholder values for every variable the production Compose file requires, none of them real. */
 export function composeValidationEnvironment(revision: string): Record<string, string> {
   return {
     CATANOVA_DOMAIN: 'catanova.example',
@@ -69,6 +78,10 @@ export function composeValidationEnvironment(revision: string): Record<string, s
     SUPABASE_URL: 'https://example.supabase.co',
     SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_ci_configuration_only',
     TURNSTILE_SITE_KEY: 'site_key_for_configuration_validation',
+    TUNNEL_TOKEN: 'tunnel_token_for_configuration_validation',
+    ADMIN_ACCESS_TEAM_DOMAIN: 'catanova-ci.cloudflareaccess.com',
+    ADMIN_ACCESS_AUD: '0'.repeat(64),
+    ADMIN_EMAILS: 'owner@example.com',
   };
 }
 

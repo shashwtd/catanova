@@ -33,6 +33,7 @@ The following host commands run in that root shell. Define this helper again in 
 catanova_compose() {
   env -u CATANOVA_DOMAIN -u CATANOVA_REVISION \
     -u SUPABASE_URL -u SUPABASE_PUBLISHABLE_KEY -u TURNSTILE_SITE_KEY \
+    -u TUNNEL_TOKEN -u ADMIN_ACCESS_TEAM_DOMAIN -u ADMIN_ACCESS_AUD -u ADMIN_EMAILS -u ADMIN_ORIGIN \
     docker compose \
       --env-file /etc/catanova/production.env \
       -f /opt/catanova/app/deploy/single-vm/compose.yaml "$@"
@@ -41,7 +42,7 @@ catanova_compose() {
 git -C /opt/catanova/app rev-parse HEAD
 catanova_compose config --quiet
 catanova_compose ps
-catanova_compose logs --tail=100 game caddy
+catanova_compose logs --tail=100 game caddy cloudflared
 findmnt --mountpoint /srv/catanova
 df -h / /srv/catanova
 docker volume inspect catanova-game-data --format '{{.Mountpoint}}'
@@ -49,6 +50,8 @@ curl --fail --show-error https://catanova.io/healthz
 ```
 
 Health confirms the HTTP/database check only. Also verify login, guest verification, room joining, and reconnect after a release. Keep full environment files and private game snapshots out of issue reports and Git.
+
+The admin console at `https://admin.catanova.io` runs inside the game container on port 3100 and is reached only through the `cloudflared` service and Cloudflare Access; it has no published port and Caddy never routes to it. Its setup, verification and the host status files it reads from `/srv/catanova/status` are in [the admin console guide](../../docs/ADMIN.md).
 
 The [isolated recovery check](verify-recovery.mjs) prepares a two-client fixture, then verifies it after restarting its test container or the VM. It checks seats, one settlement and road, private views, history and duplicate-command receipts. It targets loopback port 3001, refuses authenticated/Supabase servers, and requires a separate test database and private proof file. It passed across the first VM reboot; its disposable container, volume and proof files have been removed. It is not a public-account or backup-restore test. Keep future proof files, which contain test seat tokens and state, outside Git and remove disposable test resources separately from production volumes.
 

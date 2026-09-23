@@ -101,12 +101,15 @@ npm run probe
 
 Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
+The operator console (live operations, games, players and statistics, player feedback and an audit log) is a separate listener that production reaches only through Cloudflare Access and a Cloudflare Tunnel. Locally, `ADMIN_PORT=3100 ADMIN_AUTH=local-dev npm start` serves it at `http://127.0.0.1:3100`. [Admin console setup and security](docs/ADMIN.md).
+
 ## Project layout
 
 ```text
 apps/
   client/       React UI, flat terrain/SVG board, sound/effects, recoverable connection
   server/       Same-origin HTTP/WebSocket server, private snapshots, SQLite saves
+  admin/        Operator console, served only by the admin listener behind Cloudflare Access
 packages/
   protocol/     Shared messages and bounded input validation
   rules/        Pure rules engine, board topology, seeded balanced generation

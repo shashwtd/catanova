@@ -6,7 +6,18 @@ import { Avatar, ProfileEditor } from './Profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { GameLoader } from './GameLoader.js';
 import { GoogleMark } from './ProviderMarks.js';
-import { ArrowRight, CircleHelp, JoinRoom, History, LogOut, Pencil, Plus, Users, X } from './GameIcons.js';
+import {
+  ArrowRight,
+  CircleHelp,
+  JoinRoom,
+  History,
+  LogOut,
+  MessageSquare,
+  Pencil,
+  Plus,
+  Users,
+  X,
+} from './GameIcons.js';
 import { MatchHistory, PlayerStats } from './MatchHistory.js';
 import type { PlayerGameState } from './MatchHistory.js';
 import { normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
@@ -95,6 +106,7 @@ export function PlayerHub({
   onProfile,
   onEditProfile,
   onFriends,
+  onFeedback,
   onSignOut,
 }: {
   auth: Auth;
@@ -110,6 +122,7 @@ export function PlayerHub({
   onEditProfile?: () => void;
   onFriends: () => void;
   onSettings: () => void;
+  onFeedback?: () => void;
   onSignOut: () => void;
 }) {
   const [tab, setTab] = useState<'lobby' | 'history'>('lobby');
@@ -176,6 +189,11 @@ export function PlayerHub({
               <a className="hub-profile-action" href="/guide/" target="_blank" rel="noopener noreferrer">
                 <CircleHelp size={20} /> How to play
               </a>
+              {onFeedback && (
+                <button className="hub-profile-action" onClick={onFeedback}>
+                  <MessageSquare size={18} /> Send feedback
+                </button>
+              )}
               {/* A door on its own said nothing to anyone who was looking for
                   the way out, so it says it. */}
               <button className="hub-profile-action hub-sign-out" onClick={onSignOut} title="Sign out">

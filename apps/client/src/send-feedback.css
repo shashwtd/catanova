@@ -1,0 +1,92 @@
+/*
+ * Send feedback borrows the Settings parchment wholesale: its segmented tabs
+ * for the three kinds, its switch and caption for the technical details, and
+ * the dialog's own buttons. The only new piece is the message box, drawn to
+ * sit in that family: a pale paper well with the panel's brass edge.
+ */
+.feedback-form .feedback-kinds {
+  margin-bottom: 16px;
+}
+.feedback-kinds .settings-tab[aria-checked='true'] {
+  background: #fffbeb;
+  color: #2f5246;
+  box-shadow: 0 1px 3px #2a3c3426;
+}
+.feedback-kinds .settings-tab:hover:not([aria-checked='true']) {
+  background: #efe5cb;
+}
+.feedback-kinds .settings-tab:focus-visible {
+  outline: 2px solid #287569;
+  outline-offset: 2px;
+}
+.feedback-message {
+  position: relative;
+}
+.feedback-message textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 132px;
+  max-height: 40vh;
+  resize: vertical;
+  margin: 0;
+  padding: 11px 13px 26px;
+  border: 1px solid #bda16c80;
+  border-radius: 10px;
+  background: #fffbeb99;
+  box-shadow: inset 0 1px 3px #2a3c3418;
+  color: #3b3322;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.feedback-message textarea::placeholder {
+  color: #96805e;
+}
+.feedback-message textarea:focus-visible {
+  outline: 2px solid #287569;
+  outline-offset: 2px;
+}
+.feedback-count {
+  position: absolute;
+  right: 12px;
+  bottom: 7px;
+  color: #867051;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.feedback-form .feedback-details {
+  margin-top: 18px;
+}
+.feedback-form .feedback-details .settings-row-heading {
+  font-size: 15px;
+  color: #59472f;
+}
+.feedback-form .entry-error {
+  margin: 14px 0 0;
+}
+.feedback-form .dialog-actions {
+  margin-top: 20px;
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  /* 16px keeps phones from zooming into the field. */
+  .feedback-message textarea {
+    font-size: 16px;
+  }
+  /* Phone dialogs give every input a 44px touch height; the switch keeps its
+     own shape and gets its touch height from its label instead. */
+  .game-dialog .feedback-form .settings-switch input,
+  .playing .game-panel .feedback-form .settings-switch input {
+    min-height: 0;
+  }
+}
+.feedback-thanks {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 2px 0 0;
+  color: #315447;
+  font-size: 16px;
+  font-weight: 600;
+}

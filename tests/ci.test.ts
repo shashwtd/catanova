@@ -98,9 +98,14 @@ test('local CI validates Compose with the workflow placeholders and a clean envi
     SUPABASE_URL: 'https://example.supabase.co',
     SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_ci_configuration_only',
     TURNSTILE_SITE_KEY: 'site_key_for_configuration_validation',
+    TUNNEL_TOKEN: 'tunnel_token_for_configuration_validation',
+    ADMIN_ACCESS_TEAM_DOMAIN: 'catanova-ci.cloudflareaccess.com',
+    ADMIN_ACCESS_AUD: '0'.repeat(64),
+    ADMIN_EMAILS: 'owner@example.com',
   });
-  // Values that alter the build or the bots must not leak from a developer shell into the gate.
-  for (const name of ['GA_MEASUREMENT_ID', 'TYPESAFE_API_KEY', 'SUPABASE_URL', 'NODE_ENV'])
+  // Values that alter the build, the bots or the admin listener must not leak from a developer
+  // shell into the gate.
+  for (const name of ['GA_MEASUREMENT_ID', 'TYPESAFE_API_KEY', 'SUPABASE_URL', 'NODE_ENV', 'ADMIN_PORT'])
     assert.ok(SCRUBBED_VARIABLES.includes(name), name);
 });
 

@@ -25,18 +25,18 @@ cp deploy/single-vm/.env.example deploy/single-vm/.env
 chmod 600 deploy/single-vm/.env
 ```
 
-Replace the commit placeholder before running the commands. Fill all five values in `deploy/single-vm/.env`; `CATANOVA_REVISION` must exactly match `git rev-parse HEAD`. This file is ignored by Git. Use one bare DNS hostname for `CATANOVA_DOMAIN`. Public keys belong here; privileged keys do not.
+Replace the commit placeholder before running the commands. Fill every required value in `deploy/single-vm/.env`, including the admin console's Cloudflare settings described in [the admin console guide](../../docs/ADMIN.md); `CATANOVA_REVISION` must exactly match `git rev-parse HEAD`. This file is ignored by Git. Use one bare DNS hostname for `CATANOVA_DOMAIN`. Public keys belong here; privileged keys do not.
 
 Run the following from **deploy/single-vm**. `--env-file .env` explicitly selects this deployment's configuration, and `${VAR:?message}` rejects missing or empty values. Avoid exporting conflicting variables in the shell: shell values take precedence. [Compose interpolation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
 
 ```sh
 docker compose --env-file .env config --quiet
 docker compose --env-file .env build --pull game
-docker compose --env-file .env pull caddy
+docker compose --env-file .env pull caddy cloudflared
 docker compose --env-file .env run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 docker compose --env-file .env up -d --no-build
 docker compose --env-file .env ps
-docker compose --env-file .env logs --tail=80 game caddy
+docker compose --env-file .env logs --tail=80 game caddy cloudflared
 ```
 
 The image carries the source revision label. Node's base-image tag in the repository Dockerfile and Caddy's patch tag can receive image rebuilds; keep the resulting image IDs with release records if exact rollback is needed. This pins application source, not every upstream image digest.

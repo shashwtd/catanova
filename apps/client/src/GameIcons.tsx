@@ -40,6 +40,8 @@ const CONTROL_PATHS = {
 
   smile: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18 M9 10v.5 M15 10v.5 M8 14a5 5 0 0 0 8 0',
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+  feedback:
+    'M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2 M8 9h8 M8 12.5h5',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
 export const GAME_ICON_NAMES = [
@@ -161,7 +163,8 @@ export const JoinRoom = icon('join'),
   Exchange = icon('exchange'),
   LightClose = icon('light-close'),
   LightCheck = icon('light-check'),
-  Configure = icon('configure');
+  Configure = icon('configure'),
+  MessageSquare = icon('feedback');
 
 /**
  * The champion.
