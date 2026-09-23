@@ -55,12 +55,12 @@ out. [How the bots work, and what a game costs](docs/BOTS.md).
 
 ## A fairer starting island
 
-The default **balanced-v1** preset keeps the standard resource and number supplies, with explicit bounds:
+The default **balanced-v2** preset keeps the standard resource and number supplies, with explicit bounds:
 
 - No connected resource clusters larger than two tiles; every resource is spread across the island.
-- No adjacent 6/8 tiles, and no intersection above 11 production pips.
-- Each resource gets a reasonable share of production numbers.
-- Nine separated ports with the familiar ratios.
+- No 6 or 8 next to another 6 or 8, no equal numbers on neighbouring tiles, no 2 next to the 12, and no intersection above 11 production pips.
+- Each resource gets a reasonable share of production numbers: 2.5–4 pips per tile on average.
+- Nine separated ports with the familiar ratios, alternating with open sea around the coast like the official frame.
 
 Strong three-resource placements remain possible. Dice are independently random; there are no catch-up rolls. This is a named custom setup, separate from the official spiral/fixed presets. [Generation rules and tests](docs/MAP_GENERATION.md).
 
