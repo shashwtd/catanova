@@ -87,9 +87,10 @@ export const ACTIVITY_MAX_AGE_MS = 30_000;
 
 /**
  * Games started and ended, and accounts that played, since two moments the
- * page chooses (the start of its day and of its week), counted over every
- * match record. Finished games have a winner; abandoned ones do not. A new
- * player is an account whose first recorded game started in the window.
+ * page chooses (the start of its day and of its week, which must not be
+ * later), counted over every match record. Finished games have a winner;
+ * abandoned ones do not. A new player is an account whose first recorded
+ * game started in the window.
  */
 export function countActivity(db: DatabaseSync, now: number, day: number, week: number): ActivitySummary {
   const matches = `SELECT room_id, started_at, finished_at, winner FROM match_records
@@ -106,20 +107,37 @@ export function countActivity(db: DatabaseSync, now: number, day: number, week: 
        FROM (${matches})`,
     )
     .get({ day, week }) as Record<string, number>;
+  // The week's players come from the week's games alone (CROSS JOIN keeps
+  // SQLite reading the games first, then only their seats, rather than every
+  // participation ever). Each is then new unless some game of theirs started
+  // before the day (or week) began: an indexed lookup that stops at the first
+  // one it finds, so a regular's many old games are never all read.
+  const before = (since: string) => `(
+    EXISTS (SELECT 1 FROM match_participants p JOIN match_records m ON m.room_id = p.room_id
+      WHERE p.user_id = people.userId AND m.started_at < ${since})
+    OR EXISTS (SELECT 1 FROM archived_participants p JOIN archived_matches m ON m.room_id = p.room_id
+      WHERE p.user_id = people.userId AND m.started_at < ${since}))`;
   const people = db
     .prepare(
-      `WITH players AS (
-         SELECT p.user_id AS userId, m.started_at AS startedAt FROM (
-           SELECT room_id, user_id FROM match_participants
-           UNION ALL SELECT room_id, user_id FROM archived_participants
-         ) p JOIN (${matches}) m ON m.room_id = p.room_id
-         WHERE m.started_at IS NOT NULL
-       ), firsts AS (SELECT userId, min(startedAt) AS first FROM players GROUP BY userId)
+      `WITH recent AS (
+         SELECT p.user_id AS userId, m.started_at AS startedAt
+         FROM match_records m CROSS JOIN match_participants p ON p.room_id = m.room_id
+         WHERE m.started_at >= :week
+         UNION ALL
+         SELECT p.user_id, m.started_at
+         FROM archived_matches m CROSS JOIN archived_participants p ON p.room_id = m.room_id
+         WHERE m.started_at >= :week
+       ), people AS (
+         SELECT userId, max(startedAt) >= :day AS today FROM recent GROUP BY userId
+       ), known AS (
+         SELECT today, ${before(':day')} AS beforeDay, ${before(':week')} AS beforeWeek FROM people
+       )
        SELECT
-         (SELECT count(DISTINCT userId) FROM players WHERE startedAt >= :day) AS playersDay,
-         (SELECT count(DISTINCT userId) FROM players WHERE startedAt >= :week) AS playersWeek,
-         (SELECT count(*) FROM firsts WHERE first >= :day) AS newDay,
-         (SELECT count(*) FROM firsts WHERE first >= :week) AS newWeek`,
+         coalesce(sum(today), 0) AS playersDay,
+         count(*) AS playersWeek,
+         coalesce(sum(NOT beforeDay), 0) AS newDay,
+         coalesce(sum(NOT beforeWeek), 0) AS newWeek
+       FROM known`,
     )
     .get({ day, week }) as Record<string, number>;
   return {

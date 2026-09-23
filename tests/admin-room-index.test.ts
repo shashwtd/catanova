@@ -216,10 +216,34 @@ test('games and players are counted since the start of the day and week the page
   assert.deepEqual(activity.abandoned, { day: 0, week: 0 });
   assert.deepEqual(activity.players, { day: 2, week: 4 }, 'Dan and Eve today; Alice and Cara too this week');
   assert.deepEqual(activity.newPlayers, { day: 2, week: 3 }, 'Alice first played ten days ago');
+  // Earlier rounds of a rematch count as games too: Dan played one a month ago,
+  // so he is not new, and Bob one yesterday, so he played this week.
+  const round = (id: string, player: Identity, startedAt: number) => {
+    const source = store.db.prepare('SELECT room_id FROM seats WHERE user_id = ? LIMIT 1').get(player.id)!;
+    store.db
+      .prepare(
+        `INSERT INTO archived_matches (room_id, revision, started_at, finished_at, sort_at, turns, winner, players, source_room_id)
+         VALUES (?, 1, ?, ?, ?, 10, NULL, '[]', ?)`,
+      )
+      .run(id, startedAt, startedAt + HOUR / 2, startedAt + HOUR / 2, source.room_id as string);
+    store.db
+      .prepare(
+        `INSERT INTO archived_participants (room_id, player_id, user_id, points, outcome, resumable)
+         VALUES (?, 'p1', ?, 2, 'abandoned', 0)`,
+      )
+      .run(id, player.id);
+  };
+  round('round-dan', dan!, now - 30 * 24 * HOUR);
+  round('round-bob', bob!, now - 30 * HOUR);
+  const withRounds = countActivity(store.db, now, now - 5 * HOUR, now - 72 * HOUR);
+  assert.deepEqual(withRounds.started, { day: 1, week: 3 });
+  assert.deepEqual(withRounds.abandoned, { day: 0, week: 1 });
+  assert.deepEqual(withRounds.players, { day: 2, week: 5 });
+  assert.deepEqual(withRounds.newPlayers, { day: 1, week: 2 }, 'Eve today; Cara this week');
   // The worker gives the same answer, and reuses it for half a minute.
   const index = new RoomIndex({ databasePath: path, db: store.db, leaseMs: ROOM_CODE_LEASE_MS });
   t.after(() => index.close());
-  assert.deepEqual(await index.activity(now, now - 5 * HOUR, now - 72 * HOUR), activity);
+  assert.deepEqual(await index.activity(now, now - 5 * HOUR, now - 72 * HOUR), withRounds);
 });
 
 test('an account goes by the name it last sat down with and the sign-in it last used', async (t) => {
