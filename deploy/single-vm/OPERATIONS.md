@@ -49,7 +49,9 @@ The [isolated recovery check](verify-recovery.mjs) prepares a two-client fixture
 
 ## Deploy a reviewed update
 
-Merging a pull request into `main` does **not** deploy it. The GitHub workflow runs checks only; there is no Azure deployment job or server auto-pull. A merge already updates `main`, so no second push is needed. Deploy the reviewed merge commit with the process below.
+Merging a pull request into `main` does **not** deploy it. There is no Azure deployment job or server auto-pull. A merge already updates `main`, so no second push is needed. Deploy the reviewed merge commit with the process below.
+
+**GitHub Actions has not run since 20 September 2026** (the account is locked over billing), so no merge since then was checked automatically. The gate is now local: before merging and before every deploy, check out the exact commit and run `npm run ci` on the operator's computer. It runs everything the old workflow ran and prints a pass/fail summary; see [the contributing guide](../../CONTRIBUTING.md#the-merge-gate-npm-run-ci). Deploy only a commit whose run ended in `RESULT: PASS` without uncommitted changes. Where Docker is available, `npm run ci -- --docker` also starts the built image and probes it. The VM itself has no Node toolchain; it validates Compose again during the update below.
 
 Finish active games where possible and record the current commit and image ID before updating. Confirm a recent successful off-VM backup; a manual run uses `systemctl start catanova-backup.service`. Check its result before proceeding.
 

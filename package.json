@@ -22,6 +22,7 @@
     "test:connectivity": "tsx --test tests/connectivity.test.ts",
     "probe": "tsx scripts/probe.ts",
     "check": "npm run typecheck && npm test && npm run build",
+    "ci": "tsx scripts/ci.ts",
     "format": "prettier --write apps packages tests scripts docs README.md",
     "report:retention": "node --import tsx scripts/retention-report.ts"
   },
