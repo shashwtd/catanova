@@ -481,7 +481,8 @@ export async function startServer(
     handshakeTimeout.unref();
     let windowStart = Date.now();
     let messages = 0;
-    let authenticating = false;
+    let authenticating = false,
+      authRefreshing = false;
     let authExpiry: ReturnType<typeof setTimeout> | undefined;
     let accountToken: string | undefined, accountIdentity: Identity | undefined;
     let activityPending = false,
@@ -647,6 +648,39 @@ export async function startServer(
             version: PROTOCOL_VERSION,
           });
           broadcast(seat.room_id);
+        } else if (message.type === 'auth') {
+          // A fresh token for this socket's account, so a signed-in player is not
+          // disconnected every time their token expires (hourly). An outage at the
+          // sign-in service keeps the current session until it runs out; a
+          // different or invalid account closes the socket as before.
+          if (!verify || !accountIdentity || authRefreshing) {
+            if (!authRefreshing) send(ws, { type: 'auth', ok: false });
+            return;
+          }
+          authRefreshing = true;
+          let identity: Identity;
+          try {
+            identity = await verify(message.accessToken);
+          } catch (error) {
+            if (
+              error instanceof ProtocolError &&
+              ['AUTH_UNAVAILABLE', 'ACCOUNT_UNAVAILABLE'].includes(error.code)
+            ) {
+              if (ws.readyState === WebSocket.OPEN) send(ws, { type: 'auth', ok: false });
+            } else ws.close(4003, 'Refresh account session');
+            return;
+          } finally {
+            authRefreshing = false;
+          }
+          if (ws.readyState !== WebSocket.OPEN) return;
+          if (identity.id !== accountIdentity.id || identity.expiresAt <= Date.now()) {
+            ws.close(4003, 'Refresh account session');
+            return;
+          }
+          accountToken = message.accessToken;
+          accountIdentity = identity;
+          setAuthDeadline();
+          send(ws, { type: 'auth', ok: true, expiresAt: identity.expiresAt });
         } else {
           const watchedRoom = spectators.get(ws);
           if (watchedRoom) {

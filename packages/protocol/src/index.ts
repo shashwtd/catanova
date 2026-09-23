@@ -133,7 +133,9 @@ export type ClientMessage =
   | { type: 'sync' }
   | { type: 'history'; before?: number }
   | { type: 'statistics' }
-  | { type: 'ping'; nonce: string };
+  | { type: 'ping'; nonce: string }
+  /** A fresh sign-in token for the socket already open, so it need not reconnect every hour. */
+  | { type: 'auth'; accessToken: string };
 export type ServerMessage =
   | { type: 'welcome'; playerId: string; state: RoomState; version: number }
   | { type: 'state'; state: RoomState }
@@ -149,7 +151,9 @@ export type ServerMessage =
   | { type: 'statistics'; statistics: GameStatistics }
   | { type: 'pong'; nonce: string; revision?: number; serverNow?: number }
   | { type: 'reaction'; playerId: string; name: string; reaction: ReactionName; at: number }
-  | { type: 'error'; code: string; message: string; commandId?: string };
+  | { type: 'error'; code: string; message: string; commandId?: string }
+  /** Whether a refreshed token was accepted; if not, the client simply offers it again later. */
+  | { type: 'auth'; ok: boolean; expiresAt?: number };
 
 /** Bounds and a strict operation whitelist keep untrusted messages out of the store. */
 export function parseClientMessage(input: string): ClientMessage {
@@ -246,5 +250,10 @@ export function parseClientMessage(input: string): ClientMessage {
   }
   if (v.type === 'ping' && typeof v.nonce === 'string' && v.nonce.length <= 80)
     return { type: 'ping', nonce: v.nonce };
+  if (v.type === 'auth') {
+    if (typeof v.accessToken !== 'string' || !v.accessToken || v.accessToken.length > 16000)
+      throw new Error('Invalid authentication');
+    return { type: 'auth', accessToken: v.accessToken };
+  }
   throw new Error('Unknown or invalid operation');
 }
