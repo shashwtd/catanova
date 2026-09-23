@@ -8,18 +8,12 @@ import {
   analyticsLoader,
 } from '../apps/client/src/analytics.js';
 
-type FakeEvent = { defaultPrevented: boolean; preventDefault(): void };
-
-/** Just enough of a document for the loader: elements, listeners, a modal dialog and a cookie jar. */
+/** Just enough of a document for the loader: elements, listeners and a cookie jar. */
 class FakeElement {
   children: FakeElement[] = [];
   parentNode: FakeElement | null = null;
   attributes = new Map<string, string>();
-  listeners = new Map<string, ((event?: FakeEvent) => void)[]>();
-  /** A dialog's state, and how many times showModal() opened it. */
-  open = false;
-  modal = 0;
-  focused = 0;
+  listeners = new Map<string, (() => void)[]>();
   textContent = '';
   className = '';
   type = '';
@@ -51,38 +45,11 @@ class FakeElement {
     child.parentNode = null;
     return child;
   }
-  addEventListener(type: string, listener: (event?: FakeEvent) => void) {
+  addEventListener(type: string, listener: () => void) {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
   }
   click() {
     for (const listener of this.listeners.get('click') ?? []) listener.call(this);
-  }
-  dispatch(type: string): FakeEvent {
-    const event: FakeEvent = {
-      defaultPrevented: false,
-      preventDefault() {
-        this.defaultPrevented = true;
-      },
-    };
-    for (const listener of this.listeners.get(type) ?? []) listener.call(this, event);
-    return event;
-  }
-  focus() {
-    this.focused++;
-  }
-  showModal() {
-    if (this.open) throw new Error('InvalidStateError: the dialog is already open');
-    this.open = true;
-    this.modal++;
-  }
-  close() {
-    if (!this.open) return;
-    this.open = false;
-    this.dispatch('close');
-  }
-  /** Escape as a browser handles it: a cancel event the page may refuse, then a close. */
-  pressEscape() {
-    if (!this.dispatch('cancel').defaultPrevented) this.close();
   }
   find(match: (element: FakeElement) => boolean): FakeElement | undefined {
     for (const child of this.children) {
@@ -204,7 +171,7 @@ function page({
     events.filter((event): event is IArguments => typeof (event as IArguments)[0] === 'string');
   const tags = () => head.children.filter((node) => node.tagName === 'script' && node.src);
   const stylesheet = () => head.find((node) => node.tagName === 'link');
-  const banner = () => body.find((node) => node.className === 'consent-dialog');
+  const banner = () => body.find((node) => node.className === 'consent-banner');
   const button = (choice: string) =>
     banner()?.find((node) => node.getAttribute('data-consent-choice') === choice);
   const control = () => body.querySelectorAll('[data-consent-control]')[0];
@@ -240,7 +207,7 @@ function page({
     banner,
     button,
     run,
-    /** The dialog opens only once its stylesheet has loaded. */
+    /** The banner is added only once its stylesheet has loaded. */
     showBanner() {
       stylesheet()?.onload?.();
       return banner();
@@ -290,15 +257,18 @@ test('nothing reaches Google until the visitor allows it, and the answer is reme
   assert.equal(index(visit.commands(), 'config'), -1);
   assert.equal(index(visit.commands(), 'js'), -1);
   assert.equal(visit.stylesheet()?.href, CONSENT_STYLESHEET);
-  assert.equal(visit.banner(), undefined, 'the dialog waits for its styles');
+  assert.equal(visit.banner(), undefined, 'the banner waits for its styles');
   const banner = visit.showBanner()!;
-  assert.equal(banner.tagName, 'dialog');
-  assert.deepEqual([banner.open, banner.modal], [true, 1], 'opened as a modal over the page');
+  assert.equal(banner.tagName, 'section');
   assert.match(banner.find((node) => node.tagName === 'p')!.textContent, /Google Analytics/);
   const privacy = banner.find((node) => node.tagName === 'a')!;
   assert.deepEqual([privacy.href, privacy.textContent], ['/privacy/', 'Privacy']);
   assert.equal(visit.button('granted')?.textContent, 'Accept all');
   assert.equal(visit.button('denied')?.textContent, 'Deny');
+  assert.deepEqual(
+    banner.find((node) => node.className === 'consent-actions')!.children.map((node) => node.textContent),
+    ['Deny', 'Accept all'],
+  );
   visit.button('granted')!.click();
   assert.equal(visit.banner(), undefined);
   assert.equal(visit.saved.get(CONSENT_STORAGE_KEY), 'granted');
@@ -325,37 +295,8 @@ test('Deny is remembered, loads nothing and clears cookies Google Analytics left
     '_ga_TEST=; Max-Age=0; path=/; domain=catanova.io',
   ]);
   const again = page({ stored: 'denied' });
-  assert.equal(again.stylesheet(), undefined, 'no dialog and no stylesheet once answered');
+  assert.equal(again.stylesheet(), undefined, 'no banner and no stylesheet once answered');
   assert.equal(again.tags().length, 0);
-});
-
-test('the question must be answered: Escape and forced closes do not dismiss it', () => {
-  const visit = page();
-  const dialog = visit.showBanner()!;
-  assert.equal(dialog.getAttribute('tabindex'), '-1');
-  assert.equal(dialog.focused, 1, 'the dialog itself takes focus, so its question is read first');
-  assert.deepEqual(
-    dialog.find((node) => node.className === 'consent-actions')!.children.map((node) => node.textContent),
-    ['Deny', 'Accept all'],
-    'both answers are buttons side by side; Accept all is the bright one in consent.css',
-  );
-  dialog.pressEscape();
-  assert.deepEqual([dialog.open, dialog.modal], [true, 1], 'Escape is refused');
-  // Chrome may close a modal on Escape even when the page refuses it; unanswered, it opens again.
-  dialog.close();
-  assert.deepEqual([dialog.open, dialog.modal], [true, 2]);
-  assert.equal(visit.saved.get(CONSENT_STORAGE_KEY), undefined, 'nothing is assumed');
-  visit.button('denied')!.click();
-  assert.equal(dialog.open, false);
-  assert.equal(visit.banner(), undefined);
-  assert.equal(dialog.modal, 2, 'an answer closes it for good');
-  // Leaving for a room closes it without reopening, and it asks again on the next public page.
-  const leaving = page();
-  const question = leaving.showBanner()!;
-  leaving.history.pushState(null, '', '/room/ABCD');
-  assert.deepEqual([question.open, question.modal], [false, 1]);
-  assert.equal(leaving.saved.get(CONSENT_STORAGE_KEY), undefined);
-  assert.ok(page().showBanner(), 'still unanswered, so the next visit asks again');
 });
 
 test('storage that refuses access still asks, and the answer holds for the page', () => {
@@ -479,16 +420,16 @@ test('the privacy page control shows the stored answer and changes it later', ()
   ]);
 });
 
-test('an unanswered visitor to the privacy page can answer in the dialog or the control', () => {
+test('an unanswered visitor to the privacy page can answer in the banner or the control', () => {
   const visit = page({ pathname: '/privacy/', privacy: true });
   assert.deepEqual(visit.shown(), { states: ['unset'], pressed: ['granted:false', 'denied:false'] });
   assert.ok(visit.showBanner());
   visit.controlButton('granted').click();
-  assert.equal(visit.banner(), undefined, 'answering in the control also answers the dialog');
+  assert.equal(visit.banner(), undefined, 'answering in the control also answers the banner');
   assert.deepEqual(visit.shown(), { states: ['granted'], pressed: ['granted:true', 'denied:false'] });
   assert.equal(visit.tags().length, 1);
   const banner = page({ pathname: '/privacy/', privacy: true });
   banner.showBanner();
   banner.button('denied')!.click();
-  assert.deepEqual(banner.shown().states, ['denied'], 'and the dialog updates the control');
+  assert.deepEqual(banner.shown().states, ['denied'], 'and the banner updates the control');
 });

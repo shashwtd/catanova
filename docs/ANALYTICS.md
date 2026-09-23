@@ -5,7 +5,7 @@ usernames and social data; it is not the dice or match-history database.
 
 Website visits are a separate, much smaller record: Google Analytics 4 runs on the
 public pages only, and only for visitors who choose **Accept all** in the consent
-dialog. Google's tag is not loaded before that answer. See
+banner. Google's tag is not loaded before that answer. See
 [Measurement](art/RUNTIME.md#measurement) for how the loader keeps room codes out of it.
 
 ## What is recorded today
