@@ -167,6 +167,25 @@ test('line charts are labelled SVG with a legend and a table of every value, and
   );
   const path = steps.match(/class="chart-line line-1" d="([^"]+)"/)![1]!;
   assert.match(path, /^M[\d.]+,[\d.]+H[\d.]+V[\d.]+H[\d.]+V[\d.]+$/);
+  // A marker's label reads away from the nearer edge, so one near the end is not cut off.
+  const marked = (at: number) =>
+    renderToStaticMarkup(
+      createElement(LineChart, {
+        label: 'Sockets',
+        x: [],
+        series: [{ name: 'Sockets', slot: 1, values: [] }],
+        domain: [0, 600_000],
+        ticks: [0, 600_000],
+        tickLabel: String,
+        pointLabel: String,
+        format: String,
+        xTitle: 'Time',
+        yTitle: 'sockets',
+        markers: [{ x: at, label: 'server started' }],
+      }),
+    ).match(/<g class="chart-marker">.*?<\/g>/)![0];
+  assert.match(marked(590_000), /<text[^>]*text-anchor="end"[^>]*>server started<\/text>/);
+  assert.doesNotMatch(marked(10_000), /text-anchor/);
 });
 
 test('time axes tick on round local times, and the day and week start at local midnight and Monday', () => {

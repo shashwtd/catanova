@@ -545,14 +545,19 @@ export function LineChart({
           />
           {markers
             .filter((marker) => marker.x >= x0 && marker.x <= x1)
-            .map((marker) => (
-              <g key={`${marker.x}-${marker.label}`} className="chart-marker">
-                <line x1={sx(marker.x)} x2={sx(marker.x)} y1={top} y2={top + plot.height} />
-                <text x={sx(marker.x) + 4} y={top + 9}>
-                  {marker.label}
-                </text>
-              </g>
-            ))}
+            .map((marker) => {
+              const at = sx(marker.x);
+              // Read away from the nearer edge, so a marker near the end is never cut off.
+              const before = at > left + plot.width / 2;
+              return (
+                <g key={`${marker.x}-${marker.label}`} className="chart-marker">
+                  <line x1={at} x2={at} y1={top} y2={top + plot.height} />
+                  <text x={before ? at - 4 : at + 4} y={top + 9} textAnchor={before ? 'end' : undefined}>
+                    {marker.label}
+                  </text>
+                </g>
+              );
+            })}
           {wash && <path className={`chart-area area-${series[0]!.slot}`} d={wash} />}
           {series.map((s, i) => (
             <path key={s.name} className={`chart-line line-${s.slot}`} d={paths[i]} />
