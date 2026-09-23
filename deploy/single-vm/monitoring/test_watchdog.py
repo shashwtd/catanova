@@ -406,7 +406,8 @@ class MainTests(WatchdogTestCase):
 
     def test_check_only_and_test_alert_send_nothing_unexpected(self):
         self.write_backup_status(7)
-        with Stub() as stub, patch.object(watchdog, "probe_https", return_value=good_probe()), patch.object(watchdog, "disk_percent", return_value=30.0):
+        # The backup and certificate are dated from NOW, so the check must run at NOW too.
+        with Stub() as stub, patch.object(watchdog, "probe_https", return_value=good_probe()), patch.object(watchdog, "disk_percent", return_value=30.0), patch.object(watchdog.time, "time", return_value=NOW):
             config = self.config(ping_url=stub.url("/uuid"), alert_url=stub.url("/topic"))
             self.assertEqual(self.run_main(config, "--check-only")[0], 0)
             self.assertEqual(stub.requests, [])
