@@ -121,7 +121,106 @@ systemctl start catanova-backup.service
 systemctl show catanova-backup.service -p Result -p ExecMainStatus
 ```
 
-Verify the upload and latest successful timestamp; an inactive successful oneshot is normal. Configure an alert if the last successful backup is over 30 minutes old; that alert has not been installed. For recovery, follow [Restore and verify](backup/README.md#restore-and-verify): validate a downloaded snapshot in isolation, stop the backup worker and sole game writer, preserve the old database and WAL files, then restore with correct ownership. Never copy a live SQLite file as a backup or overwrite an open database. These snapshots cover matches; Supabase accounts, Caddy certificates, and VM configuration have separate recovery needs.
+Verify the upload and latest successful timestamp; an inactive successful oneshot is normal. For recovery, follow [Restore production from a backup](#restore-production-from-a-backup). Never copy a live SQLite file as a backup or overwrite an open database. These snapshots cover matches; Supabase accounts, Caddy certificates, and VM configuration have separate recovery needs.
+
+## Restore drill
+
+The weekly [restore drill](backup/README.md#restore-drill) downloads the newest backup and verifies its checksum and SQLite structure. It then checks every room with the deployed release's own code: saved state against the journal hash chain, history, rules invariants, and one legal move applied to a copy of each unfinished game. It runs on Wednesdays at 21:40 UTC. To run one now and read the result:
+
+```sh
+systemctl start catanova-drill.service
+journalctl -u catanova-drill.service -n 80 --no-pager
+python3 -m json.tool /srv/catanova/status/drill.json
+```
+
+A passing run ends with `restore drill passed: N games in M rooms verified` and pings its check. A failing drill never touches live data, so read which step failed before acting:
+
+- **Download or checksum:** the backup could not be fetched, or it is not the file the worker uploaded. Check the storage role and recent backups (`--list`, below); try `--blob` with the previous backup.
+- **gzip or SQLite:** that backup is damaged. Drill the previous one. If several are damaged, stop and investigate the worker before trusting any backup.
+- **Game verification:** the journal names each failing room and reason, for example `loadGame: STATE_INTEGRITY` or `wood: bank 4 + hands 16 = 20, expected 19`. The same room in the live database is probably damaged too. Check it before it spreads into further backups, and keep that backup for analysis.
+
+`--list`, `--blob NAME --output FILE` and offline use from a downloaded archive are described in [the backup guide](backup/README.md#restore-drill).
+
+## Restore production from a backup
+
+Use this when the live database is lost or damaged: a disk fault, `STATE_INTEGRITY` errors across rooms, or a release that corrupted data. A restore puts **every** room back to the moment of the chosen backup and loses all later moves. For one damaged room, investigate that room instead. The weekly drill rehearses steps 2 and 3 with the newest backup, so a passing drill is evidence these steps will work. Never restore into the production volume just to practise.
+
+If the VM or its data disk is gone, first build a replacement host with [bootstrap.sh](bootstrap.sh), deploy the same reviewed release as in [the deployment guide](README.md), and install the backup worker and drill without enabling their timers. Then follow the steps below; step 5 has nothing to preserve.
+
+Run everything as root on the VM with the `catanova_compose` helper from [Connect and inspect](#connect-and-inspect) defined.
+
+1. **Record and quiet the incident.** Note the time the damage began. Optionally pause the three checks on healthchecks.io so planned downtime does not page anyone.
+2. **Choose the snapshot:** the newest backup taken before the damage began.
+
+   ```sh
+   run_drill() {
+     systemd-run --quiet --wait --pipe -p EnvironmentFile=/etc/catanova/backup.env \
+       -p EnvironmentFile=/etc/catanova/drill.env /usr/bin/python3 -B /opt/catanova-backup/restore_drill.py "$@"
+   }
+   run_drill --list 20
+   ```
+
+3. **Verify it into a private file** with the release that will serve it. By default the drill uses the game container's image, even a stopped container; if the container was removed, add `--image catanova-local:<full commit hash>`. Continue only after `restore drill passed`, and write down the `sha256` it prints for the verified database.
+
+   ```sh
+   install -d -m 0700 /root/catanova-restore
+   run_drill --blob 'game/YYYY/MM/DD/NAME.sqlite.gz' --work-directory /root/catanova-restore \
+     --output /root/catanova-restore/verified.sqlite --no-report
+   ```
+
+4. **Stop every writer.** Stop the timers, let a running backup finish, then stop the game. Players see an error page from Caddy until step 7.
+
+   ```sh
+   systemctl stop catanova-backup.timer catanova-drill.timer catanova-watchdog.timer
+   while systemctl is-active --quiet catanova-backup.service catanova-drill.service; do sleep 2; done
+   catanova_compose stop game
+   ```
+
+5. **Preserve the current database and its WAL/SHM files together**, for later analysis or to undo the restore:
+
+   ```sh
+   volume=$(docker volume inspect catanova-game-data --format '{{.Mountpoint}}')
+   saved=/root/catanova-restore/before-$(date -u +%Y%m%dT%H%M%SZ)
+   install -d -m 0700 "$saved"
+   cp -a "$volume"/probe.sqlite* "$saved"/
+   ls -la "$saved"
+   ```
+
+6. **Install the verified file** with the old file's owner and mode. The old `-wal` and `-shm` files must go: SQLite would apply them to the restored database. Compare the checksum with step 3.
+
+   ```sh
+   owner=$(stat -c '%u' "$volume/probe.sqlite"); group=$(stat -c '%g' "$volume/probe.sqlite")
+   mode=$(stat -c '%a' "$volume/probe.sqlite")
+   install -m "$mode" -o "$owner" -g "$group" /root/catanova-restore/verified.sqlite "$volume/probe.sqlite.restoring"
+   rm -f "$volume/probe.sqlite-wal" "$volume/probe.sqlite-shm"
+   mv "$volume/probe.sqlite.restoring" "$volume/probe.sqlite"
+   sha256sum "$volume/probe.sqlite"
+   ```
+
+   On a replacement host with no old file, use owner and group `1000` (the image's `node` user) and mode `600`.
+
+7. **Start the same release and check it.** Wait for `healthy`, read the logs, and open a room you know from the snapshot. Its board, hands and turn should match that moment.
+
+   ```sh
+   catanova_compose up -d --no-build game
+   catanova_compose ps
+   catanova_compose logs --tail=80 game
+   curl --fail --show-error https://catanova.io/healthz
+   ```
+
+8. **Resume protection.** Take a fresh backup of the restored state, re-enable the timers, confirm the watchdog passes, and resume the healthchecks.io checks.
+
+   ```sh
+   systemctl start catanova-backup.service
+   systemctl show catanova-backup.service -p Result -p ExecMainStatus
+   systemctl start catanova-backup.timer catanova-drill.timer catanova-watchdog.timer
+   systemctl start catanova-watchdog.service
+   journalctl -u catanova-watchdog.service -n 12 --no-pager
+   ```
+
+9. **Record** the backup name, its time, the restore time, the lost interval and the verified checksum. Keep `$saved` until the cause is understood, then delete it: it holds every game.
+
+To undo, stop the game again, copy `probe.sqlite`, `-wal` and `-shm` back from `$saved` together with `cp -a`, and start the game.
 
 ## DNS and VM power
 

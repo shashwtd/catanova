@@ -17,7 +17,7 @@ import { decide, initialPlan } from '../packages/bot/src/index.js';
 import type { BotPlan } from '../packages/bot/src/index.js';
 
 export type FixtureRooms = {
-  /** Three seats (one bot), stopped mid-turn after a roll. */
+  /** Three seats (one bot), stopped mid-turn after a person's roll. */
   inProgress: string;
   /** Four people, stopped with the third settlement placed and its road due. */
   setup: string;
@@ -68,12 +68,20 @@ async function playUntil(store: Store, roomId: string, stop: (game: Game) => boo
   throw new Error(`fixture room ${roomId} did not reach its target state within ${limit} moves`);
 }
 
+/** Seat tokens by player id, so a test can reconnect as a person after a restore. */
+export const seatTokens = new Map<string, string>();
+
+function seat(store: Store, mode: 'create' | 'join', name: string, roomId?: string) {
+  const secret = token();
+  const seated = store.enter(mode, secret, name, roomId);
+  seatTokens.set(seated.id, secret);
+  return seated;
+}
+
 function lobbyOf(store: Store, people: number, bots = 0) {
-  const host = store.enter('create', token(), 'Host');
+  const host = seat(store, 'create', 'Host');
   const roomId = host.room_id;
-  const guests = Array.from({ length: people - 1 }, (_, i) =>
-    store.enter('join', token(), `Guest ${i + 1}`, roomId),
-  );
+  const guests = Array.from({ length: people - 1 }, (_, i) => seat(store, 'join', `Guest ${i + 1}`, roomId));
   for (let i = 0; i < bots; i++)
     store.lobby(host, token(), store.snapshot(roomId).revision, false, undefined, undefined, true);
   return { host, guests, roomId };
@@ -94,7 +102,13 @@ export async function buildPlayedDatabase(path: string): Promise<{ store: Store;
   };
 
   const inProgress = room(2, 1);
-  await playUntil(store, inProgress.roomId, (g) => g.phase === 'actions' && g.turn >= 6, 2000);
+  const inProgressBots = new Set(store.botSeatsIn(inProgress.roomId).map((bot) => bot.id));
+  await playUntil(
+    store,
+    inProgress.roomId,
+    (g) => g.phase === 'actions' && g.turn >= 6 && !inProgressBots.has(g.players[g.active]!.id),
+    3000,
+  );
 
   const setup = room(4);
   await playUntil(

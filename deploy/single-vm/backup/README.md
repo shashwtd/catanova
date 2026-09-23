@@ -70,7 +70,48 @@ Run backups while the game has its database open. Read-only WAL access requires 
 
 Fifteen-minute scheduling is a target, not a guaranteed recovery point. Failures, upload duration or VM downtime can make the last successful snapshot older. A restore loses changes made after that snapshot. These backups cover the game database only: Supabase accounts, Caddy certificate data, VM configuration and an optional wiki have separate recovery needs. Container-scoped contributor permission also permits deletion; this is versioned operational backup, not immutable protection against a compromised VM.
 
+## Restore drill
+
+[`restore_drill.py`](restore_drill.py) proves that a backup restores into games that load and can be played, not merely into a well-formed SQLite file. It is the weekly rehearsal for [the production restore runbook](../OPERATIONS.md#restore-production-from-a-backup), and the same tool produces the verified file that runbook installs. It uses Python 3.9+ standard libraries and imports `backup.py` from the same folder. Each run:
+
+1. Lists the container through the VM identity (the worker's own token path) and downloads the newest `game/` blob, or `--blob NAME`, into a new 0700 folder under `/var/lib/catanova-drill`.
+2. Compares the archive's SHA-256 with the blob's `sha256` metadata written by the worker, and Azure's `Content-MD5`, before anything is decompressed.
+3. Decompresses into that folder, then runs the checks from [Restore and verify](#restore-and-verify): `PRAGMA integrity_check`, `PRAGMA foreign_key_check` and the required tables, on a read-only connection.
+4. Runs [`scripts/verify-restored-games.ts`](../../../scripts/verify-restored-games.ts) from the **running game image**, the deployed release, in a one-off container with no network, no capabilities, a read-only root filesystem, 1 CPU, 768 MB and user `nobody`. It sees only this run's restored file (read-only) and a scratch folder. It opens a private copy with the real `Store`, whose constructor migrates the schema, and for every room checks `loadGame`, the journal hash chain (`Store.verifyJournal`), the public history, bank + hands = 19 for each resource, development cards, piece supplies, phase and active player. It then applies the turn timer's mandatory move to a clone of every unfinished game.
+5. Removes the folder, writes `/srv/catanova/status/drill.json`, and posts to `DRILL_PING_URL` (`/fail` with the reason on failure).
+
+A failure names each failing room in the journal and in `drill.json`. The ping carries only counts. The live database, its volume and the game container are never touched. The drill needs a deployed release that contains the verifier and `Store.verifyJournal`; an older image fails with `game verifier could not verify the database`, and a release without `verifyJournal` fails every room rather than skipping the chain check. It does not test Google sign-in, Supabase, Caddy certificates or real browsers.
+
+Install it next to the worker, from the reviewed checkout, after the worker is installed:
+
+```sh
+sudo install -m 0644 deploy/single-vm/backup/restore_drill.py /opt/catanova-backup/restore_drill.py
+sudo install -m 0600 deploy/single-vm/backup/drill.env.example /etc/catanova/drill.env
+sudo install -m 0644 deploy/single-vm/backup/catanova-drill.service /etc/systemd/system/catanova-drill.service
+sudo install -m 0644 deploy/single-vm/backup/catanova-drill.timer /etc/systemd/system/catanova-drill.timer
+sudo systemd-analyze verify /etc/systemd/system/catanova-drill.service /etc/systemd/system/catanova-drill.timer
+sudo systemctl daemon-reload
+sudo systemctl start catanova-drill.service
+sudo journalctl -u catanova-drill.service -n 60 --no-pager
+sudo python3 -m json.tool /srv/catanova/status/drill.json
+sudo systemctl enable --now catanova-drill.timer
+systemctl list-timers catanova-drill.timer
+```
+
+Paste the drill's ping URL into `/etc/catanova/drill.env`. The timer runs on Wednesdays at 21:40 UTC; `Persistent=true` catches up once after downtime. A run downloads one blob within the region, needs free space for about three times the database size under `/var/lib/catanova-drill`, and runs at low CPU and I/O priority. Always use `systemctl start catanova-drill.service` for an unscheduled drill, so the work folder and environment match the timer's.
+
+Other uses, from a root shell on the VM (`systemd-run` parses the environment files exactly as the service does):
+
+```sh
+sudo systemd-run --quiet --wait --pipe -p EnvironmentFile=/etc/catanova/backup.env \
+  -p EnvironmentFile=/etc/catanova/drill.env /usr/bin/python3 -B /opt/catanova-backup/restore_drill.py --list 10
+```
+
+The same form with `--blob NAME --output /root/catanova-restore/verified.sqlite --no-report` verifies one chosen backup and keeps the verified database (0600, never overwriting). A downloaded archive can also be drilled offline from a built checkout, with the SHA-256 copied from the blob's `sha256` metadata: `python3 -B deploy/single-vm/backup/restore_drill.py --file downloaded.sqlite.gz --sha256 HEX --verifier-command "node dist/scripts/verify-restored-games.js" --no-report`.
+
 ## Restore and verify
+
+The restore drill automates steps 1–3 below with stronger checks, and [the operations runbook](../OPERATIONS.md#restore-production-from-a-backup) is the complete production procedure. These manual steps remain the fallback when the drill cannot run.
 
 1. Use an authorized Azure Portal/account to download a selected private `.sqlite.gz` blob into a restricted directory on a recovery machine. Check its recorded timestamp and compare `sha256sum downloaded.sqlite.gz` with the blob's `sha256` metadata or the successful worker log. Do not post the database, its JSON state or the download credentials in public logs or this repository.
 2. Decompress and verify a **new isolated file** before touching production. From that restricted directory:
@@ -104,4 +145,4 @@ Fifteen-minute scheduling is a target, not a guaranteed recovery point. Failures
 python3 -B -m unittest discover -s deploy/single-vm/backup -v
 ```
 
-The tests keep a WAL writer open and prove that committed state, events and command receipts survive as one standalone database while an uncommitted move is excluded. They stub all metadata and Blob connections, exercise integrity/error handling and private-temp cleanup, and cannot provision or contact Azure. Pings go to a loopback HTTP stub: success and `/fail` bodies, and a rejected, unreachable, slow or stalled endpoint never failing a good backup. Live role assignment, systemd isolation and off-host restoration still need verification on the deployed Linux VM.
+The tests keep a WAL writer open and prove that committed state, events and command receipts survive as one standalone database while an uncommitted move is excluded. They stub all metadata and Blob connections, exercise integrity/error handling and private-temp cleanup, and cannot provision or contact Azure. Pings go to a loopback HTTP stub: success and `/fail` bodies, and a rejected, unreachable, slow or stalled endpoint never failing a good backup. The drill's tests cover the paged listing, newest-blob choice, checksum refusal, truncated, foreign, unrelated and damaged archives, verifier failure, crash and timeout, the isolated `docker run` and removal of a timed-out container, `--output`, status and pings. `npm test` adds the end-to-end rehearsal in `tests/restore-drill.test.ts`. It plays real games through the Store, backs them up with this worker's snapshot code while the database is open, and runs the drill with the real verifier. It then shows that a tampered game row fails naming its room and that the verified copy, served by the real server, lets the player whose turn it was reconnect and play the next move. Live role assignment, systemd isolation and off-host restoration still need verification on the deployed Linux VM.
