@@ -274,7 +274,7 @@ class PingServer:
         # A deliberately slow handler must not hold up the test, nor print the client's hang-up.
         self.httpd.block_on_close = False
         self.httpd.handle_error = lambda _request, _address: None
-        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
 
     def __enter__(self):
         self.thread.start()

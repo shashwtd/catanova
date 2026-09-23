@@ -1,0 +1,38 @@
+[Unit]
+Description=Check Catanova's public HTTPS, game container, backups, disks and certificate
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/catanova/watchdog.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B /opt/catanova-watchdog/watchdog.py
+# Exit 1 (a check failed, already reported) leaves the unit "failed" until the next clean run,
+# so `systemctl --failed` shows it too. Exit 2 means the configuration itself is wrong.
+# Alert de-duplication state (which checks were failing, when the last push went out).
+StateDirectory=catanova-watchdog
+StateDirectoryMode=0700
+TimeoutStartSec=2min
+TimeoutStopSec=10s
+KillMode=control-group
+UMask=0077
+# `docker inspect` goes through /run/docker.sock, which is root-equivalent; the script only
+# reads container state and never starts, stops or changes a container.
+NoNewPrivileges=true
+ProtectSystem=strict
+# The only other write: status/watchdog.json. "-" keeps a missing folder from blocking checks.
+ReadWritePaths=-/srv/catanova/status
+ProtectHome=read-only
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryMax=128M
+Nice=5
