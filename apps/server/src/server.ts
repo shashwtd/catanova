@@ -1072,7 +1072,15 @@ export async function startServer(
   // Bots take their turns on their own timer, in the same shape as the clock
   // above: find rooms that owe a move, commit one through the ordinary rules
   // path, broadcast. A room with no bots costs one indexed query per tick.
-  const bots = new BotDriver({ store, changed: broadcast });
+  const bots = new BotDriver({
+    store,
+    changed: broadcast,
+    // Failures, backoffs and rescued moves go to the server log; every ordinary
+    // bot move would drown them.
+    log: (event, detail) => {
+      if (event !== 'bot_move') console.log(JSON.stringify({ event, ...detail }));
+    },
+  });
   bots.start();
   try {
     await new Promise<void>((resolve, reject) => {
