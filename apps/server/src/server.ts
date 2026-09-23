@@ -992,6 +992,16 @@ export async function startServer(
     port: address.port,
     url: `ws://127.0.0.1:${address.port}/ws`,
     store,
+    /** Read-only socket counts and a room push, for the admin listener (apps/server/src/admin). */
+    runtime: {
+      sockets: () => ({
+        total: wss.clients.size,
+        players: sessions.size,
+        spectators: spectators.size,
+        seats: [...activeSeats].filter(([, ws]) => ws.readyState === WebSocket.OPEN).map(([id]) => id),
+      }),
+      broadcast,
+    },
     async close() {
       closing = true;
       bots.stop();
