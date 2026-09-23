@@ -15,6 +15,30 @@ test('island topology has shared corners and edges, without duplicate geometry',
     for (const n of v.neighbors) assert.ok(board.vertices[n]!.neighbors.includes(v.id));
   }
 });
+/** Edge k of a hex joins its corners k and k + 1 and faces this axial direction: NE, E, SE, SW, W, NW. */
+const FACING = [
+  [1, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 1],
+  [-1, 0],
+  [0, -1],
+] as const;
+/** The sea space across a coastal edge, in axial coordinates. */
+function seaSpace(board: Board, edgeId: number) {
+  const e = board.edges[edgeId]!,
+    h = board.hexes[e.hexes[0]!]!;
+  const k = h.vertices.findIndex((v, i) => {
+    const w = h.vertices[(i + 1) % 6]!;
+    return (v === e.a && w === e.b) || (v === e.b && w === e.a);
+  });
+  return { q: h.q + FACING[k]![0], r: h.r + FACING[k]![1] };
+}
+const seaSteps = (a: { q: number; r: number }, b: { q: number; r: number }) =>
+  Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.q + a.r - b.q - b.r));
+/** The six sea spaces off the island's tips each sit at two of the three axial extremes. */
+const offTip = ({ q, r }: { q: number; r: number }) =>
+  [q, r, -q - r].filter((c) => Math.abs(c) === 3).length === 2;
 const timed = <T>(deal: () => T): [T, number] => {
   const started = performance.now();
   const result = deal();
@@ -47,6 +71,18 @@ test('500 seeded islands preserve the supply and satisfy every balance constrain
     const portVertices = b.ports.flatMap((p) => [b.edges[p.edge]!.a, b.edges[p.edge]!.b]);
     assert.equal(new Set(portVertices).size, 18);
     assert.equal(b.ports.filter((p) => p.resource === 'any').length, 4);
+    assert.deepEqual(
+      b.ports.map((p) => p.resource).sort(),
+      ['any', 'any', 'any', 'any', ...RESOURCES].sort(),
+    );
+    // Harbours alternate with open sea all round the island, as on the fixed frame: nine different sea spaces
+    // out of the eighteen, none beside another, three of them off the island's tips.
+    const seas = b.ports.map((p) => seaSpace(b, p.edge));
+    assert.equal(new Set(seas.map(({ q, r }) => `${q},${r}`)).size, 9, `seed ${seed}`);
+    for (const [i, sea] of seas.entries())
+      for (const other of seas.slice(i + 1))
+        assert.ok(seaSteps(sea, other) > 1, `seed ${seed}: harbours on neighbouring sea spaces`);
+    assert.equal(seas.filter(offTip).length, 3, `seed ${seed}`);
     fingerprints.add(JSON.stringify(b.hexes.map((h) => [h.terrain, h.number])));
   }
   assert.equal(fingerprints.size, 500);

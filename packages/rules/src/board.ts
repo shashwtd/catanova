@@ -189,9 +189,39 @@ function dealNumbers(hexes: readonly Hex[], land: readonly Hex[], random: () => 
   return true;
 }
 
+/** Nine harbours around the 30 coastal edges, spaced 3, 3 and 4 edges apart. */
+const HARBOUR_SLOTS = [0, 3, 6, 10, 13, 16, 20, 23, 26];
+
+/**
+ * The harbour edges of each rotation of HARBOUR_SLOTS that keeps harbours off the same and neighbouring sea
+ * spaces. With nine harbours on the eighteen sea spaces round the island, that makes harbour and open sea
+ * alternate all the way round, as on the fixed frame in docs/SETUP.md, with harbours off three of the six tips.
+ * The other four of every ten rotations put three pairs of harbours side by side and leave every tip bare.
+ */
+function harbourLayouts(graph: Pick<Board, 'hexes' | 'vertices' | 'edges'>): Edge[][] {
+  // Twice the edge's midpoint. Its angle orders the coast, and subtracting the land hex's centre gives the centre
+  // of the sea space across the edge: neighbouring sea spaces are √3 apart, any other two at least 3.
+  const out = (e: Edge) => ({
+    x: graph.vertices[e.a]!.x + graph.vertices[e.b]!.x,
+    y: graph.vertices[e.a]!.y + graph.vertices[e.b]!.y,
+  });
+  const sea = (e: Edge) => ({
+    x: out(e).x - graph.hexes[e.hexes[0]!]!.x,
+    y: out(e).y - graph.hexes[e.hexes[0]!]!.y,
+  });
+  const apart = (e: Edge, f: Edge) => Math.hypot(sea(e).x - sea(f).x, sea(e).y - sea(f).y) > 2;
+  const coast = graph.edges
+    .filter((e) => e.hexes.length === 1)
+    .sort((a, b) => Math.atan2(out(a).y, out(a).x) - Math.atan2(out(b).y, out(b).x));
+  return coast
+    .map((_, offset) => HARBOUR_SLOTS.map((slot) => coast[(slot + offset) % coast.length]!))
+    .filter((edges) => edges.every((e, i) => edges.slice(i + 1).every((f) => apart(e, f))));
+}
+
 export function generateBoard(seed: number): Board {
   const random = seededRandom(seed),
-    graph = topology();
+    graph = topology(),
+    harbours = harbourLayouts(graph);
   const terrain: Terrain[] = [
     'desert',
     ...RESOURCES.flatMap((r) => Array<Terrain>(r === 'brick' || r === 'ore' ? 3 : 4).fill(r)),
@@ -208,20 +238,9 @@ export function generateBoard(seed: number): Board {
     const land = graph.hexes.filter((h) => h.terrain !== 'desert');
     for (let attempt = 0; attempt < 20000; attempt++) {
       if (!dealNumbers(graph.hexes, land, random) || fairnessIssues(graph).length) continue;
-      const coast = graph.edges
-        .filter((e) => e.hexes.length === 1)
-        .sort((a, b) => {
-          const mid = (e: Edge) =>
-            Math.atan2(
-              graph.vertices[e.a]!.y + graph.vertices[e.b]!.y,
-              graph.vertices[e.a]!.x + graph.vertices[e.b]!.x,
-            );
-          return mid(a) - mid(b);
-        });
       const resources = shuffle<Resource | 'any'>(['any', 'any', 'any', 'any', ...RESOURCES], random);
-      const offset = Math.floor(random() * coast.length);
-      const ports = [0, 3, 6, 10, 13, 16, 20, 23, 26].map((i, n) => ({
-        edge: coast[(i + offset) % coast.length]!.id,
+      const ports = harbours[Math.floor(random() * harbours.length)]!.map((edge, n) => ({
+        edge: edge.id,
         resource: resources[n]!,
       }));
       return { seed: seed >>> 0, preset: 'balanced-v2', ...graph, ports };
