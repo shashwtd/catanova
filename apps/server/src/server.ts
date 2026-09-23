@@ -966,6 +966,19 @@ export async function startServer(
     }
   }, 500);
   clockScheduler.unref();
+  // Journal rows saved before compaction hold a whole game each. Rewrite them a
+  // few at a time in the background (about 20 ms a second) until none are left;
+  // new moves are already stored compactly.
+  const journalCompactor = setInterval(() => {
+    if (closing) return;
+    try {
+      if (store.compactJournal(40).scanned === 0) clearInterval(journalCompactor);
+    } catch (error) {
+      clearInterval(journalCompactor);
+      console.error('Journal compaction stopped; saved games are unaffected:', error);
+    }
+  }, 1000);
+  journalCompactor.unref();
   // Bots take their turns on their own timer, in the same shape as the clock
   // above: find rooms that owe a move, commit one through the ordinary rules
   // path, broadcast. A room with no bots costs one indexed query per tick.
@@ -999,6 +1012,7 @@ export async function startServer(
       clearInterval(launchScheduler);
       launches.clear();
       clearInterval(clockScheduler);
+      clearInterval(journalCompactor);
       for (const ws of wss.clients) ws.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await new Promise<void>((resolve, reject) =>

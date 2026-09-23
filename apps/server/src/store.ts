@@ -39,6 +39,7 @@ import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/t
 import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
 import { PlayerRecords, parseGamesCursor } from './player-records.js';
+import { decodeState, encodeState } from './journal.js';
 import { setImmediate } from 'node:timers/promises';
 
 export class ProtocolError extends Error {
@@ -68,6 +69,7 @@ export const STANDIN_AFTER_MS = 30 * 1000;
  *  the table — and not the mildest either, which would throw their game away. */
 export const STANDIN_LEVEL: BotLevel = 'sharp';
 type Absence = { disconnectedAt: number; resignAt: number };
+type JournalRow = { state: string; state_z: Uint8Array | null; board_hash: string | null };
 type Presence = { version?: 2; pausedAt?: number; seats: Record<string, Absence> };
 /**
  * A table nobody is sitting at is abandoned only once it has been empty for the
@@ -266,9 +268,13 @@ export class Store {
       ['participants', 'TEXT'],
       ['phase', 'TEXT'],
       ['dice_total', 'INTEGER'],
+      // A compact row keeps its game here and an empty `state`; see journal.ts.
+      ['state_z', 'BLOB'],
+      ['board_hash', 'TEXT'],
     ])
       if (!eventColumns.includes(name))
         this.db.exec('ALTER TABLE game_events ADD COLUMN ' + name + ' ' + type);
+    this.db.exec('CREATE TABLE IF NOT EXISTS journal_boards (hash TEXT PRIMARY KEY, board TEXT NOT NULL)');
     // The two facts anything outside the live game ever asked a journal row for.
     // Kept as plain columns so statistics and match records never have to open
     // a saved state; older rows are filled in once from the state they carry.
@@ -757,7 +763,11 @@ export class Store {
     automatic = false,
     actorKind: 'human' | 'bot' | 'timer' | 'system' = 'system',
   ) {
-    const state = JSON.stringify(game);
+    const state = JSON.stringify(game),
+      encoded = encodeState(game, state);
+    this.db
+      .prepare('INSERT OR IGNORE INTO journal_boards(hash, board) VALUES (?, ?)')
+      .run(encoded.boardHash, encoded.board);
     const entry: HistoryEntry = {
       revision,
       actor,
@@ -769,7 +779,7 @@ export class Store {
     };
     this.db
       .prepare(
-        'INSERT INTO game_events(room_id, revision, command_id, actor, action, previous_hash, state_hash, state, public_entry, phase, dice_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO game_events(room_id, revision, command_id, actor, action, previous_hash, state_hash, state, state_z, board_hash, public_entry, phase, dice_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         roomId,
@@ -778,8 +788,10 @@ export class Store {
         actor,
         JSON.stringify(action),
         this.eventHead(roomId)?.state_hash ?? null,
-        hash(state),
-        state,
+        encoded.stateHash,
+        '',
+        encoded.compact,
+        encoded.boardHash,
         JSON.stringify(entry),
         game.phase,
         kind === 'roll' && game.dice ? game.dice[0] + game.dice[1] : null,
@@ -800,9 +812,89 @@ export class Store {
   /** The complete game exactly as it stood after one journal entry, for audits and recovery checks. */
   journalState(roomId: string, revision: number): Game | undefined {
     const row = this.db
-      .prepare('SELECT state FROM game_events WHERE room_id = ? AND revision = ?')
-      .get(roomId, revision) as { state: string } | undefined;
-    return row ? (JSON.parse(row.state) as Game) : undefined;
+      .prepare('SELECT state, state_z, board_hash FROM game_events WHERE room_id = ? AND revision = ?')
+      .get(roomId, revision) as JournalRow | undefined;
+    return row ? JSON.parse(this.journalText(row)) : undefined;
+  }
+  /** A row's game as the exact JSON its hash was taken over. Older rows still carry it whole. */
+  private journalText(row: JournalRow): string {
+    if (row.state !== '') return row.state;
+    const board = this.db.prepare('SELECT board FROM journal_boards WHERE hash = ?').get(row.board_hash) as
+      { board: string } | undefined;
+    if (!row.state_z || !board)
+      throw new ProtocolError('STATE_INTEGRITY', 'A saved move cannot be read; no moves were discarded');
+    return JSON.stringify(decodeState(row.state_z, board.board));
+  }
+  /**
+   * Check a room's whole journal: every row readable, every state matching its
+   * hash, every row linked to the one before, and the saved game matching the
+   * last entry of the round in play. Used by recovery drills and the admin view.
+   */
+  verifyJournal(roomId: string): { events: number; problems: string[] } {
+    const problems: string[] = [];
+    let previous: string | null = null,
+      events = 0;
+    for (const row of this.db
+      .prepare(
+        'SELECT revision, previous_hash, state_hash, state, state_z, board_hash FROM game_events WHERE room_id = ? ORDER BY revision',
+      )
+      .iterate(roomId) as Iterable<
+      JournalRow & { revision: number; previous_hash: string | null; state_hash: string }
+    >) {
+      events++;
+      if (row.previous_hash !== previous)
+        problems.push(`revision ${row.revision}: not linked to the entry before it`);
+      try {
+        if (hash(this.journalText(row)) !== row.state_hash)
+          problems.push(`revision ${row.revision}: saved state does not match its hash`);
+      } catch {
+        problems.push(`revision ${row.revision}: saved state cannot be read`);
+      }
+      previous = row.state_hash;
+    }
+    try {
+      this.loadGame(roomId);
+    } catch (error) {
+      problems.push(`current game: ${(error as Error).message}`);
+    }
+    return { events, problems };
+  }
+  /**
+   * Rewrite up to `limit` rows still holding a whole game into the compact form.
+   * A row is only rewritten when its state matches its hash and the compact form
+   * decodes to exactly the same JSON; anything else is marked and left as it
+   * was, so evidence of a problem is never overwritten. Returns how many rows
+   * were looked at, so a caller knows when nothing is left.
+   */
+  compactJournal(limit = 50): { scanned: number; compacted: number } {
+    return this.transaction(() => {
+      const rows = this.db
+        .prepare(
+          "SELECT room_id, revision, state, state_hash FROM game_events WHERE state <> '' AND state_z IS NULL LIMIT ?",
+        )
+        .all(limit) as { room_id: string; revision: number; state: string; state_hash: string }[];
+      let compacted = 0;
+      for (const row of rows) {
+        const encoded =
+          hash(row.state) === row.state_hash ? encodeState(JSON.parse(row.state), row.state) : null;
+        if (!encoded || JSON.stringify(decodeState(encoded.compact, encoded.board)) !== row.state) {
+          this.db
+            .prepare("UPDATE game_events SET state_z = X'' WHERE room_id = ? AND revision = ?")
+            .run(row.room_id, row.revision);
+          continue;
+        }
+        this.db
+          .prepare('INSERT OR IGNORE INTO journal_boards(hash, board) VALUES (?, ?)')
+          .run(encoded.boardHash, encoded.board);
+        this.db
+          .prepare(
+            "UPDATE game_events SET state = '', state_z = ?, board_hash = ? WHERE room_id = ? AND revision = ?",
+          )
+          .run(encoded.compact, encoded.boardHash, row.room_id, row.revision);
+        compacted++;
+      }
+      return { scanned: rows.length, compacted };
+    });
   }
   round(roomId: string): number {
     return (

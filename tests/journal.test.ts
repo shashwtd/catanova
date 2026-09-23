@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -64,6 +65,22 @@ function journal(store: Store, roomId: string): Row[] {
   ).map((row) => ({ ...row, state: store.journalState(roomId, row.revision)! }));
 }
 
+/** Rewrite a room's journal the way servers before compaction stored it: every row a whole game. */
+function asLegacyJournal(store: Store, roomId: string) {
+  for (const { revision } of store.db
+    .prepare('SELECT revision FROM game_events WHERE room_id=?')
+    .all(roomId) as { revision: number }[])
+    store.db
+      .prepare('UPDATE game_events SET state=?, state_z=NULL, board_hash=NULL WHERE room_id=? AND revision=?')
+      .run(JSON.stringify(store.journalState(roomId, revision)), roomId, revision);
+}
+const storedBytes = (store: Store, roomId: string) =>
+  store.db
+    .prepare(
+      'SELECT sum(length(state)) + coalesce(sum(length(state_z)), 0) AS n FROM game_events WHERE room_id=?',
+    )
+    .get(roomId)!.n as number;
+
 test('journal rows carry their phase and dice total, and older rows gain them when the database opens', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'catanova-journal-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -89,7 +106,8 @@ test('journal rows carry their phase and dice total, and older rows gain them wh
   };
   check();
   const before = store.statistics(roomId);
-  // A database written before these columns existed.
+  // A database written before these columns existed: whole games, no extra columns.
+  asLegacyJournal(store, roomId);
   store.db.exec('ALTER TABLE game_events DROP COLUMN phase');
   store.db.exec('ALTER TABLE game_events DROP COLUMN dice_total');
   store.close();
@@ -97,4 +115,67 @@ test('journal rows carry their phase and dice total, and older rows gain them wh
   t.after(() => store.close());
   check();
   assert.deepEqual(store.statistics(roomId), before);
+});
+
+test('each move is stored without its board, compressed, and reads back as exactly the state that was hashed', (t) => {
+  const store = new Store(':memory:');
+  t.after(() => store.close());
+  const roomId = playedRoom(store, 160);
+  const rows = store.db
+    .prepare(
+      'SELECT revision, state, length(state_z) AS size, board_hash, state_hash FROM game_events WHERE room_id=?',
+    )
+    .all(roomId) as {
+    revision: number;
+    state: string;
+    size: number;
+    board_hash: string;
+    state_hash: string;
+  }[];
+  assert.ok(rows.length > 150);
+  for (const row of rows) {
+    assert.equal(row.state, '', 'no row keeps a whole game');
+    const text = JSON.stringify(store.journalState(roomId, row.revision));
+    assert.equal(createHash('sha256').update(text).digest('hex'), row.state_hash, `revision ${row.revision}`);
+  }
+  assert.equal(new Set(rows.map((row) => row.board_hash)).size, 1, 'one board, stored once');
+  const average = rows.reduce((n, row) => n + row.size, 0) / rows.length;
+  const whole = JSON.stringify(store.loadGame(roomId)).length;
+  assert.ok(
+    average * 6 < whole,
+    `a stored move (${average.toFixed(0)} B) is a fraction of a game (${whole} B)`,
+  );
+  assert.deepEqual(store.verifyJournal(roomId), { events: rows.length, problems: [] });
+});
+
+test('older whole-game rows compact losslessly, and a row that fails its own hash is kept and reported', (t) => {
+  const store = new Store(':memory:');
+  t.after(() => store.close());
+  const roomId = playedRoom(store, 120);
+  const states = journal(store, roomId).map((row) => row.state);
+  const statistics = store.statistics(roomId);
+  asLegacyJournal(store, roomId);
+  const legacyBytes = storedBytes(store, roomId);
+  assert.deepEqual(store.verifyJournal(roomId).problems, []);
+  // One row whose saved state no longer matches its hash: evidence, not something to tidy away.
+  const tampered = journal(store, roomId)[40]!.revision;
+  const edited = store.journalState(roomId, tampered)!;
+  edited.turn += 1;
+  store.db
+    .prepare('UPDATE game_events SET state=? WHERE room_id=? AND revision=?')
+    .run(JSON.stringify(edited), roomId, tampered);
+  let passes = 0;
+  while (store.compactJournal(25).scanned > 0) passes++;
+  assert.ok(passes >= 4, 'compaction works through the journal in small batches');
+  assert.deepEqual(store.compactJournal(25), { scanned: 0, compacted: 0 }, 'and then stops');
+  const after = journal(store, roomId);
+  for (const [i, row] of after.entries())
+    if (row.revision === tampered) assert.equal(row.state.turn, edited.turn);
+    else assert.deepEqual(row.state, states[i], `revision ${row.revision}`);
+  assert.deepEqual(store.statistics(roomId), statistics);
+  assert.deepEqual(store.verifyJournal(roomId).problems, [
+    `revision ${tampered}: saved state does not match its hash`,
+  ]);
+  const compactBytes = storedBytes(store, roomId);
+  assert.ok(compactBytes * 5 < legacyBytes, `${legacyBytes} B of whole games became ${compactBytes} B`);
 });
