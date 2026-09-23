@@ -30,7 +30,45 @@ export function encodeState(game: Game, full = JSON.stringify(game)): EncodedSta
 }
 
 export function decodeState(compact: Uint8Array, board: string): Game {
-  const game = JSON.parse(inflateRawSync(compact).toString('utf8')) as Game;
+  const game = inflateGame(compact);
   game.board = JSON.parse(board) as Game['board'];
   return game;
+}
+
+/** A compact row's game with its board left out (null): enough for everything but the map. */
+export function inflateGame(compact: Uint8Array): Game {
+  return JSON.parse(inflateRawSync(compact).toString('utf8')) as Game;
+}
+
+/** The columns a journal row keeps its game in. */
+export type JournalRow = { state: string; state_z: Uint8Array | null; board_hash: string | null };
+
+/** True for a row that keeps its game whole in `state`, as rows written before compaction do. */
+export const wholeRow = (row: JournalRow) => row.state !== '{}' && row.state !== '';
+
+/**
+ * Reads journal rows in either form: the whole JSON older releases kept, or
+ * the compact deflated game whose board is stored once in journal_boards (see
+ * Store.journalState, which reads single rows the same way). Every row of a
+ * match names the same board, so each board is looked up and parsed once and
+ * shared by every game this reader returns: treat those games as read-only.
+ * Undefined for a row whose game cannot be read.
+ */
+export function journalReader(
+  board: (hash: string) => string | undefined,
+): (row: JournalRow) => Game | undefined {
+  const boards = new Map<string, Game['board'] | undefined>();
+  return (row) => {
+    if (wholeRow(row)) return JSON.parse(row.state) as Game;
+    if (!row.state_z?.length || !row.board_hash) return undefined;
+    if (!boards.has(row.board_hash)) {
+      const text = board(row.board_hash);
+      boards.set(row.board_hash, text === undefined ? undefined : (JSON.parse(text) as Game['board']));
+    }
+    const shared = boards.get(row.board_hash);
+    if (!shared) return undefined;
+    const game = inflateGame(row.state_z);
+    game.board = shared;
+    return game;
+  };
 }

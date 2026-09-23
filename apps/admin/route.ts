@@ -10,6 +10,7 @@ export const PAGES = [
   { id: 'players', label: 'Players' },
   { id: 'stats', label: 'Stats' },
   { id: 'feedback', label: 'Feedback' },
+  { id: 'system', label: 'System' },
   { id: 'audit', label: 'Audit' },
 ] as const;
 export type Page = (typeof PAGES)[number]['id'];
@@ -45,6 +46,3 @@ export function useRoute(): Route {
   }, []);
   return parseRoute(hash);
 }
-
-/** Share of rolls expected for each total from 2 to 12 with two fair dice. */
-export const FAIR_DICE_SHARE = Array.from({ length: 11 }, (_, i) => (6 - Math.abs(5 - i)) / 36);

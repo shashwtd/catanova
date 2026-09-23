@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { ROOM_CODE_LEASE_MS, Store } from '../apps/server/src/store.js';
 import type { Identity } from '../apps/server/src/auth.js';
-import { RoomIndex } from '../apps/server/src/admin/room-index.js';
+import { RoomIndex, countActivity } from '../apps/server/src/admin/room-index.js';
+import { indexAccounts } from '../apps/server/src/admin/accounts-index.js';
 import { Analysis } from '../apps/server/src/admin/analysis-runner.js';
 import { AdminRequestError } from '../apps/server/src/admin/api.js';
 import { newSession } from '../apps/client/src/connection.js';
@@ -100,12 +101,17 @@ test('the room index counts on its own thread, reuses a pass until it is dropped
     [second],
   );
   assert.equal((await index.list(Date.now(), { status: 'all', q: '', page: 2 })).rooms.length, 0);
-  // Seat names and account ids, never a LIKE pattern.
-  assert.deepEqual(await index.accounts('LICI'), ['00000000-0000-4000-8000-000000000301']);
-  assert.deepEqual(await index.accounts('00000000-0000-4000-8000-0000000003'), [
+  // Every account, found by any name it used or the start of its id, never a LIKE pattern.
+  const players = async (q: string) =>
+    (await index.players(Date.now(), { q, sort: 'lastSeen', dir: 'desc', page: 1 })).accounts.map(
+      (account) => account.userId,
+    );
+  assert.deepEqual(await players(''), ['00000000-0000-4000-8000-000000000301']);
+  assert.deepEqual(await players('LICI'), ['00000000-0000-4000-8000-000000000301']);
+  assert.deepEqual(await players('00000000-0000-4000-8000-0000000003'), [
     '00000000-0000-4000-8000-000000000301',
   ]);
-  assert.deepEqual(await index.accounts('%'), []);
+  assert.deepEqual(await players('%'), []);
   index.close();
   assert.equal(index.running, false);
   await refused(index.summary(Date.now()), 'SHUTTING_DOWN');
@@ -143,7 +149,10 @@ test('a room count stuck inside SQLite times out, and nothing starts beside it u
   // The thread is still waiting inside SQLite, so no second pass starts beside it.
   await refused(index.summary(Date.now()), 'ROOM_INDEX_BUSY');
   await refused(index.list(Date.now(), { status: 'all', q: '', page: 1 }), 'ROOM_INDEX_BUSY');
-  await refused(index.accounts('host'), 'ROOM_INDEX_BUSY');
+  await refused(
+    index.players(Date.now(), { q: 'host', sort: 'lastSeen', dir: 'desc', page: 1 }),
+    'ROOM_INDEX_BUSY',
+  );
   // Still so a while later: it is waiting on SQLite, which a terminate() cannot cut short.
   await new Promise((resolve) => setTimeout(resolve, 300));
   await refused(index.summary(Date.now()), 'ROOM_INDEX_BUSY');
@@ -168,4 +177,91 @@ test('statistics stuck inside SQLite time out, and the next run waits for that t
   const stats = await eventually(() => analysis.stats());
   assert.equal(stats.fresh, true);
   assert.equal(stats.value.totals.matches, 0);
+});
+
+test('games and players are counted since the start of the day and week the page asks about', async (t) => {
+  const HOUR = 3_600_000;
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  let clock = now - 240 * HOUR;
+  const dir = await mkdtemp(join(tmpdir(), 'catanova-activity-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const path = join(dir, 'game.sqlite');
+  const store = new Store(path, { now: () => clock });
+  t.after(() => store.close());
+  const person = (name: string, n: number): Identity => ({
+    id: `00000000-0000-4000-8000-00000000050${n}`,
+    name,
+    expiresAt: now + HOUR,
+    profile: defaultProfile(name),
+  });
+  const [alice, bob, cara, dan, eve] = ['Alice', 'Bob', 'Cara', 'Dan', 'Eve'].map(person);
+  /** Two accounts start a game; unless `playing`, the second leaves and the first wins by resignation. */
+  const game = (first: Identity, second: Identity, playing = false) => {
+    const host = store.enter('create', newSession(first.name).token, first.name, undefined, first);
+    const guest = store.enter('join', newSession(second.name).token, second.name, host.room_id, second);
+    store.lobby(guest, `ready-${guest.id}`, store.snapshot(host.room_id).revision, true);
+    store.action(host, `start-${host.id}`, store.snapshot(host.room_id).revision, { kind: 'start' });
+    clock += HOUR / 2;
+    if (!playing) store.leave(guest, `leave-${guest.id}`, store.snapshot(host.room_id).revision);
+  };
+  game(alice!, bob!); // ten days ago
+  clock = now - 48 * HOUR;
+  game(alice!, cara!); // two days ago
+  clock = now - HOUR;
+  game(dan!, eve!, true); // an hour ago, still being played
+  clock = now;
+  const activity = countActivity(store.db, now, now - 5 * HOUR, now - 72 * HOUR);
+  assert.deepEqual(activity.started, { day: 1, week: 2 });
+  assert.deepEqual(activity.finished, { day: 0, week: 1 });
+  assert.deepEqual(activity.abandoned, { day: 0, week: 0 });
+  assert.deepEqual(activity.players, { day: 2, week: 4 }, 'Dan and Eve today; Alice and Cara too this week');
+  assert.deepEqual(activity.newPlayers, { day: 2, week: 3 }, 'Alice first played ten days ago');
+  // Earlier rounds of a rematch count as games too: Dan played one a month ago,
+  // so he is not new, and Bob one yesterday, so he played this week.
+  const round = (id: string, player: Identity, startedAt: number) => {
+    const source = store.db.prepare('SELECT room_id FROM seats WHERE user_id = ? LIMIT 1').get(player.id)!;
+    store.db
+      .prepare(
+        `INSERT INTO archived_matches (room_id, revision, started_at, finished_at, sort_at, turns, winner, players, source_room_id)
+         VALUES (?, 1, ?, ?, ?, 10, NULL, '[]', ?)`,
+      )
+      .run(id, startedAt, startedAt + HOUR / 2, startedAt + HOUR / 2, source.room_id as string);
+    store.db
+      .prepare(
+        `INSERT INTO archived_participants (room_id, player_id, user_id, points, outcome, resumable)
+         VALUES (?, 'p1', ?, 2, 'abandoned', 0)`,
+      )
+      .run(id, player.id);
+  };
+  round('round-dan', dan!, now - 30 * 24 * HOUR);
+  round('round-bob', bob!, now - 30 * HOUR);
+  const withRounds = countActivity(store.db, now, now - 5 * HOUR, now - 72 * HOUR);
+  assert.deepEqual(withRounds.started, { day: 1, week: 3 });
+  assert.deepEqual(withRounds.abandoned, { day: 0, week: 1 });
+  assert.deepEqual(withRounds.players, { day: 2, week: 5 });
+  assert.deepEqual(withRounds.newPlayers, { day: 1, week: 2 }, 'Eve today; Cara this week');
+  // The worker gives the same answer, and reuses it for half a minute.
+  const index = new RoomIndex({ databasePath: path, db: store.db, leaseMs: ROOM_CODE_LEASE_MS });
+  t.after(() => index.close());
+  assert.deepEqual(await index.activity(now, now - 5 * HOUR, now - 72 * HOUR), withRounds);
+});
+
+test('an account goes by the name it last sat down with and the sign-in it last used', async (t) => {
+  const { store, lobby } = await database(t);
+  t.after(() => store.close());
+  const id = '00000000-0000-4000-8000-000000000401';
+  const as = (name: string, isGuest?: boolean): Identity => ({
+    id,
+    name,
+    expiresAt: Date.now() + 3_600_000,
+    profile: defaultProfile(name),
+    ...(isGuest === undefined ? {} : { isGuest }),
+  });
+  lobby('Robin', as('Robin', true)); // a guest first
+  lobby('Rob', as('Rob', false)); // then signed in with Google
+  lobby('Robin', as('Robin')); // then a seat from before sign-in types were recorded
+  const [account] = indexAccounts(store.db);
+  assert.deepEqual(account!.names, ['Robin', 'Rob'], 'newest first, each once');
+  assert.equal(account!.name, 'Robin');
+  assert.equal(account!.accountType, 'permanent', 'the latest sign-in type recorded, not the first');
 });

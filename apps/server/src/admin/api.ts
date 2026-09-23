@@ -4,10 +4,25 @@ import type { AdminConfig } from './config.js';
 import type { AdminAudit, AuditInput } from './audit.js';
 import type { AuthRejection } from './types.js';
 
+/** A signed-in account with Catanova open right now, from the presence hub. */
+export type OnlineAccount = {
+  userId: string;
+  name: string | null;
+  guest: boolean;
+  since: number;
+  tabs: number;
+};
+
 /** What the game server exposes to the admin listener: live socket counts and a way to push a room. */
 export type GameRuntime = {
   sockets(): { total: number; players: number; spectators: number; seats: string[] };
   broadcast(roomId: string): void;
+  /**
+   * Accounts with Catanova open right now, from the game server's presence
+   * hub, wherever they are in it. A runtime without it still lists everyone
+   * connected to a room, and says that accounts elsewhere cannot be seen.
+   */
+  online?(): OnlineAccount[];
 };
 
 /** A refusal with a status and a stable code, safe to show to the admin. */

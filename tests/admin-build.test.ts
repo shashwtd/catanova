@@ -7,8 +7,13 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { build } from 'vite';
 import { loadAdminAssets } from '../apps/server/src/admin/assets.js';
-import { Columns } from '../apps/admin/ui.js';
+import { Columns, LineChart, PlayerColour } from '../apps/admin/ui.js';
 import { parseRoute } from '../apps/admin/route.js';
+import { accountLabel, clock, diceLabel, localWindows, timeTicks } from '../apps/admin/format.js';
+import { fairness } from '../apps/admin/pages/Stats.js';
+import { detailPairs } from '../apps/admin/pages/Audit.js';
+import { diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
+import { PLAYER_COLORS } from '../packages/protocol/src/colors.js';
 
 test('npm run build produces dist/admin, beside and separate from the game client', async () => {
   const scripts = JSON.parse(await readFile('package.json', 'utf8')).scripts as Record<string, string>;
@@ -77,4 +82,149 @@ test('admin charts and routes are plain markup: no inline styles, and ids never 
   });
   assert.equal(parseRoute('#/unknown').page, 'overview');
   assert.equal(parseRoute('#/games/%E0%A4%A').id, undefined, 'a malformed id is ignored');
+});
+
+test('a seat colour is the game’s own swatch and name, with no inline style', () => {
+  const given = renderToStaticMarkup(createElement(PlayerColour, { color: 'jade', chosen: false }));
+  assert.doesNotMatch(given, /style=/);
+  assert.match(given, new RegExp(`fill="${PLAYER_COLORS.jade}"`));
+  assert.match(given, />Jade<span class="muted">default<\/span>/);
+  const picked = renderToStaticMarkup(createElement(PlayerColour, { color: 'coral', chosen: true }));
+  assert.match(picked, />Coral<\/span>$/);
+  assert.equal(
+    renderToStaticMarkup(createElement(PlayerColour, { color: null, chosen: false })),
+    '<span class="muted">—</span>',
+  );
+  assert.equal(accountLabel('permanent'), 'Google');
+  assert.equal(accountLabel('guest'), 'Guest');
+  assert.equal(accountLabel(null), null);
+});
+
+test('dice are only called fair or not where a test can say so', () => {
+  const counts = FAIR_DICE.map((p) => p * 360);
+  assert.match(
+    fairness(diceSummary(counts, 'classic')),
+    /^χ² 0 over 10 degrees of freedom, p = 1\. Consistent with fair, independent dice\.$/,
+  );
+  assert.match(fairness(diceSummary(counts, 'balanced')), /deck of all 36 pairs.*does not apply/);
+  assert.doesNotMatch(fairness(diceSummary(counts, 'balanced')), /Consistent|Unlikely/);
+  assert.match(fairness(diceSummary(counts, { classic: 180, balanced: 180 })), /no single test applies/);
+  assert.match(fairness(diceSummary(Array(11).fill(0))), /No rolls yet/);
+  assert.equal(diceLabel('classic'), 'Natural');
+  assert.equal(diceLabel('balanced'), 'Balanced');
+});
+
+test('line charts are labelled SVG with a legend and a table of every value, and no inline style', () => {
+  const chart = renderToStaticMarkup(
+    createElement(LineChart, {
+      label: 'People online and playing',
+      x: [0, 60_000, 120_000, 600_000],
+      series: [
+        { name: 'Online', slot: 1, values: [2, 3, null, 4] },
+        { name: 'Playing', slot: 2, values: [1, 1, 2, 2] },
+      ],
+      domain: [0, 600_000],
+      ticks: [0, 300_000, 600_000],
+      tickLabel: (at: number) => `${at / 60_000} min`,
+      pointLabel: (at: number) => `minute ${at / 60_000}`,
+      format: (value: number) => `${value} people`,
+      xTitle: 'Time',
+      yTitle: 'people',
+      gapAfter: 150_000,
+      integer: true,
+    }),
+  );
+  assert.doesNotMatch(chart, /style=/);
+  assert.match(chart, /role="img" aria-label="People online and playing"/);
+  assert.match(chart, /tabindex="0"/, 'reachable by keyboard for the tooltip');
+  assert.match(chart, />people<\/text>/, 'the value axis says its unit');
+  assert.match(chart, />5 min<\/text>/, 'and the time axis its ticks');
+  // A missing value and a gap longer than `gapAfter` both break the line.
+  const online = chart.match(/class="chart-line line-1" d="([^"]+)"/)![1]!;
+  assert.equal(online.match(/M/g)!.length, 2);
+  const playing = chart.match(/class="chart-line line-2" d="([^"]+)"/)![1]!;
+  assert.equal(playing.match(/M/g)!.length, 2, 'the last point is ten minutes after the one before');
+  assert.match(chart, /<figcaption class="legend">.*Online.*Playing.*<\/figcaption>/s);
+  assert.match(chart, /<summary>Show the numbers<\/summary>/);
+  assert.match(chart, /<td class="nowrap">minute 10<\/td><td class="num">4 people<\/td>/);
+  assert.match(chart, /<td class="num">—<\/td>/, 'a missing value is shown as missing');
+  // Counts get whole-number ticks: a top of three becomes four, halved at two.
+  assert.match(chart, />2<\/text>.*>4<\/text>/s);
+  // A score holds until it changes: drawn as steps, never as a slope between turns.
+  const steps = renderToStaticMarkup(
+    createElement(LineChart, {
+      label: 'Points by turn',
+      x: [0, 1, 2],
+      series: [{ name: 'Ann', slot: 1, values: [2, 2, 5] }],
+      ticks: [0, 1, 2],
+      tickLabel: String,
+      pointLabel: (turn: number) => `Turn ${turn}`,
+      format: String,
+      xTitle: 'Turn',
+      yTitle: 'points',
+      step: true,
+    }),
+  );
+  const path = steps.match(/class="chart-line line-1" d="([^"]+)"/)![1]!;
+  assert.match(path, /^M[\d.]+,[\d.]+H[\d.]+V[\d.]+H[\d.]+V[\d.]+$/);
+  // A marker's label reads away from the nearer edge, so one near the end is not cut off.
+  const marked = (at: number) =>
+    renderToStaticMarkup(
+      createElement(LineChart, {
+        label: 'Sockets',
+        x: [],
+        series: [{ name: 'Sockets', slot: 1, values: [] }],
+        domain: [0, 600_000],
+        ticks: [0, 600_000],
+        tickLabel: String,
+        pointLabel: String,
+        format: String,
+        xTitle: 'Time',
+        yTitle: 'sockets',
+        markers: [{ x: at, label: 'server started' }],
+      }),
+    ).match(/<g class="chart-marker">.*?<\/g>/)![0];
+  assert.match(marked(590_000), /<text[^>]*text-anchor="end"[^>]*>server started<\/text>/);
+  assert.doesNotMatch(marked(10_000), /text-anchor/);
+});
+
+test('time axes tick on round local times, and the day and week start at local midnight and Monday', () => {
+  const from = new Date(2026, 8, 24, 9, 7).getTime();
+  assert.deepEqual(
+    timeTicks(from, from + 3_600_000).map((at) => clock(at)),
+    ['09:15', '09:30', '09:45', '10:00'],
+  );
+  assert.deepEqual(
+    timeTicks(from, from + 6 * 3_600_000).map((at) => clock(at)),
+    ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00'],
+  );
+  assert.deepEqual(
+    timeTicks(from, from + 24 * 3_600_000).map((at) => clock(at)),
+    ['12:00', '18:00', '00:00', '06:00'],
+  );
+  const { day, week } = localWindows(new Date(2026, 8, 24, 15, 30).getTime());
+  assert.equal(day, new Date(2026, 8, 24).getTime());
+  assert.equal(week, new Date(2026, 8, 21).getTime(), '24 September 2026 is a Thursday');
+});
+
+test('an audit entry names its game by room code and each detail in words, not as JSON', () => {
+  const entry = {
+    id: 1,
+    at: 0,
+    actor: 'owner@example.com',
+    action: 'game.end',
+    target: '8303bc14-a54a-41d1-89d1-020afa8050a8',
+    detail: { roomCode: '5WMC', revision: 51, previousPhase: 'roll', players: ['Ann', 'Bo'], from: null },
+    ip: null,
+    requestId: 'r',
+  };
+  assert.deepEqual(detailPairs(entry), [
+    ['revision', '51'],
+    ['previous phase', 'roll'],
+    ['players', 'Ann, Bo'],
+    ['from', '—'],
+  ]);
+  // Only a room target is shown by its code; anywhere else the code stays among the details.
+  assert.deepEqual(detailPairs({ ...entry, target: null })[0], ['room code', '5WMC']);
+  assert.deepEqual(detailPairs({ ...entry, detail: { nested: { a: 1 } } }), [['nested', '{"a":1}']]);
 });

@@ -9,17 +9,24 @@
  * public entry; their saved states are never opened here.
  */
 import type { Store } from '../store.js';
-import { ProtocolError, ROOM_CODE_LEASE_MS } from '../store.js';
+import { ProtocolError, ROOM_CODE_LEASE_MS, STANDIN_AFTER_MS } from '../store.js';
+import { score } from '../../../../packages/rules/src/game.js';
 import type { Game } from '../../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
+import { isPlayerColor, seatColors } from '../../../../packages/protocol/src/colors.js';
+import type { PlayerColor } from '../../../../packages/protocol/src/colors.js';
 import { isRoomReference, normalizeRoomReference } from '../../../../packages/protocol/src/room-reference.js';
 import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRequest } from './api.js';
 import { GAMES_PAGE_SIZE, ROOM_STATUSES, indexRoom } from './room-index.js';
 import type { RoomIndex } from './room-index.js';
+import type { Analysis } from './analysis-runner.js';
 import type {
+  Cached,
+  GameAnalytics,
   GameDetail,
   GameListItem,
+  GameResult,
   GamesPage,
   PrivateGameState,
   RoomStatus,
@@ -34,7 +41,7 @@ const time = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-type SeatRow = {
+export type SeatRow = {
   id: string;
   name: string;
   bot: number;
@@ -46,7 +53,7 @@ type SeatRow = {
   ready: number;
 };
 
-function seatRows(store: Store, roomId: string): SeatRow[] {
+export function seatRows(store: Store, roomId: string): SeatRow[] {
   return store.db
     .prepare(
       'SELECT id, name, bot, bot_level, departed, user_id, account_type, color, ready FROM seats WHERE room_id = ? ORDER BY rowid',
@@ -55,7 +62,7 @@ function seatRows(store: Store, roomId: string): SeatRow[] {
 }
 
 /** Opens a room's game, turning an unreadable save into a visible error rather than a failed page. */
-function openGame(store: Store, roomId: string): { game?: Game; error?: string } {
+export function openGame(store: Store, roomId: string): { game?: Game; error?: string } {
   try {
     const game = store.loadGame(roomId);
     return game ? { game } : {};
@@ -64,7 +71,7 @@ function openGame(store: Store, roomId: string): { game?: Game; error?: string }
   }
 }
 
-type Live = { connected: ReadonlySet<string>; standIns: ReadonlySet<string> };
+export type Live = { connected: ReadonlySet<string>; standIns: ReadonlySet<string> };
 
 function summarize(id: string, seat: SeatRow | undefined, game: Game | undefined, live: Live): SeatSummary {
   const player = game?.players.find((candidate) => candidate.id === id);
@@ -82,8 +89,32 @@ function summarize(id: string, seat: SeatRow | undefined, game: Game | undefined
   };
 }
 
+/**
+ * Each seat's colour as the table sees it. The game resolves colours over the
+ * seats at the table in the order they sat down (a started game's players, a
+ * lobby's remaining seats), whatever order the game later plays them in, and a
+ * seat that never picked a colour still gets one; this repeats that exactly.
+ */
+function tableColors(seats: SeatRow[], game: Game | undefined): Map<string, PlayerColor> {
+  const table = seats.filter((seat) =>
+    game ? game.players.some((player) => player.id === seat.id) : !seat.departed,
+  );
+  const colors = seatColors(table);
+  return new Map(table.map((seat, index) => [seat.id, colors[index]!]));
+}
+
+/** How a finished game ended, as its table was told; null while it is still being played. */
+export function gameResult(game: Game): GameResult | null {
+  if (game.phase !== 'finished') return null;
+  return {
+    winner: game.players.find((player) => player.id === game.winner)?.name ?? null,
+    winnerId: game.winner,
+    reason: !game.winner ? 'abandoned' : game.finishReason === 'resignation' ? 'resignation' : 'points',
+  };
+}
+
 /** A started game's players in turn order; a lobby's seats still in it. */
-function tableSeats(seats: SeatRow[], game: Game | undefined, live: Live): SeatSummary[] {
+export function tableSeats(seats: SeatRow[], game: Game | undefined, live: Live): SeatSummary[] {
   const ids = game
     ? game.players.map((player) => player.id)
     : seats.filter((s) => !s.departed).map((s) => s.id);
@@ -97,16 +128,21 @@ function tableSeats(seats: SeatRow[], game: Game | undefined, live: Live): SeatS
   );
 }
 
-function firstEventAt(store: Store, roomId: string): number | null {
+/**
+ * When the room's current game started: its first journal entry after the
+ * round began. A room that returned to its lobby keeps the earlier rounds'
+ * entries, so the room's very first entry dates the first round, not this one.
+ */
+export function roundStartedAt(store: Store, roomId: string): number | null {
   const row = store.db
     .prepare(
-      "SELECT json_extract(public_entry, '$.at') AS at FROM game_events WHERE room_id = ? ORDER BY revision LIMIT 1",
+      "SELECT json_extract(public_entry, '$.at') AS at FROM game_events WHERE room_id = ? AND revision > ? ORDER BY revision LIMIT 1",
     )
-    .get(roomId) as { at: string | null } | undefined;
+    .get(roomId, store.round(roomId)) as { at: string | null } | undefined;
   return time(row?.at);
 }
 
-function liveState(context: AdminContext, roomId?: string): Live {
+export function liveState(context: AdminContext, roomId?: string): Live {
   const standIns = roomId
     ? context.store.standInIds(roomId)
     : context.store.db
@@ -136,8 +172,15 @@ export async function listGames(
   const { store } = context;
   const now = context.now();
   const live = liveState(context);
+  const counts = { ...found.counts };
   const items = found.rooms.map((listed): GameListItem => {
     const room = indexRoom(store.db, now, ROOM_CODE_LEASE_MS, listed.id) ?? listed;
+    // The pass can be a few seconds old. A row shown is read fresh, and the
+    // counts follow it, so the tabs never disagree with the rows under them.
+    if (room.status !== listed.status) {
+      counts[listed.status]--;
+      counts[room.status]++;
+    }
     const { game, error } = room.hasGame ? openGame(store, room.id) : {};
     return {
       roomId: room.id,
@@ -146,9 +189,13 @@ export async function listGames(
       phase: game?.phase ?? room.phase,
       turn: game?.turn ?? room.turn,
       revision: room.revision,
-      createdAt: firstEventAt(store, room.id),
+      createdAt: roundStartedAt(store, room.id),
       lastActivity: room.lastActivity,
-      players: tableSeats(seatRows(store, room.id), game, live),
+      players: tableSeats(seatRows(store, room.id), game, live).map((seat) => {
+        const player = game?.players.find((candidate) => candidate.id === seat.id);
+        return { ...seat, points: game && player ? score(game, player, !!game.winner) : null };
+      }),
+      result: game ? gameResult(game) : null,
       ...(error ? { error } : {}),
     };
   });
@@ -157,7 +204,7 @@ export async function listGames(
     total: found.total,
     page,
     pageSize: GAMES_PAGE_SIZE,
-    counts: found.counts,
+    counts,
     indexedAt: found.indexedAt,
   };
 }
@@ -183,6 +230,7 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
   const live = liveState(context, roomId);
   const seats = seatRows(store, roomId);
   const table = tableSeats(seats, game, live);
+  const colors = tableColors(seats, game);
   // Seats that left before this game started still belong in the record, after the table.
   const others = seats
     .filter((seat) => !table.some((listed) => listed.id === seat.id))
@@ -204,13 +252,6 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
       snapshot = null;
     }
   }
-  let statistics: GameDetail['statistics'] = null;
-  try {
-    const value = store.statistics(roomId);
-    statistics = { rolls: value.rolls, diceCounts: value.diceCounts };
-  } catch {
-    statistics = null;
-  }
   const code = store.roomCode(roomId) ?? null;
   const rounds = store.db
     .prepare(
@@ -225,32 +266,43 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
     winner: string | null;
     players: string;
   }[];
-  const settings = store.db.prepare('SELECT settings FROM room_settings WHERE room_id = ?').get(roomId) as
-    { settings: string } | undefined;
   return {
     roomId,
     roomCode: code,
     status: room.status,
     revision: room.revision,
     round: store.round(roomId),
-    createdAt: firstEventAt(store, roomId),
+    createdAt: roundStartedAt(store, roomId),
     lastActivity: room.lastActivity,
     snapshot,
     seats: [...table, ...others].map((seat) => {
       const row = seats.find((candidate) => candidate.id === seat.id);
-      return { ...seat, color: row?.color ?? null, ready: !!row?.ready };
+      return {
+        ...seat,
+        color: colors.get(seat.id) ?? null,
+        colorChosen: colors.has(seat.id) && isPlayerColor(row?.color) && colors.get(seat.id) === row.color,
+        ready: !!row?.ready,
+      };
     }),
     standIns: standIns.map((row) => ({ ...row, styled: !!row.styled })),
     presence: {
-      paused: room.paused,
+      // One source for "paused", the same one the status and the games list read.
+      paused: room.status === 'paused',
+      pausedAt: room.status === 'paused' ? room.pausedAt : null,
       absent: (snapshot?.players ?? []).flatMap((player) =>
         player.disconnectedAt !== undefined && player.resignAt !== undefined
-          ? [{ playerId: player.id, disconnectedAt: player.disconnectedAt, resignAt: player.resignAt }]
+          ? [
+              {
+                playerId: player.id,
+                disconnectedAt: player.disconnectedAt,
+                standInAt: player.disconnectedAt + STANDIN_AFTER_MS,
+                resignAt: player.resignAt,
+              },
+            ]
           : [],
       ),
     },
     clock: store.clock(roomId) ?? null,
-    statistics,
     history: store.history(roomId),
     rounds: rounds.map((round) => {
       const players = JSON.parse(round.players) as { id: string; name: string }[];
@@ -262,7 +314,7 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
         winner: players.find((player) => player.id === round.winner)?.name ?? null,
       };
     }),
-    settings: settings ? (JSON.parse(settings.settings) as Record<string, unknown>) : null,
+    settings: store.settings(roomId),
     integrityError: error ?? null,
     canEnd: !!game && game.phase !== 'finished',
     confirmation: code ?? roomId,
@@ -274,6 +326,43 @@ export function gameHistory(context: AdminContext, reference: string, query: URL
   const before = query.get('before');
   if (before !== null && !/^\d{1,12}$/.test(before)) throw new AdminRequestError(400, 'INVALID_CURSOR');
   return context.store.history(roomId, before === null ? undefined : Number(before));
+}
+
+const ARCHIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * How the room's current game went, or one of its earlier rounds (`round`, an
+ * archived match of this room). Only which rows to read is settled here, with
+ * two indexed lookups; reading them is the analysis worker's job.
+ */
+export function gameAnalytics(
+  context: AdminContext,
+  analysis: Analysis,
+  reference: string,
+  query: URLSearchParams,
+): Promise<Cached<GameAnalytics>> {
+  const { store } = context;
+  const roomId = resolveRoom(store, reference);
+  const round = query.get('round');
+  if (round !== null && !ARCHIVE_ID.test(round)) throw new AdminRequestError(400, 'INVALID_ROUND');
+  let toRevision: number | null;
+  if (round) {
+    const archived = store.db
+      .prepare('SELECT revision FROM archived_matches WHERE room_id = ? AND source_room_id = ?')
+      .get(round.toLowerCase(), roomId) as { revision: number } | undefined;
+    if (!archived) throw new AdminRequestError(404, 'ROUND_NOT_FOUND', 'No such round in this room');
+    toRevision = archived.revision;
+  } else {
+    // The current round's rows: those after it began.
+    toRevision = (
+      store.db
+        .prepare('SELECT max(revision) AS revision FROM game_events WHERE room_id = ? AND revision > ?')
+        .get(roomId, store.round(roomId)) as { revision: number | null }
+    ).revision;
+    if (toRevision === null)
+      throw new AdminRequestError(404, 'NO_GAME', 'This room has no game in this round');
+  }
+  return analysis.game({ roomId, archiveId: round ? round.toLowerCase() : null, toRevision });
 }
 
 /** Hands, deck and dice deck. The view is written to the audit log before anything is returned. */

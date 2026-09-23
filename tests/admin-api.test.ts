@@ -5,27 +5,30 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { startServer } from '../apps/server/src/server.js';
-import type { Store } from '../apps/server/src/store.js';
+import { Store } from '../apps/server/src/store.js';
 import type { Identity } from '../apps/server/src/auth.js';
 import { startAdminServer } from '../apps/server/src/admin/listener.js';
+import type { GameRuntime, OnlineAccount } from '../apps/server/src/admin/api.js';
+import { whoIsOnline } from '../apps/server/src/admin/online.js';
 import type { AdminConfig } from '../apps/server/src/admin/config.js';
 import { chiSquarePValue, computeStats, diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
 import type {
   AdminOverview,
   AdminStats,
+  AdminSystem,
   AuditPage,
   Cached,
   GameDetail,
   GamesPage,
   PlayerDetail,
-  PlayerSummary,
+  PlayersPage,
   PrivateGameState,
   RetentionReport,
 } from '../apps/server/src/admin/types.js';
 import { Connection, newSession } from '../apps/client/src/connection.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../packages/protocol/src/index.js';
-import { emptyHand, gameView, robberVictims } from '../packages/rules/src/game.js';
+import { emptyHand, gameView, robberVictims, score } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { readyLobby } from './helpers.js';
@@ -68,7 +71,7 @@ function choose(g: Game): { player: string; action: GameAction } {
   return { player, action };
 }
 
-function play(store: Store, roomId: string, moves: number) {
+function play(store: Store, roomId: string, moves: number, prefix = 'admin-test') {
   for (let i = 0; i < moves; i++) {
     const game = store.loadGame(roomId)!;
     if (game.phase === 'finished') return;
@@ -76,7 +79,7 @@ function play(store: Store, roomId: string, moves: number) {
     const seat = store.snapshot(roomId).players.find((p) => p.id === next.player)!;
     store.action(
       { id: seat.id, name: seat.name, room_id: roomId },
-      `admin-test-${i}`,
+      `${prefix}-${i}`,
       store.snapshot(roomId).revision,
       next.action,
     );
@@ -96,7 +99,7 @@ const account = (name: string, n: number): Identity => ({
  * two players are connected over WebSockets beside a bot, a paused game played
  * by three accounts, and later a finished one.
  */
-async function seeded(t: TestContext) {
+async function seeded(t: TestContext, options: { online?: () => OnlineAccount[] } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'catanova-admin-api-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const databasePath = join(dir, 'game.sqlite');
@@ -169,10 +172,14 @@ async function seeded(t: TestContext) {
     statusDir,
     revision: 'deadbeef',
   };
+  // The presence hub is the game server's; tests stand in for it where they need accounts online.
+  const runtime: GameRuntime = options.online
+    ? { ...server.runtime, online: options.online }
+    : server.runtime;
   const admin = await startAdminServer({
     config,
     store,
-    runtime: server.runtime,
+    runtime,
     databasePath,
     assetsDirectory: join(dir, 'no-build'),
     log: () => {},
@@ -195,6 +202,7 @@ async function seeded(t: TestContext) {
   return {
     server,
     store,
+    runtime,
     admin,
     get,
     post,
@@ -207,7 +215,7 @@ async function seeded(t: TestContext) {
   };
 }
 
-test('overview reports the process, sockets, rooms, database, status files and recent errors', async (t) => {
+test('the System tab reports the process, sockets, rooms, database, status files and recent errors', async (t) => {
   const { get, store, statusDir, clients } = await seeded(t);
   console.error('Admin overview test: simulated failure', new Error('simulated storage fault'));
   // A move the database fails to save is answered as a storage error and kept for the console.
@@ -217,7 +225,7 @@ test('overview reports the process, sockets, rooms, database, status files and r
   };
   await assert.rejects(clients[0]!.action({ kind: 'roll' }), /Could not save the action/);
   store.action = action;
-  let overview = await get<AdminOverview>('/api/admin/overview');
+  let overview = await get<AdminSystem>('/api/admin/system');
   assert.ok(
     overview.errors.some(
       (entry) => entry.source === 'websocket' && /simulated SQLITE_FULL/.test(entry.message),
@@ -267,7 +275,7 @@ test('overview reports the process, sockets, rooms, database, status files and r
     join(statusDir, 'drill.json'),
     JSON.stringify({ ...backup, kind: 'drill', result: 'failure', reason: 'game verifier failed' }),
   );
-  overview = await get<AdminOverview>('/api/admin/overview');
+  overview = await get<AdminSystem>('/api/admin/system');
   assert.equal(overview.status.backup.state, 'ok');
   assert.deepEqual(overview.status.backup.state === 'ok' && overview.status.backup.data, backup);
   assert.equal(overview.status.watchdog.state, 'invalid');
@@ -301,6 +309,18 @@ test('games are listed by status and searchable, and a game’s detail shows its
   const pausedItem = (await get<GamesPage>('/api/admin/games?status=paused')).items[0]!;
   assert.equal(pausedItem.roomId, paused);
   assert.ok(pausedItem.players.every((player) => !player.connected && player.userId));
+  // Points are what the table sees: no hidden victory point cards before a winner reveals them.
+  const pausedGame = store.loadGame(paused)!;
+  assert.deepEqual(
+    pausedItem.players.map((player) => player.points),
+    pausedGame.players.map((player) => score(pausedGame, player, false)),
+  );
+  assert.equal(pausedItem.result, null);
+  assert.ok(
+    (await get<GamesPage>('/api/admin/games?status=lobby')).items[0]!.players.every(
+      (player) => player.points === null,
+    ),
+  );
   // Search by room code, by player name, by a fragment, and for nobody.
   for (const q of [
     store.roomCode(paused)!,
@@ -337,13 +357,232 @@ test('games are listed by status and searchable, and a game’s detail shows its
   assert.ok(view.players.every((player) => player.hand === undefined && player.cards === undefined));
   assert.ok(!('deck' in view) && view.deckCount > 0);
   assert.ok(detail.history.entries.length > 0);
-  assert.equal(detail.statistics!.rolls, store.statistics(paused).rolls);
+  // The dice of a game are in its analytics now, worked out off the game's thread.
+  assert.ok(!('statistics' in detail));
   const older = await get<{ entries: HistoryEntry[] }>(
     `/api/admin/games/${paused}/history?before=${detail.history.entries.at(-1)!.revision}`,
   );
   assert.ok(older.entries.every((entry) => entry.revision < detail.history.entries.at(-1)!.revision));
   await get('/api/admin/games/ZZZZ', 404);
   await get('/api/admin/games/not-a-room', 404);
+});
+
+test('the list and the detail agree on a table that has just emptied, and word its deadlines as the game applies them', async (t) => {
+  const { get, server, clients, live, paused } = await seeded(t);
+  const before = await get<GamesPage>('/api/admin/games');
+  assert.deepEqual(before.counts, { lobby: 1, live: 1, paused: 1, finished: 0, empty: 0 });
+  // Both people at the live table leave; the room index's pass from a moment ago still says live.
+  for (const client of clients) client.stop();
+  await until(() => server.runtime.sockets().total === 0, 'the sockets to close');
+  const after = await get<GamesPage>('/api/admin/games');
+  assert.equal(after.indexedAt, before.indexedAt, 'the same pass answered');
+  assert.equal(after.items.find((item) => item.roomId === live)!.status, 'paused');
+  assert.deepEqual(after.counts, { lobby: 1, live: 0, paused: 2, finished: 0, empty: 0 });
+  const detail = await get<GameDetail>(`/api/admin/games/${live}`);
+  assert.equal(detail.status, 'paused');
+  assert.equal(detail.presence.paused, true);
+  assert.ok(detail.presence.pausedAt! <= Date.now());
+  // A paused table's seats are given up at resignAt; a bot would have taken them 30 s after they left.
+  const pausedDetail = await get<GameDetail>(`/api/admin/games/${paused}`);
+  for (const absent of pausedDetail.presence.absent) {
+    assert.equal(absent.standInAt, absent.disconnectedAt + 30_000);
+    assert.ok(absent.resignAt >= pausedDetail.presence.pausedAt!);
+  }
+});
+
+test('a room that played again dates its game from this round, not the first', async (t) => {
+  const { get, store } = await seeded(t);
+  const host = store.enter('create', newSession('Rae').token, 'Rae');
+  const guest = store.enter('join', newSession('Sol').token, 'Sol', host.room_id);
+  store.action(host, 'first-start', readyLobby(store, host.room_id), { kind: 'start' });
+  // Rae is at the table, so Sol leaving hands her the game.
+  store.setConnected(host, true);
+  store.leave(guest, 'sol-leaves', store.snapshot(host.room_id).revision);
+  assert.equal(store.loadGame(host.room_id)!.phase, 'finished');
+  store.action(host, 'back-to-lobby', store.snapshot(host.room_id).revision, { kind: 'returnToLobby' });
+  assert.equal((await get<GameDetail>(`/api/admin/games/${host.room_id}`)).createdAt, null, 'not started');
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  store.lobby(host, 'add-bot-2', store.snapshot(host.room_id).revision, false, undefined, undefined, true);
+  store.action(host, 'second-start', store.snapshot(host.room_id).revision, { kind: 'start' });
+  const second = store.db
+    .prepare(
+      "SELECT json_extract(public_entry, '$.at') AS at FROM game_events WHERE room_id = ? AND json_extract(public_entry, '$.kind') = 'start' ORDER BY revision DESC LIMIT 1",
+    )
+    .get(host.room_id)!.at as string;
+  const detail = await get<GameDetail>(`/api/admin/games/${host.room_id}`);
+  assert.equal(detail.createdAt, Date.parse(second));
+  assert.equal(detail.rounds.length, 1);
+  assert.ok(detail.rounds[0]!.startedAt! < detail.createdAt!);
+  const listed = (await get<GamesPage>(`/api/admin/games?q=${store.roomCode(host.room_id)}`)).items[0]!;
+  assert.equal(listed.createdAt, detail.createdAt);
+});
+
+test('Overview is the glance: who is online, the live games, today’s and this week’s games, and what needs a look', async (t) => {
+  const since = Date.now() - 5 * 60_000;
+  const { get, store, accounts, live, paused, statusDir } = await seeded(t, {
+    online: () => [{ userId: accounts.bob.id, name: 'Bob', guest: false, since, tabs: 1 }],
+  });
+  await writeFile(
+    join(statusDir, 'backup.json'),
+    JSON.stringify({ result: 'failure', reason: 'upload refused', timestamp: new Date().toISOString() }),
+  );
+  console.error('Overview test: a recent error');
+  const overview = await get<AdminOverview>('/api/admin/overview');
+  assert.equal(overview.revision, 'deadbeef');
+  assert.ok(overview.uptimeSeconds >= 0);
+  // The two local players at the live table, and Bob, seated at the paused table but not at it.
+  assert.equal(overview.online.accounts, true);
+  assert.deepEqual(overview.online.counts, {
+    online: 3,
+    playing: 2,
+    inLobbies: 0,
+    elsewhere: 1,
+    spectators: 0,
+  });
+  assert.deepEqual(
+    overview.online.people.map((person) => person.name),
+    ['Guest', 'Hostess', 'Bob'],
+  );
+  assert.ok(!('error' in overview.rooms));
+  const { countedAt, ...rooms } = overview.rooms;
+  assert.deepEqual(rooms, { live: 1, paused: 1, lobbies: 1 });
+  assert.ok(countedAt <= overview.now);
+  // Games being played, most recently active first, with the points the table sees.
+  assert.deepEqual(
+    overview.liveGames.map((game) => [game.roomId, game.status]),
+    [
+      [live, 'live'],
+      [paused, 'paused'],
+    ],
+  );
+  const pausedGame = store.loadGame(paused)!;
+  const listed = overview.liveGames[1]!;
+  assert.equal(listed.turn, pausedGame.turn);
+  assert.equal(listed.target, 10);
+  assert.deepEqual(
+    listed.players.map((player) => player.points),
+    pausedGame.players.map((player) => score(pausedGame, player, false)),
+  );
+  assert.ok(listed.startedAt! <= overview.now);
+  // Both matches started today (by UTC here, as no day was sent); none has ended.
+  assert.ok(!('error' in overview.activity));
+  assert.deepEqual(
+    [overview.activity.started, overview.activity.finished, overview.activity.abandoned],
+    [
+      { day: 2, week: 2 },
+      { day: 0, week: 0 },
+      { day: 0, week: 0 },
+    ],
+  );
+  assert.deepEqual(overview.activity.players, { day: 3, week: 3 });
+  assert.deepEqual(overview.activity.newPlayers, { day: 3, week: 3 });
+  assert.ok(overview.performance.rssBytes > 0 && overview.performance.sockets === 2);
+  assert.equal(overview.status.backup.state === 'ok' && overview.status.backup.data.result, 'failure');
+  assert.ok(overview.errors.recent.length <= 5 && overview.errors.total >= overview.errors.recent.length);
+  assert.match(overview.errors.recent[0]!.message, /Overview test: a recent error/);
+  assert.equal(overview.rejections, 0);
+  // The page sends the start of its own day and week; nonsense is refused, not counted.
+  const now = Date.now();
+  const custom = await get<AdminOverview>(`/api/admin/overview?day=${now - 60_000}&week=${now - 120_000}`);
+  assert.ok(!('error' in custom.activity));
+  assert.deepEqual([custom.activity.day, custom.activity.week], [now - 60_000, now - 120_000]);
+  assert.equal(custom.activity.started.week, 2, 'both started in the last two minutes');
+  const later = await get<AdminOverview>(`/api/admin/overview?day=${now + 30_000}&week=${now + 30_000}`);
+  assert.ok(!('error' in later.activity) && later.activity.started.week === 0, 'nothing after them');
+  await get(`/api/admin/overview?day=${now - 60_000}&week=${now}`, 400);
+  await get(`/api/admin/overview?day=${now - 30 * 86_400_000}`, 400);
+  await get('/api/admin/overview?day=yesterday', 400);
+});
+
+test('who is online merges the presence hub with the seats connected to rooms, and says where each one is', async (t) => {
+  const since = Date.now() - 60_000;
+  const dana = '00000000-0000-4000-8000-000000000009';
+  const { store, server, runtime, accounts, live, paused, lobby } = await seeded(t, {
+    online: () => [
+      { userId: accounts.alice.id, name: 'Alice', guest: false, since, tabs: 2 },
+      { userId: dana, name: null, guest: true, since, tabs: 1 },
+    ],
+  });
+  const now = whoIsOnline(store, runtime, Date.now());
+  assert.equal(now.accounts, true);
+  assert.deepEqual(
+    now.people.map((person) => [person.name, person.accountType, person.place.kind, person.userId]),
+    [
+      // At a live table first (local players with no account), then seated elsewhere, then the hub.
+      ['Guest', null, 'game', null],
+      ['Hostess', null, 'game', null],
+      ['Alice', 'permanent', 'game', accounts.alice.id],
+      ['Unknown account', 'guest', 'hub', dana],
+    ],
+  );
+  const [guest, , alice] = now.people;
+  assert.deepEqual(guest!.place, {
+    kind: 'game',
+    roomId: live,
+    roomCode: store.roomCode(live)!,
+    status: 'live',
+    turn: store.loadGame(live)!.turn,
+    atTable: true,
+  });
+  // Alice holds a seat at the paused table but is not connected to it: she is in the hub.
+  assert.equal(alice!.place.kind === 'game' && alice!.place.atTable, false);
+  assert.equal(alice!.place.kind === 'game' && alice!.place.roomId, paused);
+  assert.deepEqual([alice!.since, alice!.tabs, alice!.seatId], [since, 2, null]);
+  assert.deepEqual(now.counts, { online: 4, playing: 2, inLobbies: 0, elsewhere: 2, spectators: 0 });
+
+  // Without the presence hub, only people connected to rooms can be seen, and it says so.
+  const lobbySeat = store.snapshot(lobby).players[0]!;
+  const bare: GameRuntime = {
+    sockets: () => {
+      const sockets = server.runtime.sockets();
+      return { ...sockets, seats: [...sockets.seats, lobbySeat.id] };
+    },
+    broadcast: (roomId) => server.runtime.broadcast(roomId),
+  };
+  const seatsOnly = whoIsOnline(store, bare, Date.now());
+  assert.equal(seatsOnly.accounts, false);
+  assert.deepEqual(
+    seatsOnly.people.map((person) => [person.name, person.place.kind]),
+    [
+      ['Guest', 'game'],
+      ['Hostess', 'game'],
+      ['Lobbyist', 'lobby'],
+    ],
+  );
+  assert.deepEqual(seatsOnly.counts, { online: 3, playing: 2, inLobbies: 1, elsewhere: 0, spectators: 0 });
+});
+
+test('a seat’s colour is the one the table sees, picked or given, whatever order the game plays in', async (t) => {
+  const { get, store, lobby, paused, accounts } = await seeded(t);
+  // Nobody at the paused table picked a colour: they are dealt in the order they sat down,
+  // not the shuffled order the game plays them in.
+  const detail = await get<GameDetail>(`/api/admin/games/${paused}`);
+  const byAccount = (id: string) => detail.seats.find((seat) => seat.userId === id)!;
+  assert.deepEqual(
+    [accounts.alice.id, accounts.bob.id, accounts.cara.id].map((id) => byAccount(id).color),
+    ['coral', 'sky', 'violet'],
+  );
+  assert.ok(detail.seats.every((seat) => !seat.colorChosen));
+  // In the lobby the second seat picks coral, so the first is given the next free default.
+  const [host, waiter] = store.snapshot(lobby).players;
+  store.lobby(
+    { id: waiter!.id, name: waiter!.name, room_id: lobby },
+    'pick-coral',
+    store.snapshot(lobby).revision,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    'coral',
+  );
+  const seats = (await get<GameDetail>(`/api/admin/games/${lobby}`)).seats;
+  assert.deepEqual(
+    seats.map((seat) => [seat.id, seat.color, seat.colorChosen]),
+    [
+      [host!.id, 'sky', false],
+      [waiter!.id, 'coral', true],
+    ],
+  );
 });
 
 test('viewing a game’s private state is written to the audit log first', async (t) => {
@@ -414,8 +653,10 @@ test('ending a game finishes it as abandoned, journals and audits it, and pushes
   // Both connected players are sent the finished game.
   await until(() => clients.every((client) => client.state?.game?.phase === 'finished'), 'the finished game');
   assert.ok(clients.every((client) => client.state!.game!.finishReason === 'abandoned'));
-  // The room is now listed as finished and cannot be ended twice; a lobby has nothing to end.
-  assert.equal((await get<GamesPage>('/api/admin/games?status=finished')).items[0]!.roomId, live);
+  // The room is now listed as finished, with no winner, and cannot be ended twice; a lobby has nothing to end.
+  const finishedItem = (await get<GamesPage>('/api/admin/games?status=finished')).items[0]!;
+  assert.equal(finishedItem.roomId, live);
+  assert.deepEqual(finishedItem.result, { winner: null, winnerId: null, reason: 'abandoned' });
   assert.equal((await get<GameDetail>(`/api/admin/games/${live}`)).canEnd, false);
   await post(`/api/admin/games/${live}/end`, { confirm: code }, 409);
   await post(`/api/admin/games/${lobby}/end`, { confirm: store.roomCode(lobby) }, 409);
@@ -429,36 +670,120 @@ test('ending a game finishes it as abandoned, journals and audits it, and pushes
   );
 });
 
-test('players can be found by name or id, with their record and current game', async (t) => {
-  const { get, accounts, paused } = await seeded(t);
-  const found = await get<{ players: PlayerSummary[] }>('/api/admin/players?q=ali');
+test('every player is listed by default, sortable and paged, and can still be found by name or id', async (t) => {
+  const [dana, eve] = [account('Dana', 4), account('Eve', 6)];
+  const { get, store, accounts, paused } = await seeded(t, {
+    online: () => [{ userId: accounts.bob.id, name: 'Bob', guest: false, since: Date.now(), tabs: 1 }],
+  });
+  // Eve beats Dana (Dana leaves while Eve is at the table); Eli has only ever opened the hub.
+  const host = store.enter('create', newSession('d').token, 'd', undefined, dana);
+  const guest = store.enter('join', newSession('e').token, 'e', host.room_id, eve);
+  store.action(host, 'dana-start', readyLobby(store, host.room_id), { kind: 'start' });
+  store.setConnected(guest, true);
+  store.leave(host, 'dana-leaves', store.snapshot(host.room_id).revision);
+  const won = store.loadGame(host.room_id)!;
+  assert.equal(won.winner, guest.id);
+  const eli = '00000000-0000-4000-8000-000000000005';
+  store.markSeen(eli, Date.now() - 60_000);
+  store.markSeen(accounts.cara.id, Date.now() - 120_000);
+
+  const list = async (query = '') => get<PlayersPage>(`/api/admin/players${query}`);
+  const everyone = await list();
+  assert.equal(everyone.total, 6, 'nobody has to be searched for');
   assert.deepEqual(
-    found.players.map((player) => player.userId),
+    [everyone.sort, everyone.dir, everyone.page, everyone.pageSize],
+    ['lastSeen', 'desc', 1, 25],
+  );
+  // Most recently seen first; accounts never seen last, by name.
+  assert.deepEqual(
+    everyone.items.map((player) => player.name),
+    [null, 'Cara', 'Alice', 'Bob', 'Dana', 'Eve'],
+  );
+  const byId = (page: PlayersPage, id: string) => page.items.find((player) => player.userId === id)!;
+  const alice = byId(everyone, accounts.alice.id);
+  assert.deepEqual(
+    [
+      alice.games,
+      alice.wins,
+      alice.winRate,
+      alice.averagePoints,
+      alice.accountType,
+      alice.currentRoom?.roomId,
+    ],
+    [1, 0, null, null, 'permanent', paused],
+    'a game still being played decides nothing',
+  );
+  const winner = byId(everyone, eve.id);
+  assert.deepEqual([winner.games, winner.wins, winner.winRate], [1, 1, 1]);
+  assert.equal(
+    winner.averagePoints,
+    score(
+      won,
+      won.players.find((player) => player.id === guest.id)!,
+      true,
+    ),
+  );
+  assert.equal(byId(everyone, dana.id).winRate, 0, 'leaving is a decided game lost');
+  assert.equal(byId(everyone, accounts.bob.id).online, true);
+  assert.equal(byId(everyone, accounts.cara.id).online, false);
+  assert.equal(byId(everyone, accounts.cara.id).accountType, 'guest');
+  assert.equal(byId(everyone, eli).games, 0);
+  assert.ok(alice.firstPlayed! <= Date.now());
+  assert.equal(everyone.presence, true);
+  // Sorted by games, wins, first game and name, either way.
+  assert.equal((await list('?sort=games')).items.at(-1)!.userId, eli);
+  assert.equal((await list('?sort=wins')).items[0]!.userId, eve.id);
+  assert.equal((await list('?sort=joined')).items.at(-1)!.userId, eli, 'never played: last either way');
+  assert.equal((await list('?sort=joined&dir=asc')).items.at(-1)!.userId, eli);
+  assert.deepEqual(
+    (await list('?sort=name')).items.map((player) => player.name),
+    ['Alice', 'Bob', 'Cara', 'Dana', 'Eve', null],
+  );
+  assert.deepEqual(
+    (await list('?sort=name&dir=desc')).items.map((player) => player.name),
+    ['Eve', 'Dana', 'Cara', 'Bob', 'Alice', null],
+  );
+  // Paged, and found by any name used or the start of an id.
+  assert.equal((await list('?page=2')).items.length, 0);
+  assert.deepEqual(
+    (await list('?q=ali')).items.map((player) => player.userId),
     [accounts.alice.id],
   );
-  assert.equal(found.players[0]!.name, 'Alice');
-  assert.equal(found.players[0]!.currentRoom?.roomId, paused);
   assert.deepEqual(
-    (await get<{ players: PlayerSummary[] }>(`/api/admin/players?q=${accounts.cara.id}`)).players.map(
-      (player) => player.userId,
-    ),
+    (await list(`?q=${accounts.cara.id}`)).items.map((player) => player.userId),
     [accounts.cara.id],
   );
-  // An id prefix matches every account that shares it.
-  assert.equal(
-    (await get<{ players: PlayerSummary[] }>('/api/admin/players?q=00000000-0000')).players.length,
-    3,
+  assert.equal((await list('?q=00000000-0000')).total, 6);
+  assert.equal((await list('?q=%25%25')).total, 0);
+  await get('/api/admin/players?sort=elo', 400);
+  await get('/api/admin/players?dir=sideways', 400);
+  await get('/api/admin/players?page=0', 400);
+  await get(`/api/admin/players?q=${'x'.repeat(65)}`, 400);
+
+  const detail = await get<PlayerDetail>(`/api/admin/players/${accounts.alice.id}`);
+  assert.deepEqual(detail.names, ['Alice']);
+  assert.equal(detail.accountType, 'permanent');
+  assert.deepEqual(
+    [detail.record.matches, detail.record.won, detail.record.playing, detail.record.winRate],
+    [1, 0, 1, null],
   );
-  await get('/api/admin/players?q=a', 400);
-  assert.equal((await get<{ players: PlayerSummary[] }>('/api/admin/players?q=%25%25')).players.length, 0);
-  const detail = await get<PlayerDetail>(`/api/admin/players/${accounts.cara.id}`);
-  assert.deepEqual(detail.names, ['Cara']);
-  assert.equal(detail.accountType, 'guest');
-  assert.equal(detail.record.matches, 1);
-  assert.equal(detail.record.playing, 1);
-  assert.equal(detail.matches[0]!.roomId, paused);
-  assert.equal(detail.matches[0]!.players.length, 3);
-  assert.equal(detail.seats[0]!.roomId, paused);
+  assert.ok(detail.record.firstPlayed! <= Date.now());
+  assert.equal(detail.online, null, 'Alice is not online');
+  // The game still being played shows the points the table sees, not her hidden cards.
+  const pausedGame = store.loadGame(paused)!;
+  const inPlay = detail.matches.find((match) => match.outcome === 'playing')!;
+  const aliceInPaused = pausedGame.players.find((player) => player.name === 'Alice')!;
+  assert.equal(inPlay.points, score(pausedGame, aliceInPaused, false));
+  assert.equal(inPlay.roomId, paused);
+  const eveDetail = await get<PlayerDetail>(`/api/admin/players/${eve.id}`);
+  assert.deepEqual([eveDetail.record.won, eveDetail.record.winRate], [1, 1]);
+  assert.equal(eveDetail.record.averagePoints, winner.averagePoints);
+  const bob = await get<PlayerDetail>(`/api/admin/players/${accounts.bob.id}`);
+  assert.equal(bob.online?.place.kind, 'game');
+  assert.equal(bob.presence, true);
+  // An account seen only in the hub has a page too; one never seen does not.
+  const hubOnly = await get<PlayerDetail>(`/api/admin/players/${eli}`);
+  assert.deepEqual([hubOnly.names, hubOnly.record.matches], [[], 0]);
   await get('/api/admin/players/00000000-0000-4000-8000-000000000099', 404);
 });
 
@@ -539,7 +864,74 @@ test('dice statistics compare fairly with two fair dice', () => {
     rolls: 0,
     counts: Array(11).fill(0),
     expected: Array(11).fill(0),
+    model: 'two-dice',
     chiSquare: null,
     pValue: null,
   });
+  // Balanced dice follow the curve by design, so they get no χ² test; flat totals expect every total alike.
+  const deck = diceSummary(
+    FAIR_DICE.map((p) => p * 360),
+    'balanced',
+  );
+  assert.equal(deck.model, 'deck');
+  assert.equal(deck.chiSquare, null);
+  assert.deepEqual(
+    deck.expected,
+    exact.expected.map((e) => e / 10),
+  );
+  const flat = diceSummary(Array(11).fill(10), 'flat');
+  assert.equal(flat.model, 'flat');
+  assert.deepEqual(flat.expected, Array(11).fill(10));
+  assert.equal(flat.chiSquare, 0);
+  // A mixture expects the sum of its modes' expectations, and no single test applies.
+  const mixed = diceSummary(
+    Array(11)
+      .fill(0)
+      .map((_, i) => (i === 5 ? 22 : 2)),
+    { classic: 36, flat: 11 },
+  );
+  assert.equal(mixed.model, 'mixed');
+  assert.equal(mixed.pValue, null);
+  assert.deepEqual(
+    mixed.expected,
+    FAIR_DICE.map((p) => Math.round((p * 36 + 1) * 100) / 100),
+  );
+});
+
+test('dice count under the mode each game was played with, not the room’s current setting', (t) => {
+  const store = new Store(':memory:');
+  t.after(() => store.close());
+  {
+    const host = store.enter('create', newSession('Uma').token, 'Uma');
+    const guest = store.enter('join', newSession('Vic').token, 'Vic', host.room_id);
+    const room = host.room_id;
+    const natural = { turnTimerSeconds: null, diceMode: 'classic' as const };
+    store.configureSettings(host, 'natural', store.snapshot(room).revision, natural);
+    store.action(host, 'start-1', readyLobby(store, room), { kind: 'start' });
+    play(store, room, 60, 'first');
+    const rolls = () =>
+      store.db
+        .prepare("SELECT count(*) AS n FROM game_events WHERE json_extract(public_entry, '$.kind') = 'roll'")
+        .get()!.n as number;
+    const naturalRolls = rolls();
+    assert.ok(naturalRolls > 3, 'the first game rolled');
+    store.leave(guest, 'vic-leaves', store.snapshot(room).revision);
+    store.action(host, 'back', store.snapshot(room).revision, { kind: 'returnToLobby' });
+    // The room switches to balanced dice for its next game.
+    store.configureSettings(host, 'balanced', store.snapshot(room).revision, {
+      ...natural,
+      diceMode: 'balanced',
+    });
+    store.lobby(host, 'add-bot', store.snapshot(room).revision, false, undefined, undefined, true);
+    store.action(host, 'start-2', store.snapshot(room).revision, { kind: 'start' });
+    play(store, room, 60, 'second');
+    assert.ok(rolls() > naturalRolls, 'the second game rolled');
+    const { dice } = computeStats(store.db, Date.now());
+    assert.equal(dice.byMode.classic!.rolls, naturalRolls);
+    assert.equal(dice.byMode.balanced!.rolls, rolls() - naturalRolls);
+    assert.equal(dice.byMode.balanced!.model, 'deck');
+    assert.equal(dice.byMode.classic!.model, 'two-dice');
+    assert.equal(dice.overall.model, 'mixed');
+    assert.equal(dice.overall.chiSquare, null);
+  }
 });

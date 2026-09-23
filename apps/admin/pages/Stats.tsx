@@ -7,17 +7,12 @@ import type {
   RetentionReport,
 } from '../../server/src/admin/types.js';
 import { api, ApiError, useApi } from '../api.js';
-import { count, percent, time } from '../format.js';
+import { count, diceLabel, percent, time } from '../format.js';
 import { Columns, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
 
 const TOTALS = Array.from({ length: 11 }, (_, i) => String(i + 2));
-const MODE_NAMES: Record<string, string> = {
-  classic: 'Natural',
-  balanced: 'Balanced',
-  flat: 'Flat (retired)',
-};
 
-function DiceTable({ dice }: { dice: DiceSummary }) {
+export function DiceTable({ dice }: { dice: DiceSummary }) {
   return (
     <Table className="compact">
       <thead>
@@ -40,7 +35,7 @@ function DiceTable({ dice }: { dice: DiceSummary }) {
           ))}
         </tr>
         <tr>
-          <th>Fair dice</th>
+          <th>{expectationName(dice)}</th>
           {dice.expected.map((n, i) => (
             <td key={i} className="num muted">
               {Math.round(n)}
@@ -52,12 +47,22 @@ function DiceTable({ dice }: { dice: DiceSummary }) {
   );
 }
 
-function fairness(dice: DiceSummary) {
-  if (dice.pValue === null) return 'No rolls yet.';
+/** What the numbers say about the dice, and only what a test of them can say. */
+export function fairness(dice: DiceSummary): string {
+  if (!dice.rolls) return 'No rolls yet.';
+  if (dice.model === 'deck')
+    return 'Balanced dice are drawn from a deck of all 36 pairs, so their totals follow the curve by design; a χ² test of independent dice does not apply.';
+  if (dice.model === 'mixed')
+    return 'These rolls mix dice modes, so no single test applies: the expectation adds up each mode’s own, and each mode is judged on its own below.';
+  const subject = dice.model === 'flat' ? 'equally likely totals' : 'fair, independent dice';
   return `χ² ${dice.chiSquare} over 10 degrees of freedom, p = ${dice.pValue}. ${
-    dice.pValue < 0.01 ? 'Unlikely from fair independent dice.' : 'Consistent with fair independent dice.'
+    dice.pValue !== null && dice.pValue < 0.01 ? `Unlikely from ${subject}.` : `Consistent with ${subject}.`
   }`;
 }
+
+/** The expectation's name in charts and tables. */
+export const expectationName = (dice: DiceSummary) =>
+  dice.model === 'flat' ? 'Equal totals' : dice.model === 'mixed' ? 'Expected' : 'Two fair dice';
 
 function Retention() {
   const [days, setDays] = useState<'7' | '14' | '30' | '90'>('30');
@@ -289,10 +294,13 @@ export function Stats() {
             {stats.dice.overall.rolls ? (
               <>
                 <Columns
-                  label="Rolls of each total across every game, against two fair dice"
+                  label={`Rolls of each total across every game, against ${expectationName(stats.dice.overall).toLowerCase()}`}
                   categories={TOTALS}
                   series={[{ name: 'Rolled', slot: 1, values: stats.dice.overall.counts }]}
-                  reference={{ name: 'Two fair dice', values: stats.dice.overall.expected }}
+                  reference={{
+                    name: expectationName(stats.dice.overall),
+                    values: stats.dice.overall.expected,
+                  }}
                 />
                 <p className="muted">{fairness(stats.dice.overall)}</p>
                 <DiceTable dice={stats.dice.overall} />
@@ -300,15 +308,15 @@ export function Stats() {
                   Object.entries(stats.dice.byMode).map(([mode, dice]) => (
                     <div key={mode} className="report-section">
                       <h3>
-                        {MODE_NAMES[mode] ?? mode} dice · {count(dice.rolls)} rolls
+                        {diceLabel(mode)} dice · {count(dice.rolls)} rolls
                       </h3>
                       <p className="muted">{fairness(dice)}</p>
                       <DiceTable dice={dice} />
                     </div>
                   ))}
                 <p className="footnote">
-                  Split by each room&rsquo;s current dice setting. Balanced dice draw from a deck, so they are
-                  meant to sit closer to the expectation than independent rolls.
+                  Each roll counts under the dice its own game was played with, whatever the room is set to
+                  now.
                 </p>
               </>
             ) : (
