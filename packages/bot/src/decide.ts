@@ -20,7 +20,7 @@ import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../rules/src/index.js';
 import { CARD_NAMES } from '../../rules/src/game.js';
 import type { Resource } from '../../rules/src/index.js';
 import type { Board } from '../../rules/src/board.js';
-import { roadSites } from '../../rules/src/game.js';
+import { roadSites, settlementSites } from '../../rules/src/game.js';
 import type { CardKind, GameAction, GameView, Hand } from '../../rules/src/game.js';
 import { choice, noul, JevUnavailable } from './jev.js';
 import type { JevClient, Question } from './jev.js';
@@ -221,7 +221,15 @@ const FOCUS_COST: Record<Focus, keyof typeof COSTS | null> = {
  */
 function effectiveFocus(plan: BotPlan, view: GameView): Focus {
   const { legal, deckCount } = view;
-  const reachable = legal.settlements.length > 0 || legal.roads.length > 0;
+  // Asked of the board, not of the hand: the legal lists are empty whenever a
+  // road is unaffordable, which is most of the time, and reading them here
+  // turned every settlement plan into a card plan until the timber and clay
+  // for a road were already in hand.
+  const me = view.players.find((p) => p.hand);
+  const reachable =
+    !!me &&
+    me.pieces.settlements < 5 &&
+    (settlementSites(view, me.id).length > 0 || (me.pieces.roads < 15 && roadSites(view, me.id).length > 0));
   if (plan.focus === 'settlement' && !reachable) return deckCount > 0 ? 'card' : 'city';
   if (
     plan.focus === 'city' &&
@@ -232,6 +240,16 @@ function effectiveFocus(plan: BotPlan, view: GameView): Focus {
   if (plan.focus === 'card' && deckCount === 0) return legal.cities.length ? 'city' : 'settlement';
   if (plan.focus === 'save') return legal.cities.length ? 'city' : 'settlement';
   return plan.focus;
+}
+
+/**
+ * Everything the current focus costs, not just the part still missing. This is
+ * what a seven leaves in hand: keeping only the missing part threw away the
+ * rock for a city because the hay for it was already there.
+ */
+function focusCost(plan: BotPlan, view: GameView): Hand {
+  const cost = FOCUS_COST[effectiveFocus(plan, view)];
+  return { ...(cost ? COSTS[cost] : { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }) };
 }
 
 const none = (plan: BotPlan, action: GameAction, explain: string): Decision => ({
@@ -376,12 +394,9 @@ export async function decide(ctx: DecideContext): Promise<Decision> {
 
   if (view.phase === 'discard') {
     const count = Math.floor(handTotal(hand) / 2);
-    const keep = plan.needs.length
-      ? plan.needs
-      : (RESOURCES.filter((r) => hand[r] > 0).slice(0, 2) as Resource[]);
     return none(
       plan,
-      { kind: 'discard', resources: discardChoice(hand, keep, count) },
+      { kind: 'discard', resources: discardChoice(hand, focusCost(plan, view), count) },
       `Discarding ${count}, keeping what the plan needs.`,
     );
   }
@@ -529,7 +544,13 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   if (cities.length) moves.city = 'upgrade a settlement to a city: one point and double production';
   if (roads.length && can.includes('road')) moves.road = 'build a road toward a corner or for longest road';
   if (legal.canBuyCard) moves.card = 'buy a development card';
-  const trade = bankTrade(hand, legal.rates, plan.needs, view.bank);
+  // What the focus still needs, worked out from this hand at every decision.
+  // It used to be refreshed only when the decision service answered, so a bot
+  // playing without one kept the empty list it started with, and a trade needs
+  // something to receive: it never traded with the bank or a harbour at all.
+  const focus = FOCUS_COST[effectiveFocus(plan, view)];
+  const { needs, surplus } = needsAndSurplus(hand, focus);
+  const trade = bankTrade(hand, legal.rates, needs, view.bank, focus ? COSTS[focus] : undefined);
   if (trade)
     moves.trade = `trade ${RESOURCE_NAMES[trade.give].toLowerCase()} to the bank for the ${RESOURCE_NAMES[trade.receive].toLowerCase()} the plan needs`;
   const kinds = playableKinds(ctx);
@@ -552,15 +573,13 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
     return none(plan, { kind: 'endTurn' }, 'Nothing affordable; holding resources.');
   if (Object.keys(moves).length === 1 && moves.endTurn)
     return none(plan, { kind: 'endTurn' }, 'Nothing affordable; holding resources.');
-  // One real option and no plan to revisit is not worth a decision either.
-  if (Object.keys(moves).length === 2 && moves.trade && !plan.needs.length)
-    return none(plan, { kind: 'endTurn' }, 'Only a trade available and nothing to save for.');
 
   const targetTaken = plan.targetSite !== null && !!view.buildings[plan.targetSite];
   const threat = threatOf(ctx);
   const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat, everyFewTurns: planLife });
 
   const fallback = (): Decision => {
+    const current = { ...plan, needs, surplus };
     // A card held to the end of the game was worth nothing. With no decision
     // service to ask, playing one beats passing on the turn, and the strongest
     // of them is picked here rather than the first that came out of the deck.
@@ -577,9 +596,9 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
               : legal.canBuyCard
                 ? { kind: 'buyCard' }
                 : card
-                  ? playCard(ctx, plan, card)
+                  ? playCard(ctx, current, card)
                   : { kind: 'endTurn' };
-    return { ...none(plan, action, 'Playing the plan without the decision service.'), degraded: true };
+    return { ...none(current, action, 'Playing the plan without the decision service.'), degraded: true };
   };
   if (!jev) return fallback();
 
@@ -670,11 +689,7 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
 
   const nextPlan = stale
     ? readPlan(ctx, ev.answers, threat, plan.targetSite ?? corners[0] ?? null)
-    : {
-        ...plan,
-        decisions: plan.decisions + 1,
-        needs: needsAndSurplus(hand, FOCUS_COST[effectiveFocus(plan, view)]).needs,
-      };
+    : { ...plan, decisions: plan.decisions + 1, needs };
   return {
     action,
     plan: nextPlan,

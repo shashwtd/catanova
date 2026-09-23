@@ -173,13 +173,21 @@ export function robberTargets(view: GameView, hexId: number, meId: string): stri
   return robberVictims(view, meId, hexId);
 }
 
-/** Which cards to throw away on a seven: keep what the plan needs, drop the
- *  most plentiful of the rest. Pure counting, so no decision is spent on it. */
-export function discardChoice(hand: Hand, keep: readonly Resource[], count: number): Hand {
+/** Which cards to throw away on a seven: keep what the plan's purchase costs
+ *  and drop from the biggest pile beyond that, one card at a time so the hand
+ *  that is left stays varied. Only when nothing spare is left does a card the
+ *  plan wants go. Pure counting, so no decision is spent on it. */
+export function discardChoice(hand: Hand, keep: Hand, count: number): Hand {
   const out: Hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
-  const pool = RESOURCES.flatMap((r) => Array<Resource>(hand[r]).fill(r));
-  pool.sort((a, b) => (keep.includes(a) ? 1 : 0) - (keep.includes(b) ? 1 : 0) || hand[b] - hand[a]);
-  for (const r of pool.slice(0, count)) out[r] += 1;
+  const left: Hand = { ...hand };
+  const biggest = (size: (r: Resource) => number) =>
+    RESOURCES.filter((r) => size(r) > 0).sort((a, b) => size(b) - size(a))[0];
+  for (let n = 0; n < count; n++) {
+    const r = biggest((r) => left[r] - keep[r]) ?? biggest((r) => left[r]);
+    if (!r) break;
+    left[r] -= 1;
+    out[r] += 1;
+  }
   return out;
 }
 
@@ -196,13 +204,17 @@ export function bankTrade(
   rates: Hand,
   needs: readonly Resource[],
   bank: Hand,
+  keep?: Hand,
 ): { give: Resource; receive: Resource } | null {
   // The bank can run dry late in a game, and asking for a resource it does not
   // hold is rejected by the rules, so supply is checked here rather than
   // discovered as an error.
   const wanted = needs.filter((r) => bank[r] > 0);
-  const give = RESOURCES.filter((r) => !wanted.includes(r) && hand[r] >= (rates[r] || 4)).sort(
-    (a, b) => hand[b] - hand[a],
+  // Never trade below what the purchase itself costs: four of five hay traded
+  // for rock leaves a city short of hay instead.
+  const spare = (r: Resource) => hand[r] - (keep?.[r] ?? 0);
+  const give = RESOURCES.filter((r) => !wanted.includes(r) && spare(r) >= (rates[r] || 4)).sort(
+    (a, b) => spare(b) - spare(a),
   )[0];
   const receive = wanted[0];
   return give && receive ? { give, receive } : null;
