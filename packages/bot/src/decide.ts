@@ -401,15 +401,23 @@ export async function decide(ctx: DecideContext): Promise<Decision> {
   }
 
   // --- rungs that need judgement ------------------------------------------
+  // When the service fails the same rung is answered again without it, which
+  // is exactly how a bot with no key plays. A thinner fallback used to live
+  // here: it built a city or a settlement and otherwise passed, never a road,
+  // a card or a trade, so its starting roads never reached a new corner and a
+  // table whose service was down stalled at about four points each.
   try {
-    if (view.phase === 'setupSettlement') return await openingPlacement(ctx, plan);
-    if (view.phase === 'robber') return await placeRobber(ctx, plan);
-    if (view.phase === 'actions') return await takeTurn(ctx, plan);
+    return await judge(ctx, plan);
   } catch (error) {
     if (!(error instanceof JevUnavailable)) throw error;
-    return { ...degradedMove(ctx, plan), degraded: true };
+    return { ...(await judge({ ...ctx, jev: null }, plan)), degraded: true };
   }
+}
 
+async function judge(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
+  if (ctx.view.phase === 'setupSettlement') return openingPlacement(ctx, plan);
+  if (ctx.view.phase === 'robber') return placeRobber(ctx, plan);
+  if (ctx.view.phase === 'actions') return takeTurn(ctx, plan);
   return none(plan, { kind: 'endTurn' }, 'Nothing to do.');
 }
 
@@ -703,34 +711,4 @@ function playCard(ctx: DecideContext, plan: BotPlan, cardId: string): GameAction
   }
   if (kind === 'monopoly') return { kind: 'playCard', cardId, resource: wanted[0] ?? 'ore' };
   return { kind: 'playCard', cardId };
-}
-
-/** Used when the decision service cannot be reached at all. */
-function degradedMove(ctx: DecideContext, plan: BotPlan): Decision {
-  const { board, view } = ctx;
-  if (view.phase === 'setupSettlement') {
-    const options = rankCorners(board, view.legal.settlements, 1);
-    return none(
-      plan,
-      { kind: 'settlement', vertex: options[0] ?? view.legal.settlements[0] ?? 0 },
-      'Strongest corner by production.',
-    );
-  }
-  if (view.phase === 'robber') {
-    const hex =
-      rankRobberHexes(board, view, ctx.meId, 1, contests(ctx.level, ctx.standIn).leaderWeight)[0] ??
-      view.robber;
-    const victim = robberTargets(view, hex, ctx.meId)[0];
-    return none(plan, { kind: 'robber', hex, ...(victim ? { victim } : {}) }, 'Blocking the strongest tile.');
-  }
-  const can = affordable(handOf(view));
-  if (view.legal.cities.length && can.includes('city'))
-    return none(plan, { kind: 'city', vertex: view.legal.cities[0]! }, 'Upgrading to a city.');
-  if (view.legal.settlements.length && can.includes('settlement'))
-    return none(
-      plan,
-      { kind: 'settlement', vertex: rankCorners(board, view.legal.settlements, 1)[0]! },
-      'Taking a corner.',
-    );
-  return none(plan, { kind: 'endTurn' }, 'Holding resources.');
 }
