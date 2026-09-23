@@ -43,6 +43,8 @@ export type IndexedRoom = {
   humans: number;
   hasGame: boolean;
   paused: boolean;
+  /** When the table emptied, while it is paused. */
+  pausedAt: number | null;
   phase: string | null;
   turn: number | null;
   lastActivity: number | null;
@@ -125,6 +127,7 @@ function classify(db: DatabaseSync, rows: RoomRow[], leaseMs: number): IndexedRo
       humans: row.humans,
       hasGame: !!row.hasGame,
       paused,
+      pausedAt: row.pausedAt,
       phase,
       turn: typeof event?.turn === 'number' ? event.turn : null,
       lastActivity: touched === null ? eventAt : eventAt === null ? touched : Math.max(touched, eventAt),

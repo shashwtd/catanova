@@ -346,6 +346,56 @@ test('games are listed by status and searchable, and a game’s detail shows its
   await get('/api/admin/games/not-a-room', 404);
 });
 
+test('the list and the detail agree on a table that has just emptied, and word its deadlines as the game applies them', async (t) => {
+  const { get, server, clients, live, paused } = await seeded(t);
+  const before = await get<GamesPage>('/api/admin/games');
+  assert.deepEqual(before.counts, { lobby: 1, live: 1, paused: 1, finished: 0, empty: 0 });
+  // Both people at the live table leave; the room index's pass from a moment ago still says live.
+  for (const client of clients) client.stop();
+  await until(() => server.runtime.sockets().total === 0, 'the sockets to close');
+  const after = await get<GamesPage>('/api/admin/games');
+  assert.equal(after.indexedAt, before.indexedAt, 'the same pass answered');
+  assert.equal(after.items.find((item) => item.roomId === live)!.status, 'paused');
+  assert.deepEqual(after.counts, { lobby: 1, live: 0, paused: 2, finished: 0, empty: 0 });
+  const detail = await get<GameDetail>(`/api/admin/games/${live}`);
+  assert.equal(detail.status, 'paused');
+  assert.equal(detail.presence.paused, true);
+  assert.ok(detail.presence.pausedAt! <= Date.now());
+  // A paused table's seats are given up at resignAt; a bot would have taken them 30 s after they left.
+  const pausedDetail = await get<GameDetail>(`/api/admin/games/${paused}`);
+  for (const absent of pausedDetail.presence.absent) {
+    assert.equal(absent.standInAt, absent.disconnectedAt + 30_000);
+    assert.ok(absent.resignAt >= pausedDetail.presence.pausedAt!);
+  }
+});
+
+test('a room that played again dates its game from this round, not the first', async (t) => {
+  const { get, store } = await seeded(t);
+  const host = store.enter('create', newSession('Rae').token, 'Rae');
+  const guest = store.enter('join', newSession('Sol').token, 'Sol', host.room_id);
+  store.action(host, 'first-start', readyLobby(store, host.room_id), { kind: 'start' });
+  // Rae is at the table, so Sol leaving hands her the game.
+  store.setConnected(host, true);
+  store.leave(guest, 'sol-leaves', store.snapshot(host.room_id).revision);
+  assert.equal(store.loadGame(host.room_id)!.phase, 'finished');
+  store.action(host, 'back-to-lobby', store.snapshot(host.room_id).revision, { kind: 'returnToLobby' });
+  assert.equal((await get<GameDetail>(`/api/admin/games/${host.room_id}`)).createdAt, null, 'not started');
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  store.lobby(host, 'add-bot-2', store.snapshot(host.room_id).revision, false, undefined, undefined, true);
+  store.action(host, 'second-start', store.snapshot(host.room_id).revision, { kind: 'start' });
+  const second = store.db
+    .prepare(
+      "SELECT json_extract(public_entry, '$.at') AS at FROM game_events WHERE room_id = ? AND json_extract(public_entry, '$.kind') = 'start' ORDER BY revision DESC LIMIT 1",
+    )
+    .get(host.room_id)!.at as string;
+  const detail = await get<GameDetail>(`/api/admin/games/${host.room_id}`);
+  assert.equal(detail.createdAt, Date.parse(second));
+  assert.equal(detail.rounds.length, 1);
+  assert.ok(detail.rounds[0]!.startedAt! < detail.createdAt!);
+  const listed = (await get<GamesPage>(`/api/admin/games?q=${store.roomCode(host.room_id)}`)).items[0]!;
+  assert.equal(listed.createdAt, detail.createdAt);
+});
+
 test('a seat’s colour is the one the table sees, picked or given, whatever order the game plays in', async (t) => {
   const { get, store, lobby, paused, accounts } = await seeded(t);
   // Nobody at the paused table picked a colour: they are dealt in the order they sat down,

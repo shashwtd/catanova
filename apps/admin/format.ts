@@ -50,6 +50,29 @@ export const percent = (part: number, whole: number) =>
 
 export const short = (id: string | null | undefined, length = 8) => (id ? id.slice(0, length) : '—');
 
+/** Dice modes by the names players see in the lobby. */
+export const DICE_LABELS: Record<string, string> = {
+  classic: 'Natural',
+  balanced: 'Balanced',
+  flat: 'Flat (retired)',
+};
+export const diceLabel = (mode: string | null | undefined) =>
+  mode ? (DICE_LABELS[mode] ?? mode) : DICE_LABELS.classic!;
+
+/** What the table is waiting for, in words rather than the engine's phase ids. */
+const PHASE_LABELS: Record<string, string> = {
+  setupSettlement: 'Setup',
+  setupRoad: 'Setup',
+  roll: 'To roll',
+  actions: 'Building and trading',
+  discard: 'Discarding',
+  robber: 'Moving the robber',
+  freeRoads: 'Free roads',
+  finished: 'Finished',
+};
+export const phaseLabel = (phase: string | null | undefined) =>
+  phase ? (PHASE_LABELS[phase] ?? phase) : '—';
+
 /** How an account signs in: `permanent` accounts are Google sign-ins; guests have no sign-in. */
 export const accountLabel = (type: string | null | undefined): string | null =>
   type === 'permanent' ? 'Google' : type === 'guest' ? 'Guest' : (type ?? null);

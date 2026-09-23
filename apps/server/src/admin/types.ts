@@ -4,7 +4,7 @@
  */
 import type { HistoryEntry, RoomState } from '../../../../packages/protocol/src/index.js';
 import type { PlayerColor } from '../../../../packages/protocol/src/colors.js';
-import type { TurnClock } from '../../../../packages/protocol/src/settings.js';
+import type { RoomSettings, TurnClock } from '../../../../packages/protocol/src/settings.js';
 import type { Metric, Window } from '../../../../scripts/reporting/retention.js';
 import type { AuditEntry } from './audit.js';
 import type { ServerErrorEntry } from './errors.js';
@@ -130,7 +130,16 @@ export type GameDetail = {
    */
   seats: (SeatSummary & { color: PlayerColor | null; colorChosen: boolean; ready: boolean })[];
   standIns: { playerId: string; since: number; level: string; styled: boolean }[];
-  presence: { paused: boolean; absent: { playerId: string; disconnectedAt: number; resignAt: number }[] };
+  /**
+   * `paused` is exactly `status === 'paused'`: nobody is at the table. While the
+   * table is live, an absent seat is played by a bot from `standInAt`, and
+   * `resignAt` does not apply; it is when a paused table gives the seat up.
+   */
+  presence: {
+    paused: boolean;
+    pausedAt: number | null;
+    absent: { playerId: string; disconnectedAt: number; standInAt: number; resignAt: number }[];
+  };
   clock: TurnClock | null;
   statistics: { rolls: number; diceCounts: number[] } | null;
   history: { entries: HistoryEntry[]; hasMore: boolean };
@@ -141,7 +150,8 @@ export type GameDetail = {
     turns: number;
     winner: string | null;
   }[];
-  settings: Record<string, unknown> | null;
+  /** The room's settings as the server resolves them; a started game's own dice mode is in its snapshot. */
+  settings: RoomSettings;
   /** Set when the saved game cannot be read, which is itself worth knowing. */
   integrityError: string | null;
   canEnd: boolean;

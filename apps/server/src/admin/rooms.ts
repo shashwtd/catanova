@@ -9,7 +9,7 @@
  * public entry; their saved states are never opened here.
  */
 import type { Store } from '../store.js';
-import { ProtocolError, ROOM_CODE_LEASE_MS } from '../store.js';
+import { ProtocolError, ROOM_CODE_LEASE_MS, STANDIN_AFTER_MS } from '../store.js';
 import type { Game } from '../../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
 import { isPlayerColor, seatColors } from '../../../../packages/protocol/src/colors.js';
@@ -113,12 +113,17 @@ function tableSeats(seats: SeatRow[], game: Game | undefined, live: Live): SeatS
   );
 }
 
-function firstEventAt(store: Store, roomId: string): number | null {
+/**
+ * When the room's current game started: its first journal entry after the
+ * round began. A room that returned to its lobby keeps the earlier rounds'
+ * entries, so the room's very first entry dates the first round, not this one.
+ */
+function roundStartedAt(store: Store, roomId: string): number | null {
   const row = store.db
     .prepare(
-      "SELECT json_extract(public_entry, '$.at') AS at FROM game_events WHERE room_id = ? ORDER BY revision LIMIT 1",
+      "SELECT json_extract(public_entry, '$.at') AS at FROM game_events WHERE room_id = ? AND revision > ? ORDER BY revision LIMIT 1",
     )
-    .get(roomId) as { at: string | null } | undefined;
+    .get(roomId, store.round(roomId)) as { at: string | null } | undefined;
   return time(row?.at);
 }
 
@@ -152,8 +157,15 @@ export async function listGames(
   const { store } = context;
   const now = context.now();
   const live = liveState(context);
+  const counts = { ...found.counts };
   const items = found.rooms.map((listed): GameListItem => {
     const room = indexRoom(store.db, now, ROOM_CODE_LEASE_MS, listed.id) ?? listed;
+    // The pass can be a few seconds old. A row shown is read fresh, and the
+    // counts follow it, so the tabs never disagree with the rows under them.
+    if (room.status !== listed.status) {
+      counts[listed.status]--;
+      counts[room.status]++;
+    }
     const { game, error } = room.hasGame ? openGame(store, room.id) : {};
     return {
       roomId: room.id,
@@ -162,7 +174,7 @@ export async function listGames(
       phase: game?.phase ?? room.phase,
       turn: game?.turn ?? room.turn,
       revision: room.revision,
-      createdAt: firstEventAt(store, room.id),
+      createdAt: roundStartedAt(store, room.id),
       lastActivity: room.lastActivity,
       players: tableSeats(seatRows(store, room.id), game, live),
       ...(error ? { error } : {}),
@@ -173,7 +185,7 @@ export async function listGames(
     total: found.total,
     page,
     pageSize: GAMES_PAGE_SIZE,
-    counts: found.counts,
+    counts,
     indexedAt: found.indexedAt,
   };
 }
@@ -242,15 +254,13 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
     winner: string | null;
     players: string;
   }[];
-  const settings = store.db.prepare('SELECT settings FROM room_settings WHERE room_id = ?').get(roomId) as
-    { settings: string } | undefined;
   return {
     roomId,
     roomCode: code,
     status: room.status,
     revision: room.revision,
     round: store.round(roomId),
-    createdAt: firstEventAt(store, roomId),
+    createdAt: roundStartedAt(store, roomId),
     lastActivity: room.lastActivity,
     snapshot,
     seats: [...table, ...others].map((seat) => {
@@ -264,10 +274,19 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
     }),
     standIns: standIns.map((row) => ({ ...row, styled: !!row.styled })),
     presence: {
-      paused: room.paused,
+      // One source for "paused", the same one the status and the games list read.
+      paused: room.status === 'paused',
+      pausedAt: room.status === 'paused' ? room.pausedAt : null,
       absent: (snapshot?.players ?? []).flatMap((player) =>
         player.disconnectedAt !== undefined && player.resignAt !== undefined
-          ? [{ playerId: player.id, disconnectedAt: player.disconnectedAt, resignAt: player.resignAt }]
+          ? [
+              {
+                playerId: player.id,
+                disconnectedAt: player.disconnectedAt,
+                standInAt: player.disconnectedAt + STANDIN_AFTER_MS,
+                resignAt: player.resignAt,
+              },
+            ]
           : [],
       ),
     },
@@ -284,7 +303,7 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
         winner: players.find((player) => player.id === round.winner)?.name ?? null,
       };
     }),
-    settings: settings ? (JSON.parse(settings.settings) as Record<string, unknown>) : null,
+    settings: store.settings(roomId),
     integrityError: error ?? null,
     canEnd: !!game && game.phase !== 'finished',
     confirmation: code ?? roomId,
