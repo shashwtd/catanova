@@ -56,11 +56,11 @@ export const PUBLIC_PAGES = [
 /**
  * Where people write about their data.
  *
- * Cloudflare Email Routing forwards every catanova.io address to the owner's
- * own inbox, so the page names none of their personal addresses. The build
- * warns if this is ever not an address.
+ * A general catanova.io address that Cloudflare Email Routing forwards to the
+ * owner's own inbox, so the page names none of their personal addresses. The
+ * build warns if this is ever not an address.
  */
-export const PRIVACY_CONTACT = 'privacy@catanova.io';
+export const PRIVACY_CONTACT = 'contact@catanova.io';
 /** The date the privacy page last changed, shown on the page and in its structured data. */
 export const PRIVACY_UPDATED = { text: '23 September 2026', iso: '2026-09-23' } as const;
 
