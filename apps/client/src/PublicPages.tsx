@@ -1406,18 +1406,24 @@ export function PublicGuide() {
 }
 
 /** Every service that handles data for Catanova, and what it does. */
+/**
+ * Who helps run Catanova, by what each does rather than by name: the page
+ * says what happens to a visitor's data without listing the stack. Google is
+ * named where the visitor meets Google itself, in sign-in and in analytics.
+ */
 const PRIVACY_SERVICES = [
+  ['Hosting', 'Runs our game server and stores its database.'],
   [
-    'Supabase',
-    'Accounts and sign-in: the email address of your Google account if you use Google, and your username, avatar and friends.',
+    'Sign-in and accounts',
+    'Keeps your account: your username, avatar and friends, and your Google email address if you continue with Google.',
   ],
-  ['Microsoft Azure', 'Hosts our game server and its database, in the Central India region.'],
-  ['Cloudflare Turnstile', 'Checks that a new guest is a person when you choose Play as guest.'],
-  ['Google Analytics 4', 'Counts visits to the home page, the guide and this page, only if you allow it.'],
+  ['Guest check', 'Checks that a new guest is a person when you choose Play as guest.'],
   [
-    'TypeSafe',
-    'Works out moves for bots from the state of the game. Bot requests carry that game state, not your name or email.',
+    'Bot moves',
+    'Works out moves for bots from the state of the game. It receives that game state, not your name or email.',
   ],
+  ['Email', 'Delivers messages sent to our contact address.'],
+  ['Google Analytics', 'Counts visits to the home page, the guide and this page, only if you accept.'],
 ] as const;
 
 /**
@@ -1425,10 +1431,11 @@ const PRIVACY_SERVICES = [
  *
  * Every sentence is a claim about the code, and each one can be traced to it:
  * `supabase/schema.sql` for accounts, friends and the seven-day guest expiry,
- * the game server's SQLite store for games, last-seen times and the switch
- * that hides them, the room access limits for IP addresses, and `analytics.ts`
- * for the consent control below, which that loader wires up. Change one of
- * those and this page has to change with it.
+ * the game server's store for games, last-seen times and the switch that
+ * hides them, the room access limits for IP addresses, and `analytics.ts` for
+ * the consent control below, which that loader wires up. Change one of those
+ * and this page has to change with it. It says what is kept and why, and names
+ * the services that help only by what they do.
  */
 export function PublicPrivacy() {
   return (
@@ -1456,8 +1463,8 @@ export function PublicPrivacy() {
         <h1>Privacy</h1>
         <p className="guide-subtitle">Last updated: {PRIVACY_UPDATED.text}</p>
         <p className="guide-lead">
-          Catanova is a free game you play in your browser. This page lists what it keeps about you, the
-          services that help run it, and how to have your data deleted.
+          Catanova is a free game you play in your browser. This page lists what it keeps about you, who
+          helps run it, and how to have your data deleted.
         </p>
         <section aria-labelledby="privacy-keep">
           <div className="guide-heading">
@@ -1465,9 +1472,9 @@ export function PublicPrivacy() {
           </div>
           <ul className="privacy-list">
             <li>
-              <strong>Your account.</strong> Signing in goes through Supabase. If you continue with Google,
-              that includes the email address of your Google account; Catanova does not use your Google name
-              or photo. Supabase also keeps the username and avatar you choose, and your friends list.
+              <strong>Your account.</strong> The username and avatar you choose, and your friends list. If
+              you continue with Google, also the email address of your Google account; Catanova does not use
+              your Google name or photo.
             </li>
             <li>
               <strong>Guest profiles.</strong> A guest profile expires after seven days without activity. Its
@@ -1475,9 +1482,9 @@ export function PublicPrivacy() {
               our game records.
             </li>
             <li>
-              <strong>Your games.</strong> Our own server keeps every game you play: each move, the result and
-              who played, linked to your account. That is what lets you reconnect and see your match history.
-              These records are not deleted automatically.
+              <strong>Your games.</strong> Every game you play: each move, the result and who played, linked
+              to your account. That is what lets you reconnect and see your match history. These records are
+              not deleted automatically.
             </li>
             <li>
               <strong>What other players see.</strong> Your username and avatar appear at the table, and
@@ -1486,8 +1493,8 @@ export function PublicPrivacy() {
               turn off <em>Show when you were last online</em> in Settings, under Privacy.
             </li>
             <li>
-              <strong>IP addresses.</strong> Our server holds your IP address briefly in memory to limit how
-              often requests can be made. It never writes it to the game database.
+              <strong>IP addresses.</strong> Used only briefly, to protect the game from abuse, and never
+              stored.
             </li>
             <li>
               <strong>Visits to these pages.</strong> Only if you allow analytics. See{' '}
@@ -1571,11 +1578,7 @@ export function PublicPrivacy() {
         </section>
         <footer className="guide-footer">
           <p>
-            Catanova is open source, and the code this page describes is{' '}
-            <a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
-              on GitHub
-            </a>
-            . New to the game? Read <a href="/guide/">how to play</a>.
+            New to the game? Read <a href="/guide/">how to play</a>.
           </p>
         </footer>
       </main>

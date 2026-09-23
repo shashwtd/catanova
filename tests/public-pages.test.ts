@@ -274,7 +274,7 @@ test('the production entry is readable before JavaScript and only public pages e
   for (const match of guide.matchAll(/href="#([^"]+)"/g)) assert.ok(guide.includes(`id="${match[1]}"`));
 });
 
-test('the privacy page is linked from the public pages and names only what the code does', async (t) => {
+test('the privacy page is linked from the public pages and says what is kept without listing the stack', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'catanova-privacy-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await writeFile(join(directory, 'index.html'), await readFile('apps/client/index.html', 'utf8'));
@@ -299,15 +299,11 @@ test('the privacy page is linked from the public pages and names only what the c
   for (const state of ['unset', 'granted', 'denied'])
     assert.ok(privacy.includes(`data-consent-state="${state}"`), state);
   for (const choice of ['granted', 'denied']) assert.ok(privacy.includes(`data-consent-choice="${choice}"`));
-  for (const service of [
-    'Supabase',
-    'Microsoft Azure',
-    'Central India',
-    'Cloudflare Turnstile',
-    'Google Analytics 4',
-    'TypeSafe',
-  ])
-    assert.ok(privacy.includes(service), service);
+  // Services are described by what they do; only Google, which visitors meet directly, is named.
+  for (const name of ['Supabase', 'Azure', 'Central India', 'Turnstile', 'TypeSafe', 'SQLite', 'Cloudflare'])
+    assert.ok(!privacy.includes(name), `the privacy page names ${name}`);
+  for (const role of ['Hosting', 'Sign-in and accounts', 'Guest check', 'Bot moves', 'Google Analytics'])
+    assert.ok(privacy.includes(role), role);
   assert.ok(privacy.includes('not your name or email'));
   // Claims that name something elsewhere in the repository must still match it.
   assert.ok(privacy.includes('seven days without activity'));
@@ -320,7 +316,7 @@ test('the privacy page is linked from the public pages and names only what the c
     (await readFile('apps/client/src/GameSettings.tsx', 'utf8')).includes('Show when you were last online'),
     'the page names the switch Settings actually shows',
   );
-  // A clearly marked placeholder until the owner supplies an inbox; never an invented one.
+  // The owner's general address, forwarded to their inbox, so no personal address is published.
   assert.ok(privacy.includes(`<a href="mailto:${PRIVACY_CONTACT}">${PRIVACY_CONTACT}</a>`));
   for (const match of privacy.matchAll(/<a ([^>]*href="https?:[^"]*"[^>]*)>/g)) {
     assert.match(match[1]!, /target="_blank"/, match[1]!);
