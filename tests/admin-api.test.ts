@@ -8,6 +8,8 @@ import { startServer } from '../apps/server/src/server.js';
 import { Store } from '../apps/server/src/store.js';
 import type { Identity } from '../apps/server/src/auth.js';
 import { startAdminServer } from '../apps/server/src/admin/listener.js';
+import type { GameRuntime, OnlineAccount } from '../apps/server/src/admin/api.js';
+import { whoIsOnline } from '../apps/server/src/admin/online.js';
 import type { AdminConfig } from '../apps/server/src/admin/config.js';
 import { chiSquarePValue, computeStats, diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
 import type {
@@ -96,7 +98,7 @@ const account = (name: string, n: number): Identity => ({
  * two players are connected over WebSockets beside a bot, a paused game played
  * by three accounts, and later a finished one.
  */
-async function seeded(t: TestContext) {
+async function seeded(t: TestContext, options: { online?: () => OnlineAccount[] } = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'catanova-admin-api-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const databasePath = join(dir, 'game.sqlite');
@@ -169,10 +171,14 @@ async function seeded(t: TestContext) {
     statusDir,
     revision: 'deadbeef',
   };
+  // The presence hub is the game server's; tests stand in for it where they need accounts online.
+  const runtime: GameRuntime = options.online
+    ? { ...server.runtime, online: options.online }
+    : server.runtime;
   const admin = await startAdminServer({
     config,
     store,
-    runtime: server.runtime,
+    runtime,
     databasePath,
     assetsDirectory: join(dir, 'no-build'),
     log: () => {},
@@ -195,6 +201,7 @@ async function seeded(t: TestContext) {
   return {
     server,
     store,
+    runtime,
     admin,
     get,
     post,
@@ -406,6 +413,64 @@ test('a room that played again dates its game from this round, not the first', a
   assert.ok(detail.rounds[0]!.startedAt! < detail.createdAt!);
   const listed = (await get<GamesPage>(`/api/admin/games?q=${store.roomCode(host.room_id)}`)).items[0]!;
   assert.equal(listed.createdAt, detail.createdAt);
+});
+
+test('who is online merges the presence hub with the seats connected to rooms, and says where each one is', async (t) => {
+  const since = Date.now() - 60_000;
+  const dana = '00000000-0000-4000-8000-000000000009';
+  const { store, server, runtime, accounts, live, paused, lobby } = await seeded(t, {
+    online: () => [
+      { userId: accounts.alice.id, name: 'Alice', guest: false, since, tabs: 2 },
+      { userId: dana, name: null, guest: true, since, tabs: 1 },
+    ],
+  });
+  const now = whoIsOnline(store, runtime, Date.now());
+  assert.equal(now.accounts, true);
+  assert.deepEqual(
+    now.people.map((person) => [person.name, person.accountType, person.place.kind, person.userId]),
+    [
+      // At a live table first (local players with no account), then seated elsewhere, then the hub.
+      ['Guest', null, 'game', null],
+      ['Hostess', null, 'game', null],
+      ['Alice', 'permanent', 'game', accounts.alice.id],
+      ['Unknown account', 'guest', 'hub', dana],
+    ],
+  );
+  const [guest, , alice] = now.people;
+  assert.deepEqual(guest!.place, {
+    kind: 'game',
+    roomId: live,
+    roomCode: store.roomCode(live)!,
+    status: 'live',
+    turn: store.loadGame(live)!.turn,
+    atTable: true,
+  });
+  // Alice holds a seat at the paused table but is not connected to it: she is in the hub.
+  assert.equal(alice!.place.kind === 'game' && alice!.place.atTable, false);
+  assert.equal(alice!.place.kind === 'game' && alice!.place.roomId, paused);
+  assert.deepEqual([alice!.since, alice!.tabs, alice!.seatId], [since, 2, null]);
+  assert.deepEqual(now.counts, { online: 4, playing: 2, inLobbies: 0, elsewhere: 2, spectators: 0 });
+
+  // Without the presence hub, only people connected to rooms can be seen, and it says so.
+  const lobbySeat = store.snapshot(lobby).players[0]!;
+  const bare: GameRuntime = {
+    ...server.runtime,
+    sockets: () => {
+      const sockets = server.runtime.sockets();
+      return { ...sockets, seats: [...sockets.seats, lobbySeat.id] };
+    },
+  };
+  const seatsOnly = whoIsOnline(store, bare, Date.now());
+  assert.equal(seatsOnly.accounts, false);
+  assert.deepEqual(
+    seatsOnly.people.map((person) => [person.name, person.place.kind]),
+    [
+      ['Guest', 'game'],
+      ['Hostess', 'game'],
+      ['Lobbyist', 'lobby'],
+    ],
+  );
+  assert.deepEqual(seatsOnly.counts, { online: 3, playing: 2, inLobbies: 1, elsewhere: 0, spectators: 0 });
 });
 
 test('a seat’s colour is the one the table sees, picked or given, whatever order the game plays in', async (t) => {

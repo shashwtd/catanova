@@ -77,6 +77,51 @@ export type AdminOverview = {
 
 export type RoomStatus = 'lobby' | 'live' | 'paused' | 'finished' | 'empty';
 
+/**
+ * Where someone online is: at a table (`atTable` when their seat's socket is
+ * connected; otherwise they hold a seat in an unfinished game but are
+ * elsewhere, such as the hub), in a lobby, or only in the player hub.
+ */
+export type OnlinePlace =
+  | { kind: 'hub' }
+  | { kind: 'lobby'; roomId: string; roomCode: string | null }
+  | {
+      kind: 'game';
+      roomId: string;
+      roomCode: string | null;
+      status: RoomStatus;
+      turn: number | null;
+      atTable: boolean;
+    };
+
+/** One person online: an account the presence hub reports, or a seat connected without one. */
+export type OnlinePerson = {
+  userId: string | null;
+  /** The seat whose socket is open, if they are connected to a room. */
+  seatId: string | null;
+  name: string;
+  /** `permanent` (Google), `guest`, or null for a local seat with no account. */
+  accountType: string | null;
+  /** Online since, and in how many tabs: known for accounts the presence hub reports. */
+  since: number | null;
+  tabs: number | null;
+  place: OnlinePlace;
+};
+
+export type OnlineNow = {
+  /** Whether the game server reports account presence; without it only people connected to rooms appear. */
+  accounts: boolean;
+  people: OnlinePerson[];
+  counts: {
+    online: number;
+    /** At the table of a game that has started and not finished. */
+    playing: number;
+    inLobbies: number;
+    elsewhere: number;
+    spectators: number;
+  };
+};
+
 export type SeatSummary = {
   id: string;
   name: string;
