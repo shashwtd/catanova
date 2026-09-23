@@ -6,7 +6,7 @@ import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
-import { ConnectionPanel } from './ConnectionPanel.js';
+import { LiveConnectionPanel } from './ConnectionPanel.js';
 import type { GameToolPanel } from './GameTools.js';
 import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
@@ -54,10 +54,13 @@ import { PlayerRail } from './PlayerRail.js';
 import { BoardViewport } from './BoardViewport.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
+import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
+import { hasSavedSession } from './saved-session.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { mountApp } from './mount-app.js';
 import {
   GameIcon,
@@ -251,7 +254,9 @@ function App() {
   const currentHomePath = useRef(accountHomePath(auth));
   currentHomePath.current = accountHomePath(auth);
   const connectedIdentity = useRef<string | null>(null);
-  const [metrics, setMetrics] = useState(initialMetrics);
+  // Probes land every few seconds; only the connection panel follows each one.
+  const [metricsFeed] = useState(() => new NetworkMetricsFeed());
+  const clockOffset = useClockOffset(metricsFeed);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
     [historyHasMore, setHistoryHasMore] = useState(false);
   const historyLoaded = useRef(false);
@@ -301,7 +306,13 @@ function App() {
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me && !player?.resigned;
   const matchResults = useMatchResults(room, `${accountIdentity ?? 'anonymous'}:${me ?? 'spectator'}`);
-  const entering = !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite)));
+  // "/" shows the public landing while sign-in loads, unless a saved session is about
+  // to open the player's hub. Later sign-in attempts keep the screen they started on.
+  const authSettled = useRef(false);
+  if (!auth.loading) authSettled.current = true;
+  const returning = !authSettled.current && hasSavedSession(localStorage, auth.config);
+  const entering =
+    !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite || returning)));
   const playerHome = !room && !entering && showPlayerHome(auth, invite);
   const privacy = useAccountPrivacy(
     auth.accessToken,
@@ -334,7 +345,7 @@ function App() {
       !!player?.resigned ||
       !!room?.paused,
     hand = player?.hand ?? emptyHand();
-  const presentedGame = room ? dicePresentationGame(room, feedback.beforeDice) : undefined;
+  const presentedGame = room ? dicePresentationGame(room, feedback.board) : undefined;
   const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
     feedback.sound.playAttention(cue),
   );
@@ -446,7 +457,7 @@ function App() {
     setRoom(null);
     setHistoryEntries([]);
     historyLoaded.current = false;
-    setMetrics(initialMetrics());
+    metricsFeed.publish(initialMetrics());
     setMe(undefined);
     setStatus('idle');
     setBusy(false);
@@ -485,7 +496,7 @@ function App() {
         preloadGame: true,
         accessToken: auth.accessToken,
         onMetrics: (value) => {
-          if (connection.current === c) setMetrics(value);
+          if (connection.current === c) metricsFeed.publish(value);
         },
         onStatus: (value) => {
           if (connection.current === c) setStatus(value);
@@ -622,7 +633,7 @@ function App() {
     setLaunchVisualExpired(false);
     const launch = room?.launch;
     if (!launch) return;
-    const serverTime = room.serverNow ?? Date.now() + (metrics.clockOffsetMs ?? 0);
+    const serverTime = room.serverNow ?? Date.now() + (clockOffset ?? 0);
     const remaining = Math.max(0, Math.min(10_000, launch.deadlineAt - serverTime));
     const timer = setTimeout(() => {
       setLaunchVisualExpired(true);
@@ -1014,7 +1025,7 @@ function App() {
       )}
       {g && room && (
         <PlayerRail
-          clockOffset={metrics.clockOffsetMs}
+          clockOffset={clockOffset}
           room={room}
           game={presentedGame ?? g}
           me={me}
@@ -1022,7 +1033,7 @@ function App() {
             <TurnTimer
               room={room}
               me={me}
-              offset={metrics.clockOffsetMs}
+              offset={clockOffset}
               connected={connected}
               onWarning={() => feedback.sound.play('warning')}
             />
@@ -1301,8 +1312,8 @@ function App() {
           )}
           {panel === 'connection' && (
             <UtilityPanel tool="connection" title="Connection" onClose={() => setPanel(null)}>
-              <ConnectionPanel
-                metrics={metrics}
+              <LiveConnectionPanel
+                feed={metricsFeed}
                 status={status}
                 revision={room?.revision ?? 0}
                 pending={busy}
@@ -1347,7 +1358,7 @@ function App() {
               onAction={(a) => void act(a)}
               disabled={disabled}
               connected={connected}
-              offset={metrics.clockOffsetMs}
+              offset={clockOffset}
               onWarning={() => feedback.sound.play('warning')}
             />
           )}
@@ -1375,9 +1386,10 @@ function App() {
       {g && (
         <GameEffects
           event={feedback.event}
-          lastDice={g.dice}
+          // The dock shows the dice of the board being shown, never those of a queued roll.
+          lastDice={(presentedGame ?? g).dice}
           reducedMotion={reducedMotion}
-          activity={!feedback.presentationBusy}
+          activity={!feedback.rolling}
           awards={feedback.awards}
           onAwardComplete={feedback.finishAward}
           onAwardStart={feedback.announceAward}
@@ -1510,5 +1522,7 @@ if (resultsPreview) {
 } else if (designPreview) {
   void import('./dev/LoungePreview.js').then(({ LoungePreview }) => root.render(<LoungePreview />));
 } else {
-  root.render(<App />);
+  // mountApp has just removed the prerendered landing: commit in this same task, so no
+  // frame paints an empty page in between.
+  flushSync(() => root.render(<App />));
 }
