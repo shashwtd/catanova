@@ -7,6 +7,13 @@
  * A local playtest server accepts it without an account. Either way it is
  * limited to five an hour per account and per address, and stored as plain
  * text that is only ever rendered as text.
+ *
+ * Only feedback that is stored counts toward those hourly limits, so failed
+ * attempts from strangers cannot use up anyone else's allowance. Attempts of
+ * any kind are limited separately, per address and per minute, before an
+ * account is looked up. Addresses are the game's usual client addresses: behind
+ * Caddy they are real only when TRUSTED_PROXY_CIDRS names Caddy's network;
+ * otherwise every player shares Caddy's address and these per-address limits.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
@@ -14,7 +21,6 @@ import { ProtocolError } from './store.js';
 import type { Store } from './store.js';
 import { accountFailure } from './accounts.js';
 import type { AccountService } from './accounts.js';
-import { RoomAccessLimit } from './room-access.js';
 import { FeedbackError, parseFeedbackSubmission } from '../../../packages/protocol/src/feedback.js';
 import type {
   FeedbackCategory,
@@ -23,6 +29,8 @@ import type {
 } from '../../../packages/protocol/src/feedback.js';
 
 export const FEEDBACK_PER_HOUR = 5;
+/** Attempts of any kind, per address, before an account is looked up. */
+export const FEEDBACK_ATTEMPTS_PER_MINUTE = 20;
 export const FEEDBACK_BODY_LIMIT = 16 * 1024;
 export const FEEDBACK_PAGE_SIZE = 50;
 
@@ -149,6 +157,60 @@ export class FeedbackStore {
   }
 }
 
+/**
+ * Fixed-window counters per key, in memory. When full it forgets the oldest
+ * window instead of refusing newcomers: cycling through thousands of addresses
+ * gains nothing that many addresses did not already give, and nobody else is
+ * locked out. Every window has the same length, so insertion order is expiry
+ * order and both pruning and eviction start at the front.
+ */
+export class FeedbackLimit {
+  private readonly windows = new Map<string, { count: number; endsAt: number }>();
+
+  constructor(
+    readonly limit: number,
+    private readonly windowMs: number,
+    private readonly maxKeys = 10_000,
+  ) {}
+
+  private current(key: string, now: number) {
+    for (const [other, window] of this.windows) {
+      if (window.endsAt > now) break;
+      this.windows.delete(other);
+    }
+    const window = this.windows.get(key);
+    // Only a clock stepped backwards leaves an ended window behind a live one.
+    if (window && window.endsAt <= now) {
+      this.windows.delete(key);
+      return undefined;
+    }
+    return window;
+  }
+
+  /** Seconds until `key` may go again; 0 when it may go now. */
+  wait(key: string, now: number): number {
+    const window = this.current(key, now);
+    return window && window.count >= this.limit ? Math.max(1, Math.ceil((window.endsAt - now) / 1000)) : 0;
+  }
+
+  count(key: string, now: number): void {
+    let window = this.current(key, now);
+    if (!window) {
+      if (this.windows.size >= this.maxKeys) this.windows.delete(this.windows.keys().next().value!);
+      window = { count: 0, endsAt: now + this.windowMs };
+      this.windows.set(key, window);
+    }
+    window.count++;
+  }
+
+  /** Counts one for `key` if it is under the limit; returns what `wait` would have. */
+  take(key: string, now: number): number {
+    const wait = this.wait(key, now);
+    if (!wait) this.count(key, now);
+    return wait;
+  }
+}
+
 class FeedbackRequestError extends Error {
   constructor(
     readonly status: number,
@@ -169,8 +231,9 @@ const ACCOUNT_STATUS: Record<string, number> = {
 
 export class PlayerFeedback {
   readonly feedback: FeedbackStore;
-  private readonly byAccount = new RoomAccessLimit(FEEDBACK_PER_HOUR, 60 * 60_000);
-  private readonly byAddress = new RoomAccessLimit(FEEDBACK_PER_HOUR, 60 * 60_000);
+  private readonly attempts = new FeedbackLimit(FEEDBACK_ATTEMPTS_PER_MINUTE, 60_000);
+  private readonly byAccount = new FeedbackLimit(FEEDBACK_PER_HOUR, 60 * 60_000);
+  private readonly byAddress = new FeedbackLimit(FEEDBACK_PER_HOUR, 60 * 60_000);
 
   constructor(
     private readonly options: {
@@ -186,10 +249,9 @@ export class PlayerFeedback {
     this.feedback = new FeedbackStore(options.store.db);
   }
 
-  private limit(bucket: RoomAccessLimit, key: string, response: ServerResponse) {
-    const access = bucket.consume(key, this.options.now());
-    if (access.allowed) return;
-    response.setHeader('Retry-After', String(access.retryAfter));
+  private refuseFor(seconds: number, response: ServerResponse) {
+    if (!seconds) return;
+    response.setHeader('Retry-After', String(seconds));
     throw new FeedbackRequestError(
       429,
       'FEEDBACK_RATE_LIMIT',
@@ -234,7 +296,9 @@ export class PlayerFeedback {
         !this.options.allowedOrigins.includes(origin)
       )
         throw new FeedbackRequestError(403, 'FEEDBACK_ORIGIN', 'Feedback must come from the game');
-      this.limit(this.byAddress, this.options.clientAddress(request), response);
+      const address = this.options.clientAddress(request);
+      // Bounds how often one address can make us ask Supabase about a token.
+      this.refuseFor(this.attempts.take(address, this.options.now()), response);
       let account: { id: string; username: string | null } | null = null;
       if (this.options.authenticated) {
         const accounts = this.options.accounts;
@@ -250,8 +314,9 @@ export class PlayerFeedback {
         const expiresAt = verified.expiresAt === null ? Infinity : Date.parse(verified.expiresAt);
         if (expiresAt <= this.options.now()) throw accountFailure('GUEST_EXPIRED');
         if (!verified.registered || !verified.profile) throw accountFailure('ONBOARDING_REQUIRED');
-        this.limit(this.byAccount, verified.id, response);
         account = { id: verified.id, username: verified.username };
+        // Already over the hour: say so before reading the message.
+        this.refuseFor(this.byAccount.wait(account.id, this.options.now()), response);
       }
       let submission: FeedbackSubmission;
       try {
@@ -261,7 +326,15 @@ export class PlayerFeedback {
           throw new FeedbackRequestError(400, 'FEEDBACK_INVALID', error.message);
         throw error;
       }
-      const id = this.feedback.add(this.options.now(), account, submission);
+      // Checked, stored and counted in one synchronous step, so parallel requests cannot overshoot.
+      const now = this.options.now();
+      this.refuseFor(
+        Math.max(account ? this.byAccount.wait(account.id, now) : 0, this.byAddress.wait(address, now)),
+        response,
+      );
+      const id = this.feedback.add(now, account, submission);
+      if (account) this.byAccount.count(account.id, now);
+      this.byAddress.count(address, now);
       response.writeHead(201).end(JSON.stringify({ id }));
     } catch (error) {
       const status =

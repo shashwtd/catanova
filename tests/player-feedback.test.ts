@@ -8,7 +8,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { startServer } from '../apps/server/src/server.js';
 import { startAdminServer } from '../apps/server/src/admin/listener.js';
 import type { FeedbackPage, PlayerDetail } from '../apps/server/src/admin/types.js';
-import { FEEDBACK_PER_HOUR } from '../apps/server/src/feedback.js';
+import {
+  FEEDBACK_ATTEMPTS_PER_MINUTE,
+  FEEDBACK_PER_HOUR,
+  FeedbackLimit,
+} from '../apps/server/src/feedback.js';
 import {
   FEEDBACK_MESSAGE_MAX,
   FeedbackError,
@@ -111,14 +115,32 @@ test('a local playtest server accepts feedback without an account, within the ho
   assert.equal((await send(valid, { 'Content-Type': 'text/plain' })).status, 415);
   assert.equal((await send(valid, { 'Content-Type': 'application/x-www-form-urlencoded' })).status, 415);
   assert.equal((await send(valid, { ...JSON_HEADERS, Origin: 'https://evil.example' })).status, 403);
-  // A malformed body is refused, and still counts as an attempt against the hour.
+  // A malformed body is refused and does not use up the hour: only stored feedback counts.
   assert.equal((await send('{not json')).status, 400);
-  for (let i = 2; i < FEEDBACK_PER_HOUR; i++) assert.equal((await send(valid)).status, 201);
+  for (let i = 1; i < FEEDBACK_PER_HOUR; i++) assert.equal((await send(valid)).status, 201);
   const limited = await send(valid);
   assert.equal(limited.status, 429);
   assert.equal(JSON.parse(limited.body).code, 'FEEDBACK_RATE_LIMIT');
   assert.ok(Number(limited.headers['retry-after']) > 3000);
-  assert.equal(server.store.db.prepare('SELECT count(*) AS n FROM feedback').get()!.n, FEEDBACK_PER_HOUR - 1);
+  assert.equal(server.store.db.prepare('SELECT count(*) AS n FROM feedback').get()!.n, FEEDBACK_PER_HOUR);
+});
+
+test('feedback limits count per window, and a full table forgets the oldest window instead of refusing', () => {
+  const limit = new FeedbackLimit(2, 60_000, 3);
+  const at = 1_000_000;
+  assert.equal(limit.take('a', at), 0);
+  assert.equal(limit.take('a', at + 1), 0);
+  assert.equal(limit.take('a', at + 2), 60, 'the third in a minute waits for the window to end');
+  assert.equal(limit.wait('a', at + 59_999), 1);
+  assert.equal(limit.take('a', at + 60_000), 0, 'a new window');
+  // Three keys fit; a fourth pushes out the window that started first, not the newcomer.
+  limit.count('b', at + 60_001);
+  limit.count('b', at + 60_002);
+  limit.count('c', at + 60_003);
+  limit.count('d', at + 60_004);
+  assert.equal(limit.wait('d', at + 60_005), 0);
+  assert.equal(limit.wait('a', at + 60_005), 0, '“a” was the oldest and was forgotten');
+  assert.equal(limit.wait('b', at + 60_005), 60, '“b” is still limited');
 });
 
 test('oversized and invalid feedback is refused before it is stored', async (t) => {
@@ -148,6 +170,8 @@ async function authenticatedServer(t: TestContext) {
     ['two', account(2)],
     ['new', account(3, { registered: false, username: null, profile: null })],
     ['expired', account(4, { isGuest: true, expiresAt: new Date(now - 1000).toISOString() })],
+    ['five', account(5)],
+    ['six', account(6)],
   ]);
   const supabase = createServer((request, response) => {
     const token = request.headers.authorization?.slice('Bearer '.length) ?? '';
@@ -210,10 +234,20 @@ test('with accounts configured, only a signed-in, registered, unexpired account 
   for (let i = 1; i < FEEDBACK_PER_HOUR; i++)
     assert.equal((await send('one', `198.51.100.${i}`)).status, 201);
   assert.deepEqual(await status('one', '198.51.100.99'), [429, 'FEEDBACK_RATE_LIMIT']);
-  // ...and five an hour per address, whichever account sends it.
-  for (let i = 0; i < FEEDBACK_PER_HOUR; i++)
-    assert.notEqual((await send(i % 2 ? 'two' : 'forged', '192.0.2.7')).status, 429);
-  assert.deepEqual(await status('two', '192.0.2.7'), [429, 'FEEDBACK_RATE_LIMIT']);
+  // ...and five an hour per address, whichever accounts send it. Refused attempts never count,
+  // so strangers sharing an address (or Caddy's) cannot use up anyone's hour.
+  for (const token of ['two', 'forged', 'two', 'five', 'forged', 'five', 'six', 'forged'])
+    assert.equal((await send(token, '192.0.2.7')).status, token === 'forged' ? 401 : 201, token);
+  assert.deepEqual(await status('six', '192.0.2.7'), [429, 'FEEDBACK_RATE_LIMIT']);
+  assert.equal((await send('six', '192.0.2.8')).status, 201, 'the same account from elsewhere');
+  // Attempts of any kind are limited per address and minute before any account is looked up.
+  for (let i = 0; i < FEEDBACK_ATTEMPTS_PER_MINUTE; i++)
+    assert.equal((await send('forged', '192.0.2.9')).status, 401);
+  assert.deepEqual(await status('six', '192.0.2.9'), [429, 'FEEDBACK_RATE_LIMIT']);
+  assert.equal(
+    server.store.db.prepare('SELECT count(*) AS n FROM feedback').get()!.n,
+    FEEDBACK_PER_HOUR * 2 + 1,
+  );
 });
 
 test('the admin inbox lists feedback and records every resolve and reopen', async (t) => {
