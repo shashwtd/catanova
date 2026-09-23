@@ -1,5 +1,13 @@
 import { Activity, Wifi, WifiOff } from './GameIcons.js';
 import type { NetworkMetrics, ConnectionStatus } from './connection.js';
+import { useNetworkMetrics } from './network-metrics.js';
+import type { NetworkMetricsFeed } from './network-metrics.js';
+type PanelProps = Omit<Parameters<typeof ConnectionPanel>[0], 'metrics'>;
+/** The open panel follows every probe itself, so a ping never re-renders the table around it. */
+export function LiveConnectionPanel({ feed, ...props }: PanelProps & { feed: NetworkMetricsFeed }) {
+  const metrics = useNetworkMetrics(feed);
+  return <ConnectionPanel metrics={metrics} {...props} />;
+}
 export function ConnectionPanel({
   metrics,
   status,

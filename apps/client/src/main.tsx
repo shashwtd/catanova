@@ -6,7 +6,7 @@ import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
-import { ConnectionPanel } from './ConnectionPanel.js';
+import { LiveConnectionPanel } from './ConnectionPanel.js';
 import type { GameToolPanel } from './GameTools.js';
 import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
@@ -54,6 +54,7 @@ import { PlayerRail } from './PlayerRail.js';
 import { BoardViewport } from './BoardViewport.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
+import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -251,7 +252,9 @@ function App() {
   const currentHomePath = useRef(accountHomePath(auth));
   currentHomePath.current = accountHomePath(auth);
   const connectedIdentity = useRef<string | null>(null);
-  const [metrics, setMetrics] = useState(initialMetrics);
+  // Probes land every few seconds; only the connection panel follows each one.
+  const [metricsFeed] = useState(() => new NetworkMetricsFeed());
+  const clockOffset = useClockOffset(metricsFeed);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
     [historyHasMore, setHistoryHasMore] = useState(false);
   const historyLoaded = useRef(false);
@@ -446,7 +449,7 @@ function App() {
     setRoom(null);
     setHistoryEntries([]);
     historyLoaded.current = false;
-    setMetrics(initialMetrics());
+    metricsFeed.publish(initialMetrics());
     setMe(undefined);
     setStatus('idle');
     setBusy(false);
@@ -485,7 +488,7 @@ function App() {
         preloadGame: true,
         accessToken: auth.accessToken,
         onMetrics: (value) => {
-          if (connection.current === c) setMetrics(value);
+          if (connection.current === c) metricsFeed.publish(value);
         },
         onStatus: (value) => {
           if (connection.current === c) setStatus(value);
@@ -622,7 +625,7 @@ function App() {
     setLaunchVisualExpired(false);
     const launch = room?.launch;
     if (!launch) return;
-    const serverTime = room.serverNow ?? Date.now() + (metrics.clockOffsetMs ?? 0);
+    const serverTime = room.serverNow ?? Date.now() + (clockOffset ?? 0);
     const remaining = Math.max(0, Math.min(10_000, launch.deadlineAt - serverTime));
     const timer = setTimeout(() => {
       setLaunchVisualExpired(true);
@@ -1014,7 +1017,7 @@ function App() {
       )}
       {g && room && (
         <PlayerRail
-          clockOffset={metrics.clockOffsetMs}
+          clockOffset={clockOffset}
           room={room}
           game={presentedGame ?? g}
           me={me}
@@ -1022,7 +1025,7 @@ function App() {
             <TurnTimer
               room={room}
               me={me}
-              offset={metrics.clockOffsetMs}
+              offset={clockOffset}
               connected={connected}
               onWarning={() => feedback.sound.play('warning')}
             />
@@ -1301,8 +1304,8 @@ function App() {
           )}
           {panel === 'connection' && (
             <UtilityPanel tool="connection" title="Connection" onClose={() => setPanel(null)}>
-              <ConnectionPanel
-                metrics={metrics}
+              <LiveConnectionPanel
+                feed={metricsFeed}
                 status={status}
                 revision={room?.revision ?? 0}
                 pending={busy}
@@ -1347,7 +1350,7 @@ function App() {
               onAction={(a) => void act(a)}
               disabled={disabled}
               connected={connected}
-              offset={metrics.clockOffsetMs}
+              offset={clockOffset}
               onWarning={() => feedback.sound.play('warning')}
             />
           )}
