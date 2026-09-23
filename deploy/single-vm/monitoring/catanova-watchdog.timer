@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Catanova watchdog every five minutes
+
+[Timer]
+# Minutes 02, 07, 12 ... 57: offset from the backups at 00, 15, 30 and 45.
+OnCalendar=*-*-* *:02/5:00
+AccuracySec=5s
+Unit=catanova-watchdog.service
+
+[Install]
+WantedBy=timers.target
