@@ -37,6 +37,7 @@ test('award celebrations use public committed counts, carry transfer credit, and
   assert.deepEqual(deriveAwardCelebrations(start, first), [
     {
       id: 'AWARDS23:2:longestRoad',
+      revision: 2,
       kind: 'longestRoad',
       name: 'Longest Road',
       playerId: 'p1',

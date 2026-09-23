@@ -334,7 +334,7 @@ function App() {
       !!player?.resigned ||
       !!room?.paused,
     hand = player?.hand ?? emptyHand();
-  const presentedGame = room ? dicePresentationGame(room, feedback.beforeDice) : undefined;
+  const presentedGame = room ? dicePresentationGame(room, feedback.board) : undefined;
   const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
     feedback.sound.playAttention(cue),
   );
@@ -1375,9 +1375,10 @@ function App() {
       {g && (
         <GameEffects
           event={feedback.event}
-          lastDice={g.dice}
+          // The dock shows the dice of the board being shown, never those of a queued roll.
+          lastDice={(presentedGame ?? g).dice}
           reducedMotion={reducedMotion}
-          activity={!feedback.presentationBusy}
+          activity={!feedback.rolling}
           awards={feedback.awards}
           onAwardComplete={feedback.finishAward}
           onAwardStart={feedback.announceAward}
