@@ -281,7 +281,13 @@ export class Store {
     ])
       if (!eventColumns.includes(name))
         this.db.exec('ALTER TABLE game_events ADD COLUMN ' + name + ' ' + type);
-    this.db.exec('CREATE TABLE IF NOT EXISTS journal_boards (hash TEXT PRIMARY KEY, board TEXT NOT NULL)');
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS journal_boards (hash TEXT PRIMARY KEY, board TEXT NOT NULL);
+      /* Only rows still holding a whole game, so compaction finds the next batch
+         without reading past every row it has already rewritten; empty once done. */
+      CREATE INDEX IF NOT EXISTS game_events_whole ON game_events(room_id, revision)
+        WHERE state <> '' AND state_z IS NULL;
+    `);
     // The two facts anything outside the live game ever asked a journal row for.
     // Kept as plain columns so statistics and match records never have to open
     // a saved state; older rows are filled in once from the state they carry.
@@ -932,7 +938,7 @@ export class Store {
     return this.transaction(() => {
       const rows = this.db
         .prepare(
-          "SELECT room_id, revision, state, state_hash FROM game_events WHERE state <> '' AND state_z IS NULL LIMIT ?",
+          "SELECT room_id, revision, state, state_hash FROM game_events WHERE state <> '' AND state_z IS NULL ORDER BY room_id, revision LIMIT ?",
         )
         .all(limit) as { room_id: string; revision: number; state: string; state_hash: string }[];
       let compacted = 0;
