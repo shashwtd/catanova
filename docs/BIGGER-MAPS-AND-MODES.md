@@ -80,8 +80,8 @@ Smaller things that will need touching, none of them hard:
 - Seat count is capped at four in three places: `SEATS` in `Lobby.tsx`, the
   four-seat guard in `Store.lobby`, and `createGame`'s own check. The colour
   palette already holds eight, so six players need no new colours.
-- `Board.preset` is the string literal `'balanced-v1'` and `Game.schema` is `1`.
-  Both are already versioned, which is exactly what we want.
+- `Board.preset` is `'balanced-v1' | 'balanced-v2'` (new boards are v2) and
+  `Game.schema` is `1`. Both are versioned, which is exactly what we want.
 
 ## Phase 0 — make the board data
 
@@ -90,9 +90,10 @@ is pleasant or miserable, so it is worth doing properly and worth its own PR.
 
 **Board recipes.** Replace the hardcoded bag with a `BoardPreset` record: the
 coordinate shape, terrain counts, number tokens, harbour count and the fairness
-rules to apply. `generateBoard(seed, preset)` reads one. `'balanced-v1'` becomes
-the first entry and must produce byte-identical boards for the same seed —
-assert that against a stored fixture, because every saved game depends on it.
+rules to apply. `generateBoard(seed, preset)` reads one. `'balanced-v2'` becomes
+the first entry. Saved games and lobbies keep the board JSON they were dealt
+and start from it, so no preset has to reproduce old boards byte for byte; a
+fixture per preset is still worth keeping, to notice unintended changes.
 
 **Shape as data.** `topology()` takes a predicate or a list of axial
 coordinates instead of a hardcoded range. Radius-2 stays the default.

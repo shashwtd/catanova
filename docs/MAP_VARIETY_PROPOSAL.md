@@ -1,6 +1,6 @@
 # More interesting openings without a rigid island
 
-Proposal only. The current `balanced-v1` generator is unchanged by this UI update.
+Proposal only. Since this was written the generator became `balanced-v2`; see [Map generation](MAP_GENERATION.md) for the rules it applies now.
 
 ## What the current code checks
 
@@ -8,8 +8,8 @@ Proposal only. The current `balanced-v1` generator is unchanged by this UI updat
 - No connected resource cluster larger than two.
 - At least two tiles of each resource separated by three hex steps.
 - Total production pips for each resource between 2.5 and 4 per tile.
-- No adjacent 6/8 numbers and no intersection above 11 production pips.
-- Nine ports: four general 3:1 and one 2:1 for each resource, with spaced coastal ownership edges.
+- No adjacent 6/8 numbers, no equal numbers on neighbouring tiles, no 2 next to 12, and no intersection above 11 production pips.
+- Nine ports: four general 3:1 and one 2:1 for each resource, alternating with open sea around the coast as in the official frame.
 
 This bounds extremes, but it does not evaluate the snake-order opening draft. Resource spread alone does not guarantee good choices remain after the first settlements.
 

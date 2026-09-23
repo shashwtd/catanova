@@ -55,7 +55,7 @@ Each port is usable from either endpoint of its edge. These configuration facts 
 
 The published variable method shuffles the six coastal frame sections, randomizes terrain, and uses the A–R counterclockwise number spiral described in the [rulebook](RULEBOOK.md#32-variable-island-setup). Ports move with their frame sections; this is not the same as independently shuffling nine ports onto arbitrary coastal corners.
 
-The current app uses the explicitly requested **balanced-v1** preset described in [Map generation](MAP_GENERATION.md). It constrains clustering and production, and shuffles port positions; its distribution differs from the official setup above. The fixed and classic variable presets on this page are reference targets and are not selectable yet. Every saved game preserves its actual board, preset and seed.
+The current app deals the **balanced-v2** preset described in [Map generation](MAP_GENERATION.md). It constrains clustering, production and neighbouring numbers, and places the nine harbours in the frame's alternating harbour/open-sea pattern with their types shuffled; its terrain and number distribution still differs from the official setup above. Boards dealt by the earlier balanced-v1 preset stay valid in saved games. The fixed and classic variable presets on this page are reference targets and are not selectable yet. Every saved game preserves its actual board, preset and seed.
 
 ## Implementation checks required
 
