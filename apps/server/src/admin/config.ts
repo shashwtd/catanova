@@ -100,15 +100,16 @@ export function readAdminConfig(env: NodeJS.ProcessEnv = process.env): AdminConf
   const audience = env.ADMIN_ACCESS_AUD?.trim().toLowerCase() ?? '';
   if (!AUDIENCE.test(audience))
     fail('ADMIN_ACCESS_AUD must be the Access application’s 64-character Audience (AUD) tag');
-  const emails = new Set(
-    (env.ADMIN_EMAILS ?? '')
-      .split(',')
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  const listed = (env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+  // Printable ASCII, checked before lower-casing, exactly as tokens are checked.
+  for (const email of listed)
+    if (!/^[!-~]+$/.test(email) || !EMAIL.test(email)) fail('ADMIN_EMAILS contains an invalid address');
+  const emails = new Set(listed.map((email) => email.toLowerCase()));
   if (!emails.size) fail('ADMIN_EMAILS must list at least one address');
   if (emails.size > 20) fail('ADMIN_EMAILS may list at most 20 addresses');
-  for (const email of emails) if (!EMAIL.test(email)) fail(`ADMIN_EMAILS contains an invalid address`);
   const origin = env.ADMIN_ORIGIN?.trim() ?? '';
   if (!origin) fail('ADMIN_ORIGIN must be set, such as https://admin.catanova.io');
   if (exactOrigin(origin, 'ADMIN_ORIGIN').protocol !== 'https:') fail('ADMIN_ORIGIN must use https');

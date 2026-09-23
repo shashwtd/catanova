@@ -109,6 +109,18 @@ test('a Cloudflare Access token is accepted only when every check passes', async
     'EMAIL_NOT_ALLOWED',
   );
   await refused(verify(keys.token({ email: ['owner@example.com'] }, { at })), 403, 'EMAIL_NOT_ALLOWED');
+  // Case differences are fine; Unicode that lower-cases into an allowed ASCII address is not.
+  const kim = createAccessVerifier({
+    teamDomain: TEAM,
+    audience: AUD,
+    emails: new Set(['kim@example.com']),
+    certsUrl: keys.certsUrl,
+    now: () => clock.now,
+  });
+  assert.equal((await kim(keys.token({ email: 'KIM@Example.COM' }, { at }))).email, 'kim@example.com');
+  const kelvin = `${String.fromCharCode(0x212a)}im@example.com`;
+  assert.equal(kelvin.toLowerCase(), 'kim@example.com', 'the trap this guards against');
+  await refused(kim(keys.token({ email: kelvin }, { at })), 403, 'EMAIL_NOT_ALLOWED');
 
   // The same token, reused after it expires.
   const token = keys.token({}, { at });
@@ -210,6 +222,8 @@ test('the admin listener refuses to start in production without complete Cloudfl
     [{ ADMIN_EMAILS: undefined }, /at least one/],
     [{ ADMIN_EMAILS: ' , ' }, /at least one/],
     [{ ADMIN_EMAILS: 'not-an-email' }, /invalid address/],
+    // Lower-casing would turn the Kelvin sign into an ASCII "k".
+    [{ ADMIN_EMAILS: `${String.fromCharCode(0x212a)}im@example.com` }, /invalid address/],
     [{ ADMIN_ORIGIN: undefined }, /ADMIN_ORIGIN/],
     [{ ADMIN_ORIGIN: 'http://admin.catanova.io' }, /https/],
     [{ ADMIN_ORIGIN: 'https://admin.catanova.io/' }, /exact origin/],

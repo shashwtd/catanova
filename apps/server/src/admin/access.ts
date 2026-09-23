@@ -218,7 +218,10 @@ export function createAccessVerifier(options: AccessVerifierOptions): AccessVeri
     if (seconds > exp + skew) throw new AdminAuthError(401, 'EXPIRED');
     if (nbf !== undefined && seconds < nbf - skew) throw new AdminAuthError(401, 'NOT_YET_VALID');
     if (iat > seconds + skew) throw new AdminAuthError(401, 'ISSUED_IN_FUTURE');
-    const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';
+    const claimed = typeof claims.email === 'string' ? claims.email.trim() : '';
+    // Printable ASCII only, then lower-cased: Unicode case mapping would turn some other
+    // characters into ASCII letters (the Kelvin sign becomes "k").
+    const email = /^[!-~]+$/.test(claimed) ? claimed.toLowerCase() : '';
     if (!email || !options.emails.has(email)) throw new AdminAuthError(403, 'EMAIL_NOT_ALLOWED');
     return { email, expiresAt: exp * 1000 };
   };
