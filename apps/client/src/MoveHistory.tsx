@@ -24,7 +24,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   const actor = people.find(
     (name) =>
       line.startsWith(name) &&
-      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
+      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|took|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
         line.slice(name.length),
       ),
   );

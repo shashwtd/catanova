@@ -556,7 +556,9 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     requireRule(total(a.resources) === g.discards[p.id], `Discard exactly ${g.discards[p.id]} cards`);
     transfer(p.hand, g.bank, a.resources);
     delete g.discards[p.id];
-    log(g, `${p.name} discarded ${total(a.resources)} cards.`);
+    // Discards go back to the bank in front of everyone (and the bank's counts
+    // show them anyway), so the record names them.
+    log(g, `${p.name} discarded ${resourceText(a.resources)}.`);
     if (!Object.keys(g.discards).length) {
       if (activePlayer(g).resigned) {
         advanceTurn(g, true);
@@ -785,6 +787,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
         'Choose two available bank resources (or the remainder if only one exists)',
       );
       transfer(g.bank, p.hand, a.resources);
+      log(g, `${p.name} took ${resourceText(a.resources)} from the bank with Year of Plenty.`);
     }
     if (card.kind === 'monopoly') {
       requireRule(a.resource, 'Choose a resource');
