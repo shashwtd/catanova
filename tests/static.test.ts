@@ -164,6 +164,58 @@ test('one server serves client assets and same-origin WebSockets without exposin
   ws.close();
 });
 
+test('pages may open sockets only to their own host, and production HTTPS pins HTTPS', async (t) => {
+  const client = await mkdtemp(join(tmpdir(), 'catanova-headers-'));
+  await writeFile(join(client, 'index.html'), '<!doctype html><title>Catanova</title>');
+  await mkdir(join(client, 'guide'));
+  await writeFile(join(client, 'guide', 'index.html'), '<!doctype html><title>How to play Catanova</title>');
+  const server = await startServer({ port: 0, databasePath: ':memory:', clientDirectory: client });
+  t.after(async () => {
+    await server.close();
+    await rm(client, { recursive: true, force: true });
+  });
+  const origin = `http://127.0.0.1:${server.port}`;
+  const connect = (policy: string) => /connect-src ([^;]*);/.exec(policy)![1]!;
+  // Closed after each response, so the server can shut down without waiting out keep-alive.
+  const get = (path: string, headers: Record<string, string> = {}) =>
+    rawRequest(origin + path, { ...headers, Connection: 'close' });
+  // Plain-http local play: its own ws:// origin, and no HSTS to pin localhost.
+  const local = await get('/');
+  const localPolicy = local.headers['content-security-policy'] as string;
+  assert.match(connect(localPolicy), new RegExp(`^'self' ws://127\\.0\\.0\\.1:${server.port}( |$)`));
+  assert.doesNotMatch(connect(localPolicy), /(?:^| )wss?:(?: |$)/, 'no socket to any host');
+  assert.equal(local.headers['strict-transport-security'], undefined);
+  // Production: Caddy terminates TLS and forwards the scheme; the Host is the site's.
+  const production = await get('/', { Host: 'catanova.io', 'X-Forwarded-Proto': 'https' });
+  const policy = production.headers['content-security-policy'] as string;
+  assert.match(connect(policy), /^'self' wss:\/\/catanova\.io( |$)/);
+  assert.doesNotMatch(connect(policy), /(?:^| )wss?:(?: |$)|ws:\/\//);
+  assert.equal(production.headers['strict-transport-security'], 'max-age=31536000; includeSubDomains');
+  const redirect = await get('/guide', { Host: 'catanova.io', 'X-Forwarded-Proto': 'https' });
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers['strict-transport-security'], 'max-age=31536000; includeSubDomains');
+  // HTTPS in front of a loopback name or an address never pins it.
+  for (const host of ['localhost:3000', 'catanova.localhost', '127.0.0.1:3000']) {
+    const response = await get('/', { Host: host, 'X-Forwarded-Proto': 'https' });
+    assert.equal(response.headers['strict-transport-security'], undefined, host);
+    assert.ok(connect(response.headers['content-security-policy'] as string).includes(`wss://${host}`));
+  }
+  assert.equal(
+    (await get('/', { Host: 'catanova.io', 'X-Forwarded-Proto': 'http' })).headers[
+      'strict-transport-security'
+    ],
+    undefined,
+  );
+  // A Host header cannot add sources or directives: anything but a plain host is left out.
+  for (const host of ["evil.example; script-src 'unsafe-inline' *", 'evil.example wss://evil.example']) {
+    const response = await get('/', { Host: host, 'X-Forwarded-Proto': 'https' });
+    const headers = `${response.headers['content-security-policy']} ${response.headers['strict-transport-security']}`;
+    assert.ok(!headers.includes('evil'), host);
+    assert.equal((headers.match(/script-src/g) ?? []).length, 1);
+    assert.match(connect(response.headers['content-security-policy'] as string), /^'self'( |$)/);
+  }
+});
+
 test('content-hashed WebP art is immutable while stable art URLs revalidate', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'catanova-art-cache-'));
   await mkdir(join(directory, 'art', 'optimized'), { recursive: true });

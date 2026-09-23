@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { TLSSocket } from 'node:tls';
 import { ART_REDIRECTS } from './art-redirects.js';
 import { isRoomReference, normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
 
@@ -65,6 +66,36 @@ function matchesETag(header: string | undefined, etag: string) {
   });
 }
 
+/**
+ * The host the browser asked for, when it is safe to repeat inside a header.
+ *
+ * It is the address the page's socket connects to (`location.host`), and the
+ * same value the WebSocket upgrade compares Origin against. Only a DNS name or
+ * an IPv4 address with an optional port qualifies, so nothing sent in the
+ * header can add a directive to the policy; anything else gets no host at all.
+ */
+function requestHost(request: IncomingMessage): string | undefined {
+  const host = request.headers.host?.toLowerCase();
+  return host && /^[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::\d{1,5})?$/.test(host) ? host : undefined;
+}
+
+/** HTTPS as the browser saw it: TLS on this socket, or the scheme Caddy forwards in front of it. */
+function secureRequest(request: IncomingMessage) {
+  const forwarded = request.headers['x-forwarded-proto'];
+  const scheme = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim().toLowerCase();
+  return (request.socket as Partial<TLSSocket>).encrypted === true || scheme === 'https';
+}
+
+/**
+ * Loopback names and bare addresses never get HSTS. A browser that pinned
+ * `localhost` to HTTPS for a year would refuse plain-http local play on every
+ * port, and HSTS is ignored for IP addresses anyway.
+ */
+function localHost(host: string) {
+  const name = host.replace(/:\d+$/, '');
+  return name === 'localhost' || name.endsWith('.localhost') || /^[\d.]+$/.test(name);
+}
+
 /** Pre-rendered public pages kept as a directory index; each has one canonical address. */
 const PAGE_DIRECTORIES = ['/guide/', '/privacy/'];
 
@@ -79,6 +110,12 @@ export async function serveClient(
   authOrigin?: string,
   captchaEnabled = false,
 ) {
+  const host = requestHost(request);
+  const secure = secureRequest(request);
+  // Only for requests that arrived over HTTPS (Caddy in production). Browsers
+  // ignore the header on a plain-http response in any case.
+  if (secure && host && !localHost(host))
+    response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     response.writeHead(405).end();
     return;
@@ -195,9 +232,18 @@ export async function serveClient(
         }
       : { script: '', frame: '', img: '', connect: '' };
     const frameSources = `${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${analyticsSources.frame}`;
+    /**
+     * The game's socket, and no other.
+     *
+     * The client opens exactly one socket, to `location.host`. CSP3 lets
+     * `'self'` cover same-host ws:/wss:, but WebKit only matched it from April
+     * 2022 (Safari 15.4 and older block it), so the socket's own origin is
+     * named as well. `ws:` and `wss:` used to allow a socket to any host.
+     */
+    const socketSource = host ? ` ${secure ? 'wss' : 'ws'}://${host}` : '';
     response.setHeader(
       'Content-Security-Policy',
-      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${analyticsSources.script};${frameSources ? ` frame-src${frameSources};` : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:${analyticsSources.img}; connect-src 'self' ws: wss:${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${authOrigin ? ' ' + new URL(authOrigin).origin : ''}${analyticsSources.connect}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
+      `default-src 'self'; script-src 'self'${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${analyticsSources.script};${frameSources ? ` frame-src${frameSources};` : ''} style-src 'self' 'unsafe-inline'; img-src 'self' data:${analyticsSources.img}; connect-src 'self'${socketSource}${captchaEnabled ? ' https://challenges.cloudflare.com' : ''}${authOrigin ? ' ' + new URL(authOrigin).origin : ''}${analyticsSources.connect}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`,
     );
     response.setHeader(
       'Cache-Control',
