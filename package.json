@@ -13,10 +13,11 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && vite build apps/client --outDir ../../dist/client --emptyOutDir && node dist/scripts/render-public-pages.js && node dist/scripts/precompress-client.js",
+    "build": "tsc -p tsconfig.json && vite build apps/client --outDir ../../dist/client --emptyOutDir && vite build apps/admin --outDir ../../dist/admin --emptyOutDir && node dist/scripts/render-public-pages.js && node dist/scripts/precompress-client.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "npm run build && tsx watch apps/server/src/index.ts",
     "dev:client": "vite apps/client --host 127.0.0.1 --port 5173 --strictPort",
+    "dev:admin": "vite apps/admin --host 127.0.0.1 --port 5174 --strictPort",
     "start": "node dist/apps/server/src/index.js",
     "test": "tsx --test tests/*.test.ts",
     "test:connectivity": "tsx --test tests/connectivity.test.ts",
