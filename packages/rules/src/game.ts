@@ -193,7 +193,9 @@ export function createGame(
   seats: { id: string; name: string }[],
   seed: number,
   random: () => number,
-  options: { diceMode?: DiceMode; victoryPoints?: number } = {},
+  // `board`: the island a lobby was already showing, played exactly as dealt. A seed
+  // only reproduces a board under the generator that dealt it, and generators change.
+  options: { diceMode?: DiceMode; victoryPoints?: number; board?: Board } = {},
 ): Game {
   requireRule(
     options.victoryPoints === undefined || validVictoryPoints(options.victoryPoints),
@@ -201,7 +203,8 @@ export function createGame(
   );
   requireRule(seats.length >= 2 && seats.length <= 4, 'Start with two to four players');
   requireRule(new Set(seats.map((p) => p.id)).size === seats.length, 'Seats must be unique');
-  const board = generateBoard(seed);
+  requireRule(!options.board || options.board.seed === seed >>> 0, 'The island does not match its seed');
+  const board = options.board ? structuredClone(options.board) : generateBoard(seed);
   const g: Game = {
     schema: 1,
     ruleset: RULESET,

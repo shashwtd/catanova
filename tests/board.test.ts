@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fairnessIssues, generateBoard, topology } from '../packages/rules/src/board.js';
+import { createGame } from '../packages/rules/src/game.js';
 import type { Board } from '../packages/rules/src/board.js';
 import { NUMBER_SPIRAL, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
 
@@ -119,4 +120,18 @@ test('new islands are balanced-v2, and boards saved as balanced-v1 remain valid'
   // must stay a valid Board. tsc checks this file: dropping 'balanced-v1' from the type fails here.
   const saved = JSON.parse(JSON.stringify(generateBoard(281))) as Board;
   saved.preset = 'balanced-v1';
+});
+
+test('a game starts on the island its lobby was dealt, even one from an older generator', () => {
+  const seats = [
+    { id: 'a', name: 'A' },
+    { id: 'b', name: 'B' },
+  ];
+  // A lobby opened before a generator change keeps the island it showed.
+  const dealt = generateBoard(1234);
+  const older = { ...structuredClone(dealt), preset: 'balanced-v1' as const };
+  older.hexes[0]!.number = older.hexes[0]!.number === 5 ? 9 : 5;
+  const game = createGame(seats, 1234, () => 0.5, { board: older });
+  assert.deepEqual(game.board, older);
+  assert.throws(() => createGame(seats, 99, () => 0.5, { board: older }), /does not match its seed/);
 });

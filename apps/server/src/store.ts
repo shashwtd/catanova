@@ -1913,7 +1913,8 @@ export class Store {
           ),
           room.board.seed,
           this.random,
-          this.settings(seat.room_id),
+          // The island the lobby has been showing, exactly as dealt.
+          { ...this.settings(seat.room_id), board: room.board },
         );
       } else {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');
