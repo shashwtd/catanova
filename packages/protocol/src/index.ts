@@ -74,6 +74,10 @@ export type RoomPlayer = {
   ready?: boolean;
   disconnectedAt?: number;
   resignAt?: number;
+  /** The seat's account when it is signed in with Google, so the people at the
+   *  table, or watching it, can send a friend request. Absent for guests, bots
+   *  and players without an account, and never in an invite preview. */
+  accountId?: string;
 };
 export type RoomState = {
   previousResults?: MatchResults;
@@ -98,7 +102,7 @@ export type RoomPreview = {
   roomId: string;
   roomCode?: string;
   board: Board;
-  players: Omit<RoomPlayer, 'connected'>[];
+  players: Omit<RoomPlayer, 'connected' | 'accountId'>[];
   started: boolean;
   settings?: RoomSettings;
 };

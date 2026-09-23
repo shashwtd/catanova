@@ -14,6 +14,7 @@ import { BOT_LEVELS, BOT_LEVEL_LABEL } from '../packages/protocol/src/bots.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { createGame, gameView } from '../packages/rules/src/game.js';
+import type { FriendStatus } from '../apps/client/src/social-presence.js';
 
 function lobby(): RoomState {
   return {
@@ -330,6 +331,50 @@ test('each profile shows its road length and knights played on its portrait, the
   assert.ok(
     css.includes('.playing .profile-portrait:has(> .profile-absence) > .profile-award-counts'),
     'an absence label, in the same place, takes precedence',
+  );
+});
+
+test('another player with an account can be added as a friend, and the button says where things stand', () => {
+  const room = lobby();
+  room.players[0]!.accountId = 'host-account';
+  room.players[1]!.accountId = 'second-account';
+  room.players[2]!.accountId = 'third-account';
+  const game = gameView(
+    createGame(room.players, 82, () => 0.34),
+    'p0',
+  );
+  const statuses: Record<string, FriendStatus> = {};
+  const friendship = {
+    self: 'host-account',
+    status: (id: string) => statuses[id] ?? 'none',
+    request: async () => {},
+    accept: async () => {},
+  };
+  const render = () => renderToStaticMarkup(createElement(PlayerRail, { room, game, me: 'p0', friendship }));
+  let html = render();
+  assert.ok(!profileCard(html, 'p0').includes('profile-friend'), 'never yourself');
+  assert.match(
+    profileCard(html, 'p1'),
+    /<button type="button" class="profile-friend" data-status="none" title="Add Second as a friend"/,
+  );
+  statuses['second-account'] = 'received';
+  statuses['third-account'] = 'sent';
+  html = render();
+  assert.match(profileCard(html, 'p1'), /data-status="received" title="Accept Second’s friend request"/);
+  assert.match(profileCard(html, 'p2'), /<span class="profile-friend" data-status="sent" role="img"/);
+  statuses['second-account'] = 'friends';
+  assert.ok(!profileCard(render(), 'p1').includes('profile-friend'), 'already friends');
+  // A guest's or a bot's seat has no account to add, and a viewer without friends has none to offer.
+  delete room.players[2]!.accountId;
+  assert.ok(!profileCard(render(), 'p2').includes('profile-friend'));
+  assert.ok(
+    !renderToStaticMarkup(createElement(PlayerRail, { room, game, me: 'p0' })).includes('profile-friend'),
+  );
+  // It shows on hover or once the card is tapped, and a touch screen cannot press it unseen.
+  const css = readFileSync('apps/client/src/game-feedback-polish.css', 'utf8');
+  assert.match(
+    css,
+    /@media \(hover: none\) \{\s*\.playing \.player-profile:not\(\[data-friend-reveal\]\) \.profile-friend \{\s*pointer-events: none;/,
   );
 });
 

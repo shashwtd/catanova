@@ -517,7 +517,7 @@ export class Store {
     const players = (
       this.db
         .prepare(
-          'SELECT id, name, profile, ready, departed, bot, bot_level, color FROM seats WHERE room_id = ? ORDER BY rowid',
+          'SELECT id, name, profile, ready, departed, bot, bot_level, color, user_id, account_type FROM seats WHERE room_id = ? ORDER BY rowid',
         )
         .all(roomId) as {
         id: string;
@@ -528,6 +528,8 @@ export class Store {
         bot: number;
         bot_level: string | null;
         color: string | null;
+        user_id: string | null;
+        account_type: string | null;
       }[]
     ).filter((p) => (game ? game.players.some((player) => player.id === p.id) : !p.departed));
     const presence = this.presence(roomId);
@@ -547,6 +549,8 @@ export class Store {
         ...(p.bot ? { bot: true, botLevel: (p.bot_level as string | null) ?? 'steady' } : {}),
         ...(isPlayerColor(p.color) ? { color: p.color } : {}),
         ...(standingIn.has(p.id) ? { standIn: true as const } : {}),
+        // Only for someone at the table or watching it: an invite preview has no viewer.
+        ...(viewer && p.user_id && p.account_type === 'permanent' ? { accountId: p.user_id } : {}),
         ...presence?.seats[p.id],
       })),
       ...(presence?.pausedAt !== undefined ? { paused: true } : {}),

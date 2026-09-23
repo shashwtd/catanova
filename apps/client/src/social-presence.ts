@@ -35,6 +35,16 @@ export type FriendsWithPresence = Omit<FriendsState, 'friends'> & {
   friends: (PublicAccount & Partial<Omit<FriendPresenceChange, 'id'>>)[];
 };
 
+/** Where the viewer stands with an account: befriended, asked, asked by them, or neither. */
+export type FriendStatus = 'friends' | 'sent' | 'received' | 'none';
+
+export function friendStatus(state: FriendsState, id: string): FriendStatus {
+  if (state.friends.some((friend) => friend.id === id)) return 'friends';
+  if (state.outgoing.some((account) => account.id === id)) return 'sent';
+  if (state.incoming.some((account) => account.id === id)) return 'received';
+  return 'none';
+}
+
 /** One friend's pushed change applied to the list. An id not on the list leaves it untouched. */
 export function applyFriendChange(
   state: FriendsWithPresence,

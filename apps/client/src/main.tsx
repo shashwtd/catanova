@@ -52,6 +52,7 @@ import {
   previewJoinReference,
 } from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
+import { friendStatus } from './social-presence.js';
 import { BoardViewport } from './BoardViewport.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
@@ -136,6 +137,9 @@ import './table-light.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];
+/** Why a friend request from the table did not go through, for the error toast. */
+const friendFailure = (failure: unknown) =>
+  failure instanceof Error ? failure.message : 'That friend request did not go through. Try again.';
 
 const SESSION_KEY = 'catanova.seat.v1',
   OUTBOX_KEY = 'catanova.outbox.v1',
@@ -1060,6 +1064,18 @@ function App() {
               connected={connected}
               onWarning={() => feedback.sound.play('warning')}
             />
+          }
+          friendship={
+            auth.config?.mode === 'authenticated' && auth.account?.registered && !auth.account.isGuest
+              ? {
+                  self: auth.account.id,
+                  status: (id) => friendStatus(auth.friends, id),
+                  request: (id) =>
+                    auth.requestFriend(id).catch((failure) => setError(friendFailure(failure))),
+                  accept: (id) =>
+                    auth.respondFriend(id, true).catch((failure) => setError(friendFailure(failure))),
+                }
+              : undefined
           }
         />
       )}

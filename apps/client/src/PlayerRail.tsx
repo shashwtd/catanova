@@ -10,6 +10,7 @@ import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus } from './DisconnectStatus.js';
 import { playerStandings } from './player-ranking.js';
 import { CardTooltip } from './CardTooltip.js';
+import type { FriendStatus } from './social-presence.js';
 
 function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; count: number }) {
   const label = `${count} ${kind === 'resource' ? 'resource' : 'development'} cards`;
@@ -47,6 +48,65 @@ function AwardCounts({ player, road, army }: { player: PlayerView; road: boolean
   );
 }
 
+/** How the rail offers friend requests, for a viewer with a Google account. */
+export type RailFriendship = {
+  /** The viewer's own account, never offered. */
+  self: string;
+  status: (accountId: string) => FriendStatus;
+  /** Both report their own failures and resolve either way. */
+  request: (accountId: string) => Promise<unknown>;
+  accept: (accountId: string) => Promise<unknown>;
+};
+
+/**
+ * Add someone at the table as a friend, or accept their request, from a small
+ * button on the corner of their portrait. It shows while the card is hovered or
+ * focused, or once it is tapped, so the rail stays quiet until it is wanted.
+ */
+function FriendButton({
+  name,
+  accountId,
+  friendship,
+}: {
+  name: string;
+  accountId: string;
+  friendship: RailFriendship;
+}) {
+  const [busy, setBusy] = useState(false);
+  const status = friendship.status(accountId);
+  if (status === 'friends') return null;
+  if (status === 'sent')
+    return (
+      <span
+        className="profile-friend"
+        data-status="sent"
+        role="img"
+        title="Friend request sent"
+        aria-label={`Friend request sent to ${name}`}
+      >
+        <GameIcon name="light-check" size={15} />
+      </span>
+    );
+  const accepting = status === 'received';
+  const label = accepting ? `Accept ${name}’s friend request` : `Add ${name} as a friend`;
+  return (
+    <button
+      type="button"
+      className="profile-friend"
+      data-status={status}
+      title={label}
+      aria-label={label}
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void (accepting ? friendship.accept : friendship.request)(accountId).finally(() => setBusy(false));
+      }}
+    >
+      <GameIcon name="add-friend" size={16} />
+    </button>
+  );
+}
+
 export function AwardStandings({ game, kind }: { game: GameView; kind: 'longestRoad' | 'largestArmy' }) {
   const field = kind === 'longestRoad' ? 'roadLength' : 'knights';
   const players = game.players
@@ -79,12 +139,14 @@ export function PlayerRail({
   me,
   timer,
   clockOffset,
+  friendship,
 }: {
   room: RoomState;
   game: GameView;
   me?: string;
   timer?: ReactNode;
   clockOffset?: number;
+  friendship?: RailFriendship;
 }) {
   const ranked = playerStandings(game);
   // Keyed by player, not by seat number: the game shuffles the order when it
@@ -113,6 +175,17 @@ export function PlayerRail({
       document.documentElement.style.removeProperty('--rail-height');
     };
   }, []);
+  /** The card whose friend button a tap has shown, where there is no hover to show it. */
+  const [revealed, setRevealed] = useState<string | null>(null);
+  useEffect(() => {
+    if (!revealed) return;
+    const away = (event: PointerEvent) => {
+      const card = (event.target as Element | null)?.closest?.('[data-player-profile]');
+      if (card?.getAttribute('data-player-profile') !== revealed) setRevealed(null);
+    };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [revealed]);
   const [now, setNow] = useState(Date.now);
   const fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() });
   if (room.serverNow !== undefined && room.serverNow !== fallback.current.server)
@@ -146,6 +219,8 @@ export function PlayerRail({
             aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${active ? ', current turn' : ''}`}
             className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''} ${!seat?.connected ? 'offline' : ''} ${p.resigned ? 'has-resigned' : ''}`}
             style={{ '--player-color': colors[p.id] } as CSSProperties}
+            data-friend-reveal={revealed === p.id || undefined}
+            onClick={friendship ? () => setRevealed(p.id) : undefined}
           >
             <div className="profile-portrait">
               <Avatar profile={seat?.profile ?? defaultProfile(p.name)} />
@@ -182,6 +257,9 @@ export function PlayerRail({
                 paused={room.paused}
               />
               <AwardCounts player={p} road={road} army={army} />
+              {friendship && seat?.accountId && seat.accountId !== friendship.self && (
+                <FriendButton name={p.name} accountId={seat.accountId} friendship={friendship} />
+              )}
             </div>
             <div className="profile-caption">
               <div className="profile-name-row">
