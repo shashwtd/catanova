@@ -246,8 +246,22 @@ export class Store {
       .prepare('PRAGMA table_info(game_events)')
       .all()
       .map((c) => c.name);
-    for (const name of ['actor_kind', 'participants'])
-      if (!eventColumns.includes(name)) this.db.exec('ALTER TABLE game_events ADD COLUMN ' + name + ' TEXT');
+    for (const [name, type] of [
+      ['actor_kind', 'TEXT'],
+      ['participants', 'TEXT'],
+      ['phase', 'TEXT'],
+      ['dice_total', 'INTEGER'],
+    ])
+      if (!eventColumns.includes(name))
+        this.db.exec('ALTER TABLE game_events ADD COLUMN ' + name + ' ' + type);
+    // The two facts anything outside the live game ever asked a journal row for.
+    // Kept as plain columns so statistics and match records never have to open
+    // a saved state; older rows are filled in once from the state they carry.
+    this.db.exec(`
+      UPDATE game_events SET phase = json_extract(state, '$.phase') WHERE phase IS NULL AND state <> '';
+      UPDATE game_events SET dice_total = json_extract(state, '$.dice[0]') + json_extract(state, '$.dice[1]')
+        WHERE dice_total IS NULL AND state <> '' AND json_extract(public_entry, '$.kind') = 'roll';
+    `);
     this.records = new PlayerRecords(this.db);
     for (const row of this.db.prepare('SELECT id FROM seats WHERE bot = 1 AND departed = 0').all())
       this.botSeats.add(row.id as string);
@@ -714,7 +728,7 @@ export class Store {
     };
     this.db
       .prepare(
-        'INSERT INTO game_events(room_id, revision, command_id, actor, action, previous_hash, state_hash, state, public_entry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO game_events(room_id, revision, command_id, actor, action, previous_hash, state_hash, state, public_entry, phase, dice_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         roomId,
@@ -726,6 +740,8 @@ export class Store {
         hash(state),
         state,
         JSON.stringify(entry),
+        game.phase,
+        kind === 'roll' && game.dice ? game.dice[0] + game.dice[1] : null,
       );
     // Private provenance alongside the existing journal, never in public history or snapshots.
     const participants =
@@ -739,6 +755,13 @@ export class Store {
       .prepare('UPDATE game_events SET actor_kind=?,participants=? WHERE room_id=? AND revision=?')
       .run(actorKind, participants ? JSON.stringify(participants) : null, roomId, revision);
     this.records.record(roomId, revision, game, entry);
+  }
+  /** The complete game exactly as it stood after one journal entry, for audits and recovery checks. */
+  journalState(roomId: string, revision: number): Game | undefined {
+    const row = this.db
+      .prepare('SELECT state FROM game_events WHERE room_id = ? AND revision = ?')
+      .get(roomId, revision) as { state: string } | undefined;
+    return row ? (JSON.parse(row.state) as Game) : undefined;
   }
   round(roomId: string): number {
     return (
@@ -762,7 +785,7 @@ export class Store {
     const diceCounts = Array<number>(11).fill(0);
     const rows = this.db
       .prepare(
-        `SELECT json_extract(state,'$.dice[0]') + json_extract(state,'$.dice[1]') AS total, count(*) AS n
+        `SELECT dice_total AS total, count(*) AS n
       FROM game_events WHERE room_id=? AND revision>? AND json_extract(public_entry,'$.kind')='roll'
       GROUP BY total`,
       )

@@ -97,7 +97,7 @@ export class PlayerRecords {
         ? (currentEntry ??
           (this.db
             .prepare(
-              "SELECT public_entry FROM game_events WHERE room_id=? AND json_extract(state,'$.phase')='finished' ORDER BY revision LIMIT 1",
+              "SELECT public_entry FROM game_events WHERE room_id=? AND phase='finished' ORDER BY revision LIMIT 1",
             )
             .get(roomId)?.public_entry as string | undefined))
         : undefined;
