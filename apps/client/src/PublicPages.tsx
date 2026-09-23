@@ -1547,10 +1547,10 @@ export function PublicPrivacy() {
             </div>
             <div className="privacy-choice-actions">
               <button type="button" data-consent-choice="granted">
-                Allow analytics
+                Accept all
               </button>
               <button type="button" data-consent-choice="denied">
-                No thanks
+                Deny
               </button>
             </div>
           </div>

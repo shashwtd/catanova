@@ -1,85 +1,77 @@
 /* The analytics question on the public pages. /analytics.js fetches this only
-   while a visitor has not answered, and adds the banner once it has loaded.
-   It is drawn like the landing footer: white type in the game's Barlow on the
-   same blurred green shade, low enough to leave the play buttons clear. */
-.consent-banner {
-  position: fixed;
-  inset: auto 0 0;
-  z-index: 40;
-  isolation: isolate;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px 22px;
-  padding: 26px 20px max(14px, env(safe-area-inset-bottom));
+   while a visitor has not answered, and opens the dialog once it has loaded.
+   It must be answered before the page can be used, so it sits over a dimmed
+   page, drawn like the landing footer: white type in the game's Barlow on the
+   same deep green. Accept all is the bright button; Deny is the same size and
+   plainly legible, only quieter. */
+.consent-dialog {
+  box-sizing: border-box;
+  width: min(430px, calc(100vw - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 22px 22px 18px;
+  border: 1px solid #fff4d433;
+  border-radius: 14px;
+  background: #143425f7;
   color: #fff;
   text-align: center;
+  box-shadow: 0 18px 50px #04100bb3;
   font:
-    500 14px/1.45 Barlow,
+    500 15px/1.5 Barlow,
     sans-serif;
 }
-.consent-banner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(180deg, #173c2d00, #143425d9 26px, #112e24f2);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 26px);
-  mask-image: linear-gradient(180deg, transparent, #000 26px);
+.consent-dialog:focus {
+  outline: none;
 }
-.consent-banner p {
-  margin: 0;
+.consent-dialog::backdrop {
+  background: #0a1c1499;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.consent-dialog p {
+  margin: 0 0 18px;
   font: inherit;
   color: inherit;
   text-wrap: balance;
 }
-.consent-banner a {
+.consent-dialog a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .consent-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
-.consent-banner button {
-  min-height: 36px;
-  padding: 6px 15px;
-  border-radius: 8px;
+.consent-dialog button {
+  flex: 1 1 140px;
+  min-height: 42px;
+  padding: 8px 16px;
+  border-radius: 9px;
   font:
-    600 14px/1.2 Barlow,
+    600 15px/1.2 Barlow,
     sans-serif;
   cursor: pointer;
 }
-.consent-banner [data-consent-choice='granted'] {
+.consent-dialog [data-consent-choice='granted'] {
   border: 1px solid #fff4d4;
   background: #fff4d4;
   color: #36503f;
   box-shadow: 0 2px 5px #0e241b40;
 }
-.consent-banner [data-consent-choice='granted']:hover {
+.consent-dialog [data-consent-choice='granted']:hover {
   background: #fff9e5;
 }
-.consent-banner [data-consent-choice='denied'] {
-  border: 1px solid #fff4d499;
+.consent-dialog [data-consent-choice='denied'] {
+  border: 1px solid #fff4d466;
   background: transparent;
-  color: #fff;
+  color: #ffffffd9;
 }
-.consent-banner [data-consent-choice='denied']:hover {
-  background: #ffffff1a;
+.consent-dialog [data-consent-choice='denied']:hover {
+  background: #ffffff14;
 }
-.consent-banner :focus-visible {
+.consent-dialog :focus-visible {
   outline: 3px solid #fff2ca;
   outline-offset: 3px;
-}
-@media (max-width: 650px) {
-  .consent-banner {
-    gap: 9px;
-    padding-inline: 16px;
-    font-size: 13px;
-  }
 }

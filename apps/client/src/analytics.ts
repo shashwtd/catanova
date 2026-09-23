@@ -20,7 +20,7 @@ export const MEASURED_PATHS = ['/', '/guide/', '/privacy/'] as const;
 /** Where a visitor's answer is kept in this browser: `granted` or `denied`. */
 export const CONSENT_STORAGE_KEY = 'catanova.analytics-consent';
 
-/** The banner's styles. Fetched only while a visitor has not answered. */
+/** The consent dialog's styles. Fetched only while a visitor has not answered. */
 export const CONSENT_STYLESHEET = '/consent.css';
 
 /**
@@ -79,9 +79,18 @@ export function analyticsLoader(measurementId: string): string {
   }
   measurePath(path);
   var banner = null;
+  // Closing it on purpose (an answer, or leaving for a room) must not reopen it.
   function dismiss() {
-    if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+    var dialog = banner;
     banner = null;
+    if (!dialog) return;
+    if (dialog.open && dialog.close) dialog.close();
+    if (dialog.parentNode) dialog.parentNode.removeChild(dialog);
+  }
+  function show(dialog) {
+    if (dialog.showModal) dialog.showModal();
+    else dialog.setAttribute('open', '');
+    if (dialog.focus) dialog.focus();
   }
   // The question belongs to the public pages; it never follows anyone into a room.
   function leaveIfPrivate() {
@@ -182,9 +191,13 @@ export function analyticsLoader(measurementId: string): string {
     // Appear styled or not at all; unanswered means nothing is measured.
     style.onload = function () {
       if (banner || choice() || pages.indexOf(location.pathname) < 0) return;
-      banner = document.createElement('section');
-      banner.className = 'consent-banner';
-      banner.setAttribute('aria-label', 'Analytics');
+      // A question that must be answered: a modal dialog over the page, with
+      // Accept all and a quieter, equally sized Deny.
+      var dialog = (banner = document.createElement('dialog'));
+      dialog.className = 'consent-dialog';
+      dialog.setAttribute('aria-label', 'Analytics');
+      // Focusable itself, so its question is read first rather than its link.
+      dialog.setAttribute('tabindex', '-1');
       var text = document.createElement('p');
       text.textContent = 'May we use Google Analytics to count visits? ' +
         'It runs only on these public pages, never in your games. ';
@@ -194,7 +207,7 @@ export function analyticsLoader(measurementId: string): string {
       text.appendChild(more);
       var actions = document.createElement('div');
       actions.className = 'consent-actions';
-      [['granted', 'Allow analytics'], ['denied', 'No thanks']].forEach(function (option) {
+      [['denied', 'Deny'], ['granted', 'Accept all']].forEach(function (option) {
         var button = document.createElement('button');
         button.type = 'button';
         button.setAttribute('data-consent-choice', option[0]);
@@ -202,9 +215,16 @@ export function analyticsLoader(measurementId: string): string {
         button.addEventListener('click', function () { choose(option[0]); });
         actions.appendChild(button);
       });
-      banner.appendChild(text);
-      banner.appendChild(actions);
-      document.body.appendChild(banner);
+      dialog.appendChild(text);
+      dialog.appendChild(actions);
+      // Escape does not close it: it waits for an answer.
+      dialog.addEventListener('cancel', function (event) { event.preventDefault(); });
+      // Some browsers close a modal on Escape regardless; unanswered, it opens again.
+      dialog.addEventListener('close', function () {
+        if (banner === dialog && !choice()) show(dialog);
+      });
+      document.body.appendChild(dialog);
+      show(dialog);
     };
     document.head.appendChild(style);
   }

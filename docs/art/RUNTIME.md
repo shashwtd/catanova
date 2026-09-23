@@ -115,23 +115,26 @@ selects another property. The former `GTM_ID` setting is retired.
 The loader uses Google Consent Mode v2 in what Google calls basic mode. Before
 anything else it sets `ad_storage`, `ad_user_data`, `ad_personalization` and
 `analytics_storage` to `denied`, and it does not fetch `gtag/js` at all until the
-visitor chooses **Allow analytics**. Without an answer, or after **No thanks**,
+visitor chooses **Accept all**. Without an answer, or after **Deny**,
 nothing is sent to Google Analytics, not even a cookieless ping. Allowing sends
 `gtag('consent', 'update', { analytics_storage: 'granted' })`, then the usual
 config and tag.
 
-A small banner asks on the loader's pages only. Its styles are `/consent.css`,
-fetched only while there is no answer, and the banner appears once they have
-loaded. The history wrapper removes it as soon as the address leaves those pages,
-so it never shows in a room, the lobby or a game. The answer is kept in
+A modal dialog asks on the loader's pages only, and the page cannot be used
+until it is answered: **Accept all** is the bright button, **Deny** an equally
+sized, quieter one. Escape does not close it, and if a browser closes it anyway it
+opens again; it asks on every visit until there is an answer. Its styles are
+`/consent.css`, fetched only while there is no answer, and the dialog opens once
+they have loaded. The history wrapper closes it as soon as the address leaves those
+pages, so it never shows in a room, the lobby or a game. The answer is kept in
 `localStorage` under `catanova.analytics-consent` (`granted` or `denied`); every
 access is guarded, so a browser that refuses storage is simply asked again next
 time. An answer given after the app has changed the address takes effect from the
 next public page load, because collection never resumes in a document once it has
-been disabled. **No thanks** also expires `_ga` and `_ga_*` cookies left from
+been disabled. **Deny** also expires `_ga` and `_ga_*` cookies left from
 before consent was asked.
 
-The banner links to `/privacy/`, which says what is collected and carries the
+The dialog links to `/privacy/`, which says what is collected and carries the
 control for changing the answer later. That control is rendered hidden and the
 loader reveals and wires it, so where the loader does not run (another host, a
 build with measurement off, a blocker) no dead buttons are shown. The page's
