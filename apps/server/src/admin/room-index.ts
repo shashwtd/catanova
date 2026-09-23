@@ -9,7 +9,9 @@
  * on one worker thread with its own read-only connection, at most once every
  * few seconds however many pages are open, and only the counts and the page
  * being shown travel back. The worker exits when the console goes quiet. It
- * also runs the player search, the other read that scans a whole table.
+ * also answers the other reads that scan whole tables: the list of every
+ * account for the Players tab, and the games and players counted since the
+ * start of a day and a week for Overview.
  *
  * Status comes from cheap columns: whether a `games` row exists, the phase
  * recorded on the room's newest journal row, and the presence row's pause
@@ -21,6 +23,8 @@ import { Worker } from 'node:worker_threads';
 import type { DatabaseSync } from 'node:sqlite';
 import { isShortRoomCode, normalizeRoomReference } from '../../../../packages/protocol/src/room-reference.js';
 import { AdminRequestError } from './api.js';
+import { ACCOUNTS_MAX_AGE_MS, indexAccounts, pageAccounts } from './accounts-index.js';
+import type { AccountsPage, IndexedAccount, PlayersQuery } from './accounts-index.js';
 import { serverErrors } from './errors.js';
 import type { ActivitySummary, RoomStatus } from './types.js';
 
@@ -74,9 +78,9 @@ export type RoomIndexQuery =
   | { kind: 'list'; now: number; query: RoomListQuery }
   | { kind: 'live'; now: number; limit: number }
   | { kind: 'activity'; now: number; day: number; week: number }
-  | { kind: 'accounts'; q: string };
+  | { kind: 'players'; now: number; query: PlayersQuery };
 
-type Answer = RoomSummary | RoomList | LiveRooms | ActivitySummary | string[];
+type Answer = RoomSummary | RoomList | LiveRooms | ActivitySummary | AccountsPage;
 
 /** How long a count of games and players is reused, whoever asks. */
 export const ACTIVITY_MAX_AGE_MS = 30_000;
@@ -218,34 +222,6 @@ export function indexRoom(
   return classify(db, db.prepare(`${ROOMS} WHERE r.id = ?`).all(now, roomId) as RoomRow[], leaseMs)[0];
 }
 
-const UUID_PREFIX = /^[0-9a-f-]{8,36}$/i;
-
-/**
- * Up to 50 accounts whose seat or profile name contains `q`, or whose id
- * starts with it, most recently seated first. LIKE wildcards in `q` are literal.
- */
-export function matchingAccounts(db: DatabaseSync, q: string): string[] {
-  const escaped = q.replace(/[\\%_]/g, (c) => '\\' + c);
-  const like = `%${escaped}%`;
-  // An id is matched by prefix only; an empty pattern matches nothing.
-  const idLike = UUID_PREFIX.test(q) ? `${escaped.toLowerCase()}%` : '';
-  // Seats carry every account that ever sat down; the local profile table covers
-  // accounts that only ever saved a profile.
-  const ids = db
-    .prepare(
-      `SELECT user_id AS userId, max(rowid) AS latest FROM seats
-       WHERE user_id IS NOT NULL AND (name LIKE ? ESCAPE '\\' OR user_id LIKE ? ESCAPE '\\')
-       GROUP BY user_id
-       UNION
-       SELECT user_id, 0 FROM profiles
-       WHERE json_extract(profile, '$.name') LIKE ? ESCAPE '\\' OR user_id LIKE ? ESCAPE '\\'
-       ORDER BY latest DESC LIMIT 200`,
-    )
-    .all(like, idLike, like, idLike)
-    .map((row) => row.userId as string);
-  return [...new Set(ids)].slice(0, 50);
-}
-
 export function countStatuses(rooms: IndexedRoom[]): RoomCounts {
   const counts = Object.fromEntries(ROOM_STATUSES.map((status) => [status, 0])) as RoomCounts;
   for (const room of rooms) counts[room.status]++;
@@ -281,12 +257,13 @@ export class RoomIndexCache {
     this.pass = null;
     this.named.clear();
     this.activities.clear();
+    this.accounts = null;
   }
 
   answer(query: RoomIndexQuery): Answer {
     switch (query.kind) {
-      case 'accounts':
-        return matchingAccounts(this.db, query.q);
+      case 'players':
+        return this.players(query.now, query.query);
       case 'summary':
         return this.summary(query.now);
       case 'live':
@@ -303,6 +280,18 @@ export class RoomIndexCache {
     const pass = this.current(now);
     const rooms = pass.rooms.filter((room) => room.status === 'live' || room.status === 'paused');
     return { indexedAt: pass.at, total: rooms.length, rooms: rooms.slice(0, limit) };
+  }
+
+  private accounts: { clock: number; at: number; list: IndexedAccount[] } | null = null;
+
+  /** One page of every known account (see accounts-index.ts), from a list at most a few seconds old. */
+  players(now: number, query: PlayersQuery): AccountsPage {
+    const clock = (this.options.clock ?? (() => performance.now()))();
+    if (!this.accounts || clock - this.accounts.clock >= ACCOUNTS_MAX_AGE_MS) {
+      const read = this.options.read ?? (<T>(work: () => T) => work());
+      this.accounts = { clock, at: now, list: read(() => indexAccounts(this.db)) };
+    }
+    return pageAccounts(this.accounts.list, query, this.accounts.at);
   }
 
   private readonly activities = new Map<string, { clock: number; value: ActivitySummary }>();
@@ -462,9 +451,9 @@ export class RoomIndex {
     return this.ask({ kind: 'activity', now, day, week }) as Promise<ActivitySummary>;
   }
 
-  /** See `matchingAccounts`. Not cached: each search is typed by hand. */
-  accounts(q: string): Promise<string[]> {
-    return this.ask({ kind: 'accounts', q }) as Promise<string[]>;
+  /** One page of every known account, searched and sorted (see accounts-index.ts). */
+  players(now: number, query: PlayersQuery): Promise<AccountsPage> {
+    return this.ask({ kind: 'players', now, query }) as Promise<AccountsPage>;
   }
 
   /** Whether a worker thread is up (or still stopping). */

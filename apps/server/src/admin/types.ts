@@ -284,14 +284,39 @@ export type GameDetail = {
 
 export type PrivateGameState = { roomId: string; revision: number; game: unknown };
 
+export type PlayerSort = 'lastSeen' | 'games' | 'wins' | 'joined' | 'name';
+
+/** One account in the Players list. */
 export type PlayerSummary = {
   userId: string;
-  name: string;
+  /** The name it last played under; null for an account that only ever opened the player hub. */
+  name: string | null;
   accountType: string | null;
   lastSeen: number | null;
-  matches: number;
+  /** When its first recorded game started. */
+  firstPlayed: number | null;
+  games: number;
   wins: number;
+  /** Wins over games with a winner it finished in (won, lost or resigned); null before any. */
+  winRate: number | null;
+  /** Points those games ended with, every card revealed; null before any. */
+  averagePoints: number | null;
+  online: boolean;
   currentRoom: { roomId: string; roomCode?: string } | null;
+};
+
+export type PlayersPage = {
+  items: PlayerSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+  sort: PlayerSort;
+  dir: 'asc' | 'desc';
+  q: string;
+  /** The list is from the room index's worker at this time; online and current games are read fresh. */
+  indexedAt: number;
+  /** Whether the presence hub is reported, so "online" covers accounts outside rooms too. */
+  presence: boolean;
 };
 
 export type PlayerMatch = {
@@ -309,10 +334,15 @@ export type PlayerMatch = {
 
 export type PlayerDetail = {
   userId: string;
+  /** Every name it played under, newest first; empty for an account seen only in the player hub. */
   names: string[];
   accountType: string | null;
   lastSeen: number | null;
   sharesLastSeen: boolean;
+  /** Where it is, if online now. */
+  online: OnlinePerson | null;
+  /** Whether the presence hub is reported; without it, only an account at a room can be seen online. */
+  presence: boolean;
   currentRoom: { roomId: string; roomCode?: string } | null;
   record: {
     matches: number;
@@ -321,6 +351,9 @@ export type PlayerDetail = {
     resigned: number;
     abandoned: number;
     playing: number;
+    winRate: number | null;
+    averagePoints: number | null;
+    firstPlayed: number | null;
   };
   matches: PlayerMatch[];
   seats: { roomId: string; roomCode: string | null; name: string; departed: boolean }[];

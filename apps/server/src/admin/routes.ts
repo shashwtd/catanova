@@ -11,7 +11,7 @@ import type { MetricsRange } from './types.js';
 import { overview } from './overview.js';
 import { systemReport } from './system.js';
 import { ROOM_PARAM, endGame, gameDetail, gameHistory, listGames, privateGame } from './rooms.js';
-import { playerDetail, searchPlayers } from './players.js';
+import { listPlayers, playerDetail } from './players.js';
 import { feedbackRoutes } from './feedback.js';
 import { RETENTION_DAYS } from './analysis-runner.js';
 import type { Analysis } from './analysis-runner.js';
@@ -74,7 +74,7 @@ export function coreRoutes(
     {
       method: 'GET',
       path: /^\/api\/admin\/players$/,
-      handle: ({ query }) => searchPlayers(context, rooms, query),
+      handle: ({ query }) => listPlayers(context, rooms, query),
     },
     {
       method: 'GET',

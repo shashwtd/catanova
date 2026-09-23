@@ -100,12 +100,17 @@ test('the room index counts on its own thread, reuses a pass until it is dropped
     [second],
   );
   assert.equal((await index.list(Date.now(), { status: 'all', q: '', page: 2 })).rooms.length, 0);
-  // Seat names and account ids, never a LIKE pattern.
-  assert.deepEqual(await index.accounts('LICI'), ['00000000-0000-4000-8000-000000000301']);
-  assert.deepEqual(await index.accounts('00000000-0000-4000-8000-0000000003'), [
+  // Every account, found by any name it used or the start of its id, never a LIKE pattern.
+  const players = async (q: string) =>
+    (await index.players(Date.now(), { q, sort: 'lastSeen', dir: 'desc', page: 1 })).accounts.map(
+      (account) => account.userId,
+    );
+  assert.deepEqual(await players(''), ['00000000-0000-4000-8000-000000000301']);
+  assert.deepEqual(await players('LICI'), ['00000000-0000-4000-8000-000000000301']);
+  assert.deepEqual(await players('00000000-0000-4000-8000-0000000003'), [
     '00000000-0000-4000-8000-000000000301',
   ]);
-  assert.deepEqual(await index.accounts('%'), []);
+  assert.deepEqual(await players('%'), []);
   index.close();
   assert.equal(index.running, false);
   await refused(index.summary(Date.now()), 'SHUTTING_DOWN');
@@ -143,7 +148,10 @@ test('a room count stuck inside SQLite times out, and nothing starts beside it u
   // The thread is still waiting inside SQLite, so no second pass starts beside it.
   await refused(index.summary(Date.now()), 'ROOM_INDEX_BUSY');
   await refused(index.list(Date.now(), { status: 'all', q: '', page: 1 }), 'ROOM_INDEX_BUSY');
-  await refused(index.accounts('host'), 'ROOM_INDEX_BUSY');
+  await refused(
+    index.players(Date.now(), { q: 'host', sort: 'lastSeen', dir: 'desc', page: 1 }),
+    'ROOM_INDEX_BUSY',
+  );
   // Still so a while later: it is waiting on SQLite, which a terminate() cannot cut short.
   await new Promise((resolve) => setTimeout(resolve, 300));
   await refused(index.summary(Date.now()), 'ROOM_INDEX_BUSY');

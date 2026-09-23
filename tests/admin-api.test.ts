@@ -21,7 +21,7 @@ import type {
   GameDetail,
   GamesPage,
   PlayerDetail,
-  PlayerSummary,
+  PlayersPage,
   PrivateGameState,
   RetentionReport,
 } from '../apps/server/src/admin/types.js';
@@ -669,36 +669,120 @@ test('ending a game finishes it as abandoned, journals and audits it, and pushes
   );
 });
 
-test('players can be found by name or id, with their record and current game', async (t) => {
-  const { get, accounts, paused } = await seeded(t);
-  const found = await get<{ players: PlayerSummary[] }>('/api/admin/players?q=ali');
+test('every player is listed by default, sortable and paged, and can still be found by name or id', async (t) => {
+  const [dana, eve] = [account('Dana', 4), account('Eve', 6)];
+  const { get, store, accounts, paused } = await seeded(t, {
+    online: () => [{ userId: accounts.bob.id, name: 'Bob', guest: false, since: Date.now(), tabs: 1 }],
+  });
+  // Eve beats Dana (Dana leaves while Eve is at the table); Eli has only ever opened the hub.
+  const host = store.enter('create', newSession('d').token, 'd', undefined, dana);
+  const guest = store.enter('join', newSession('e').token, 'e', host.room_id, eve);
+  store.action(host, 'dana-start', readyLobby(store, host.room_id), { kind: 'start' });
+  store.setConnected(guest, true);
+  store.leave(host, 'dana-leaves', store.snapshot(host.room_id).revision);
+  const won = store.loadGame(host.room_id)!;
+  assert.equal(won.winner, guest.id);
+  const eli = '00000000-0000-4000-8000-000000000005';
+  store.markSeen(eli, Date.now() - 60_000);
+  store.markSeen(accounts.cara.id, Date.now() - 120_000);
+
+  const list = async (query = '') => get<PlayersPage>(`/api/admin/players${query}`);
+  const everyone = await list();
+  assert.equal(everyone.total, 6, 'nobody has to be searched for');
   assert.deepEqual(
-    found.players.map((player) => player.userId),
+    [everyone.sort, everyone.dir, everyone.page, everyone.pageSize],
+    ['lastSeen', 'desc', 1, 25],
+  );
+  // Most recently seen first; accounts never seen last, by name.
+  assert.deepEqual(
+    everyone.items.map((player) => player.name),
+    [null, 'Cara', 'Alice', 'Bob', 'Dana', 'Eve'],
+  );
+  const byId = (page: PlayersPage, id: string) => page.items.find((player) => player.userId === id)!;
+  const alice = byId(everyone, accounts.alice.id);
+  assert.deepEqual(
+    [
+      alice.games,
+      alice.wins,
+      alice.winRate,
+      alice.averagePoints,
+      alice.accountType,
+      alice.currentRoom?.roomId,
+    ],
+    [1, 0, null, null, 'permanent', paused],
+    'a game still being played decides nothing',
+  );
+  const winner = byId(everyone, eve.id);
+  assert.deepEqual([winner.games, winner.wins, winner.winRate], [1, 1, 1]);
+  assert.equal(
+    winner.averagePoints,
+    score(
+      won,
+      won.players.find((player) => player.id === guest.id)!,
+      true,
+    ),
+  );
+  assert.equal(byId(everyone, dana.id).winRate, 0, 'leaving is a decided game lost');
+  assert.equal(byId(everyone, accounts.bob.id).online, true);
+  assert.equal(byId(everyone, accounts.cara.id).online, false);
+  assert.equal(byId(everyone, accounts.cara.id).accountType, 'guest');
+  assert.equal(byId(everyone, eli).games, 0);
+  assert.ok(alice.firstPlayed! <= Date.now());
+  assert.equal(everyone.presence, true);
+  // Sorted by games, wins, first game and name, either way.
+  assert.equal((await list('?sort=games')).items.at(-1)!.userId, eli);
+  assert.equal((await list('?sort=wins')).items[0]!.userId, eve.id);
+  assert.equal((await list('?sort=joined')).items.at(-1)!.userId, eli, 'never played: last either way');
+  assert.equal((await list('?sort=joined&dir=asc')).items.at(-1)!.userId, eli);
+  assert.deepEqual(
+    (await list('?sort=name')).items.map((player) => player.name),
+    ['Alice', 'Bob', 'Cara', 'Dana', 'Eve', null],
+  );
+  assert.deepEqual(
+    (await list('?sort=name&dir=desc')).items.map((player) => player.name),
+    ['Eve', 'Dana', 'Cara', 'Bob', 'Alice', null],
+  );
+  // Paged, and found by any name used or the start of an id.
+  assert.equal((await list('?page=2')).items.length, 0);
+  assert.deepEqual(
+    (await list('?q=ali')).items.map((player) => player.userId),
     [accounts.alice.id],
   );
-  assert.equal(found.players[0]!.name, 'Alice');
-  assert.equal(found.players[0]!.currentRoom?.roomId, paused);
   assert.deepEqual(
-    (await get<{ players: PlayerSummary[] }>(`/api/admin/players?q=${accounts.cara.id}`)).players.map(
-      (player) => player.userId,
-    ),
+    (await list(`?q=${accounts.cara.id}`)).items.map((player) => player.userId),
     [accounts.cara.id],
   );
-  // An id prefix matches every account that shares it.
-  assert.equal(
-    (await get<{ players: PlayerSummary[] }>('/api/admin/players?q=00000000-0000')).players.length,
-    3,
+  assert.equal((await list('?q=00000000-0000')).total, 6);
+  assert.equal((await list('?q=%25%25')).total, 0);
+  await get('/api/admin/players?sort=elo', 400);
+  await get('/api/admin/players?dir=sideways', 400);
+  await get('/api/admin/players?page=0', 400);
+  await get(`/api/admin/players?q=${'x'.repeat(65)}`, 400);
+
+  const detail = await get<PlayerDetail>(`/api/admin/players/${accounts.alice.id}`);
+  assert.deepEqual(detail.names, ['Alice']);
+  assert.equal(detail.accountType, 'permanent');
+  assert.deepEqual(
+    [detail.record.matches, detail.record.won, detail.record.playing, detail.record.winRate],
+    [1, 0, 1, null],
   );
-  await get('/api/admin/players?q=a', 400);
-  assert.equal((await get<{ players: PlayerSummary[] }>('/api/admin/players?q=%25%25')).players.length, 0);
-  const detail = await get<PlayerDetail>(`/api/admin/players/${accounts.cara.id}`);
-  assert.deepEqual(detail.names, ['Cara']);
-  assert.equal(detail.accountType, 'guest');
-  assert.equal(detail.record.matches, 1);
-  assert.equal(detail.record.playing, 1);
-  assert.equal(detail.matches[0]!.roomId, paused);
-  assert.equal(detail.matches[0]!.players.length, 3);
-  assert.equal(detail.seats[0]!.roomId, paused);
+  assert.ok(detail.record.firstPlayed! <= Date.now());
+  assert.equal(detail.online, null, 'Alice is not online');
+  // The game still being played shows the points the table sees, not her hidden cards.
+  const pausedGame = store.loadGame(paused)!;
+  const inPlay = detail.matches.find((match) => match.outcome === 'playing')!;
+  const aliceInPaused = pausedGame.players.find((player) => player.name === 'Alice')!;
+  assert.equal(inPlay.points, score(pausedGame, aliceInPaused, false));
+  assert.equal(inPlay.roomId, paused);
+  const eveDetail = await get<PlayerDetail>(`/api/admin/players/${eve.id}`);
+  assert.deepEqual([eveDetail.record.won, eveDetail.record.winRate], [1, 1]);
+  assert.equal(eveDetail.record.averagePoints, winner.averagePoints);
+  const bob = await get<PlayerDetail>(`/api/admin/players/${accounts.bob.id}`);
+  assert.equal(bob.online?.place.kind, 'game');
+  assert.equal(bob.presence, true);
+  // An account seen only in the hub has a page too; one never seen does not.
+  const hubOnly = await get<PlayerDetail>(`/api/admin/players/${eli}`);
+  assert.deepEqual([hubOnly.names, hubOnly.record.matches], [[], 0]);
   await get('/api/admin/players/00000000-0000-4000-8000-000000000099', 404);
 });
 
