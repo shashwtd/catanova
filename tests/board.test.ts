@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fairnessIssues, generateBoard, topology } from '../packages/rules/src/board.js';
+import type { Board } from '../packages/rules/src/board.js';
 import { NUMBER_SPIRAL, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
 
 test('island topology has shared corners and edges, without duplicate geometry', () => {
@@ -37,4 +38,11 @@ test('500 seeded islands preserve the supply and satisfy every balance constrain
   assert.equal(fingerprints.size, 500);
   assert.deepEqual(generateBoard(281), generateBoard(281));
   assert.deepEqual(Object.values(RESOURCE_NAMES), ['Timber', 'Clay', 'Sheep', 'Hay', 'Rock']);
+});
+test('new islands are balanced-v2, and boards saved as balanced-v1 remain valid', () => {
+  for (let seed = 0; seed < 20; seed++) assert.equal(generateBoard(seed).preset, 'balanced-v2');
+  // A seed deals a different island under v2, but saved games keep the board they were dealt, so the old id
+  // must stay a valid Board. tsc checks this file: dropping 'balanced-v1' from the type fails here.
+  const saved = JSON.parse(JSON.stringify(generateBoard(281))) as Board;
+  saved.preset = 'balanced-v1';
 });

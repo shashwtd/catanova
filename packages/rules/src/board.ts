@@ -25,7 +25,11 @@ export type Edge = { id: number; a: number; b: number; hexes: number[] };
 export type Port = { edge: number; resource: Resource | 'any' };
 export type Board = {
   seed: number;
-  preset: 'balanced-v1';
+  /**
+   * The generator that dealt this board: a seed reproduces a board only under its own preset. New boards
+   * are balanced-v2; saved games keep the board JSON they were dealt, so balanced-v1 boards stay valid.
+   */
+  preset: 'balanced-v1' | 'balanced-v2';
   hexes: Hex[];
   vertices: Vertex[];
   edges: Edge[];
@@ -187,7 +191,7 @@ export function generateBoard(seed: number): Board {
         edge: coast[(i + offset) % coast.length]!.id,
         resource: resources[n]!,
       }));
-      return { seed: seed >>> 0, preset: 'balanced-v1', ...graph, ports };
+      return { seed: seed >>> 0, preset: 'balanced-v2', ...graph, ports };
     }
   }
   throw new Error('Could not generate a balanced island within the search limit');
