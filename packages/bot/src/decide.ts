@@ -244,9 +244,11 @@ function effectiveFocus(plan: BotPlan, view: GameView): Focus {
 }
 
 /**
- * Everything the current focus costs, not just the part still missing. This is
- * what a seven leaves in hand: keeping only the missing part threw away the
- * rock for a city because the hay for it was already there.
+ * Everything the current focus costs, not just the part still missing: this is
+ * what a seven leaves in hand. Keeping only the missing part protected nothing
+ * already collected, so a bot with the hay for a city threw the hay away, and a
+ * bot with no list at all kept whatever came first in the resource order, which
+ * put rock and hay last.
  */
 function focusCost(plan: BotPlan, view: GameView): Hand {
   const cost = FOCUS_COST[effectiveFocus(plan, view)];

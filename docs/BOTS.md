@@ -82,6 +82,16 @@ Bots work with no configuration: without a key they play from their
 deterministic fallbacks, which is also what happens whenever the decision
 service is slow or unreachable. A bot never stalls a table.
 
+When a request fails — a timeout, an error status, or a reply that is not a
+well-formed answer to every question asked — the bot answers that same decision
+exactly as a bot with no key would, and the move is counted as degraded. After
+three failures in a row the client stops asking for a minute, so a service that
+hangs costs one eight-second timeout per minute across the whole server rather
+than one per decision; then a single request goes out to see whether it is
+back, and a success opens it up again. In a local simulation of 100 four-bot
+games against a service that timed out every request, every game finished
+within 600 turns and a game made about 8 requests.
+
 To let them think, set a TypeSafe API key in the server environment:
 
 ```sh
@@ -99,6 +109,10 @@ from the token count at the published rate of $0.042 per million.
 
 Keys stay on the server. The browser never sees one, and the bot package is
 never bundled into the client.
+
+Usernames stay on the server too. The service is told about players only as
+"me" and "opponent 1" to "opponent 3", in seat order, with their points, card
+counts, knights and buildings: no decision depends on what anybody is called.
 
 On the production VM, add `TYPESAFE_API_KEY` to `/etc/catanova/production.env`
 using `sudoedit`, then recreate the `game` service with that env file and
@@ -181,7 +195,7 @@ guess.
 Every bot is handed the same filtered view of the game the browser is handed:
 `gameView(game, seatId)`. No opponent's hand, no peeking at the development
 deck, no adjusted dice, and no shared plans between bots at the same table. A
-stand-in is the same: it holds the seat's own cards because it *is* that seat
+stand-in is the same: it holds the seat's own cards because it _is_ that seat
 for the moment, and the record it is profiled from — pieces, road length,
 knights played, harbours — is what every other player at the table can see. A
 champion's advantage is entirely in what it does with public information — the
@@ -216,6 +230,17 @@ several moves out at once.
   marks history as automatic.
 - Removing a bot uses the existing host kick control; there is no separate
   command for it.
+- If a bot cannot move — its decision throws, or the rules refuse the move it
+  chose — the room is retried after a second, then two, then four, doubling up
+  to a minute, never on every tick. After three failed attempts at the same
+  position the bot makes the move the turn clock would: roll, end the turn,
+  discard what it must, move the robber or place a free road, and in the
+  opening, which has no clock, the most productive corner and a road beside
+  it. That move goes through the same commit path as any other, so a table
+  never waits on a bot for good, even with the turn timer off.
+- A finished game or a paused table is recognised before any other work for
+  it, so a room that owes nothing costs a read or two per tick and never a
+  decision.
 
 ## Playing a game without a server
 
@@ -234,14 +259,19 @@ from.
 
 - Bots do not trade with players, only with the bank and harbours. Player
   trading is the single biggest gap in their play.
-- **Games between bots often do not finish.** In the measured set only one of
-  four reached ten points inside a 400-turn cap; the others stalled around seven
-  to nine points each. A human game takes 60 to 80 turns. The cause is that
-  bots convert resources far too slowly: with no player trading and only 4:1
-  bank rates, a board that blocks expansion leaves everyone hoarding. This is
-  the first thing to fix, and it matters more than any tuning of the questions.
+- **Games between bots with the model were slow to finish.** In the measured
+  set only one of four reached ten points inside a 400-turn cap; the others
+  stalled around seven to nine points each. A human game takes 60 to 80 turns.
+  The cause was that bots converted resources far too slowly. Part of it has
+  since been found and fixed: what a bot was short of was only worked out when
+  the model answered, so without it a bot never traded at all, and a seven
+  threw away the rock and hay it was saving. In 200 simulated four-bot games
+  without the model, bots now trade with the bank or a harbour about 27 times
+  a game, every game finishes, and the median game is 122 turns (it was 196,
+  with 4 of 200 unfinished at 1,000 turns). The set with the model has not
+  been measured again since.
 - Bots are therefore good opponents for filling a seat in a game with people in
-  it, and not yet good at playing each other.
+  it, and still slower than people at playing each other.
 - Knight play is simple: a knight is played when it is the best available move,
   not as part of a plan to take largest army.
 - A bot's plan lives in server memory. A restart costs one turn of re-planning
