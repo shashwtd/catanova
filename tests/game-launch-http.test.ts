@@ -253,10 +253,13 @@ test('a storage failure at the launch commit leaves no game, clock, or success r
   f.a.send({ type: 'launchReady', id: start.commandId, success: true });
   f.b.send({ type: 'launchReady', id: start.commandId, success: true });
   f.advance(2000);
-  await until(() =>
-    f.a.messages.some(
-      (m) => m.type === 'error' && m.code === 'LAUNCH_CANCELLED' && m.commandId === start.commandId,
-    ),
+  // The refusal is a small message and the room update after it a compressed
+  // one, so wait for the update this test goes on to read, not just the error.
+  await until(
+    () =>
+      f.a.messages.some(
+        (m) => m.type === 'error' && m.code === 'LAUNCH_CANCELLED' && m.commandId === start.commandId,
+      ) && f.a.state().launch === undefined,
   );
   assert.equal(f.server.store.loadGame(roomId), undefined);
   assert.equal(f.server.store.clock(roomId), undefined);
