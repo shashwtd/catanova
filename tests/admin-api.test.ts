@@ -346,6 +346,39 @@ test('games are listed by status and searchable, and a game’s detail shows its
   await get('/api/admin/games/not-a-room', 404);
 });
 
+test('a seat’s colour is the one the table sees, picked or given, whatever order the game plays in', async (t) => {
+  const { get, store, lobby, paused, accounts } = await seeded(t);
+  // Nobody at the paused table picked a colour: they are dealt in the order they sat down,
+  // not the shuffled order the game plays them in.
+  const detail = await get<GameDetail>(`/api/admin/games/${paused}`);
+  const byAccount = (id: string) => detail.seats.find((seat) => seat.userId === id)!;
+  assert.deepEqual(
+    [accounts.alice.id, accounts.bob.id, accounts.cara.id].map((id) => byAccount(id).color),
+    ['coral', 'sky', 'violet'],
+  );
+  assert.ok(detail.seats.every((seat) => !seat.colorChosen));
+  // In the lobby the second seat picks coral, so the first is given the next free default.
+  const [host, waiter] = store.snapshot(lobby).players;
+  store.lobby(
+    { id: waiter!.id, name: waiter!.name, room_id: lobby },
+    'pick-coral',
+    store.snapshot(lobby).revision,
+    false,
+    undefined,
+    undefined,
+    undefined,
+    'coral',
+  );
+  const seats = (await get<GameDetail>(`/api/admin/games/${lobby}`)).seats;
+  assert.deepEqual(
+    seats.map((seat) => [seat.id, seat.color, seat.colorChosen]),
+    [
+      [host!.id, 'sky', false],
+      [waiter!.id, 'coral', true],
+    ],
+  );
+});
+
 test('viewing a game’s private state is written to the audit log first', async (t) => {
   const { get, store, paused } = await seeded(t);
   const before = store.db.prepare('SELECT count(*) AS n FROM admin_audit').get()!.n as number;

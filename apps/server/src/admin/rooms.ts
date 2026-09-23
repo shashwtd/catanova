@@ -12,6 +12,8 @@ import type { Store } from '../store.js';
 import { ProtocolError, ROOM_CODE_LEASE_MS } from '../store.js';
 import type { Game } from '../../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
+import { isPlayerColor, seatColors } from '../../../../packages/protocol/src/colors.js';
+import type { PlayerColor } from '../../../../packages/protocol/src/colors.js';
 import { isRoomReference, normalizeRoomReference } from '../../../../packages/protocol/src/room-reference.js';
 import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRequest } from './api.js';
@@ -80,6 +82,20 @@ function summarize(id: string, seat: SeatRow | undefined, game: Game | undefined
     userId: seat?.user_id ?? null,
     accountType: seat?.account_type ?? null,
   };
+}
+
+/**
+ * Each seat's colour as the table sees it. The game resolves colours over the
+ * seats at the table in the order they sat down (a started game's players, a
+ * lobby's remaining seats), whatever order the game later plays them in, and a
+ * seat that never picked a colour still gets one; this repeats that exactly.
+ */
+function tableColors(seats: SeatRow[], game: Game | undefined): Map<string, PlayerColor> {
+  const table = seats.filter((seat) =>
+    game ? game.players.some((player) => player.id === seat.id) : !seat.departed,
+  );
+  const colors = seatColors(table);
+  return new Map(table.map((seat, index) => [seat.id, colors[index]!]));
 }
 
 /** A started game's players in turn order; a lobby's seats still in it. */
@@ -183,6 +199,7 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
   const live = liveState(context, roomId);
   const seats = seatRows(store, roomId);
   const table = tableSeats(seats, game, live);
+  const colors = tableColors(seats, game);
   // Seats that left before this game started still belong in the record, after the table.
   const others = seats
     .filter((seat) => !table.some((listed) => listed.id === seat.id))
@@ -238,7 +255,12 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
     snapshot,
     seats: [...table, ...others].map((seat) => {
       const row = seats.find((candidate) => candidate.id === seat.id);
-      return { ...seat, color: row?.color ?? null, ready: !!row?.ready };
+      return {
+        ...seat,
+        color: colors.get(seat.id) ?? null,
+        colorChosen: colors.has(seat.id) && isPlayerColor(row?.color) && colors.get(seat.id) === row.color,
+        ready: !!row?.ready,
+      };
     }),
     standIns: standIns.map((row) => ({ ...row, styled: !!row.styled })),
     presence: {

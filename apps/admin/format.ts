@@ -49,3 +49,7 @@ export const percent = (part: number, whole: number) =>
   whole > 0 ? `${Math.round((part / whole) * 1000) / 10}%` : '—';
 
 export const short = (id: string | null | undefined, length = 8) => (id ? id.slice(0, length) : '—');
+
+/** How an account signs in: `permanent` accounts are Google sign-ins; guests have no sign-in. */
+export const accountLabel = (type: string | null | undefined): string | null =>
+  type === 'permanent' ? 'Google' : type === 'guest' ? 'Guest' : (type ?? null);

@@ -7,8 +7,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { build } from 'vite';
 import { loadAdminAssets } from '../apps/server/src/admin/assets.js';
-import { Columns } from '../apps/admin/ui.js';
+import { Columns, PlayerColour } from '../apps/admin/ui.js';
 import { parseRoute } from '../apps/admin/route.js';
+import { accountLabel } from '../apps/admin/format.js';
+import { PLAYER_COLORS } from '../packages/protocol/src/colors.js';
 
 test('npm run build produces dist/admin, beside and separate from the game client', async () => {
   const scripts = JSON.parse(await readFile('package.json', 'utf8')).scripts as Record<string, string>;
@@ -77,4 +79,20 @@ test('admin charts and routes are plain markup: no inline styles, and ids never 
   });
   assert.equal(parseRoute('#/unknown').page, 'overview');
   assert.equal(parseRoute('#/games/%E0%A4%A').id, undefined, 'a malformed id is ignored');
+});
+
+test('a seat colour is the game’s own swatch and name, with no inline style', () => {
+  const given = renderToStaticMarkup(createElement(PlayerColour, { color: 'jade', chosen: false }));
+  assert.doesNotMatch(given, /style=/);
+  assert.match(given, new RegExp(`fill="${PLAYER_COLORS.jade}"`));
+  assert.match(given, />Jade<span class="muted">default<\/span>/);
+  const picked = renderToStaticMarkup(createElement(PlayerColour, { color: 'coral', chosen: true }));
+  assert.match(picked, />Coral<\/span>$/);
+  assert.equal(
+    renderToStaticMarkup(createElement(PlayerColour, { color: null, chosen: false })),
+    '<span class="muted">—</span>',
+  );
+  assert.equal(accountLabel('permanent'), 'Google');
+  assert.equal(accountLabel('guest'), 'Guest');
+  assert.equal(accountLabel(null), null);
 });

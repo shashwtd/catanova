@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { PlayerDetail as Detail, PlayerSummary } from '../../server/src/admin/types.js';
 import { useApi } from '../api.js';
-import { count, short, time } from '../format.js';
+import { accountLabel, count, short, time } from '../format.js';
 import { Badge, Empty, Failure, Loading, Section, Stat, Table, When } from '../ui.js';
 import type { Tone } from '../ui.js';
 import { go } from '../route.js';
@@ -86,7 +86,9 @@ export function Players({ params }: { params: URLSearchParams }) {
                   </td>
                   <td>
                     <code className="small">{short(player.userId, 13)}</code>
-                    {player.accountType && <span className="muted"> · {player.accountType}</span>}
+                    {player.accountType && (
+                      <span className="muted"> · {accountLabel(player.accountType)}</span>
+                    )}
                   </td>
                   <td className="num">{count(player.matches)}</td>
                   <td className="num">{count(player.wins)}</td>
@@ -118,7 +120,9 @@ export function PlayerDetail({ userId }: { userId: string }) {
       <div className="title-row">
         <h1>{data.names[0]}</h1>
         {data.accountType && (
-          <Badge tone={data.accountType === 'guest' ? 'warning' : 'accent'}>{data.accountType}</Badge>
+          <Badge tone={data.accountType === 'guest' ? 'warning' : 'accent'}>
+            {accountLabel(data.accountType)}
+          </Badge>
         )}
       </div>
       <div className="grid">

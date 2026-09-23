@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ApiError } from './api.js';
 import { relative, time } from './format.js';
+import { PLAYER_COLORS, PLAYER_COLOR_LABEL } from '../../packages/protocol/src/colors.js';
+import type { PlayerColor } from '../../packages/protocol/src/colors.js';
 
 export function Section({
   title,
@@ -95,6 +97,24 @@ export function When({ at, now }: { at: number | null | undefined; now?: number 
     <time dateTime={new Date(at).toISOString()} title={time(at)}>
       {relative(at, now)}
     </time>
+  );
+}
+
+/**
+ * A seat's colour as the table sees it: the game's own swatch and name, drawn
+ * as an SVG fill so no style attribute is needed. `chosen` is false for a seat
+ * that was given its colour automatically.
+ */
+export function PlayerColour({ color, chosen }: { color: PlayerColor | null; chosen: boolean }) {
+  if (!color) return <span className="muted">—</span>;
+  return (
+    <span className="player-colour">
+      <svg className="player-colour-dot" viewBox="0 0 10 10" aria-hidden="true">
+        <circle cx="5" cy="5" r="5" fill={PLAYER_COLORS[color]} />
+      </svg>
+      {PLAYER_COLOR_LABEL[color]}
+      {!chosen && <span className="muted">default</span>}
+    </span>
   );
 }
 

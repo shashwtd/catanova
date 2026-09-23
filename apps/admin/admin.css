@@ -525,6 +525,19 @@ table.metrics .metric-share {
   font-size: 12px;
 }
 
+/* A seat's colour in the game: the game's swatch beside its name */
+.player-colour {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.player-colour-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+}
+
 /* Pairs */
 dl.pairs {
   display: grid;

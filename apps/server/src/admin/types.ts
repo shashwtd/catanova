@@ -3,6 +3,7 @@
  * apps/admin. Type-only: nothing here runs in the browser bundle.
  */
 import type { HistoryEntry, RoomState } from '../../../../packages/protocol/src/index.js';
+import type { PlayerColor } from '../../../../packages/protocol/src/colors.js';
 import type { TurnClock } from '../../../../packages/protocol/src/settings.js';
 import type { Metric, Window } from '../../../../scripts/reporting/retention.js';
 import type { AuditEntry } from './audit.js';
@@ -122,7 +123,12 @@ export type GameDetail = {
   lastActivity: number | null;
   /** What a spectator is sent: the public board, players and filtered game. */
   snapshot: RoomState | null;
-  seats: (SeatSummary & { color: string | null; ready: boolean })[];
+  /**
+   * `color` is the colour the table sees, resolved the way the game resolves it
+   * (a seat that never picked one still has one); `colorChosen` says whether
+   * the player picked it. Seats no longer at the table have none.
+   */
+  seats: (SeatSummary & { color: PlayerColor | null; colorChosen: boolean; ready: boolean })[];
   standIns: { playerId: string; since: number; level: string; styled: boolean }[];
   presence: { paused: boolean; absent: { playerId: string; disconnectedAt: number; resignAt: number }[] };
   clock: TurnClock | null;

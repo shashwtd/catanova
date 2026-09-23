@@ -12,7 +12,7 @@ import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
 import type { Game } from '../../../packages/rules/src/game.js';
 import { RESOURCE_NAMES, RESOURCES } from '../../../packages/rules/src/index.js';
 import { api, ApiError, useApi } from '../api.js';
-import { count, short, time } from '../format.js';
+import { accountLabel, count, short, time } from '../format.js';
 import {
   Badge,
   Columns,
@@ -21,6 +21,7 @@ import {
   Json,
   Loading,
   Notice,
+  PlayerColour,
   Section,
   Stat,
   Table,
@@ -581,11 +582,13 @@ export function GameDetail({ roomId }: { roomId: string }) {
                     ) : (
                       <span className="muted">{seat.bot ? 'bot' : 'local seat'}</span>
                     )}
-                    {seat.accountType && <span className="muted"> · {seat.accountType}</span>}
+                    {seat.accountType && <span className="muted"> · {accountLabel(seat.accountType)}</span>}
                   </td>
                   <td className="num">{view?.points ?? '—'}</td>
                   <td className="num">{view ? `${view.resourceCount} res · ${view.cardCount} dev` : '—'}</td>
-                  <td>{seat.color ?? '—'}</td>
+                  <td>
+                    <PlayerColour color={seat.color} chosen={seat.colorChosen} />
+                  </td>
                 </tr>
               );
             })}
