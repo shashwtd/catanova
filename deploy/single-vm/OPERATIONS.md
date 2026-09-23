@@ -1,17 +1,22 @@
 # Catanova operations
 
-Operator runbook for the deployed Azure layout, updated **10 September 2026**. Direct HTTPS, routing and unauthenticated-access checks passed. A full VM reboot preserved storage, restarted healthy services and passed isolated two-client game recovery. Private backup upload, authenticated download, checksum and isolated SQLite structure were verified; the fifteen-minute timer remained active and a post-reboot upload succeeded. Real Google/Turnstile sessions and recovery of a played match from a downloaded backup remain untested; no monitoring alerts are configured. See the [deployment record](AZURE.md#launch-verification) for the exact scope of verification.
+Operator runbook for the deployed Azure layout, updated **10 September 2026**; monitoring and restore-drill tooling added **23 September 2026**. Direct HTTPS, routing and unauthenticated-access checks passed. A full VM reboot preserved storage, restarted healthy services and passed isolated two-client game recovery. Private backup upload, authenticated download, checksum and isolated SQLite structure were verified; the fifteen-minute timer remained active and a post-reboot upload succeeded. Real Google/Turnstile sessions remain untested.
 
-| Item                          | Location                                                             |
-| ----------------------------- | -------------------------------------------------------------------- |
-| Azure VM / resource group     | `catanova-game-01` / `catanova-prod-centralindia`                    |
-| Public IPv4 / game origin     | `74.225.248.124` / `https://catanova.io`                             |
-| Release checkout              | `/opt/catanova/app`                                                  |
-| Initial pinned release        | `8741e4459853277b41547e8cdc2d0a5c0d689eee`                           |
-| Production configuration      | `/etc/catanova/production.env`, root-owned, mode `0600`, outside Git |
-| Managed data-disk mount       | `/srv/catanova`, retained Azure LUN0                                 |
-| Persistent container storage  | `/srv/catanova/docker` and `/srv/catanova/containerd`                |
-| Backup worker / configuration | `/opt/catanova-backup` / `/etc/catanova/backup.env`                  |
+The watchdog, the backup and drill pings and the weekly restore drill are in the repository and passed their local tests. The drill has recovered really played test games through backup, verification and a real server restart, but **none of this is installed on the VM yet**: follow [Alerts](#alerts) to switch it on. Recovery of a played match from a real production backup is pending that first drill. See the [deployment record](AZURE.md#launch-verification) for the exact scope of verification.
+
+| Item                            | Location                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------- |
+| Azure VM / resource group       | `catanova-game-01` / `catanova-prod-centralindia`                               |
+| Public IPv4 / game origin       | `74.225.248.124` / `https://catanova.io`                                        |
+| Release checkout                | `/opt/catanova/app`                                                             |
+| Initial pinned release          | `8741e4459853277b41547e8cdc2d0a5c0d689eee`                                      |
+| Production configuration        | `/etc/catanova/production.env`, root-owned, mode `0600`, outside Git            |
+| Managed data-disk mount         | `/srv/catanova`, retained Azure LUN0                                            |
+| Persistent container storage    | `/srv/catanova/docker` and `/srv/catanova/containerd`                           |
+| Backup worker / configuration   | `/opt/catanova-backup` / `/etc/catanova/backup.env`                             |
+| Restore drill / configuration   | `/opt/catanova-backup/restore_drill.py` / `/etc/catanova/drill.env`             |
+| Watchdog / configuration        | `/opt/catanova-watchdog` / `/etc/catanova/watchdog.env`                         |
+| Status files for the admin view | `/srv/catanova/status/backup.json`, `watchdog.json`, `drill.json` (mode `0644`) |
 
 ## Connect and inspect
 
@@ -79,7 +84,7 @@ Enter the **reviewed full commit hash** below. This subshell stops on failure, r
 )
 ```
 
-Then inspect logs and HTTPS health and reconnect a test room. If only restarting the existing game process, use `catanova_compose restart game`; this also interrupts active connections. A code rollback uses the previous reviewed commit and its matching revision, provided it remains compatible with the current database. Preserve the old image until the new release is verified.
+Then inspect logs and HTTPS health and reconnect a test room. If the release changed anything under `deploy/single-vm/backup` or `deploy/single-vm/monitoring`, reinstall those files as their guides describe (keeping the existing `/etc/catanova/*.env`), reload systemd and run each changed service once. Then run `systemctl start catanova-watchdog.service` and confirm it passes against the new release. If only restarting the existing game process, use `catanova_compose restart game`; this also interrupts active connections. A code rollback uses the previous reviewed commit and its matching revision, provided it remains compatible with the current database. Preserve the old image until the new release is verified.
 
 Never use `down -v`, volume pruning, or volume deletion for redeployment. Preserve **`catanova-game-data`**, **`catanova-caddy-data`**, and **`catanova-caddy-config`**. Do not start another game container against the same SQLite volume. See the [deployment details](README.md) for Caddy configuration changes and domain switching.
 
@@ -122,6 +127,71 @@ systemctl show catanova-backup.service -p Result -p ExecMainStatus
 ```
 
 Verify the upload and latest successful timestamp; an inactive successful oneshot is normal. For recovery, follow [Restore production from a backup](#restore-production-from-a-backup). Never copy a live SQLite file as a backup or overwrite an open database. These snapshots cover matches; Supabase accounts, Caddy certificates, and VM configuration have separate recovery needs.
+
+## Alerts
+
+Three jobs on the VM report to a free dead-man's-switch service. Each posts to its own check after every run, and to that check's `/fail` URL with a one-line reason when something is wrong. The service alerts on a `/fail`, and also when posts stop arriving. Stopped posts are how a VM that is down, deallocated or offline gets noticed: the VM cannot report its own absence.
+
+| Check                    | Job and schedule                                                                  | healthchecks.io schedule        | URL goes in                                       |
+| ------------------------ | --------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------- |
+| `catanova-watchdog`      | [watchdog](monitoring/README.md): HTTPS, container, backup age, disks, TLS; 5 min | Period 5 minutes, grace 10 min  | `WATCHDOG_PING_URL`, `/etc/catanova/watchdog.env` |
+| `catanova-backup`        | [backup worker](backup/README.md), every 15 minutes                               | Period 15 minutes, grace 20 min | `BACKUP_PING_URL`, `/etc/catanova/backup.env`     |
+| `catanova-restore-drill` | [restore drill](backup/README.md#restore-drill), Wednesdays 21:40 UTC             | Period 7 days, grace 1 day      | `DRILL_PING_URL`, `/etc/catanova/drill.env`       |
+
+**Switching it on**, in this order:
+
+1. Deploy a reviewed release that contains this tooling. The drill runs the game verifier from the deployed image and requires its `Store.verifyJournal`.
+2. From that checkout, update the backup worker: `backup.py`, its service unit (it may now write `/srv/catanova/status`), and a new `/srv/catanova/status` folder. Add `BACKUP_PING_URL` to the existing `backup.env`. Follow [the backup guide](backup/README.md#install-on-the-deployed-vm).
+3. Install [the watchdog](monitoring/README.md#install-on-the-deployed-vm) and [the restore drill](backup/README.md#restore-drill), with their timers.
+4. Create the three checks and paste their URLs as below, then run each job once.
+
+**One-time setup on [healthchecks.io](https://healthchecks.io)** (its free plan has room for these three checks):
+
+1. Sign up with the address that should receive alerts. Sign-up creates a project, and email notifications to that address are its default integration.
+2. On the project's **Checks** page, click **Add Check**. Name it `catanova-watchdog`, set **Period** to 5 minutes and **Grace Time** to 10 minutes, and save. Copy its **Ping URL** (`https://hc-ping.com/…`) from the check's page.
+3. Repeat for `catanova-backup` (15 minutes, grace 20 minutes) and `catanova-restore-drill` (7 days, grace 1 day).
+4. Optional phone push for every check: on the project's **Integrations** page, add **ntfy** or **Discord** and enable it for all three checks.
+
+**On the VM**, paste each Ping URL into its file with `sudoedit` (which keeps the files root-owned and `0600`), after installing the jobs as their guides describe:
+
+```sh
+sudoedit /etc/catanova/watchdog.env   # WATCHDOG_PING_URL=https://hc-ping.com/...
+sudoedit /etc/catanova/backup.env     # BACKUP_PING_URL=https://hc-ping.com/...
+sudoedit /etc/catanova/drill.env      # DRILL_PING_URL=https://hc-ping.com/...
+sudo stat -c '%a %U %n' /etc/catanova/*.env
+sudo systemctl start catanova-backup.service catanova-watchdog.service catanova-drill.service
+```
+
+All three checks should turn green within a minute or so; the drill takes longest. To see a real alert once, set `WATCHDOG_DISK_PERCENT_MAX=1` in `watchdog.env` and run `systemctl start catanova-watchdog.service`: the check turns red and the email arrives. Then remove that line and run it again; the check recovers. During planned maintenance, use the **Pause** button on a check to silence it.
+
+**Optional direct push from the watchdog.** `ALERT_WEBHOOK_URL` in `watchdog.env` pushes the watchdog's own message, naming every failing check, when failures change, every six hours while they last, and once on recovery.
+
+- **ntfy:** install the ntfy app and subscribe to a new topic with a long random name, for example `catanova-` followed by the output of `openssl rand -hex 16`. Anyone who knows a topic's name on ntfy.sh can read it. Set `ALERT_WEBHOOK_URL=https://ntfy.sh/<topic>` and `ALERT_WEBHOOK_KIND=text`.
+- **Discord:** in a private server, open **Server Settings → Integrations → Webhooks → New Webhook**, choose a channel, and **Copy Webhook URL**. Set `ALERT_WEBHOOK_URL=<that URL>` and `ALERT_WEBHOOK_KIND=discord`.
+
+Send a test push with `sudo systemd-run --quiet --wait --pipe -p EnvironmentFile=/etc/catanova/watchdog.env /usr/bin/python3 -B /opt/catanova-watchdog/watchdog.py --test-alert`. Ping and webhook URLs are secrets: anyone holding one can report into the check or read its alerts. Keep them only in `/etc/catanova`, never in Git, issues or screenshots. Alert text contains hostnames, check results and counts, never room ids or game data.
+
+Azure cost alerts are separate and still not configured; see [the deployment record](AZURE.md#expected-azure-cost).
+
+## Reading status
+
+Every run of the three jobs atomically replaces one JSON file in `/srv/catanova/status`. The files are world-readable (`0644`) and hold no secrets or game data, so the planned admin console can show them through a **read-only** container mount of that folder. That mount is not in `compose.yaml` yet. Every file has `schema`, `kind`, `timestamp` (UTC), `result` (`success`/`failure`), `reason` and `durationSeconds`.
+
+| File            | Written by                   | Also holds                                                                                                                                         |
+| --------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backup.json`   | backup worker, every run     | blob name, `archiveBytes`, `snapshotBytes`, `sha256`, and `lastSuccess` (kept through failed runs)                                                 |
+| `watchdog.json` | watchdog, every five minutes | running `revision`, `container` status and health, `diskPercent` (`os`, `data`), `certificateDaysLeft`, `lastBackupAgeMinutes`, each check         |
+| `drill.json`    | restore drill, weekly        | blob, `backupAgeMinutes`, checksums, `revision` and image used, `rooms`, `games`, `verified`, `failed`, `phases`, `journalChain`, failing room ids |
+
+```sh
+python3 -m json.tool /srv/catanova/status/watchdog.json
+python3 -m json.tool /srv/catanova/status/backup.json
+python3 -m json.tool /srv/catanova/status/drill.json
+systemctl list-timers 'catanova-*'
+systemctl --failed
+```
+
+A stale `timestamp` means that job stopped running. Its check on healthchecks.io will already have alerted. The watchdog's unit also shows as failed in `systemctl --failed` while any check fails.
 
 ## Restore drill
 
