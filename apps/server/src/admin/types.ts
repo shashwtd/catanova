@@ -91,8 +91,57 @@ export type AdminSystem = {
   rejections: AuthRejection[];
 };
 
-/** Overview answers the same as System until it becomes the dashboard. */
-export type AdminOverview = AdminSystem;
+/** Games and players since the start of the viewer's day and week (see countActivity). */
+export type ActivitySummary = {
+  countedAt: number;
+  day: number;
+  week: number;
+  started: { day: number; week: number };
+  /** Ended with a winner. */
+  finished: { day: number; week: number };
+  /** Ended with none. */
+  abandoned: { day: number; week: number };
+  /** Distinct accounts that started a game. */
+  players: { day: number; week: number };
+  /** Accounts whose first recorded game started in the window. */
+  newPlayers: { day: number; week: number };
+};
+
+/** A game being played, as Overview lists it: points are what the table sees. */
+export type LiveGame = {
+  roomId: string;
+  roomCode: string | null;
+  status: RoomStatus;
+  turn: number;
+  phase: string;
+  target: number;
+  startedAt: number | null;
+  lastActivity: number | null;
+  players: (SeatSummary & { points: number })[];
+};
+
+/** The dashboard: who is here, what is being played, how the server is doing, and what needs a look. */
+export type AdminOverview = {
+  now: number;
+  revision: string | null;
+  uptimeSeconds: number;
+  online: OnlineNow;
+  /** Counted off the game's thread, at most a few seconds before `now`; an error if that failed. */
+  rooms: { live: number; paused: number; lobbies: number; countedAt: number } | { error: string };
+  activity: ActivitySummary | { error: string };
+  liveGames: LiveGame[];
+  performance: {
+    window: LoopWindow;
+    windowSeconds: number;
+    rssBytes: number;
+    heapUsedBytes: number;
+    sockets: number;
+  };
+  status: AdminSystem['status'];
+  /** The newest few; System lists them all. */
+  errors: { recent: ServerErrorEntry[]; total: number };
+  rejections: number;
+};
 
 export type RoomStatus = 'lobby' | 'live' | 'paused' | 'finished' | 'empty';
 

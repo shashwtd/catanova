@@ -50,6 +50,47 @@ export const percent = (part: number, whole: number) =>
 
 export const short = (id: string | null | undefined, length = 8) => (id ? id.slice(0, length) : '—');
 
+const clockFormat = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+const dayClockFormat = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+/** "14:05", in the viewer's time. */
+export const clock = (at: number) => clockFormat.format(new Date(at));
+/** "24 Sept, 14:05", in the viewer's time. */
+export const dayClock = (at: number) => dayClockFormat.format(new Date(at));
+
+/** The start of the viewer's day and week (Monday), in their own time zone. */
+export function localWindows(now = Date.now()): { day: number; week: number } {
+  const day = new Date(now);
+  day.setHours(0, 0, 0, 0);
+  const week = new Date(day);
+  week.setDate(day.getDate() - ((day.getDay() + 6) % 7));
+  return { day: day.getTime(), week: week.getTime() };
+}
+
+/**
+ * Round times for a time axis between two moments, in the viewer's time: every
+ * 15 minutes for an hour, every hour up to eight, every six hours beyond.
+ */
+export function timeTicks(from: number, to: number): number[] {
+  const span = to - from;
+  const minutes = span <= 2 * 3_600_000 ? 15 : span <= 8 * 3_600_000 ? 60 : 360;
+  const tick = new Date(from);
+  tick.setSeconds(0, 0);
+  if (minutes < 60) tick.setMinutes(Math.ceil(tick.getMinutes() / minutes) * minutes);
+  else {
+    if (tick.getMinutes() > 0) tick.setHours(tick.getHours() + 1, 0);
+    const hours = minutes / 60;
+    tick.setHours(Math.ceil(tick.getHours() / hours) * hours, 0);
+  }
+  const ticks: number[] = [];
+  for (let at = tick.getTime(); at <= to && ticks.length < 12; at += minutes * 60_000) ticks.push(at);
+  return ticks;
+}
+
 /** Dice modes by the names players see in the lobby. */
 export const DICE_LABELS: Record<string, string> = {
   classic: 'Natural',

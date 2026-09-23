@@ -7,9 +7,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { build } from 'vite';
 import { loadAdminAssets } from '../apps/server/src/admin/assets.js';
-import { Columns, PlayerColour } from '../apps/admin/ui.js';
+import { Columns, LineChart, PlayerColour } from '../apps/admin/ui.js';
 import { parseRoute } from '../apps/admin/route.js';
-import { accountLabel, diceLabel } from '../apps/admin/format.js';
+import { accountLabel, clock, diceLabel, localWindows, timeTicks } from '../apps/admin/format.js';
 import { fairness } from '../apps/admin/pages/Stats.js';
 import { diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
 import { PLAYER_COLORS } from '../packages/protocol/src/colors.js';
@@ -111,4 +111,61 @@ test('dice are only called fair or not where a test can say so', () => {
   assert.match(fairness(diceSummary(Array(11).fill(0))), /No rolls yet/);
   assert.equal(diceLabel('classic'), 'Natural');
   assert.equal(diceLabel('balanced'), 'Balanced');
+});
+
+test('line charts are labelled SVG with a legend and a table of every value, and no inline style', () => {
+  const chart = renderToStaticMarkup(
+    createElement(LineChart, {
+      label: 'People online and playing',
+      x: [0, 60_000, 120_000, 600_000],
+      series: [
+        { name: 'Online', slot: 1, values: [2, 3, null, 4] },
+        { name: 'Playing', slot: 2, values: [1, 1, 2, 2] },
+      ],
+      domain: [0, 600_000],
+      ticks: [0, 300_000, 600_000],
+      tickLabel: (at: number) => `${at / 60_000} min`,
+      pointLabel: (at: number) => `minute ${at / 60_000}`,
+      format: (value: number) => `${value} people`,
+      xTitle: 'Time',
+      yTitle: 'people',
+      gapAfter: 150_000,
+      integer: true,
+    }),
+  );
+  assert.doesNotMatch(chart, /style=/);
+  assert.match(chart, /role="img" aria-label="People online and playing"/);
+  assert.match(chart, /tabindex="0"/, 'reachable by keyboard for the tooltip');
+  assert.match(chart, />people<\/text>/, 'the value axis says its unit');
+  assert.match(chart, />5 min<\/text>/, 'and the time axis its ticks');
+  // A missing value and a gap longer than `gapAfter` both break the line.
+  const online = chart.match(/class="chart-line line-1" d="([^"]+)"/)![1]!;
+  assert.equal(online.match(/M/g)!.length, 2);
+  const playing = chart.match(/class="chart-line line-2" d="([^"]+)"/)![1]!;
+  assert.equal(playing.match(/M/g)!.length, 2, 'the last point is ten minutes after the one before');
+  assert.match(chart, /<figcaption class="legend">.*Online.*Playing.*<\/figcaption>/s);
+  assert.match(chart, /<summary>Show the numbers<\/summary>/);
+  assert.match(chart, /<td class="nowrap">minute 10<\/td><td class="num">4 people<\/td>/);
+  assert.match(chart, /<td class="num">—<\/td>/, 'a missing value is shown as missing');
+  // Counts get whole-number ticks: a top of three becomes four, halved at two.
+  assert.match(chart, />2<\/text>.*>4<\/text>/s);
+});
+
+test('time axes tick on round local times, and the day and week start at local midnight and Monday', () => {
+  const from = new Date(2026, 8, 24, 9, 7).getTime();
+  assert.deepEqual(
+    timeTicks(from, from + 3_600_000).map((at) => clock(at)),
+    ['09:15', '09:30', '09:45', '10:00'],
+  );
+  assert.deepEqual(
+    timeTicks(from, from + 6 * 3_600_000).map((at) => clock(at)),
+    ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00'],
+  );
+  assert.deepEqual(
+    timeTicks(from, from + 24 * 3_600_000).map((at) => clock(at)),
+    ['12:00', '18:00', '00:00', '06:00'],
+  );
+  const { day, week } = localWindows(new Date(2026, 8, 24, 15, 30).getTime());
+  assert.equal(day, new Date(2026, 8, 24).getTime());
+  assert.equal(week, new Date(2026, 8, 21).getTime(), '24 September 2026 is a Thursday');
 });

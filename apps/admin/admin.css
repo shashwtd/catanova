@@ -22,6 +22,7 @@
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
+  --series-4: #c98500;
   --radius: 8px;
   font-family:
     system-ui,
@@ -215,6 +216,9 @@ details.card[open] > summary {
   margin: 10px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+.footnote.first {
+  margin: 0 0 10px;
 }
 .empty {
   margin: 0;
@@ -704,6 +708,228 @@ details > summary {
 .swatch-reference {
   height: 2px;
   background: var(--ink);
+}
+
+/* Line charts: 2px lines, a dot at each end ringed in the surface colour,
+   a crosshair and tooltip, and a table of the numbers underneath. */
+.series-4 {
+  fill: var(--series-4);
+  background: var(--series-4);
+}
+.chart-frame {
+  overflow: hidden;
+}
+.line-chart svg {
+  overflow: visible;
+  touch-action: pan-y;
+}
+.line-chart svg:focus {
+  outline: none;
+}
+.line-chart svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart-key {
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.line-1 {
+  stroke: var(--series-1);
+}
+.line-2 {
+  stroke: var(--series-2);
+}
+.line-3 {
+  stroke: var(--series-3);
+}
+.line-4 {
+  stroke: var(--series-4);
+}
+.line-bg-1 {
+  background: var(--series-1);
+}
+.line-bg-2 {
+  background: var(--series-2);
+}
+.line-bg-3 {
+  background: var(--series-3);
+}
+.line-bg-4 {
+  background: var(--series-4);
+}
+.swatch-line {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+.chart-dot {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.dot-1 {
+  fill: var(--series-1);
+}
+.dot-2 {
+  fill: var(--series-2);
+}
+.dot-3 {
+  fill: var(--series-3);
+}
+.dot-4 {
+  fill: var(--series-4);
+}
+.chart-area {
+  opacity: 0.1;
+}
+.area-1 {
+  fill: var(--series-1);
+}
+.area-2 {
+  fill: var(--series-2);
+}
+.area-3 {
+  fill: var(--series-3);
+}
+.area-4 {
+  fill: var(--series-4);
+}
+.chart-axis-title,
+.chart-marker text {
+  fill: var(--muted);
+  font-size: 10.5px;
+}
+.chart-marker line {
+  stroke: var(--axis);
+  stroke-width: 1;
+}
+.chart-end-label {
+  fill: var(--ink-2);
+  font-size: 11px;
+}
+.chart-crosshair {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+}
+.chart-tip-box {
+  fill: var(--surface-3);
+  stroke: var(--line);
+}
+.chart-tip-title {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.chart-tip-value {
+  fill: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.chart-tip-name {
+  fill: var(--muted);
+  font-weight: 400;
+}
+.chart-table {
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+.chart-table summary {
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart-table-scroll {
+  max-height: 260px;
+  margin-top: 6px;
+  overflow: auto;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Overview: a row of headline numbers, then who is here and what is being played */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.kpi-value {
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.kpi-value a {
+  color: inherit;
+}
+.kpi .stat-hint {
+  margin-top: 2px;
+}
+.minis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 18px 22px;
+}
+.mini-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.mini-head h3 {
+  margin: 0;
+}
+.mini-now {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.more {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+}
+.report-lines li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 7px 0;
+}
+.report-name {
+  min-width: 96px;
+  font-weight: 600;
+}
+.error-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.error-line .message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Phones */

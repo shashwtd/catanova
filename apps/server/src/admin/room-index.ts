@@ -22,7 +22,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { isShortRoomCode, normalizeRoomReference } from '../../../../packages/protocol/src/room-reference.js';
 import { AdminRequestError } from './api.js';
 import { serverErrors } from './errors.js';
-import type { RoomStatus } from './types.js';
+import type { ActivitySummary, RoomStatus } from './types.js';
 
 export const ROOM_STATUSES: RoomStatus[] = ['lobby', 'live', 'paused', 'finished', 'empty'];
 export const GAMES_PAGE_SIZE = 25;
@@ -66,12 +66,69 @@ export type RoomListQuery = { status: RoomStatus | 'all'; q: string; page: numbe
 
 export type RoomList = { indexedAt: number; counts: RoomCounts; total: number; rooms: IndexedRoom[] };
 
+/** Games being played (live or paused), most recently active first, and how many there are. */
+export type LiveRooms = { indexedAt: number; total: number; rooms: IndexedRoom[] };
+
 export type RoomIndexQuery =
   | { kind: 'summary'; now: number }
   | { kind: 'list'; now: number; query: RoomListQuery }
+  | { kind: 'live'; now: number; limit: number }
+  | { kind: 'activity'; now: number; day: number; week: number }
   | { kind: 'accounts'; q: string };
 
-type Answer = RoomSummary | RoomList | string[];
+type Answer = RoomSummary | RoomList | LiveRooms | ActivitySummary | string[];
+
+/** How long a count of games and players is reused, whoever asks. */
+export const ACTIVITY_MAX_AGE_MS = 30_000;
+
+/**
+ * Games started and ended, and accounts that played, since two moments the
+ * page chooses (the start of its day and of its week), counted over every
+ * match record. Finished games have a winner; abandoned ones do not. A new
+ * player is an account whose first recorded game started in the window.
+ */
+export function countActivity(db: DatabaseSync, now: number, day: number, week: number): ActivitySummary {
+  const matches = `SELECT room_id, started_at, finished_at, winner FROM match_records
+    UNION ALL SELECT room_id, started_at, finished_at, winner FROM archived_matches`;
+  const games = db
+    .prepare(
+      `SELECT
+         coalesce(sum(started_at >= :day), 0) AS startedDay,
+         coalesce(sum(started_at >= :week), 0) AS startedWeek,
+         coalesce(sum(finished_at >= :day AND winner IS NOT NULL), 0) AS finishedDay,
+         coalesce(sum(finished_at >= :week AND winner IS NOT NULL), 0) AS finishedWeek,
+         coalesce(sum(finished_at >= :day AND winner IS NULL), 0) AS abandonedDay,
+         coalesce(sum(finished_at >= :week AND winner IS NULL), 0) AS abandonedWeek
+       FROM (${matches})`,
+    )
+    .get({ day, week }) as Record<string, number>;
+  const people = db
+    .prepare(
+      `WITH players AS (
+         SELECT p.user_id AS userId, m.started_at AS startedAt FROM (
+           SELECT room_id, user_id FROM match_participants
+           UNION ALL SELECT room_id, user_id FROM archived_participants
+         ) p JOIN (${matches}) m ON m.room_id = p.room_id
+         WHERE m.started_at IS NOT NULL
+       ), firsts AS (SELECT userId, min(startedAt) AS first FROM players GROUP BY userId)
+       SELECT
+         (SELECT count(DISTINCT userId) FROM players WHERE startedAt >= :day) AS playersDay,
+         (SELECT count(DISTINCT userId) FROM players WHERE startedAt >= :week) AS playersWeek,
+         (SELECT count(*) FROM firsts WHERE first >= :day) AS newDay,
+         (SELECT count(*) FROM firsts WHERE first >= :week) AS newWeek`,
+    )
+    .get({ day, week }) as Record<string, number>;
+  return {
+    countedAt: now,
+    day,
+    week,
+    started: { day: games.startedDay!, week: games.startedWeek! },
+    finished: { day: games.finishedDay!, week: games.finishedWeek! },
+    abandoned: { day: games.abandonedDay!, week: games.abandonedWeek! },
+    players: { day: people.playersDay!, week: people.playersWeek! },
+    newPlayers: { day: people.newDay!, week: people.newWeek! },
+  };
+}
 
 export type RoomIndexRequest = ({ id: number } & RoomIndexQuery) | { kind: 'invalidate' };
 
@@ -223,11 +280,44 @@ export class RoomIndexCache {
   invalidate(): void {
     this.pass = null;
     this.named.clear();
+    this.activities.clear();
   }
 
   answer(query: RoomIndexQuery): Answer {
-    if (query.kind === 'accounts') return matchingAccounts(this.db, query.q);
-    return query.kind === 'summary' ? this.summary(query.now) : this.list(query.now, query.query);
+    switch (query.kind) {
+      case 'accounts':
+        return matchingAccounts(this.db, query.q);
+      case 'summary':
+        return this.summary(query.now);
+      case 'live':
+        return this.live(query.now, query.limit);
+      case 'activity':
+        return this.activity(query.now, query.day, query.week);
+      default:
+        return this.list(query.now, query.query);
+    }
+  }
+
+  /** Games being played, most recently active first: the first `limit` of them. */
+  live(now: number, limit: number): LiveRooms {
+    const pass = this.current(now);
+    const rooms = pass.rooms.filter((room) => room.status === 'live' || room.status === 'paused');
+    return { indexedAt: pass.at, total: rooms.length, rooms: rooms.slice(0, limit) };
+  }
+
+  private readonly activities = new Map<string, { clock: number; value: ActivitySummary }>();
+
+  /** See countActivity; each pair of moments is counted at most every half minute. */
+  activity(now: number, day: number, week: number): ActivitySummary {
+    const clock = (this.options.clock ?? (() => performance.now()))();
+    const key = `${day}:${week}`;
+    const hit = this.activities.get(key);
+    if (hit && clock - hit.clock < ACTIVITY_MAX_AGE_MS) return hit.value;
+    const read = this.options.read ?? (<T>(work: () => T) => work());
+    const value = read(() => countActivity(this.db, now, day, week));
+    if (this.activities.size >= 8) this.activities.delete(this.activities.keys().next().value!);
+    this.activities.set(key, { clock, value });
+    return value;
   }
 
   summary(now: number): RoomSummary {
@@ -361,6 +451,15 @@ export class RoomIndex {
 
   list(now: number, query: RoomListQuery): Promise<RoomList> {
     return this.ask({ kind: 'list', now, query }) as Promise<RoomList>;
+  }
+
+  live(now: number, limit: number): Promise<LiveRooms> {
+    return this.ask({ kind: 'live', now, limit }) as Promise<LiveRooms>;
+  }
+
+  /** See countActivity. Scans every match record, so it runs here, off the game's thread. */
+  activity(now: number, day: number, week: number): Promise<ActivitySummary> {
+    return this.ask({ kind: 'activity', now, day, week }) as Promise<ActivitySummary>;
   }
 
   /** See `matchingAccounts`. Not cached: each search is typed by hand. */

@@ -13,6 +13,7 @@ import { whoIsOnline } from '../apps/server/src/admin/online.js';
 import type { AdminConfig } from '../apps/server/src/admin/config.js';
 import { chiSquarePValue, computeStats, diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
 import type {
+  AdminOverview,
   AdminStats,
   AdminSystem,
   AuditPage,
@@ -413,6 +414,83 @@ test('a room that played again dates its game from this round, not the first', a
   assert.ok(detail.rounds[0]!.startedAt! < detail.createdAt!);
   const listed = (await get<GamesPage>(`/api/admin/games?q=${store.roomCode(host.room_id)}`)).items[0]!;
   assert.equal(listed.createdAt, detail.createdAt);
+});
+
+test('Overview is the glance: who is online, the live games, today’s and this week’s games, and what needs a look', async (t) => {
+  const since = Date.now() - 5 * 60_000;
+  const { get, store, accounts, live, paused, statusDir } = await seeded(t, {
+    online: () => [{ userId: accounts.bob.id, name: 'Bob', guest: false, since, tabs: 1 }],
+  });
+  await writeFile(
+    join(statusDir, 'backup.json'),
+    JSON.stringify({ result: 'failure', reason: 'upload refused', timestamp: new Date().toISOString() }),
+  );
+  console.error('Overview test: a recent error');
+  const overview = await get<AdminOverview>('/api/admin/overview');
+  assert.equal(overview.revision, 'deadbeef');
+  assert.ok(overview.uptimeSeconds >= 0);
+  // The two local players at the live table, and Bob, seated at the paused table but not at it.
+  assert.equal(overview.online.accounts, true);
+  assert.deepEqual(overview.online.counts, {
+    online: 3,
+    playing: 2,
+    inLobbies: 0,
+    elsewhere: 1,
+    spectators: 0,
+  });
+  assert.deepEqual(
+    overview.online.people.map((person) => person.name),
+    ['Guest', 'Hostess', 'Bob'],
+  );
+  assert.ok(!('error' in overview.rooms));
+  const { countedAt, ...rooms } = overview.rooms;
+  assert.deepEqual(rooms, { live: 1, paused: 1, lobbies: 1 });
+  assert.ok(countedAt <= overview.now);
+  // Games being played, most recently active first, with the points the table sees.
+  assert.deepEqual(
+    overview.liveGames.map((game) => [game.roomId, game.status]),
+    [
+      [live, 'live'],
+      [paused, 'paused'],
+    ],
+  );
+  const pausedGame = store.loadGame(paused)!;
+  const listed = overview.liveGames[1]!;
+  assert.equal(listed.turn, pausedGame.turn);
+  assert.equal(listed.target, 10);
+  assert.deepEqual(
+    listed.players.map((player) => player.points),
+    pausedGame.players.map((player) => score(pausedGame, player, false)),
+  );
+  assert.ok(listed.startedAt! <= overview.now);
+  // Both matches started today (by UTC here, as no day was sent); none has ended.
+  assert.ok(!('error' in overview.activity));
+  assert.deepEqual(
+    [overview.activity.started, overview.activity.finished, overview.activity.abandoned],
+    [
+      { day: 2, week: 2 },
+      { day: 0, week: 0 },
+      { day: 0, week: 0 },
+    ],
+  );
+  assert.deepEqual(overview.activity.players, { day: 3, week: 3 });
+  assert.deepEqual(overview.activity.newPlayers, { day: 3, week: 3 });
+  assert.ok(overview.performance.rssBytes > 0 && overview.performance.sockets === 2);
+  assert.equal(overview.status.backup.state === 'ok' && overview.status.backup.data.result, 'failure');
+  assert.ok(overview.errors.recent.length <= 5 && overview.errors.total >= overview.errors.recent.length);
+  assert.match(overview.errors.recent[0]!.message, /Overview test: a recent error/);
+  assert.equal(overview.rejections, 0);
+  // The page sends the start of its own day and week; nonsense is refused, not counted.
+  const now = Date.now();
+  const custom = await get<AdminOverview>(`/api/admin/overview?day=${now - 60_000}&week=${now - 120_000}`);
+  assert.ok(!('error' in custom.activity));
+  assert.deepEqual([custom.activity.day, custom.activity.week], [now - 60_000, now - 120_000]);
+  assert.equal(custom.activity.started.week, 2, 'both started in the last two minutes');
+  const later = await get<AdminOverview>(`/api/admin/overview?day=${now + 30_000}&week=${now + 30_000}`);
+  assert.ok(!('error' in later.activity) && later.activity.started.week === 0, 'nothing after them');
+  await get(`/api/admin/overview?day=${now - 60_000}&week=${now}`, 400);
+  await get(`/api/admin/overview?day=${now - 30 * 86_400_000}`, 400);
+  await get('/api/admin/overview?day=yesterday', 400);
 });
 
 test('who is online merges the presence hub with the seats connected to rooms, and says where each one is', async (t) => {

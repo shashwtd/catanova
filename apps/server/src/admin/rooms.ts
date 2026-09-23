@@ -38,7 +38,7 @@ const time = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-type SeatRow = {
+export type SeatRow = {
   id: string;
   name: string;
   bot: number;
@@ -50,7 +50,7 @@ type SeatRow = {
   ready: number;
 };
 
-function seatRows(store: Store, roomId: string): SeatRow[] {
+export function seatRows(store: Store, roomId: string): SeatRow[] {
   return store.db
     .prepare(
       'SELECT id, name, bot, bot_level, departed, user_id, account_type, color, ready FROM seats WHERE room_id = ? ORDER BY rowid',
@@ -59,7 +59,7 @@ function seatRows(store: Store, roomId: string): SeatRow[] {
 }
 
 /** Opens a room's game, turning an unreadable save into a visible error rather than a failed page. */
-function openGame(store: Store, roomId: string): { game?: Game; error?: string } {
+export function openGame(store: Store, roomId: string): { game?: Game; error?: string } {
   try {
     const game = store.loadGame(roomId);
     return game ? { game } : {};
@@ -68,7 +68,7 @@ function openGame(store: Store, roomId: string): { game?: Game; error?: string }
   }
 }
 
-type Live = { connected: ReadonlySet<string>; standIns: ReadonlySet<string> };
+export type Live = { connected: ReadonlySet<string>; standIns: ReadonlySet<string> };
 
 function summarize(id: string, seat: SeatRow | undefined, game: Game | undefined, live: Live): SeatSummary {
   const player = game?.players.find((candidate) => candidate.id === id);
@@ -111,7 +111,7 @@ export function gameResult(game: Game): GameResult | null {
 }
 
 /** A started game's players in turn order; a lobby's seats still in it. */
-function tableSeats(seats: SeatRow[], game: Game | undefined, live: Live): SeatSummary[] {
+export function tableSeats(seats: SeatRow[], game: Game | undefined, live: Live): SeatSummary[] {
   const ids = game
     ? game.players.map((player) => player.id)
     : seats.filter((s) => !s.departed).map((s) => s.id);
@@ -130,7 +130,7 @@ function tableSeats(seats: SeatRow[], game: Game | undefined, live: Live): SeatS
  * round began. A room that returned to its lobby keeps the earlier rounds'
  * entries, so the room's very first entry dates the first round, not this one.
  */
-function roundStartedAt(store: Store, roomId: string): number | null {
+export function roundStartedAt(store: Store, roomId: string): number | null {
   const row = store.db
     .prepare(
       "SELECT json_extract(public_entry, '$.at') AS at FROM game_events WHERE room_id = ? AND revision > ? ORDER BY revision LIMIT 1",
@@ -139,7 +139,7 @@ function roundStartedAt(store: Store, roomId: string): number | null {
   return time(row?.at);
 }
 
-function liveState(context: AdminContext, roomId?: string): Live {
+export function liveState(context: AdminContext, roomId?: string): Live {
   const standIns = roomId
     ? context.store.standInIds(roomId)
     : context.store.db
