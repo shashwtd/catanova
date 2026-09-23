@@ -46,7 +46,8 @@ export type StatusFile =
   | { state: 'invalid'; error: string; modifiedAt: number | null }
   | { state: 'ok'; modifiedAt: number; data: Record<string, unknown> };
 
-export type AdminOverview = {
+/** The System tab: the process, load, sockets, rooms, database, disk, host reports and every recent error. */
+export type AdminSystem = {
   now: number;
   revision: string | null;
   process: {
@@ -89,6 +90,9 @@ export type AdminOverview = {
   errors: ServerErrorEntry[];
   rejections: AuthRejection[];
 };
+
+/** Overview answers the same as System until it becomes the dashboard. */
+export type AdminOverview = AdminSystem;
 
 export type RoomStatus = 'lobby' | 'live' | 'paused' | 'finished' | 'empty';
 

@@ -69,6 +69,10 @@ code {
   white-space: normal;
   word-break: break-all;
 }
+/* A file path or URL path: breaks anywhere rather than widening the page. */
+.path {
+  overflow-wrap: anywhere;
+}
 .muted {
   color: var(--muted);
 }
@@ -715,8 +719,10 @@ details > summary {
     gap: 6px 12px;
     padding: 8px 12px;
   }
+  /* Every section stays in view: the tabs wrap onto a second line rather than scroll off. */
   .nav {
     order: 3;
+    flex-wrap: wrap;
     width: 100%;
   }
   .page {

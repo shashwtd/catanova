@@ -1,7 +1,7 @@
 import type { AdminOverview, StatusFile } from '../../server/src/admin/types.js';
 import { useApi } from '../api.js';
 import { bytes, count, duration, percent, time } from '../format.js';
-import { HIDDEN_FIELDS, HOST_REPORTS, REPORT_FIELDS, reportVerdict, reportedAt } from '../host-reports.js';
+import { HOST_REPORTS, reportFields, reportVerdict, reportedAt } from '../host-reports.js';
 import { Badge, Empty, Failure, Loading, Notice, Section, Stat, Table, When } from '../ui.js';
 
 function StatusReport({
@@ -18,16 +18,7 @@ function StatusReport({
   now: number;
 }) {
   const verdict = reportVerdict(file, now, staleAfterMs);
-  const fields =
-    file.state === 'ok'
-      ? Object.entries(file.data)
-          .filter(([key]) => !HIDDEN_FIELDS.has(key))
-          .sort(
-            ([a], [b]) =>
-              (REPORT_FIELDS.indexOf(a) + 1 || 99) - (REPORT_FIELDS.indexOf(b) + 1 || 99) ||
-              a.localeCompare(b),
-          )
-      : [];
+  const fields = file.state === 'ok' ? reportFields(file) : [];
   return (
     <div className="status-report">
       <div className="status-title">
@@ -49,14 +40,10 @@ function StatusReport({
               <When at={reportedAt(file)} now={now} /> · runs {every}
             </dd>
           </div>
-          {fields.slice(0, 12).map(([key, value]) => (
-            <div key={key} className="pair">
-              <dt>{key}</dt>
-              <dd>
-                {typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-                  ? String(value)
-                  : JSON.stringify(value)}
-              </dd>
+          {fields.slice(0, 12).map((field) => (
+            <div key={field.key} className="pair">
+              <dt>{field.label}</dt>
+              <dd>{field.value}</dd>
             </div>
           ))}
         </dl>
@@ -177,7 +164,7 @@ export function Overview() {
             />
           )}
           <p className="footnote">
-            <code>{database.path}</code>
+            <code className="path">{database.path}</code>
           </p>
         </Section>
       </div>
@@ -195,7 +182,8 @@ export function Overview() {
           ))}
         </div>
         <p className="footnote">
-          Read from <code>{data.status.directory}</code>, where the host&rsquo;s scripts write them.
+          Read from <code className="path">{data.status.directory}</code>, where the host&rsquo;s scripts
+          write them.
         </p>
       </Section>
       <Section title={`Server errors (${data.errors.length})`} className="wide">
@@ -260,7 +248,7 @@ export function Overview() {
                   </td>
                   <td>{entry.ip ?? '—'}</td>
                   <td>
-                    <code>{entry.path}</code>
+                    <code className="path">{entry.path}</code>
                   </td>
                 </tr>
               ))}

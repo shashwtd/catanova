@@ -8,7 +8,7 @@ import type { AdminContext, ApiRoute } from './api.js';
 import { METRICS_RANGES, metricsHistory } from './metrics.js';
 import type { RuntimeMetrics } from './metrics.js';
 import type { MetricsRange } from './types.js';
-import { overview } from './overview.js';
+import { systemReport } from './system.js';
 import { ROOM_PARAM, endGame, gameDetail, gameHistory, listGames, privateGame } from './rooms.js';
 import { playerDetail, searchPlayers } from './players.js';
 import { feedbackRoutes } from './feedback.js';
@@ -32,7 +32,8 @@ export function coreRoutes(
   const room = (suffix = '') => new RegExp(`^/api/admin/games/${ROOM_PARAM}${suffix}$`);
   return [
     ...feedbackRoutes(context),
-    { method: 'GET', path: /^\/api\/admin\/overview$/, handle: () => overview(context, metrics, rooms) },
+    { method: 'GET', path: /^\/api\/admin\/overview$/, handle: () => systemReport(context, metrics, rooms) },
+    { method: 'GET', path: /^\/api\/admin\/system$/, handle: () => systemReport(context, metrics, rooms) },
     {
       // The in-memory performance history: a sample a minute since the process started, up to a day.
       method: 'GET',

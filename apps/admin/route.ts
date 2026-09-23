@@ -10,6 +10,7 @@ export const PAGES = [
   { id: 'players', label: 'Players' },
   { id: 'stats', label: 'Stats' },
   { id: 'feedback', label: 'Feedback' },
+  { id: 'system', label: 'System' },
   { id: 'audit', label: 'Audit' },
 ] as const;
 export type Page = (typeof PAGES)[number]['id'];

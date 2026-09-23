@@ -13,8 +13,8 @@ import { whoIsOnline } from '../apps/server/src/admin/online.js';
 import type { AdminConfig } from '../apps/server/src/admin/config.js';
 import { chiSquarePValue, computeStats, diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
 import type {
-  AdminOverview,
   AdminStats,
+  AdminSystem,
   AuditPage,
   Cached,
   GameDetail,
@@ -214,7 +214,7 @@ async function seeded(t: TestContext, options: { online?: () => OnlineAccount[] 
   };
 }
 
-test('overview reports the process, sockets, rooms, database, status files and recent errors', async (t) => {
+test('the System tab reports the process, sockets, rooms, database, status files and recent errors', async (t) => {
   const { get, store, statusDir, clients } = await seeded(t);
   console.error('Admin overview test: simulated failure', new Error('simulated storage fault'));
   // A move the database fails to save is answered as a storage error and kept for the console.
@@ -224,7 +224,7 @@ test('overview reports the process, sockets, rooms, database, status files and r
   };
   await assert.rejects(clients[0]!.action({ kind: 'roll' }), /Could not save the action/);
   store.action = action;
-  let overview = await get<AdminOverview>('/api/admin/overview');
+  let overview = await get<AdminSystem>('/api/admin/system');
   assert.ok(
     overview.errors.some(
       (entry) => entry.source === 'websocket' && /simulated SQLITE_FULL/.test(entry.message),
@@ -274,7 +274,7 @@ test('overview reports the process, sockets, rooms, database, status files and r
     join(statusDir, 'drill.json'),
     JSON.stringify({ ...backup, kind: 'drill', result: 'failure', reason: 'game verifier failed' }),
   );
-  overview = await get<AdminOverview>('/api/admin/overview');
+  overview = await get<AdminSystem>('/api/admin/system');
   assert.equal(overview.status.backup.state, 'ok');
   assert.deepEqual(overview.status.backup.state === 'ok' && overview.status.backup.data, backup);
   assert.equal(overview.status.watchdog.state, 'invalid');

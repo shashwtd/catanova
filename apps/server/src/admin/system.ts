@@ -1,10 +1,11 @@
 /**
- * Live operations at a glance: the process, its sockets and rooms, the
- * database and its disk, the host's backup and watchdog reports, and recent
- * errors. What runs on the game's thread is cheap enough to read every ten
- * seconds: PRAGMAs, file sizes and a few primary-key lookups. Anything that
- * grows with the database (room counts, journal rows) comes from the room
- * index's worker, and the page still loads if that is unavailable.
+ * The System tab: the process, its sockets and rooms, the database and its
+ * disk, the host's backup, watchdog and restore-drill reports, every recent
+ * error and refused request. What runs on the game's thread is cheap enough
+ * to read every ten seconds: PRAGMAs, file sizes and a few primary-key
+ * lookups. Anything that grows with the database (room counts, journal rows)
+ * comes from the room index's worker, and the page still loads if that is
+ * unavailable.
  */
 import { readFile, stat, statfs } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -12,7 +13,7 @@ import type { AdminContext } from './api.js';
 import type { RoomIndex, RoomSummary } from './room-index.js';
 import { serverErrors } from './errors.js';
 import type { RuntimeMetrics } from './metrics.js';
-import type { AdminOverview, StatusFile } from './types.js';
+import type { AdminSystem, StatusFile } from './types.js';
 
 const STATUS_FILE_LIMIT = 64 * 1024;
 
@@ -47,11 +48,21 @@ async function size(path: string): Promise<number | null> {
   }
 }
 
-export async function overview(
+/** The host's three reports, read fresh from the status directory. */
+export async function hostReports(directory: string): Promise<AdminSystem['status']> {
+  return {
+    directory,
+    backup: await readStatusFile(directory, 'backup.json'),
+    watchdog: await readStatusFile(directory, 'watchdog.json'),
+    drill: await readStatusFile(directory, 'drill.json'),
+  };
+}
+
+export async function systemReport(
   context: AdminContext,
   metrics: RuntimeMetrics,
   index: RoomIndex,
-): Promise<AdminOverview> {
+): Promise<AdminSystem> {
   const { store, runtime, config } = context;
   const now = context.now();
   let summary: RoomSummary | null = null;
@@ -68,7 +79,7 @@ export async function overview(
   const pragma = (name: string) =>
     Number(Object.values(store.db.prepare(`PRAGMA ${name}`).get() ?? {})[0] ?? 0);
   const file = context.databasePath === ':memory:' ? null : resolve(context.databasePath);
-  let disk: AdminOverview['disk'];
+  let disk: AdminSystem['disk'];
   const diskPath = file ? dirname(file) : process.cwd();
   try {
     const info = await statfs(diskPath);
@@ -127,12 +138,7 @@ export async function overview(
       journalRows: summary?.journalRows ?? null,
     },
     disk,
-    status: {
-      directory: config.statusDir,
-      backup: await readStatusFile(config.statusDir, 'backup.json'),
-      watchdog: await readStatusFile(config.statusDir, 'watchdog.json'),
-      drill: await readStatusFile(config.statusDir, 'drill.json'),
-    },
+    status: await hostReports(config.statusDir),
     errors: serverErrors.list(),
     rejections: context.rejections(),
   };
