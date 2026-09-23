@@ -83,8 +83,8 @@ Direct Google Analytics 4 uses measurement ID `G-NGHVNKN7FZ`. It replaces
 GTM-W4XDJ2N4; the GTM container script and noscript iframe are no longer injected.
 `apps/client/src/analytics.ts` generates `/analytics.js`, which asks for consent
 and only then loads Google's `gtag/js` and configures GA4. Only the public
-homepage and guide inject it; private app entry routes do not. No Google Tag
-Manager publication is needed.
+homepage, guide and privacy page inject it; private app entry routes do not. No
+Google Tag Manager publication is needed.
 
 The same-origin loader preserves the inline-script CSP restriction. It skips
 non-production hostnames and sets sanitized page URL defaults before loading
@@ -130,3 +130,10 @@ time. An answer given after the app has changed the address takes effect from th
 next public page load, because collection never resumes in a document once it has
 been disabled. **No thanks** also expires `_ga` and `_ga_*` cookies left from
 before consent was asked.
+
+The banner links to `/privacy/`, which says what is collected and carries the
+control for changing the answer later. That control is rendered hidden and the
+loader reveals and wires it, so where the loader does not run (another host, a
+build with measurement off, a blocker) no dead buttons are shown. The page's
+contact address is the placeholder `PRIVACY_CONTACT` in
+`apps/client/src/PublicPages.tsx`; the build warns until it is replaced.

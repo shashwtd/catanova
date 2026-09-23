@@ -14,7 +14,9 @@ import {
   PublicLanding,
   PublicMetadata,
   PublicArtPreloads,
+  PublicPrivacy,
   GUIDE_FAQ,
+  PRIVACY_CONTACT,
   PUBLIC_PAGES,
   REPOSITORY_URL,
   SITE_URL,
@@ -100,7 +102,7 @@ export async function renderPublicPages(directory: string) {
     !template.includes('<!-- analytics -->')
   )
     throw new Error('Expected the fresh Vite entry template before rendering public pages');
-  const metadata = (index: 0 | 1) =>
+  const metadata = (index: 0 | 1 | 2) =>
     renderToStaticMarkup(createElement(PublicMetadata, { page: PUBLIC_PAGES[index] }));
   /**
    * Measurement goes on the pages the public arrives at, and nowhere else.
@@ -141,6 +143,15 @@ export async function renderPublicPages(directory: string) {
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#123d43">${measured.head}${metadata(1)}${artPreloads}<link rel="stylesheet" href="/guide/guide.css"></head>
 <body>${measured.body}${renderToStaticMarkup(createElement(PublicGuide))}</body></html>\n`,
   );
+  // The privacy page shares the guide's stylesheet and, like it, ships no code
+  // of its own: its analytics control is wired up by the measurement loader.
+  await mkdir(join(directory, 'privacy'), { recursive: true });
+  await writeFile(
+    join(directory, 'privacy', 'index.html'),
+    `<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#123d43">${measured.head}${metadata(2)}<link rel="stylesheet" href="/guide/guide.css"></head>
+<body>${measured.body}${renderToStaticMarkup(createElement(PublicPrivacy))}</body></html>\n`,
+  );
   await writeFile(
     join(directory, 'robots.txt'),
     `${['*', ...CRAWLERS].map((agent) => `User-agent: ${agent}\nAllow: /\n`).join('\n')}\nSitemap: ${SITE_URL}/sitemap.xml\n`,
@@ -155,5 +166,9 @@ export async function renderPublicPages(directory: string) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await renderPublicPages(resolve('dist/client'));
-  console.info('Rendered public landing, guide and search discovery files.');
+  console.info('Rendered public landing, guide, privacy page and search discovery files.');
+  if (!PRIVACY_CONTACT.includes('@'))
+    console.warn(
+      `The privacy page still shows the placeholder contact "${PRIVACY_CONTACT}". Set PRIVACY_CONTACT in apps/client/src/PublicPages.tsx before deploying.`,
+    );
 }

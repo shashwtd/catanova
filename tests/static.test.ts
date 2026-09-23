@@ -35,6 +35,8 @@ test('one server serves client assets and same-origin WebSockets without exposin
   await writeFile(join(client, 'app.html'), '<!doctype html><title>Catanova room</title>');
   await mkdir(join(client, 'guide'));
   await writeFile(join(client, 'guide', 'index.html'), '<!doctype html><title>How to play Catanova</title>');
+  await mkdir(join(client, 'privacy'));
+  await writeFile(join(client, 'privacy', 'index.html'), '<!doctype html><title>Privacy at Catanova</title>');
   await writeFile(join(client, 'sitemap.xml'), '<urlset></urlset>');
   await writeFile(join(client, 'site.webmanifest'), '{"name":"Catanova"}');
   await writeFile(join(client, 'assets', 'game-123.js'), 'export const game = true;');
@@ -99,9 +101,16 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.match(await guide.text(), /How to play Catanova/);
   assert.match(guide.headers.get('content-type')!, /text\/html/);
   assert.equal(guide.headers.get('x-robots-tag'), null);
+  const privacy = await fetch(origin + '/privacy/');
+  assert.equal(privacy.status, 200);
+  assert.match(await privacy.text(), /Privacy at Catanova/);
+  assert.match(privacy.headers.get('content-type')!, /text\/html/);
+  assert.equal(privacy.headers.get('x-robots-tag'), null);
   for (const [path, target] of [
     ['/guide', '/guide/'],
     ['/guide/index.html', '/guide/'],
+    ['/privacy', '/privacy/'],
+    ['/privacy/index.html', '/privacy/'],
     ['/index.html', '/'],
     ['/index.html?room=ABCD2345', '/?room=ABCD2345'],
   ]) {

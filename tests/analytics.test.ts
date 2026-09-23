@@ -49,7 +49,7 @@ class FakeElement {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
   }
   click() {
-    for (const listener of this.listeners.get('click') ?? []) listener();
+    for (const listener of this.listeners.get('click') ?? []) listener.call(this);
   }
   find(match: (element: FakeElement) => boolean): FakeElement | undefined {
     for (const child of this.children) {
@@ -59,6 +59,47 @@ class FakeElement {
     }
     return undefined;
   }
+  /** Attribute selectors such as `[data-a]` and `[data-a] [data-b]`, which is all the loader asks for. */
+  querySelectorAll(selector: string): FakeElement[] {
+    const parts = selector.trim().split(/\s+/);
+    const has = (node: FakeElement | null, part: string) =>
+      !!node && node.attributes.has(/^\[([a-z-]+)\]$/.exec(part)?.[1] ?? '');
+    const found: FakeElement[] = [];
+    const visit = (node: FakeElement) => {
+      for (const child of node.children) {
+        if (has(child, parts.at(-1)!)) {
+          let rest = parts.slice(0, -1);
+          for (let up = child.parentNode; rest.length && up; up = up.parentNode)
+            if (has(up, rest.at(-1)!)) rest = rest.slice(0, -1);
+          if (!rest.length) found.push(child);
+        }
+        visit(child);
+      }
+    };
+    visit(this);
+    return found;
+  }
+}
+
+function element(tag: string, attributes: Record<string, string> = {}, hidden = false) {
+  const node = new FakeElement(tag);
+  for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+  node.hidden = hidden;
+  return node;
+}
+
+/** The analytics control exactly as the privacy page renders it: hidden, one line per answer. */
+function privacyControl() {
+  const control = element('div', { 'data-consent-control': '' }, true);
+  const states = element('div', { 'aria-live': 'polite' });
+  for (const state of ['unset', 'granted', 'denied'])
+    states.appendChild(element('p', { 'data-consent-state': state }, state !== 'unset'));
+  const actions = element('div');
+  for (const choice of ['granted', 'denied'])
+    actions.appendChild(element('button', { 'data-consent-choice': choice }));
+  control.appendChild(states);
+  control.appendChild(actions);
+  return control;
 }
 
 type Storage = { getItem(key: string): string | null; setItem(key: string, value: string): void };
@@ -69,7 +110,8 @@ function page({
   stored,
   storage,
   cookies = '',
-}: { pathname?: string; stored?: string; storage?: 'throws'; cookies?: string } = {}) {
+  privacy = false,
+}: { pathname?: string; stored?: string; storage?: 'throws'; cookies?: string; privacy?: boolean } = {}) {
   const location = { hostname: 'catanova.io', origin: 'https://catanova.io', pathname };
   const saved = new Map<string, string>(stored ? [[CONSENT_STORAGE_KEY, stored]] : []);
   const listeners = new Map<string, { callback: () => void; capture: boolean }>();
@@ -99,9 +141,11 @@ function page({
       getItem: (key: string) => saved.get(key) ?? null,
       setItem: (key: string, value: string) => void saved.set(key, value),
     } satisfies Storage;
-  const head = new FakeElement('head');
-  const body = new FakeElement('body');
+  const root = new FakeElement('html');
+  const head = root.appendChild(new FakeElement('head'));
+  const body = root.appendChild(new FakeElement('body'));
   head.appendChild(new FakeElement('script'));
+  if (privacy) body.appendChild(privacyControl());
   const cookieWrites: string[] = [];
   const document = {
     title: 'Catanova',
@@ -116,6 +160,7 @@ function page({
     },
     createElement: (tag: string) => new FakeElement(tag),
     getElementsByTagName: (tag: string) => head.children.filter((node) => node.tagName === tag),
+    querySelectorAll: (selector: string) => root.querySelectorAll(selector),
     addEventListener() {},
   };
   const script = analyticsLoader('G-TEST');
@@ -129,7 +174,26 @@ function page({
   const banner = () => body.find((node) => node.className === 'consent-banner');
   const button = (choice: string) =>
     banner()?.find((node) => node.getAttribute('data-consent-choice') === choice);
+  const control = () => body.querySelectorAll('[data-consent-control]')[0];
   return {
+    control,
+    /** What the privacy page's control says now: the visible answer, and which button is pressed. */
+    shown() {
+      const current = control()!;
+      return {
+        states: current
+          .querySelectorAll('[data-consent-state]')
+          .filter((node) => !node.hidden)
+          .map((node) => node.getAttribute('data-consent-state')),
+        pressed: current
+          .querySelectorAll('[data-consent-choice]')
+          .map((node) => `${node.getAttribute('data-consent-choice')}:${node.getAttribute('aria-pressed')}`),
+      };
+    },
+    controlButton: (choice: string) =>
+      control()!
+        .querySelectorAll('[data-consent-choice]')
+        .find((node) => node.getAttribute('data-consent-choice') === choice)!,
     window,
     history,
     location,
@@ -197,6 +261,8 @@ test('nothing reaches Google until the visitor allows it, and the answer is reme
   const banner = visit.showBanner()!;
   assert.equal(banner.tagName, 'section');
   assert.match(banner.find((node) => node.tagName === 'p')!.textContent, /Google Analytics/);
+  const privacy = banner.find((node) => node.tagName === 'a')!;
+  assert.deepEqual([privacy.href, privacy.textContent], ['/privacy/', 'Privacy']);
   assert.equal(visit.button('granted')?.textContent, 'Allow analytics');
   assert.equal(visit.button('denied')?.textContent, 'No thanks');
   visit.button('granted')!.click();
@@ -300,6 +366,7 @@ test('collection stops before other history wrappers run and stays off after ret
     body: new FakeElement('body'),
     createElement: (tag: string) => new FakeElement(tag),
     getElementsByTagName: () => head.children,
+    querySelectorAll: () => [],
   };
   runInNewContext(analyticsLoader('G-TEST'), { window, document, location });
   assert.equal(window['ga-disable-G-TEST'], undefined, 'public landing still measures');
@@ -325,5 +392,40 @@ test('a loader delayed until after entry into the app never loads Google', () =>
     });
     assert.deepEqual(window, {}, pathname);
   }
-  assert.deepEqual([...MEASURED_PATHS], ['/', '/guide/']);
+  assert.deepEqual([...MEASURED_PATHS], ['/', '/guide/', '/privacy/']);
+});
+
+test('the privacy page control shows the stored answer and changes it later', () => {
+  const visit = page({ pathname: '/privacy/', privacy: true, stored: 'granted', cookies: '_ga=GA1.1.1' });
+  assert.equal(visit.control()!.hidden, false, 'revealed only once the loader can make it work');
+  assert.deepEqual(visit.shown(), { states: ['granted'], pressed: ['granted:true', 'denied:false'] });
+  assert.equal(visit.tags().length, 1);
+  assert.equal(visit.stylesheet(), undefined, 'somebody who answered is not asked here either');
+  visit.controlButton('denied').click();
+  assert.equal(visit.saved.get(CONSENT_STORAGE_KEY), 'denied');
+  assert.deepEqual(visit.shown(), { states: ['denied'], pressed: ['granted:false', 'denied:true'] });
+  const update = visit
+    .commands()
+    .filter((event) => event[0] === 'consent' && event[1] === 'update')
+    .at(-1)!;
+  assert.equal(JSON.stringify(update[2]), '{"analytics_storage":"denied"}');
+  assert.equal(visit.window['ga-disable-G-TEST'], true, 'the tag already running stops collecting');
+  assert.deepEqual(visit.cookieWrites, [
+    '_ga=; Max-Age=0; path=/',
+    '_ga=; Max-Age=0; path=/; domain=catanova.io',
+  ]);
+});
+
+test('an unanswered visitor to the privacy page can answer in the banner or the control', () => {
+  const visit = page({ pathname: '/privacy/', privacy: true });
+  assert.deepEqual(visit.shown(), { states: ['unset'], pressed: ['granted:false', 'denied:false'] });
+  assert.ok(visit.showBanner());
+  visit.controlButton('granted').click();
+  assert.equal(visit.banner(), undefined, 'answering in the control also answers the banner');
+  assert.deepEqual(visit.shown(), { states: ['granted'], pressed: ['granted:true', 'denied:false'] });
+  assert.equal(visit.tags().length, 1);
+  const banner = page({ pathname: '/privacy/', privacy: true });
+  banner.showBanner();
+  banner.button('denied')!.click();
+  assert.deepEqual(banner.shown().states, ['denied'], 'and the banner updates the control');
 });

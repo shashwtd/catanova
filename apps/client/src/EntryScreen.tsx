@@ -351,6 +351,7 @@ export function EntryScreen({
             <GitHubMark />
             Open on GitHub
           </a>
+          <a href="/privacy/">Privacy</a>
         </footer>
       </div>
       {homeMenu && !auth.canPlay && (

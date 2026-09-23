@@ -15,7 +15,7 @@ export const PRIVATE_PREFIXES = ['/room', '/join', '/invite', '/auth'] as const;
  * navigation, which the loader watches: collection stops and the question
  * goes with it.
  */
-export const MEASURED_PATHS = ['/', '/guide/'] as const;
+export const MEASURED_PATHS = ['/', '/guide/', '/privacy/'] as const;
 
 /** Where a visitor's answer is kept in this browser: `granted` or `denied`. */
 export const CONSENT_STORAGE_KEY = 'catanova.analytics-consent';
@@ -41,7 +41,8 @@ export function publicPath(pathname: string): string {
  * Google Consent Mode v2 defaults every purpose to denied, and Google's tag is
  * not even fetched until the visitor answers yes: before that, nothing is sent
  * to Google at all. The answer is remembered in local storage, whose every
- * access is guarded because a private window or blocked site data can throw.
+ * access is guarded because a private window or blocked site data can throw,
+ * and the privacy page's control, which this script reveals, changes it.
  */
 export function analyticsLoader(measurementId: string): string {
   if (!/^G-[A-Z0-9]+$/.test(measurementId)) throw new Error('Invalid GA4 measurement ID');
@@ -139,6 +140,21 @@ export function analyticsLoader(measurementId: string): string {
       document.cookie = name + '=; Max-Age=0; path=/; domain=' + domain;
     });
   }
+  // The privacy page's control: hidden until this script can make it work.
+  function reflect() {
+    var current = choice() || 'unset';
+    var controls = document.querySelectorAll('[data-consent-control]');
+    for (var i = 0; i < controls.length; i++) {
+      controls[i].hidden = false;
+      var states = controls[i].querySelectorAll('[data-consent-state]');
+      for (var j = 0; j < states.length; j++)
+        states[j].hidden = states[j].getAttribute('data-consent-state') !== current;
+      var buttons = controls[i].querySelectorAll('[data-consent-choice]');
+      for (var k = 0; k < buttons.length; k++)
+        buttons[k].setAttribute('aria-pressed',
+          String(buttons[k].getAttribute('data-consent-choice') === current));
+    }
+  }
   function choose(value) {
     answered = value;
     try {
@@ -147,6 +163,16 @@ export function analyticsLoader(measurementId: string): string {
     dismiss();
     if (value === 'granted') grant();
     else revoke();
+    reflect();
+  }
+  function listen(button) {
+    var value = button.getAttribute('data-consent-choice') === 'granted' ? 'granted' : 'denied';
+    button.addEventListener('click', function () { choose(value); });
+  }
+  function wire() {
+    var buttons = document.querySelectorAll('[data-consent-control] [data-consent-choice]');
+    for (var i = 0; i < buttons.length; i++) listen(buttons[i]);
+    reflect();
   }
   function ask() {
     if (choice() || pages.indexOf(location.pathname) < 0) return;
@@ -161,7 +187,11 @@ export function analyticsLoader(measurementId: string): string {
       banner.setAttribute('aria-label', 'Analytics');
       var text = document.createElement('p');
       text.textContent = 'May we use Google Analytics to count visits? ' +
-        'It runs only on these public pages, never in your games.';
+        'It runs only on these public pages, never in your games. ';
+      var more = document.createElement('a');
+      more.href = '/privacy/';
+      more.textContent = 'Privacy';
+      text.appendChild(more);
       var actions = document.createElement('div');
       actions.className = 'consent-actions';
       [['granted', 'Allow analytics'], ['denied', 'No thanks']].forEach(function (option) {
@@ -179,8 +209,12 @@ export function analyticsLoader(measurementId: string): string {
     document.head.appendChild(style);
   }
   if (choice() === 'granted') grant();
-  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ask);
-  else ask();
+  function ready() {
+    wire();
+    ask();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
+  else ready();
 })(window, document);
 `;
 }

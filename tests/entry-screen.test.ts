@@ -123,6 +123,7 @@ test('the landing footer provides crawlable guidance and an explicit external Gi
   );
   assert.ok(html.includes('src="/art/providers/github-invertocat-white.svg"'));
   assert.ok(html.includes('Open on GitHub'));
+  assert.ok(html.includes('<a href="/privacy/">Privacy</a>'), 'the privacy page is one tap from the landing');
 });
 
 test('the small island loader appears only for pending connection or room work and exposes its status', () => {

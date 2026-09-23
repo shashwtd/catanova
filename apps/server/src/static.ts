@@ -65,6 +65,9 @@ function matchesETag(header: string | undefined, etag: string) {
   });
 }
 
+/** Pre-rendered public pages kept as a directory index; each has one canonical address. */
+const PAGE_DIRECTORIES = ['/guide/', '/privacy/'];
+
 /** Same-origin distribution. Only the built client directory is ever exposed. */
 /** Off when the site was built with `GA_MEASUREMENT_ID=off`, so the policy matches the pages. */
 const analyticsEnabled = process.env.GA_MEASUREMENT_ID !== 'off';
@@ -97,8 +100,12 @@ export async function serveClient(
     return;
   }
   if (privateEntry) response.setHeader('X-Robots-Tag', 'noindex, nofollow');
-  if (path === '/guide' || path === '/index.html' || path === '/guide/index.html') {
-    response.writeHead(308, { Location: `${path === '/index.html' ? '/' : '/guide/'}${search}` }).end();
+  const canonicalPage =
+    path === '/index.html'
+      ? '/'
+      : PAGE_DIRECTORIES.find((page) => path === page.slice(0, -1) || path === `${page}index.html`);
+  if (canonicalPage) {
+    response.writeHead(308, { Location: `${canonicalPage}${search}` }).end();
     return;
   }
   // Internal app shell keeps invite/OAuth entry free of a misleading home-menu flash.
@@ -122,8 +129,8 @@ export async function serveClient(
     ? privateEntry
       ? '/app.html'
       : '/index.html'
-    : path === '/guide/'
-      ? '/guide/index.html'
+    : PAGE_DIRECTORIES.includes(path)
+      ? `${path}index.html`
       : path;
   const root = resolve(directory),
     file = resolve(root, `.${assetPath}`);
