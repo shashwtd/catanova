@@ -27,7 +27,8 @@ function room(store: Store, count = 3, timed = false, setup = false) {
   const host = store.enter('create', sessions[0]!.token, sessions[0]!.name);
   const seats = [host, ...sessions.slice(1).map((s) => store.enter('join', s.token, s.name, host.room_id))];
   for (const seat of seats) store.setConnected(seat, true);
-  if (timed) store.configureSettings(host, 'timer-settings', 0, { turnTimerSeconds: 90 });
+  // New rooms default to a 90-second timer; untimed tests switch it off.
+  store.configureSettings(host, 'timer-settings', 0, { turnTimerSeconds: timed ? 90 : null });
   store.action(host, 'start-game', readyLobby(store, host.room_id), { kind: 'start' });
   if (!setup) finishSetup(store, host.room_id);
   const order = store.loadGame(host.room_id)!.players.map((p) => p.id);
