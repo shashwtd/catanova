@@ -7,12 +7,14 @@ import {
   GameIcon,
   History,
   Maximize,
+  MessageSquare,
   Minimize,
   Settings2,
   Wifi,
   X,
 } from './GameIcons.js';
-export type GameToolPanel = 'connection' | 'statistics' | 'journal' | 'rules' | 'settings' | 'leave';
+export type GameToolPanel =
+  'connection' | 'statistics' | 'journal' | 'rules' | 'settings' | 'feedback' | 'leave';
 export function GameTools({
   panel,
   onPanel,
@@ -64,6 +66,12 @@ export function GameTools({
     },
     { key: 'rules', label: 'How to play', icon: <CircleHelp />, action: () => togglePanel('rules') },
     { key: 'settings', label: 'Settings', icon: <Settings2 />, action: () => togglePanel('settings') },
+    {
+      key: 'feedback',
+      label: 'Send feedback',
+      icon: <MessageSquare />,
+      action: () => togglePanel('feedback'),
+    },
     { key: 'leave', label: 'Leave game', icon: <DoorOpen />, action: onLeave },
   ];
   return (

@@ -22,6 +22,7 @@ import {
 import { useEffect, useRef, useState, useId } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { RoomPreview, RoomState } from '../../../packages/protocol/src/index.js';
+import { roomHostId } from '../../../packages/protocol/src/room-host.js';
 import {
   PLAYER_COLORS,
   PLAYER_COLOR_LABEL,
@@ -351,9 +352,10 @@ export function Lobby({
   const [removalError, setRemovalError] = useState('');
   const removalTarget = room.players.find((p) => p.id === removing);
   const self = room.players.find((p) => p.id === me),
-    host = room.players[0]?.id === me;
+    hostId = roomHostId(room.players),
+    host = hostId === me;
   const canStart =
-    room.players.length >= 2 && room.players.every((p, i) => p.connected && (i === 0 || p.ready));
+    room.players.length >= 2 && room.players.every((p) => p.connected && (p.id === hostId || p.ready));
   // Everyone here, then one place to fill. Four permanent slots would make a
   // game of two look short-handed, and the old alternative — a tile a quarter
   // the size of a seat, off at the end of the row — did not read as a seat at
@@ -491,7 +493,7 @@ export function Lobby({
                   <span className={`seat-status ${p.ready && p.connected && !p.bot ? 'is-ready' : ''}`}>
                     {!p.connected ? (
                       'Disconnected'
-                    ) : i === 0 ? (
+                    ) : p.id === hostId ? (
                       'Host'
                     ) : p.bot ? (
                       // Not which one: you find that out by playing them.

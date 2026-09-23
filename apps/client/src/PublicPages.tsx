@@ -45,7 +45,24 @@ export const PUBLIC_PAGES = [
     description:
       'Create a room, invite friends and learn what everything costs. A short guide to your first game of Catanova, from the opening placements to the tenth point.',
   },
+  {
+    path: '/privacy/',
+    title: 'Privacy at Catanova: what we keep and who handles it',
+    description:
+      'What Catanova keeps when you play, which services help run it, how to turn analytics on or off, and how to ask for your data to be deleted.',
+  },
 ] as const;
+
+/**
+ * Where people write about their data.
+ *
+ * Cloudflare Email Routing forwards every catanova.io address to the owner's
+ * own inbox, so the page names none of their personal addresses. The build
+ * warns if this is ever not an address.
+ */
+export const PRIVACY_CONTACT = 'privacy@catanova.io';
+/** The date the privacy page last changed, shown on the page and in its structured data. */
+export const PRIVACY_UPDATED = { text: '23 September 2026', iso: '2026-09-23' } as const;
 
 /**
  * The questions people actually arrive with.
@@ -172,7 +189,19 @@ function structuredData(page: (typeof PUBLIC_PAGES)[number]) {
           },
           game,
         ]
-      : [game];
+      : page.path === '/privacy/'
+        ? [
+            {
+              '@type': 'WebPage',
+              '@id': `${SITE_URL}/privacy/#page`,
+              name: page.title,
+              description: page.description,
+              url: `${SITE_URL}/privacy/`,
+              inLanguage: 'en',
+              dateModified: PRIVACY_UPDATED.iso,
+            },
+          ]
+        : [game];
   return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph });
 }
 
@@ -743,10 +772,10 @@ export function PublicGuide() {
             <details className="guide-detail">
               <summary>The optional turn timer</summary>
               <p>
-                The host can leave it off or choose 40, 65, 90, 115 or 140 seconds. When a turn expires the
-                server completes whatever the rules require, using valid defaults, and ends the turn. It does
-                not buy pieces or accept trades on your behalf. Setup placements are untimed, and a required
-                discard has its own countdown.
+                New rooms start at 90 seconds; the host can choose 40, 65, 115 or 140 instead, or switch it
+                off. When a turn expires the server completes whatever the rules require, using valid
+                defaults, and ends the turn. It does not buy pieces or accept trades on your behalf. Setup
+                placements are untimed, and a required discard has its own countdown.
               </p>
             </details>
           </section>
@@ -1062,10 +1091,10 @@ export function PublicGuide() {
                         </span>
                         Turn timer
                       </th>
-                      <td>Off</td>
+                      <td>90 seconds</td>
                       <td>
-                        Switched on, a turn lasts 40, 65, 90, 115 or 140 seconds, and the game plays a
-                        sensible move for anyone who runs out.
+                        A turn lasts 40, 65, 90, 115 or 140 seconds, or the host switches the timer off. The
+                        game plays a sensible move for anyone who runs out.
                       </td>
                     </tr>
                     <tr>
@@ -1075,7 +1104,7 @@ export function PublicGuide() {
                         </span>
                         Natural or balanced dice
                       </th>
-                      <td>Natural</td>
+                      <td>Balanced</td>
                       <td>
                         Natural is two ordinary dice: every roll independent, seven the most common total.
                         Balanced draws from a deck of all thirty-six dice pairs, removing each drawn pair
@@ -1364,6 +1393,7 @@ export function PublicGuide() {
               <span>
                 Costs, deck and piece counts on this page are generated from the rules the server runs
               </span>
+              <a href="/privacy/">Privacy</a>
               <a className="guide-back-top" href="#guide-content">
                 Back to top
               </a>
@@ -1371,6 +1401,184 @@ export function PublicGuide() {
           </footer>
         </main>
       </div>
+    </>
+  );
+}
+
+/** Every service that handles data for Catanova, and what it does. */
+const PRIVACY_SERVICES = [
+  [
+    'Supabase',
+    'Accounts and sign-in: the email address of your Google account if you use Google, and your username, avatar and friends.',
+  ],
+  ['Microsoft Azure', 'Hosts our game server and its database, in the Central India region.'],
+  ['Cloudflare Turnstile', 'Checks that a new guest is a person when you choose Play as guest.'],
+  ['Google Analytics 4', 'Counts visits to the home page, the guide and this page, only if you allow it.'],
+  [
+    'TypeSafe',
+    'Works out moves for bots from the state of the game. Bot requests carry that game state, not your name or email.',
+  ],
+] as const;
+
+/**
+ * What Catanova keeps, who else handles it, and how to have it deleted.
+ *
+ * Every sentence is a claim about the code, and each one can be traced to it:
+ * `supabase/schema.sql` for accounts, friends and the seven-day guest expiry,
+ * the game server's SQLite store for games, last-seen times and the switch
+ * that hides them, the room access limits for IP addresses, and `analytics.ts`
+ * for the consent control below, which that loader wires up. Change one of
+ * those and this page has to change with it.
+ */
+export function PublicPrivacy() {
+  return (
+    <>
+      <a className="guide-skip" href="#privacy-content">
+        Skip to content
+      </a>
+      <header className="guide-bar">
+        <a className="guide-brand" href="/" aria-label="Catanova home">
+          <BrandLogo />
+        </a>
+        <p className="guide-bar-title" aria-hidden="true">
+          Privacy
+        </p>
+        <a className="guide-play" href="/">
+          Play with friends <GameIcon name="next" size={20} />
+        </a>
+      </header>
+      <main id="privacy-content" className="privacy-page">
+        <p className="guide-breadcrumb">
+          <a href="/">Catanova</a>
+          <span aria-hidden="true">›</span>
+          Privacy
+        </p>
+        <h1>Privacy</h1>
+        <p className="guide-subtitle">Last updated: {PRIVACY_UPDATED.text}</p>
+        <p className="guide-lead">
+          Catanova is a free game you play in your browser. This page lists what it keeps about you, the
+          services that help run it, and how to have your data deleted.
+        </p>
+        <section aria-labelledby="privacy-keep">
+          <div className="guide-heading">
+            <h2 id="privacy-keep">What we keep</h2>
+          </div>
+          <ul className="privacy-list">
+            <li>
+              <strong>Your account.</strong> Signing in goes through Supabase. If you continue with Google,
+              that includes the email address of your Google account; Catanova does not use your Google name
+              or photo. Supabase also keeps the username and avatar you choose, and your friends list.
+            </li>
+            <li>
+              <strong>Guest profiles.</strong> A guest profile expires after seven days without activity. Its
+              username and avatar are then deleted, and the name can be taken again. Games it played stay in
+              our game records.
+            </li>
+            <li>
+              <strong>Your games.</strong> Our own server keeps every game you play: each move, the result and
+              who played, linked to your account. That is what lets you reconnect and see your match history.
+              These records are not deleted automatically.
+            </li>
+            <li>
+              <strong>What other players see.</strong> Your username and avatar appear at the table, and
+              players signed in with Google can find you by username. Friends see whether you are online and
+              can watch a game you are playing. They also see how long ago you were last online, unless you
+              turn off <em>Show when you were last online</em> in Settings, under Privacy.
+            </li>
+            <li>
+              <strong>IP addresses.</strong> Our server holds your IP address briefly in memory to limit how
+              often requests can be made. It never writes it to the game database.
+            </li>
+            <li>
+              <strong>Visits to these pages.</strong> Only if you allow analytics. See{' '}
+              <a href="#analytics">Analytics</a>.
+            </li>
+            <li>
+              <strong>In your browser.</strong> Your sign-in session, the seat you are playing, your settings
+              and your analytics answer are kept in this browser’s storage. Catanova itself sets no cookies.
+            </li>
+          </ul>
+        </section>
+        <section aria-labelledby="privacy-services">
+          <div className="guide-heading">
+            <h2 id="privacy-services">Who else handles it</h2>
+          </div>
+          <figure className="guide-table-figure">
+            <figcaption>Services that handle data for Catanova</figcaption>
+            <div className="guide-table-scroll">
+              <table className="guide-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Service</th>
+                    <th scope="col">What it does</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PRIVACY_SERVICES.map(([name, role]) => (
+                    <tr key={name}>
+                      <th scope="row">{name}</th>
+                      <td>{role}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </figure>
+        </section>
+        <section id="analytics" className="privacy-section" aria-labelledby="privacy-analytics">
+          <div className="guide-heading">
+            <h2 id="privacy-analytics">Analytics</h2>
+          </div>
+          <p>
+            If you allow it, Google Analytics records visits to the home page, the guide and this page, with
+            the usual details it collects about your device and browser, and sets its own cookies. Room codes,
+            invitation links and the page you came from are removed first, and it never runs in rooms or
+            games. Until you allow it, Google’s analytics code is not loaded at all.
+          </p>
+          <div className="privacy-choice" data-consent-control="" hidden>
+            <div aria-live="polite">
+              <p data-consent-state="unset">Not chosen yet. Nothing is measured until you allow it.</p>
+              <p data-consent-state="granted" hidden>
+                Allowed. Google Analytics counts your visits to these pages.
+              </p>
+              <p data-consent-state="denied" hidden>
+                Not allowed. Nothing is measured.
+              </p>
+            </div>
+            <div className="privacy-choice-actions">
+              <button type="button" data-consent-choice="granted">
+                Accept all
+              </button>
+              <button type="button" data-consent-choice="denied">
+                Deny
+              </button>
+            </div>
+          </div>
+          <noscript>
+            <p className="guide-caption">
+              With JavaScript turned off, Google Analytics cannot run, so there is nothing to choose.
+            </p>
+          </noscript>
+        </section>
+        <section aria-labelledby="privacy-delete">
+          <div className="guide-heading">
+            <h2 id="privacy-delete">Deleting your data</h2>
+          </div>
+          <p>
+            There is no delete button yet. To have your account or your games deleted, or to ask what we hold
+            about you, email <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a> with your username.
+          </p>
+        </section>
+        <footer className="guide-footer">
+          <p>
+            Catanova is open source, and the code this page describes is{' '}
+            <a href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
+              on GitHub
+            </a>
+            . New to the game? Read <a href="/guide/">how to play</a>.
+          </p>
+        </footer>
+      </main>
     </>
   );
 }

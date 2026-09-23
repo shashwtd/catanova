@@ -40,7 +40,7 @@ The four general ports and five specialized ports are shuffled independently ove
 | 6 or 8 || 5 out of 36 || 5
 |}
 
-Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. There is no forced dice balancing or catch-up production bonus.
+Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. New rooms use Balanced dice, which draw from a deck of the 36 dice combinations so short games stay closer to the usual curve; the host can choose Natural dice instead. Neither gives any player a catch-up bonus.
 
 == Preset status ==
 This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.

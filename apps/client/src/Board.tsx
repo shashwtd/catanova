@@ -290,6 +290,94 @@ const BoardScenery = memo(function BoardScenery({
 });
 
 /**
+ * The harbours never change during a game either, but they draw above the tiles
+ * and below the pieces, so they cannot join the scenery layer. Memoised on the
+ * board, their 374 SVG nodes are built once instead of on every board update.
+ */
+const BoardHarbors = memo(function BoardHarbors({ board }: { board: Island }) {
+  return board.ports.map((port) => {
+    const p = portPlacement(board, port.edge),
+      n = SPRITE_INDEX[port.resource];
+    return (
+      <g
+        key={port.edge}
+        className="harbor"
+        aria-label={
+          port.resource === 'any'
+            ? 'General harbor. Three of any one resource for one other resource.'
+            : RESOURCE_NAMES[port.resource] + ' harbor. Two for one.'
+        }
+      >
+        <title>{`${
+          port.resource === 'any' ? 'General 3:1 harbor' : RESOURCE_NAMES[port.resource] + ' 2:1 harbor'
+        } · Build at either bridge entrance`}</title>
+        {p.bridges.map((bridge, i) => {
+          const dx = bridge.to.x - bridge.from.x,
+            dy = bridge.to.y - bridge.from.y,
+            length = Math.hypot(dx, dy);
+          return (
+            <g
+              key={i}
+              data-port-entrance={i}
+              transform={`translate(${bridge.from.x},${bridge.from.y}) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI})`}
+            >
+              <rect className="pier-shadow" x="0" y="-2.5" width={length} height="7" rx="1" />
+              <rect className="pier-deck" x="0" y="-3" width={length} height="6" />
+              {Array.from({ length: Math.ceil(length / 5) }, (_, j) => (
+                <path key={j} className="pier-plank" d={`M${j * 5} -3V3`} />
+              ))}
+              <path className="pier-rail" d={`M2 -3.5H${length}M2 3.5H${length}`} />
+              {[2, length - 2].map((j) => (
+                <g key={j}>
+                  <circle className="pier-post" cx={j} cy="-3.5" r="1.3" />
+                  <circle className="pier-post" cx={j} cy="3.5" r="1.3" />
+                </g>
+              ))}
+            </g>
+          );
+        })}
+        <g className="port-boat" transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
+          <svg
+            x={-SHIP_SIZE / 2}
+            y={-SHIP_SIZE / 2}
+            width={SHIP_SIZE}
+            height={SHIP_SIZE}
+            viewBox="1536 512 512 512"
+          >
+            <image href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp" width="2048" height="1024" />
+          </svg>
+        </g>
+        <g
+          className="port-cargo"
+          data-resource={port.resource}
+          transform={`translate(${p.markerX},${p.markerY})`}
+        >
+          <rect className="port-badge" {...PORT_BADGE_BOUNDS} rx="4" />
+          {port.resource === 'any' ? (
+            <text className="port-any" textAnchor="middle" x="-12" y="5">
+              ?
+            </text>
+          ) : (
+            <svg
+              x="-20"
+              y="-8"
+              width="16"
+              height="16"
+              viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
+            >
+              <image href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp" width="2048" height="1024" />
+            </svg>
+          )}
+          <text className="port-rate" textAnchor="middle" x="8" y="4">
+            {port.resource === 'any' ? '3:1' : '2:1'}
+          </text>
+        </g>
+      </g>
+    );
+  });
+});
+
+/**
  * Memoised because it is the most expensive thing on the screen — roughly
  * 18ms a commit, measured — and it was being re-rendered by every unrelated
  * state change in the app: a panel opening, a timer ticking, a reaction
@@ -468,90 +556,7 @@ export const Board = memo(function Board({
             </g>
           );
         })}
-        {board.ports.map((port) => {
-          const p = portPlacement(board, port.edge),
-            n = SPRITE_INDEX[port.resource];
-          return (
-            <g
-              key={port.edge}
-              className="harbor"
-              aria-label={
-                port.resource === 'any'
-                  ? 'General harbor. Three of any one resource for one other resource.'
-                  : RESOURCE_NAMES[port.resource] + ' harbor. Two for one.'
-              }
-            >
-              <title>{`${
-                port.resource === 'any' ? 'General 3:1 harbor' : RESOURCE_NAMES[port.resource] + ' 2:1 harbor'
-              } · Build at either bridge entrance`}</title>
-              {p.bridges.map((bridge, i) => {
-                const dx = bridge.to.x - bridge.from.x,
-                  dy = bridge.to.y - bridge.from.y,
-                  length = Math.hypot(dx, dy);
-                return (
-                  <g
-                    key={i}
-                    data-port-entrance={i}
-                    transform={`translate(${bridge.from.x},${bridge.from.y}) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI})`}
-                  >
-                    <rect className="pier-shadow" x="0" y="-2.5" width={length} height="7" rx="1" />
-                    <rect className="pier-deck" x="0" y="-3" width={length} height="6" />
-                    {Array.from({ length: Math.ceil(length / 5) }, (_, j) => (
-                      <path key={j} className="pier-plank" d={`M${j * 5} -3V3`} />
-                    ))}
-                    <path className="pier-rail" d={`M2 -3.5H${length}M2 3.5H${length}`} />
-                    {[2, length - 2].map((j) => (
-                      <g key={j}>
-                        <circle className="pier-post" cx={j} cy="-3.5" r="1.3" />
-                        <circle className="pier-post" cx={j} cy="3.5" r="1.3" />
-                      </g>
-                    ))}
-                  </g>
-                );
-              })}
-              <g className="port-boat" transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
-                <svg
-                  x={-SHIP_SIZE / 2}
-                  y={-SHIP_SIZE / 2}
-                  width={SHIP_SIZE}
-                  height={SHIP_SIZE}
-                  viewBox="1536 512 512 512"
-                >
-                  <image href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp" width="2048" height="1024" />
-                </svg>
-              </g>
-              <g
-                className="port-cargo"
-                data-resource={port.resource}
-                transform={`translate(${p.markerX},${p.markerY})`}
-              >
-                <rect className="port-badge" {...PORT_BADGE_BOUNDS} rx="4" />
-                {port.resource === 'any' ? (
-                  <text className="port-any" textAnchor="middle" x="-12" y="5">
-                    ?
-                  </text>
-                ) : (
-                  <svg
-                    x="-20"
-                    y="-8"
-                    width="16"
-                    height="16"
-                    viewBox={`${(n % 4) * 512} ${Math.floor(n / 4) * 512} 512 512`}
-                  >
-                    <image
-                      href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp"
-                      width="2048"
-                      height="1024"
-                    />
-                  </svg>
-                )}
-                <text className="port-rate" textAnchor="middle" x="8" y="4">
-                  {port.resource === 'any' ? '3:1' : '2:1'}
-                </text>
-              </g>
-            </g>
-          );
-        })}
+        <BoardHarbors board={board} />
         {game &&
           Object.entries(game.roads).map(([id, owner]) => {
             const { length, transform } = roadGeometry(board, Number(id));

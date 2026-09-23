@@ -85,12 +85,14 @@ test('every accepted game action has durable history, private outcomes and a has
   assert.ok(!JSON.stringify(entries).includes('"hand":'));
   assert.ok(!JSON.stringify(entries).includes('"deck":'));
   const rows = store.db
-    .prepare('SELECT previous_hash,state_hash,state FROM game_events ORDER BY revision')
-    .all() as { previous_hash: string | null; state_hash: string; state: string }[];
+    .prepare('SELECT revision,previous_hash,state_hash FROM game_events ORDER BY revision')
+    .all() as { revision: number; previous_hash: string | null; state_hash: string }[];
   rows.forEach((row, i) => {
-    assert.equal(createHash('sha256').update(row.state).digest('hex'), row.state_hash);
+    const state = JSON.stringify(store.journalState(host.room_id, row.revision));
+    assert.equal(createHash('sha256').update(state).digest('hex'), row.state_hash);
     assert.equal(row.previous_hash, i ? rows[i - 1]!.state_hash : null);
   });
+  assert.deepEqual(store.verifyJournal(host.room_id), { events: rows.length, problems: [] });
   const next = choose(saved),
     p = store.snapshot(host.room_id).players.find((p) => p.id === next.player)!,
     seat = { ...p, room_id: host.room_id },

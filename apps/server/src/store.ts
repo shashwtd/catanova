@@ -8,6 +8,7 @@ import {
   ROOM_CODE_LENGTH,
 } from '../../../packages/protocol/src/room-reference.js';
 import { botName, randomBotLevel } from '../../../packages/protocol/src/bots.js';
+import { roomHostId } from '../../../packages/protocol/src/room-host.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { availableColors, isPlayerColor } from '../../../packages/protocol/src/colors.js';
 import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
@@ -38,6 +39,7 @@ import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/t
 import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
 import { PlayerRecords, parseGamesCursor } from './player-records.js';
+import { decodeState, encodeState } from './journal.js';
 import { setImmediate } from 'node:timers/promises';
 
 export class ProtocolError extends Error {
@@ -67,7 +69,29 @@ export const STANDIN_AFTER_MS = 30 * 1000;
  *  the table — and not the mildest either, which would throw their game away. */
 export const STANDIN_LEVEL: BotLevel = 'sharp';
 type Absence = { disconnectedAt: number; resignAt: number };
+type JournalRow = { state: string; state_z: Uint8Array | null; board_hash: string | null };
+/**
+ * What a compact row keeps in its `state` column. Valid JSON on purpose: a
+ * server rolled back to a version from before compaction reads this column
+ * with json_extract, which fails outright on an empty string (breaking Return
+ * to Lobby) but just finds nothing in an empty object.
+ */
+const COMPACT_STATE = '{}';
 type Presence = { version?: 2; pausedAt?: number; seats: Record<string, Absence> };
+/**
+ * A table nobody is sitting at is abandoned only once it has been empty for the
+ * whole grace period. A seat's own deadline dates from when that player left,
+ * and while a bot is covering them that date quietly passes; without this, the
+ * first half-second nobody else was connected — one person reloading, a server
+ * restart, a shared Wi-Fi blip — resigned every covered seat on the spot and
+ * handed the game to whoever came back first.
+ */
+function holdFromPause(state: Presence): Presence {
+  if (state.pausedAt !== undefined)
+    for (const seat of Object.values(state.seats))
+      seat.resignAt = Math.max(seat.resignAt, state.pausedAt + RECONNECT_GRACE_MS);
+  return state;
+}
 const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
 function codeForSlot(slot: number): string {
   let code = '';
@@ -217,6 +241,13 @@ export class Store {
         PRIMARY KEY(room_id, player_id)
       );
       CREATE INDEX IF NOT EXISTS standins_room ON seat_standins(room_id);
+      /* Accounts the host removed from a room. They cannot rejoin until the room
+         starts its next round; removing someone meant nothing when they could
+         walk straight back in with the same code. */
+      CREATE TABLE IF NOT EXISTS room_removals (
+        room_id TEXT NOT NULL REFERENCES rooms(id), user_id TEXT NOT NULL, round INTEGER NOT NULL,
+        PRIMARY KEY(room_id, user_id)
+      );
     `);
     if (
       !this.db
@@ -246,8 +277,57 @@ export class Store {
       .prepare('PRAGMA table_info(game_events)')
       .all()
       .map((c) => c.name);
-    for (const name of ['actor_kind', 'participants'])
-      if (!eventColumns.includes(name)) this.db.exec('ALTER TABLE game_events ADD COLUMN ' + name + ' TEXT');
+    for (const [name, type] of [
+      ['actor_kind', 'TEXT'],
+      ['participants', 'TEXT'],
+      ['phase', 'TEXT'],
+      ['dice_total', 'INTEGER'],
+      // A compact row keeps its game here and an empty `state`; see journal.ts.
+      ['state_z', 'BLOB'],
+      ['board_hash', 'TEXT'],
+    ])
+      if (!eventColumns.includes(name))
+        this.db.exec('ALTER TABLE game_events ADD COLUMN ' + name + ' ' + type);
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS journal_boards (hash TEXT PRIMARY KEY, board TEXT NOT NULL);
+      /* Only rows still holding a whole game, so compaction finds the next batch
+         without reading past every row it has already rewritten; empty once done. */
+      DROP INDEX IF EXISTS game_events_whole;
+      CREATE INDEX IF NOT EXISTS game_events_whole_state ON game_events(room_id, revision)
+        WHERE state_z IS NULL;
+    `);
+    // The two facts anything outside the live game ever asked a journal row for.
+    // Kept as plain columns so statistics and match records never have to open
+    // a saved state; older rows are filled in once from the state they carry.
+    this.db.exec(`
+      UPDATE game_events SET phase = json_extract(state, '$.phase') WHERE phase IS NULL AND state_z IS NULL;
+      UPDATE game_events SET dice_total = json_extract(state, '$.dice[0]') + json_extract(state, '$.dice[1]')
+        WHERE dice_total IS NULL AND state_z IS NULL AND json_extract(public_entry, '$.kind') = 'roll';
+    `);
+    // Which rooms still have a game in play is asked several times a second by the
+    // bot driver and again on every join; answering it from the saved state meant
+    // parsing a whole game each time. A side table keeps the answer, and triggers
+    // keep it in step with every write of a game, whoever makes it — including an
+    // older server version after a rollback, since triggers live in the file. The
+    // games table itself keeps its shape. Rebuilt in full on every start. (An upsert
+    // rather than INSERT OR REPLACE: a trigger's own conflict policy is overridden
+    // by the statement that fired it.)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS game_phases (room_id TEXT PRIMARY KEY, phase TEXT);
+      CREATE TRIGGER IF NOT EXISTS game_phases_insert AFTER INSERT ON games BEGIN
+        INSERT INTO game_phases(room_id, phase) VALUES (NEW.room_id, json_extract(NEW.state, '$.phase'))
+          ON CONFLICT(room_id) DO UPDATE SET phase = excluded.phase;
+      END;
+      CREATE TRIGGER IF NOT EXISTS game_phases_update AFTER UPDATE OF state ON games BEGIN
+        INSERT INTO game_phases(room_id, phase) VALUES (NEW.room_id, json_extract(NEW.state, '$.phase'))
+          ON CONFLICT(room_id) DO UPDATE SET phase = excluded.phase;
+      END;
+      CREATE TRIGGER IF NOT EXISTS game_phases_delete AFTER DELETE ON games BEGIN
+        DELETE FROM game_phases WHERE room_id = OLD.room_id;
+      END;
+      DELETE FROM game_phases;
+      INSERT INTO game_phases(room_id, phase) SELECT room_id, json_extract(state, '$.phase') FROM games;
+    `);
     this.records = new PlayerRecords(this.db);
     for (const row of this.db.prepare('SELECT id FROM seats WHERE bot = 1 AND departed = 0').all())
       this.botSeats.add(row.id as string);
@@ -382,6 +462,17 @@ export class Store {
       }
       if (mode === 'resume') throw new ProtocolError('INVALID_SESSION', 'This seat cannot be resumed');
       if (identity) this.assertAccountAvailable(identity.id, roomId);
+      if (
+        identity &&
+        roomId &&
+        (
+          this.db
+            .prepare('SELECT round FROM room_removals WHERE room_id = ? AND user_id = ?')
+            .get(roomId, identity.id) as { round: number } | undefined
+        )?.round === this.round(roomId)
+      )
+        throw new ProtocolError('REMOVED_BY_HOST', 'The host removed you from this room.');
+      if (mode === 'create' && identity) this.retireSoloLobbies(identity.id);
       if (mode === 'create') {
         roomId = randomUUID();
         this.db.prepare('INSERT INTO rooms(id) VALUES (?)').run(roomId);
@@ -509,9 +600,9 @@ export class Store {
     const row = this.db
       .prepare(
         `
-      SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
+      SELECT s.room_id FROM seats s JOIN game_phases g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0
-        AND json_extract(g.state,'$.phase')<>'finished'
+        AND coalesce(g.phase,'')<>'finished'
       LIMIT 1
     `,
       )
@@ -520,13 +611,58 @@ export class Store {
     const roomCode = this.roomCode(row.room_id);
     return { roomId: row.room_id, ...(roomCode ? { roomCode } : {}) };
   }
+  /**
+   * Lobbies this account opened that nobody else has joined. Creating another
+   * room leaves them: one person waits in one empty room at a time, and an
+   * abandoned lobby otherwise held its room code and island for thirty days —
+   * enough, repeated, to use up every code.
+   */
+  private retireSoloLobbies(userId: string) {
+    const rooms = this.db
+      .prepare(
+        `SELECT s.room_id FROM seats s
+         WHERE s.user_id = ? AND s.departed = 0
+           AND NOT EXISTS (SELECT 1 FROM games g WHERE g.room_id = s.room_id)
+           AND NOT EXISTS (
+             SELECT 1 FROM seats o WHERE o.room_id = s.room_id AND o.departed = 0 AND o.bot = 0 AND o.id <> s.id
+           )`,
+      )
+      .all(userId) as { room_id: string }[];
+    for (const { room_id } of rooms) {
+      this.db
+        .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE room_id = ? AND user_id = ?')
+        .run(room_id, userId);
+      this.db.prepare('UPDATE rooms SET revision = revision + 1 WHERE id = ?').run(room_id);
+      this.closeEmptyLobby(room_id);
+    }
+  }
+  /**
+   * A lobby that never started and has no person left in it gives back its room
+   * code and its island. Rooms that have played a game keep their code, so
+   * friends returning to the same link later still find their room.
+   */
+  private closeEmptyLobby(roomId: string): boolean {
+    if (
+      this.db.prepare('SELECT 1 FROM games WHERE room_id = ?').get(roomId) ||
+      this.db.prepare('SELECT 1 FROM room_rounds WHERE room_id = ?').get(roomId) ||
+      this.db.prepare('SELECT 1 FROM seats WHERE room_id = ? AND departed = 0 AND bot = 0').get(roomId)
+    )
+      return false;
+    this.db
+      .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE room_id = ? AND departed = 0')
+      .run(roomId);
+    this.db.prepare('DELETE FROM room_codes WHERE room_id = ?').run(roomId);
+    this.db.prepare('DELETE FROM room_boards WHERE room_id = ?').run(roomId);
+    return true;
+  }
   private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
     const conflict = this.db
       .prepare(
         `
-      SELECT s.room_id FROM seats s JOIN games g ON g.room_id=s.room_id
+      SELECT s.room_id FROM seats s JOIN game_phases p ON p.room_id=s.room_id
+      JOIN games g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0 AND s.room_id<>?
-        AND json_extract(g.state,'$.phase')<>'finished'
+        AND coalesce(p.phase,'')<>'finished'
         AND EXISTS (SELECT 1 FROM json_each(g.state,'$.players') p
           WHERE json_extract(p.value,'$.id')=s.id
             AND coalesce(json_extract(p.value,'$.resigned'),0)=0)
@@ -643,6 +779,7 @@ export class Store {
             current,
             resignPlayers(current, [seat.id], {
               reason: 'leave',
+              botIds: [...this.botSeats],
               ...(this.trackPresence ? { winnerEligibleIds: [...connected] } : {}),
             }),
             commandId,
@@ -659,7 +796,7 @@ export class Store {
           'INSERT INTO leave_receipts(room_id, player_id, command_id, expected_revision, revision, counter, released) VALUES (?, ?, ?, ?, ?, ?, ?)',
         )
         .run(seat.room_id, seat.id, commandId, expectedRevision, revision, room.counter, 1);
-      this.renewRoomCode(seat.room_id);
+      if (!this.closeEmptyLobby(seat.room_id)) this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, released: true, duplicate: false };
     });
     // The transport is retired only after the entire resignation and receipt commit.
@@ -702,7 +839,11 @@ export class Store {
     automatic = false,
     actorKind: 'human' | 'bot' | 'timer' | 'system' = 'system',
   ) {
-    const state = JSON.stringify(game);
+    const state = JSON.stringify(game),
+      encoded = encodeState(game, state);
+    this.db
+      .prepare('INSERT OR IGNORE INTO journal_boards(hash, board) VALUES (?, ?)')
+      .run(encoded.boardHash, encoded.board);
     const entry: HistoryEntry = {
       revision,
       actor,
@@ -714,7 +855,7 @@ export class Store {
     };
     this.db
       .prepare(
-        'INSERT INTO game_events(room_id, revision, command_id, actor, action, previous_hash, state_hash, state, public_entry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO game_events(room_id, revision, command_id, actor, action, previous_hash, state_hash, state, state_z, board_hash, public_entry, phase, dice_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         roomId,
@@ -723,9 +864,13 @@ export class Store {
         actor,
         JSON.stringify(action),
         this.eventHead(roomId)?.state_hash ?? null,
-        hash(state),
-        state,
+        encoded.stateHash,
+        COMPACT_STATE,
+        encoded.compact,
+        encoded.boardHash,
         JSON.stringify(entry),
+        game.phase,
+        kind === 'roll' && game.dice ? game.dice[0] + game.dice[1] : null,
       );
     // Private provenance alongside the existing journal, never in public history or snapshots.
     const participants =
@@ -739,6 +884,93 @@ export class Store {
       .prepare('UPDATE game_events SET actor_kind=?,participants=? WHERE room_id=? AND revision=?')
       .run(actorKind, participants ? JSON.stringify(participants) : null, roomId, revision);
     this.records.record(roomId, revision, game, entry);
+  }
+  /** The complete game exactly as it stood after one journal entry, for audits and recovery checks. */
+  journalState(roomId: string, revision: number): Game | undefined {
+    const row = this.db
+      .prepare('SELECT state, state_z, board_hash FROM game_events WHERE room_id = ? AND revision = ?')
+      .get(roomId, revision) as JournalRow | undefined;
+    return row ? JSON.parse(this.journalText(row)) : undefined;
+  }
+  /** A row's game as the exact JSON its hash was taken over. Older rows still carry it whole. */
+  private journalText(row: JournalRow): string {
+    if (row.state !== COMPACT_STATE && row.state !== '') return row.state;
+    const board = this.db.prepare('SELECT board FROM journal_boards WHERE hash = ?').get(row.board_hash) as
+      { board: string } | undefined;
+    if (!row.state_z || !board)
+      throw new ProtocolError('STATE_INTEGRITY', 'A saved move cannot be read; no moves were discarded');
+    return JSON.stringify(decodeState(row.state_z, board.board));
+  }
+  /**
+   * Check a room's whole journal: every row readable, every state matching its
+   * hash, every row linked to the one before, and the saved game matching the
+   * last entry of the round in play. Used by recovery drills and the admin view.
+   */
+  verifyJournal(roomId: string): { events: number; problems: string[] } {
+    const problems: string[] = [];
+    let previous: string | null = null,
+      events = 0;
+    for (const row of this.db
+      .prepare(
+        'SELECT revision, previous_hash, state_hash, state, state_z, board_hash FROM game_events WHERE room_id = ? ORDER BY revision',
+      )
+      .iterate(roomId) as Iterable<
+      JournalRow & { revision: number; previous_hash: string | null; state_hash: string }
+    >) {
+      events++;
+      if (row.previous_hash !== previous)
+        problems.push(`revision ${row.revision}: not linked to the entry before it`);
+      try {
+        if (hash(this.journalText(row)) !== row.state_hash)
+          problems.push(`revision ${row.revision}: saved state does not match its hash`);
+      } catch {
+        problems.push(`revision ${row.revision}: saved state cannot be read`);
+      }
+      previous = row.state_hash;
+    }
+    try {
+      this.loadGame(roomId);
+    } catch (error) {
+      problems.push(`current game: ${(error as Error).message}`);
+    }
+    return { events, problems };
+  }
+  /**
+   * Rewrite up to `limit` rows still holding a whole game into the compact form.
+   * A row is only rewritten when its state matches its hash and the compact form
+   * decodes to exactly the same JSON; anything else is marked and left as it
+   * was, so evidence of a problem is never overwritten. Returns how many rows
+   * were looked at, so a caller knows when nothing is left.
+   */
+  compactJournal(limit = 50): { scanned: number; compacted: number } {
+    return this.transaction(() => {
+      const rows = this.db
+        .prepare(
+          'SELECT room_id, revision, state, state_hash FROM game_events WHERE state_z IS NULL ORDER BY room_id, revision LIMIT ?',
+        )
+        .all(limit) as { room_id: string; revision: number; state: string; state_hash: string }[];
+      let compacted = 0;
+      for (const row of rows) {
+        const encoded =
+          hash(row.state) === row.state_hash ? encodeState(JSON.parse(row.state), row.state) : null;
+        if (!encoded || JSON.stringify(decodeState(encoded.compact, encoded.board)) !== row.state) {
+          this.db
+            .prepare("UPDATE game_events SET state_z = X'' WHERE room_id = ? AND revision = ?")
+            .run(row.room_id, row.revision);
+          continue;
+        }
+        this.db
+          .prepare('INSERT OR IGNORE INTO journal_boards(hash, board) VALUES (?, ?)')
+          .run(encoded.boardHash, encoded.board);
+        this.db
+          .prepare(
+            'UPDATE game_events SET state = ?, state_z = ?, board_hash = ? WHERE room_id = ? AND revision = ?',
+          )
+          .run(COMPACT_STATE, encoded.compact, encoded.boardHash, row.room_id, row.revision);
+        compacted++;
+      }
+      return { scanned: rows.length, compacted };
+    });
   }
   round(roomId: string): number {
     return (
@@ -762,7 +994,7 @@ export class Store {
     const diceCounts = Array<number>(11).fill(0);
     const rows = this.db
       .prepare(
-        `SELECT json_extract(state,'$.dice[0]') + json_extract(state,'$.dice[1]') AS total, count(*) AS n
+        `SELECT dice_total AS total, count(*) AS n
       FROM game_events WHERE room_id=? AND revision>? AND json_extract(public_entry,'$.kind')='roll'
       GROUP BY total`,
       )
@@ -806,7 +1038,11 @@ export class Store {
         ...(addBot ? { addBot: true } : {}),
       }),
     );
-    return this.transaction(() => {
+    // The in-memory bot list only follows a committed seat change: a rolled-back
+    // kick or add would otherwise leave a bot treated as an absent person (with a
+    // resignation deadline and a stand-in of its own), or the reverse.
+    let botRemoved: string | undefined, botAdded: string | undefined;
+    const receipt = this.transaction(() => {
       this.rejectSettingsReceipt(seat, commandId);
       for (const table of ['receipts', 'game_receipts', 'leave_receipts'])
         if (
@@ -839,7 +1075,7 @@ export class Store {
       if (!room.players.some((p) => p.id === seat.id))
         throw new ProtocolError('SEAT_LEFT', 'You left this lobby');
       if (kickPlayerId) {
-        if (room.players[0]?.id !== seat.id)
+        if (roomHostId(room.players) !== seat.id)
           throw new ProtocolError('NOT_HOST', 'Only the host can remove players');
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
@@ -848,10 +1084,18 @@ export class Store {
         this.db
           .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE id = ? AND room_id = ?')
           .run(kickPlayerId, seat.room_id);
-        this.botSeats.delete(kickPlayerId);
+        const removed = this.db.prepare('SELECT user_id FROM seats WHERE id = ?').get(kickPlayerId) as
+          { user_id: string | null } | undefined;
+        if (removed?.user_id)
+          this.db
+            .prepare(
+              'INSERT INTO room_removals(room_id, user_id, round) VALUES (?, ?, ?) ON CONFLICT(room_id, user_id) DO UPDATE SET round = excluded.round',
+            )
+            .run(seat.room_id, removed.user_id, this.round(seat.room_id));
+        botRemoved = kickPlayerId;
       }
       if (addBot) {
-        if (room.players[0]?.id !== seat.id)
+        if (roomHostId(room.players) !== seat.id)
           throw new ProtocolError('NOT_HOST', 'Only the host can add a bot');
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
@@ -870,7 +1114,7 @@ export class Store {
           // The token hash is random and never shared, so no client handshake
           // can ever resolve to a bot's seat.
           .run(id, seat.room_id, hash(randomUUID()), name, null, JSON.stringify(botProfile), level);
-        this.botSeats.add(id);
+        botAdded = id;
       }
       if (color) {
         // First come, first served, and checked here rather than in the browser:
@@ -896,18 +1140,28 @@ export class Store {
       this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, duplicate: false };
     });
+    if (botRemoved) this.botSeats.delete(botRemoved);
+    if (botAdded) this.botSeats.add(botAdded);
+    return receipt;
   }
-  /** Rooms with a game still running and at least one seat a bot owes a move
-   *  for: a bot the host added, or a seat a bot is holding for somebody who
-   *  dropped out. Kept as a query rather than a subscription so a restart needs
-   *  no rebuilding. */
+  /** Rooms with a game still running, not paused, and at least one seat a bot
+   *  owes a move for: a bot the host added, or a seat a bot is holding for
+   *  somebody who dropped out. Kept as a query rather than a subscription so a
+   *  restart needs no rebuilding. Finished and paused rooms are left out here:
+   *  the driver asks four times a second, and every room it is handed costs a
+   *  full load of the game even when no bot can move. */
   botRooms(): string[] {
     return this.db
       .prepare(
-        `SELECT DISTINCT room_id FROM (
-           SELECT s.room_id AS room_id FROM seats s JOIN games g ON g.room_id = s.room_id
-           WHERE s.bot = 1 AND s.departed = 0
-           UNION SELECT i.room_id AS room_id FROM seat_standins i JOIN games g ON g.room_id = i.room_id
+        `SELECT DISTINCT r.room_id AS room_id FROM (
+           SELECT s.room_id AS room_id FROM seats s JOIN game_phases g ON g.room_id = s.room_id
+           WHERE s.bot = 1 AND s.departed = 0 AND coalesce(g.phase, '') <> 'finished'
+           UNION SELECT i.room_id AS room_id FROM seat_standins i JOIN game_phases g ON g.room_id = i.room_id
+           WHERE coalesce(g.phase, '') <> 'finished'
+         ) r
+         WHERE NOT EXISTS (
+           SELECT 1 FROM room_presence p
+           WHERE p.room_id = r.room_id AND json_extract(p.state, '$.pausedAt') IS NOT NULL
          )`,
       )
       .all()
@@ -1041,7 +1295,7 @@ export class Store {
       const room = this.snapshot(seat.room_id);
       if (this.loadGame(seat.room_id))
         throw new ProtocolError('GAME_STARTED', 'Game settings are locked after starting');
-      if (room.players[0]?.id !== seat.id)
+      if (roomHostId(room.players) !== seat.id)
         throw new ProtocolError('NOT_HOST', 'Only the host can change game settings');
       if (room.revision !== expectedRevision)
         throw new ProtocolError('STALE_STATE', 'The lobby changed; review the latest settings');
@@ -1051,7 +1305,13 @@ export class Store {
           'INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET settings = excluded.settings, revision = excluded.revision',
         )
         .run(seat.room_id, JSON.stringify(settings), revision);
-      this.db.prepare('UPDATE seats SET ready = 0 WHERE room_id = ? AND departed = 0').run(seat.room_id);
+      // People confirm the new settings; bots have nothing to confirm and would
+      // otherwise keep Start disabled until they were removed and added again.
+      this.db
+        .prepare(
+          'UPDATE seats SET ready = CASE WHEN bot = 1 THEN 1 ELSE 0 END WHERE room_id = ? AND departed = 0',
+        )
+        .run(seat.room_id);
       this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
       this.db
         .prepare('INSERT INTO settings_receipts VALUES (?, ?, ?, ?, ?, ?)')
@@ -1077,9 +1337,29 @@ export class Store {
           this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
           continue;
         }
+        // A table only bots are still sitting at can never be played again. Settle it
+        // now rather than leave it paused, and in friends' Watch lists, for good.
+        const settled = resignPlayers(game, [], { winnerEligibleIds: [], botIds: [...this.botSeats] });
+        if (settled !== game) {
+          this.saveLifecycle(
+            roomId,
+            game,
+            settled,
+            'bots-only-' +
+              hash(JSON.stringify({ roomId, revision: this.snapshot(roomId).revision })).slice(0, 48),
+            null,
+            { kind: 'abandon', reason: 'botsOnly' },
+            'abandoned',
+            true,
+            new Set(),
+          );
+          continue;
+        }
         const old = this.presence(roomId);
         // Old paused saves never had a running absence deadline. Migrate them once with
-        // a full grace. In v2, an already disconnected player's deadline survives restarts.
+        // a full grace. A table that was already empty before the restart keeps the
+        // moment it emptied, so its deadlines survive restarts; a table people were
+        // still playing at only empties now, and its covered seats get the full grace.
         const previous = old?.version === 2 ? old : undefined;
         const state: Presence = { version: 2, pausedAt: previous?.pausedAt ?? now, seats: {} };
         for (const player of game.players.filter((p) => !p.resigned && !this.botSeats.has(p.id)))
@@ -1087,7 +1367,7 @@ export class Store {
             disconnectedAt: now,
             resignAt: now + RECONNECT_GRACE_MS,
           };
-        this.writePresence(roomId, state);
+        this.writePresence(roomId, holdFromPause(state));
       }
     });
   }
@@ -1134,7 +1414,7 @@ export class Store {
           resignAt: now + RECONNECT_GRACE_MS,
         };
       }
-    this.writePresence(roomId, state);
+    this.writePresence(roomId, holdFromPause(state));
     if (resumed) {
       // Nobody owes an immediate automatic move for time when nobody could see the game.
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
@@ -1156,7 +1436,10 @@ export class Store {
       this.transaction(() => {
         const game = this.loadGame(seat.room_id);
         if (game) {
-          const next = resignPlayers(game, [], { winnerEligibleIds: [...nextConnected] });
+          const next = resignPlayers(game, [], {
+            winnerEligibleIds: [...nextConnected],
+            botIds: [...this.botSeats],
+          });
           if (next !== game) {
             this.saveLifecycle(
               seat.room_id,
@@ -1222,6 +1505,7 @@ export class Store {
         const next = resignPlayers(current, abandoned, {
           reason: 'disconnect',
           winnerEligibleIds: [...this.connectedSeats],
+          botIds: [...this.botSeats],
         });
         if (next === current) {
           this.updatePresence(roomId, current);
@@ -1612,9 +1896,9 @@ export class Store {
       let next: Game;
       if (action.kind === 'start') {
         if (current) throw new ProtocolError('GAME_STARTED', 'This game is already underway');
-        if (room.players[0]?.id !== seat.id)
+        if (roomHostId(room.players) !== seat.id)
           throw new ProtocolError('NOT_HOST', 'Only the room creator can start the game');
-        if (!room.players.slice(1).every((p) => p.ready))
+        if (!room.players.every((p) => p.id === seat.id || p.ready))
           throw new ProtocolError('NOT_READY', 'Every other player must be ready');
         // Recheck every account inside the start transaction: another browser may have
         // started a different lobby after these players joined or pressed Ready.
@@ -1629,7 +1913,8 @@ export class Store {
           ),
           room.board.seed,
           this.random,
-          this.settings(seat.room_id),
+          // The island the lobby has been showing, exactly as dealt.
+          { ...this.settings(seat.room_id), board: room.board },
         );
       } else {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');
@@ -1738,5 +2023,51 @@ export class Store {
   }
   close() {
     this.db.close();
+  }
+  /* ---- Admin console (apps/server/src/admin): one appended block. ---- */
+  /**
+   * Close a stuck or abandoned game with no winner. Every seat still playing
+   * resigns through the rules engine, which is what finishes a game as
+   * `abandoned`, and the result is journaled through the same lifecycle path
+   * as any other departure. Only the wording is ours: the engine would say each
+   * player "resigned after not reconnecting", which is not what happened.
+   * `audit` runs inside this transaction, so the change and its record commit
+   * or roll back together.
+   */
+  adminEndGame(
+    roomId: string,
+    commandId: string,
+    audit: (result: { revision: number; previous: Game; game: Game }) => void,
+  ): { revision: number } {
+    return this.transaction(() => {
+      const current = this.loadGame(roomId);
+      if (!current) throw new ProtocolError('NOT_STARTED', 'This room has no game in progress');
+      if (current.phase === 'finished')
+        throw new ProtocolError('GAME_FINISHED', 'This game has already finished');
+      const next = resignPlayers(
+        current,
+        current.players.filter((player) => !player.resigned).map((player) => player.id),
+      );
+      if (next.phase !== 'finished' || next.finishReason !== 'abandoned')
+        throw new ProtocolError('END_FAILED', 'The game could not be closed');
+      next.log = [
+        ...current.log,
+        { id: current.nextLog, text: 'Catanova closed this game. There is no winner.' },
+      ];
+      if (next.log.length > 80) next.log.splice(0, next.log.length - 80);
+      next.nextLog = current.nextLog + 1;
+      const revision = this.saveLifecycle(
+        roomId,
+        current,
+        next,
+        commandId,
+        null,
+        { kind: 'adminEnd' },
+        'abandoned',
+        false,
+      );
+      audit({ revision, previous: current, game: next });
+      return { revision };
+    });
   }
 }

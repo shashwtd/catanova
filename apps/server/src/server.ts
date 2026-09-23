@@ -22,6 +22,8 @@ import { RoomInviteService } from './room-invites.js';
 import { AccountPresence } from './account-presence.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { BotDriver } from './bots.js';
+import { serverErrors } from './admin/errors.js';
+import { PlayerFeedback } from './feedback.js';
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
 function validationCommandId(input: string): string | undefined {
@@ -66,6 +68,20 @@ export async function startServer(
   const hubRequests = new RoomAccessLimit(120);
   const historyRequests = new RoomAccessLimit(30);
   const presenceRequests = new RoomAccessLimit(12);
+  // Every other account route reaches Supabase too; generous, but not unlimited.
+  const accountRequests = new RoomAccessLimit(120);
+  // Resuming a saved seat bypasses the code-guessing limit so a flaky network
+  // never strands a player, but each attempt still asks Supabase who they are.
+  const resumes = new RoomAccessLimit(120);
+  // A socket that has not joined a room yet holds a slot for up to twelve
+  // seconds. Without a cap one client, signed in or not, could hold all of them
+  // and lock everybody else out. Joined sockets are not counted per address, so
+  // friends behind one home router or mobile carrier are unaffected.
+  const maxSockets = Number(process.env.MAX_SOCKETS ?? 400);
+  const UNJOINED_PER_ADDRESS = 12,
+    UNJOINED_TOTAL = Math.max(24, Math.floor(maxSockets / 4));
+  const unjoinedByAddress = new Map<string, number>();
+  let unjoined = 0;
   const accountPresence = new AccountPresence();
   const siteKey =
     options.captcha === null
@@ -74,6 +90,14 @@ export async function startServer(
   const captcha = siteKey ? { siteKey } : undefined;
   const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now, trackPresence: true });
   const roomInvites = accounts ? new RoomInviteService(store, accounts, now) : undefined;
+  const feedback = new PlayerFeedback({
+    store,
+    authenticated: !!verify,
+    ...(accounts ? { accounts } : {}),
+    now,
+    clientAddress,
+    allowedOrigins: options.allowedOrigins ?? [],
+  });
   let closing = false;
   const http = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
@@ -108,6 +132,12 @@ export async function startServer(
           url.pathname.startsWith('/api/account/matches/')
         ) {
           const access = hubRequests.consume(clientAddress(request), now());
+          if (!access.allowed) {
+            response.setHeader('Retry-After', String(access.retryAfter));
+            throw accountFailure('ACCOUNT_RATE_LIMIT');
+          }
+        } else {
+          const access = accountRequests.consume(clientAddress(request), now());
           if (!access.allowed) {
             response.setHeader('Retry-After', String(access.retryAfter));
             throw accountFailure('ACCOUNT_RATE_LIMIT');
@@ -335,11 +365,25 @@ export async function startServer(
             JSON.stringify({ error: error instanceof ProtocolError ? error.message : 'Room unavailable' }),
           );
       }
+    } else if (request.url === '/api/feedback') {
+      await feedback.handle(request, response);
     } else {
       void serveClient(request, response, options.clientDirectory ?? 'dist/client', auth?.url, !!captcha);
     }
   });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 24576, perMessageDeflate: false });
+  // Every update is a whole snapshot of mostly repeated JSON. Compressed, with the
+  // previous message as context, a typical update shrinks to a small fraction of
+  // its size — which matters most on the slow mobile connections this game was
+  // started for. About 200 KB of zlib state per socket; tiny messages go as-is.
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: 24576,
+    perMessageDeflate: {
+      threshold: 1024,
+      zlibDeflateOptions: { level: 3, memLevel: 7 },
+      concurrencyLimit: 4,
+    },
+  });
   const sessions = new Map<WebSocket, Seat>();
   // Watchers never acquire a seat, presence deadline, or authority to send moves.
   const spectators = new Map<WebSocket, string>();
@@ -362,9 +406,12 @@ export async function startServer(
   const friendLastSeen = (userId: string) =>
     store.accountPrivacy(userId).shareLastSeen ? store.lastSeen(userId) : null;
   function snapshot(roomId: string, viewer: string): RoomState {
-    const state = store.snapshot(roomId, viewer);
+    const { board, ...state } = store.snapshot(roomId, viewer);
     return {
       ...state,
+      // A game carries its own copy of the board, so sending the room's as well
+      // put the same 11 KB into every update twice.
+      ...(state.game ? {} : { board }),
       ...(launches.view(roomId) ? { launch: launches.view(roomId) } : {}),
       players: state.players.map((p) => ({
         ...p,
@@ -458,16 +505,34 @@ export async function startServer(
     if (
       closing ||
       request.url !== '/ws' ||
-      wss.clients.size >= 400 ||
+      wss.clients.size >= maxSockets ||
       (origin && !sameOrigin && !origins.includes(origin))
     ) {
       socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    if (
+      unjoined >= UNJOINED_TOTAL ||
+      (unjoinedByAddress.get(clientAddress(request)) ?? 0) >= UNJOINED_PER_ADDRESS
+    ) {
+      socket.end('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 5\r\nConnection: close\r\n\r\n');
       return;
     }
     wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
   });
   wss.on('connection', (ws, request) => {
     const address = clientAddress(request);
+    let waitingToJoin = true;
+    unjoined++;
+    unjoinedByAddress.set(address, (unjoinedByAddress.get(address) ?? 0) + 1);
+    const joined = () => {
+      if (!waitingToJoin) return;
+      waitingToJoin = false;
+      unjoined--;
+      const left = unjoinedByAddress.get(address)! - 1;
+      if (left) unjoinedByAddress.set(address, left);
+      else unjoinedByAddress.delete(address);
+    };
     alive.add(ws);
     ws.on('error', () => ws.terminate());
     ws.on('pong', () => {
@@ -481,7 +546,8 @@ export async function startServer(
     handshakeTimeout.unref();
     let windowStart = Date.now();
     let messages = 0;
-    let authenticating = false;
+    let authenticating = false,
+      authRefreshing = false;
     let authExpiry: ReturnType<typeof setTimeout> | undefined;
     let accountToken: string | undefined, accountIdentity: Identity | undefined;
     let activityPending = false,
@@ -573,7 +639,7 @@ export async function startServer(
           // A saved seat uses a strong token plus its permanent ID. Code-guessing limits must
           // never strand admitted players reconnecting through the same unreliable network.
           const savedResume = message.type === 'resume' && message.roomId && !isShortRoomCode(message.roomId);
-          if (!savedResume && !admissions.consume(address, now()).allowed)
+          if (!(savedResume ? resumes : admissions).consume(address, now()).allowed)
             throw new ProtocolError(
               'ROOM_RATE_LIMIT',
               'Too many attempts to join a room. Wait a minute and try again.',
@@ -604,6 +670,7 @@ export async function startServer(
               setAuthDeadline();
             }
             spectators.set(ws, roomId);
+            joined();
             if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
             clearTimeout(handshakeTimeout);
             send(ws, {
@@ -636,6 +703,7 @@ export async function startServer(
             oldSocket.close(4001, 'Seat resumed elsewhere');
           }
           sessions.set(ws, seat);
+          joined();
           if (message.preloadGame) preloadClients.add(ws);
           activeSeats.set(seat.id, ws);
           if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
@@ -647,6 +715,39 @@ export async function startServer(
             version: PROTOCOL_VERSION,
           });
           broadcast(seat.room_id);
+        } else if (message.type === 'auth') {
+          // A fresh token for this socket's account, so a signed-in player is not
+          // disconnected every time their token expires (hourly). An outage at the
+          // sign-in service keeps the current session until it runs out; a
+          // different or invalid account closes the socket as before.
+          if (!verify || !accountIdentity || authRefreshing) {
+            if (!authRefreshing) send(ws, { type: 'auth', ok: false });
+            return;
+          }
+          authRefreshing = true;
+          let identity: Identity;
+          try {
+            identity = await verify(message.accessToken);
+          } catch (error) {
+            if (
+              error instanceof ProtocolError &&
+              ['AUTH_UNAVAILABLE', 'ACCOUNT_UNAVAILABLE'].includes(error.code)
+            ) {
+              if (ws.readyState === WebSocket.OPEN) send(ws, { type: 'auth', ok: false });
+            } else ws.close(4003, 'Refresh account session');
+            return;
+          } finally {
+            authRefreshing = false;
+          }
+          if (ws.readyState !== WebSocket.OPEN) return;
+          if (identity.id !== accountIdentity.id || identity.expiresAt <= Date.now()) {
+            ws.close(4003, 'Refresh account session');
+            return;
+          }
+          accountToken = message.accessToken;
+          accountIdentity = identity;
+          setAuthDeadline();
+          send(ws, { type: 'auth', ok: true, expiresAt: identity.expiresAt });
         } else {
           const watchedRoom = spectators.get(ws);
           if (watchedRoom) {
@@ -878,6 +979,8 @@ export async function startServer(
             : error instanceof SyntaxError || (error instanceof Error && !('code' in error))
               ? 'INVALID_MESSAGE'
               : 'STORAGE_ERROR';
+        // A failed save is the server's fault, not the player's: keep it for the admin console.
+        if (code === 'STORAGE_ERROR') serverErrors.record('websocket', error);
         send(ws, {
           type: 'error',
           code,
@@ -895,6 +998,7 @@ export async function startServer(
       }
     });
     ws.on('close', () => {
+      joined();
       spectators.delete(ws);
       clearTimeout(handshakeTimeout);
       clearTimeout(authExpiry);
@@ -966,10 +1070,31 @@ export async function startServer(
     }
   }, 500);
   clockScheduler.unref();
+  // Journal rows saved before compaction hold a whole game each. Rewrite them a
+  // few at a time in the background (about 20 ms a second) until none are left;
+  // new moves are already stored compactly.
+  const journalCompactor = setInterval(() => {
+    if (closing) return;
+    try {
+      if (store.compactJournal(40).scanned === 0) clearInterval(journalCompactor);
+    } catch (error) {
+      clearInterval(journalCompactor);
+      console.error('Journal compaction stopped; saved games are unaffected:', error);
+    }
+  }, 1000);
+  journalCompactor.unref();
   // Bots take their turns on their own timer, in the same shape as the clock
   // above: find rooms that owe a move, commit one through the ordinary rules
   // path, broadcast. A room with no bots costs one indexed query per tick.
-  const bots = new BotDriver({ store, changed: broadcast });
+  const bots = new BotDriver({
+    store,
+    changed: broadcast,
+    // Failures, backoffs and rescued moves go to the server log; every ordinary
+    // bot move would drown them.
+    log: (event, detail) => {
+      if (event !== 'bot_move') console.log(JSON.stringify({ event, ...detail }));
+    },
+  });
   bots.start();
   try {
     await new Promise<void>((resolve, reject) => {
@@ -992,6 +1117,16 @@ export async function startServer(
     port: address.port,
     url: `ws://127.0.0.1:${address.port}/ws`,
     store,
+    /** Read-only socket counts and a room push, for the admin listener (apps/server/src/admin). */
+    runtime: {
+      sockets: () => ({
+        total: wss.clients.size,
+        players: sessions.size,
+        spectators: spectators.size,
+        seats: [...activeSeats].filter(([, ws]) => ws.readyState === WebSocket.OPEN).map(([id]) => id),
+      }),
+      broadcast,
+    },
     async close() {
       closing = true;
       bots.stop();
@@ -999,6 +1134,7 @@ export async function startServer(
       clearInterval(launchScheduler);
       launches.clear();
       clearInterval(clockScheduler);
+      clearInterval(journalCompactor);
       for (const ws of wss.clients) ws.terminate();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await new Promise<void>((resolve, reject) =>

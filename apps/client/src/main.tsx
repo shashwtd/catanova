@@ -6,15 +6,15 @@ import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
-import { ConnectionPanel } from './ConnectionPanel.js';
+import { LiveConnectionPanel } from './ConnectionPanel.js';
 import type { GameToolPanel } from './GameTools.js';
 import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
-import { isBuildAction, placementValid } from './placement.js';
-import type { PlacementDraft } from './placement.js';
+import { buildShown, isBuildAction, placementValid } from './placement.js';
+import type { BuildAction, PlacementDraft } from './placement.js';
 import { BOARD_THEMES } from './board-theme.js';
 import { usePreferences } from './preferences.js';
 import { dicePresentationGame, useFeedback } from './useFeedback.js';
@@ -22,6 +22,7 @@ import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
 import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
+import { SendFeedback, useLastMessage } from './SendFeedback.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
 import { useGameAttention } from './useGameAttention.js';
@@ -54,10 +55,13 @@ import { PlayerRail } from './PlayerRail.js';
 import { BoardViewport } from './BoardViewport.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
+import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
+import { hasSavedSession } from './saved-session.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { GameStatistics as Statistics, HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { mountApp } from './mount-app.js';
 import {
   GameIcon,
@@ -103,6 +107,7 @@ import './room-experience.css';
 import './landing.css';
 import './hud-layout.css';
 import './settings.css';
+import './send-feedback.css';
 import './trade-polish.css';
 import './awards.css';
 import './game-guidance.css';
@@ -251,7 +256,9 @@ function App() {
   const currentHomePath = useRef(accountHomePath(auth));
   currentHomePath.current = accountHomePath(auth);
   const connectedIdentity = useRef<string | null>(null);
-  const [metrics, setMetrics] = useState(initialMetrics);
+  // Probes land every few seconds; only the connection panel follows each one.
+  const [metricsFeed] = useState(() => new NetworkMetricsFeed());
+  const clockOffset = useClockOffset(metricsFeed);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]),
     [historyHasMore, setHistoryHasMore] = useState(false);
   const historyLoaded = useRef(false);
@@ -289,9 +296,12 @@ function App() {
       | 'editProfile'
       | 'invite'
       | 'friends'
+      | 'feedback'
       | null
     >(null);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
+  // Feedback can attach the last error a player saw, even after it was dismissed.
+  const lastError = useLastMessage(error || auth.error);
   const [robberHex, setRobberHex] = useState<number | null>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
   const [isFullscreen, setFullscreen] = useState(!!document.fullscreenElement);
@@ -301,7 +311,13 @@ function App() {
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me && !player?.resigned;
   const matchResults = useMatchResults(room, `${accountIdentity ?? 'anonymous'}:${me ?? 'spectator'}`);
-  const entering = !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite)));
+  // "/" shows the public landing while sign-in loads, unless a saved session is about
+  // to open the player's hub. Later sign-in attempts keep the screen they started on.
+  const authSettled = useRef(false);
+  if (!auth.loading) authSettled.current = true;
+  const returning = !authSettled.current && hasSavedSession(localStorage, auth.config);
+  const entering =
+    !room && (admitting || (auth.loading && (location.pathname !== '/' || !!arrivalInvite || returning)));
   const playerHome = !room && !entering && showPlayerHome(auth, invite);
   const privacy = useAccountPrivacy(
     auth.accessToken,
@@ -334,7 +350,25 @@ function App() {
       !!player?.resigned ||
       !!room?.paused,
     hand = player?.hand ?? emptyHand();
-  const presentedGame = room ? dicePresentationGame(room, feedback.beforeDice) : undefined;
+  const presentedGame = room ? dicePresentationGame(room, feedback.board) : undefined;
+  /**
+   * A build the player has confirmed, still drawn as its preview until the board
+   * presents it. The board can be a moment behind the server while a roll's
+   * resources are still landing, and without this the site stood empty between
+   * the click and the piece's arrival: the road seemed to vanish, then appear.
+   */
+  const [submittedBuild, setSubmittedBuild] = useState<BuildAction | null>(null);
+  useEffect(() => {
+    if (!submittedBuild) return;
+    const shown = presentedGame ?? g;
+    if (!shown || buildShown(shown, submittedBuild)) setSubmittedBuild(null);
+  }, [submittedBuild, presentedGame, g]);
+  useEffect(() => {
+    if (!submittedBuild) return;
+    // Never outlive a lost reply or a presentation that was skipped.
+    const timer = setTimeout(() => setSubmittedBuild(null), 5000);
+    return () => clearTimeout(timer);
+  }, [submittedBuild]);
   const gameNotice = useGameAttention(room, me, connected, feedback.presentationBusy, (cue) =>
     feedback.sound.playAttention(cue),
   );
@@ -446,7 +480,7 @@ function App() {
     setRoom(null);
     setHistoryEntries([]);
     historyLoaded.current = false;
-    setMetrics(initialMetrics());
+    metricsFeed.publish(initialMetrics());
     setMe(undefined);
     setStatus('idle');
     setBusy(false);
@@ -485,7 +519,7 @@ function App() {
         preloadGame: true,
         accessToken: auth.accessToken,
         onMetrics: (value) => {
-          if (connection.current === c) setMetrics(value);
+          if (connection.current === c) metricsFeed.publish(value);
         },
         onStatus: (value) => {
           if (connection.current === c) setStatus(value);
@@ -622,7 +656,7 @@ function App() {
     setLaunchVisualExpired(false);
     const launch = room?.launch;
     if (!launch) return;
-    const serverTime = room.serverNow ?? Date.now() + (metrics.clockOffsetMs ?? 0);
+    const serverTime = room.serverNow ?? Date.now() + (clockOffset ?? 0);
     const remaining = Math.max(0, Math.min(10_000, launch.deadlineAt - serverTime));
     const timer = setTimeout(() => {
       setLaunchVisualExpired(true);
@@ -980,7 +1014,7 @@ function App() {
               disabled={disabled}
               selectedRobberHex={robberHex}
               colors={seatColors}
-              pendingBuild={placementReady ? placement?.action : null}
+              pendingBuild={placementReady ? placement?.action : submittedBuild}
               onAction={onBoardAction}
               onRobber={onBoardRobber}
             />
@@ -1014,7 +1048,7 @@ function App() {
       )}
       {g && room && (
         <PlayerRail
-          clockOffset={metrics.clockOffsetMs}
+          clockOffset={clockOffset}
           room={room}
           game={presentedGame ?? g}
           me={me}
@@ -1022,7 +1056,7 @@ function App() {
             <TurnTimer
               room={room}
               me={me}
-              offset={metrics.clockOffsetMs}
+              offset={clockOffset}
               connected={connected}
               onWarning={() => feedback.sound.play('warning')}
             />
@@ -1098,6 +1132,7 @@ function App() {
           onEditProfile={() => setPanel('editProfile')}
           onFriends={() => setPanel('friends')}
           onSettings={() => setPanel('settings')}
+          onFeedback={() => setPanel('feedback')}
           onSignOut={() => setPanel('signOut')}
         />
       )}
@@ -1301,8 +1336,8 @@ function App() {
           )}
           {panel === 'connection' && (
             <UtilityPanel tool="connection" title="Connection" onClose={() => setPanel(null)}>
-              <ConnectionPanel
-                metrics={metrics}
+              <LiveConnectionPanel
+                feed={metricsFeed}
                 status={status}
                 revision={room?.revision ?? 0}
                 pending={busy}
@@ -1334,7 +1369,10 @@ function App() {
                 if (!placementValid(placement, g, room?.roomId, me)) return;
                 const action = placement.action;
                 setPlacement(null);
-                void act(action);
+                setSubmittedBuild(action);
+                void act(action).then((accepted) => {
+                  if (!accepted) setSubmittedBuild(null);
+                });
               }}
             />
           )}
@@ -1347,7 +1385,7 @@ function App() {
               onAction={(a) => void act(a)}
               disabled={disabled}
               connected={connected}
-              offset={metrics.clockOffsetMs}
+              offset={clockOffset}
               onWarning={() => feedback.sound.play('warning')}
             />
           )}
@@ -1375,9 +1413,10 @@ function App() {
       {g && (
         <GameEffects
           event={feedback.event}
-          lastDice={g.dice}
+          // The dock shows the dice of the board being shown, never those of a queued roll.
+          lastDice={(presentedGame ?? g).dice}
           reducedMotion={reducedMotion}
-          activity={!feedback.presentationBusy}
+          activity={!feedback.rolling}
           awards={feedback.awards}
           onAwardComplete={feedback.finishAward}
           onAwardStart={feedback.announceAward}
@@ -1407,6 +1446,20 @@ function App() {
             privacy={privacy.value}
             savePrivacy={privacy.save}
             previewSound={() => feedback.sound.play('settlement')}
+          />
+        </Dialog>
+      )}
+      {panel === 'feedback' && (
+        <Dialog side={!!g} tool="feedback" title="Send feedback" compact onClose={() => setPanel(null)}>
+          <SendFeedback
+            details={{
+              roomCode: room?.roomCode,
+              revision: room?.revision,
+              connection: room ? status : undefined,
+              lastError,
+            }}
+            {...(auth.config?.mode === 'authenticated' ? { accessToken: auth.accessToken } : {})}
+            onClose={() => setPanel(null)}
           />
         </Dialog>
       )}
@@ -1510,5 +1563,7 @@ if (resultsPreview) {
 } else if (designPreview) {
   void import('./dev/LoungePreview.js').then(({ LoungePreview }) => root.render(<LoungePreview />));
 } else {
-  root.render(<App />);
+  // mountApp has just removed the prerendered landing: commit in this same task, so no
+  // frame paints an empty page in between.
+  flushSync(() => root.render(<App />));
 }

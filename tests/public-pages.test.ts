@@ -1,17 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { renderPublicPages } from '../scripts/render-public-pages.js';
+import { LandingFeatures } from '../apps/client/src/LandingFeatures.js';
 import { HOME_TITLE } from '../apps/client/src/game-attention.js';
 import { REACTIONS, REACTION_LIST } from '../packages/protocol/src/reactions.js';
 import { publicPath } from '../apps/client/src/analytics.js';
+import { DEFAULT_ROOM_SETTINGS, DEFAULT_TURN_TIMER_SECONDS } from '../packages/protocol/src/settings.js';
 import {
   GUIDE_FAQ,
   GUIDE_SECTIONS,
+  PRIVACY_CONTACT,
+  PRIVACY_UPDATED,
   PUBLIC_PAGES,
   SOCIAL_CARD_ALT,
   subId,
@@ -33,6 +38,7 @@ test('the production entry is readable before JavaScript and only public pages e
   await renderPublicPages(directory);
   const home = await readFile(join(directory, 'index.html'), 'utf8');
   const guide = await readFile(join(directory, 'guide', 'index.html'), 'utf8');
+  const privacy = await readFile(join(directory, 'privacy', 'index.html'), 'utf8');
   const shell = await readFile(join(directory, 'app.html'), 'utf8');
   assert.equal((home.match(/<title>/g) ?? []).length, 1);
   assert.ok(home.includes(`<title>${PUBLIC_PAGES[0].title}</title>`));
@@ -66,7 +72,7 @@ test('the production entry is readable before JavaScript and only public pages e
   // no tag at all, and a room code cannot reach a third party that way.
   for (const marker of ['analytics.js']) {
     assert.ok(!shell.includes(marker), `app.html must stay clear of ${marker}`);
-    for (const page of [home, guide]) assert.ok(page.includes(marker), marker);
+    for (const page of [home, guide, privacy]) assert.ok(page.includes(marker), marker);
   }
   const loader = await readFile(join(directory, 'analytics.js'), 'utf8');
   assert.ok(loader.includes('G-NGHVNKN7FZ'), 'the loader names its GA4 property');
@@ -88,7 +94,7 @@ test('the production entry is readable before JavaScript and only public pages e
   // a request, warms nothing, and fails where nobody is looking. These URLs
   // carry a content hash, so a re-export moves the file and leaves the page
   // pointing at the old one, which is exactly how the logo preload broke.
-  for (const page of [home, guide])
+  for (const page of [home, guide, privacy])
     for (const match of page.matchAll(/(?:href|src)="(\/art\/[^"]+)"/g))
       await readFile(join('apps/client/public', match[1]!)).catch(() => {
         throw new Error(`${match[1]} is referenced but not on disk`);
@@ -114,6 +120,14 @@ test('the production entry is readable before JavaScript and only public pages e
     ['id="glossary"', 'Largest Army'],
   ] as const)
     assert.ok(guide.includes(anchor) && guide.includes(phrase), anchor);
+  // The room settings table states the defaults a new room is actually created with.
+  const dice = DEFAULT_ROOM_SETTINGS.diceMode === 'classic' ? 'Natural' : 'Balanced';
+  assert.ok(guide.includes(`Natural or balanced dice</th><td>${dice}</td>`), `dice default is ${dice}`);
+  // New rooms start with the slider's own default from 23 September 2026 (the
+  // change to settings.ts itself lands separately); existing rooms keep theirs.
+  assert.equal(DEFAULT_TURN_TIMER_SECONDS, 90);
+  assert.ok(guide.includes(`Turn timer</th><td>${DEFAULT_TURN_TIMER_SECONDS} seconds</td>`));
+  assert.ok(!guide.includes('leave it off'), 'the timer is no longer off by default');
   // A reference page is only useful if its own contents list works.
   const navigable = [...guide.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
   assert.ok(navigable.length >= 12, `only ${navigable.length} anchors`);
@@ -191,7 +205,7 @@ test('the production entry is readable before JavaScript and only public pages e
     ['src="/analytics.js" async', 'type="application/ld+json"'],
   );
   assert.ok(!guide.includes('/src/main.tsx'));
-  for (const html of [home, guide]) {
+  for (const html of [home, guide, privacy]) {
     assert.equal((html.match(/name="description"/g) ?? []).length, 1);
     assert.ok(html.includes('property="og:image" content="https://catanova.io/branding/social-card-v3.jpg"'));
     assert.ok(
@@ -205,10 +219,11 @@ test('the production entry is readable before JavaScript and only public pages e
   }
   assert.ok(home.includes('rel="canonical" href="https://catanova.io/"'));
   assert.ok(guide.includes('rel="canonical" href="https://catanova.io/guide/"'));
+  assert.ok(privacy.includes('rel="canonical" href="https://catanova.io/privacy/"'));
   const sitemap = await readFile(join(directory, 'sitemap.xml'), 'utf8');
   assert.deepEqual(
     [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((m) => m[1]),
-    ['https://catanova.io/', 'https://catanova.io/guide/'],
+    ['https://catanova.io/', 'https://catanova.io/guide/', 'https://catanova.io/privacy/'],
   );
   const robots = await readFile(join(directory, 'robots.txt'), 'utf8');
   assert.match(robots, /^User-agent: \*\nAllow: \/\n/);
@@ -259,6 +274,103 @@ test('the production entry is readable before JavaScript and only public pages e
   for (const match of guide.matchAll(/href="#([^"]+)"/g)) assert.ok(guide.includes(`id="${match[1]}"`));
 });
 
+test('the privacy page is linked from the public pages and names only what the code does', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'catanova-privacy-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(join(directory, 'index.html'), await readFile('apps/client/index.html', 'utf8'));
+  await renderPublicPages(directory);
+  const home = await readFile(join(directory, 'index.html'), 'utf8');
+  const guide = await readFile(join(directory, 'guide', 'index.html'), 'utf8');
+  const privacy = await readFile(join(directory, 'privacy', 'index.html'), 'utf8');
+  // The landing footer and the guide link here; the banner's link is covered with the loader.
+  assert.ok(home.includes('<a href="/privacy/">Privacy</a>'));
+  assert.ok(guide.includes('<a href="/privacy/">Privacy</a>'));
+  assert.ok(privacy.includes(`<title>${PUBLIC_PAGES[2].title}</title>`));
+  assert.equal(PRIVACY_UPDATED.text, '23 September 2026');
+  assert.ok(privacy.includes(`Last updated: ${PRIVACY_UPDATED.text}`));
+  assert.ok(privacy.includes('<link rel="stylesheet" href="/guide/guide.css">'));
+  // Like the guide it ships no code of its own; the measurement loader wires the control up.
+  assert.deepEqual(
+    [...privacy.matchAll(/<script([^>]*)>/g)].map((m) => m[1]!.trim()),
+    ['src="/analytics.js" async', 'type="application/ld+json"'],
+  );
+  // Without that loader the buttons would do nothing, so they start hidden.
+  assert.match(privacy, /<div class="privacy-choice" data-consent-control="" hidden="">/);
+  for (const state of ['unset', 'granted', 'denied'])
+    assert.ok(privacy.includes(`data-consent-state="${state}"`), state);
+  for (const choice of ['granted', 'denied']) assert.ok(privacy.includes(`data-consent-choice="${choice}"`));
+  for (const service of [
+    'Supabase',
+    'Microsoft Azure',
+    'Central India',
+    'Cloudflare Turnstile',
+    'Google Analytics 4',
+    'TypeSafe',
+  ])
+    assert.ok(privacy.includes(service), service);
+  assert.ok(privacy.includes('not your name or email'));
+  // Claims that name something elsewhere in the repository must still match it.
+  assert.ok(privacy.includes('seven days without activity'));
+  assert.match(
+    await readFile('supabase/schema.sql', 'utf8'),
+    /last_active_at <= now\(\) - interval '7 days'/,
+  );
+  assert.ok(privacy.includes('Show when you were last online'));
+  assert.ok(
+    (await readFile('apps/client/src/GameSettings.tsx', 'utf8')).includes('Show when you were last online'),
+    'the page names the switch Settings actually shows',
+  );
+  // A clearly marked placeholder until the owner supplies an inbox; never an invented one.
+  assert.ok(privacy.includes(`<a href="mailto:${PRIVACY_CONTACT}">${PRIVACY_CONTACT}</a>`));
+  for (const match of privacy.matchAll(/<a ([^>]*href="https?:[^"]*"[^>]*)>/g)) {
+    assert.match(match[1]!, /target="_blank"/, match[1]!);
+    assert.match(match[1]!, /rel="[^"]*noopener/, match[1]!);
+  }
+  for (const match of privacy.matchAll(/href="#([^"]+)"/g)) assert.ok(privacy.includes(`id="${match[1]}"`));
+  const graph = JSON.parse(privacy.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!)[
+    '@graph'
+  ] as Record<string, string>[];
+  assert.deepEqual(
+    graph.map((node) => node['@type']),
+    ['WebPage'],
+  );
+  assert.equal(graph[0]!.dateModified, PRIVACY_UPDATED.iso);
+});
+
+/** Width and height from a WebP header: the extended (VP8X) or simple lossy (VP8) layout. */
+function webpSize(data: Buffer): [number, number] {
+  assert.equal(data.subarray(0, 4).toString(), 'RIFF');
+  assert.equal(data.subarray(8, 12).toString(), 'WEBP');
+  const chunk = data.subarray(12, 16).toString();
+  if (chunk === 'VP8X') return [data.readUIntLE(24, 3) + 1, data.readUIntLE(27, 3) + 1];
+  assert.equal(chunk, 'VP8 ', `unexpected WebP chunk ${chunk}`);
+  return [data.readUInt16LE(26) & 0x3fff, data.readUInt16LE(28) & 0x3fff];
+}
+
+test('the landing shows its six small pictures from small lazy files, never the full atlases', async () => {
+  const html = renderToStaticMarkup(createElement(LandingFeatures, { onPlay: () => {} }));
+  // An inline SVG <image> downloads eagerly and these atlases are 860 KB
+  // between them; four faces and two resources are not worth that on a first visit.
+  assert.ok(!html.includes('avatars-fantasy') && !html.includes('sprites-fantasy'));
+  const thumbnails = [...html.matchAll(/<img ([^>]*src="\/art\/optimized\/landing-[^"]+"[^>]*)\/>/g)].map(
+    (match) => match[1]!,
+  );
+  assert.equal(thumbnails.length, 6, 'four avatars and two resources');
+  for (const attributes of thumbnails) {
+    const attribute = (name: string) => new RegExp(` ?${name}="([^"]*)"`).exec(attributes)?.[1];
+    const src = attribute('src')!;
+    assert.equal(attribute('loading'), 'lazy', src);
+    assert.equal(attribute('decoding'), 'async', src);
+    assert.ok(attribute('alt'), `${src} is described`);
+    const match = /^\/art\/optimized\/[a-z0-9-]+\.([a-f0-9]{12})\.webp$/.exec(src);
+    assert.ok(match, `${src} is content-hashed like the other optimized art`);
+    const data = await readFile(join('apps/client/public', src));
+    assert.equal(createHash('sha256').update(data).digest('hex').slice(0, 12), match[1], src);
+    assert.deepEqual(webpSize(data), [Number(attribute('width')), Number(attribute('height'))], src);
+    assert.ok(data.length < 12_000, `${src} is ${data.length} bytes`);
+  }
+});
+
 test('discovery assets are real files with declared icon and social dimensions', async () => {
   const root = resolve('apps/client/public');
   const manifest = JSON.parse(await readFile(join(root, 'site.webmanifest'), 'utf8')) as {
@@ -296,4 +408,3 @@ test('discovery assets are real files with declared icon and social dimensions',
   }
   assert.deepEqual(dimensions, [1200, 630]);
 });
-

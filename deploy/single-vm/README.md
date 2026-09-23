@@ -25,18 +25,18 @@ cp deploy/single-vm/.env.example deploy/single-vm/.env
 chmod 600 deploy/single-vm/.env
 ```
 
-Replace the commit placeholder before running the commands. Fill all five values in `deploy/single-vm/.env`; `CATANOVA_REVISION` must exactly match `git rev-parse HEAD`. This file is ignored by Git. Use one bare DNS hostname for `CATANOVA_DOMAIN`. Public keys belong here; privileged keys do not.
+Replace the commit placeholder before running the commands. Fill every required value in `deploy/single-vm/.env`, including the admin console's Cloudflare settings described in [the admin console guide](../../docs/ADMIN.md); `CATANOVA_REVISION` must exactly match `git rev-parse HEAD`. This file is ignored by Git. Use one bare DNS hostname for `CATANOVA_DOMAIN`. Public keys belong here; privileged keys do not.
 
 Run the following from **deploy/single-vm**. `--env-file .env` explicitly selects this deployment's configuration, and `${VAR:?message}` rejects missing or empty values. Avoid exporting conflicting variables in the shell: shell values take precedence. [Compose interpolation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
 
 ```sh
 docker compose --env-file .env config --quiet
 docker compose --env-file .env build --pull game
-docker compose --env-file .env pull caddy
+docker compose --env-file .env pull caddy cloudflared
 docker compose --env-file .env run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 docker compose --env-file .env up -d --no-build
 docker compose --env-file .env ps
-docker compose --env-file .env logs --tail=80 game caddy
+docker compose --env-file .env logs --tail=80 game caddy cloudflared
 ```
 
 The image carries the source revision label. Node's base-image tag in the repository Dockerfile and Caddy's patch tag can receive image rebuilds; keep the resulting image IDs with release records if exact rollback is needed. This pins application source, not every upstream image digest.
@@ -65,4 +65,4 @@ SQLite uses WAL files: copying only the live `probe.sqlite` file can omit commit
 
 The volume is persistence, not a backup. Before inviting users, arrange scheduled, encrypted copies **off this VM**, retain several versions, and test restoring a copy on an isolated server. Do the same for Caddy's data/config if preserving certificate state across VM loss is required. Supabase backups cover account data separately; they cannot recover this game's SQLite matches.
 
-Restore with the game stopped and a preserved copy of its existing data. Restore the chosen consistent snapshot to `/app/data/probe.sqlite`, remove stale WAL/SHM companions from the replaced database, preserve the `node` user's ownership, then start the same reviewed release and test room recovery. Never replace an open database or run the restored test against the production data volume. Backup scheduling and VM-loss recovery are operational work still to configure; this Compose file does not silently provide them.
+Restore with the game stopped and a preserved copy of its existing data. Restore the chosen consistent snapshot to `/app/data/probe.sqlite`, remove stale WAL/SHM companions from the replaced database, preserve the `node` user's ownership, then start the same reviewed release and test room recovery. Never replace an open database or run the restored test against the production data volume. This Compose file does not provide backups by itself. The [backup worker](backup/README.md) schedules the off-VM snapshots, the [restore drill](backup/README.md#restore-drill) rehearses recovery every week, and [the operations runbook](OPERATIONS.md#restore-production-from-a-backup) has the complete restore procedure, including VM loss.

@@ -1,9 +1,41 @@
 import type { CSSProperties } from 'react';
-import { ResourceIcon } from './Board.js';
-import { Avatar } from './Profile.js';
-import { defaultProfile } from '../../../packages/protocol/src/profile.js';
+import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import { ArrowRight, Exchange } from './GameIcons.js';
 import { BOARD_THEMES } from './board-theme.js';
+
+/**
+ * The six small pictures below the fold, cut out of the game's art in advance.
+ *
+ * The game draws avatars and resources from two whole atlases, 860 KB between
+ * them, and an inline SVG image downloads eagerly, so a first visit used to
+ * pay for all of it to show four faces and two resources. These are the same
+ * crops at twice their largest display size, loaded only as they approach the
+ * viewport. How they were made: docs/art/RUNTIME.md, "Landing thumbnails".
+ */
+const LANDING_AVATARS = [
+  ['Fern', '/art/optimized/landing-avatar-0.e2df3fd346a0.webp'],
+  ['Moss', '/art/optimized/landing-avatar-1.eca9a26781c1.webp'],
+  ['Pip', '/art/optimized/landing-avatar-3.028c962ae3c7.webp'],
+  ['Oak', '/art/optimized/landing-avatar-5.5a2f5a7641f3.webp'],
+] as const;
+const LANDING_RESOURCES = {
+  wood: '/art/optimized/landing-timber.fce8cddc0b3d.webp',
+  ore: '/art/optimized/landing-rock.52e98dbe36d0.webp',
+} as const;
+
+function LandingResource({ resource }: { resource: keyof typeof LANDING_RESOURCES }) {
+  return (
+    <img
+      className="feature-resource"
+      src={LANDING_RESOURCES[resource]}
+      alt={RESOURCE_NAMES[resource]}
+      width="72"
+      height="72"
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
 
 /** Small, non-interactive examples reuse the actual game art; no game loop or canvas. */
 export function LandingFeatures({ onPlay }: { onPlay: () => void }) {
@@ -28,9 +60,18 @@ export function LandingFeatures({ onPlay }: { onPlay: () => void }) {
             <small>4 / 4</small>
           </div>
           <div className="feature-avatars">
-            {['Fern', 'Moss', 'Pip', 'Oak'].map((name, i) => (
+            {LANDING_AVATARS.map(([name, src]) => (
               <div key={name}>
-                <Avatar profile={{ ...defaultProfile(name), avatar: [0, 1, 3, 5][i]! }} />
+                <span className="avatar-medallion">
+                  <img
+                    src={src}
+                    alt={`${name}'s avatar`}
+                    width="192"
+                    height="192"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </span>
                 <span>{name}</span>
               </div>
             ))}
@@ -108,13 +149,13 @@ export function LandingFeatures({ onPlay }: { onPlay: () => void }) {
         <figure className="feature-trade" aria-label="Example trade: give two Timber, get one Rock">
           <div>
             <span>You give</span>
-            <ResourceIcon resource="wood" />
+            <LandingResource resource="wood" />
             <b>2</b>
           </div>
           <Exchange size={36} />
           <div>
             <span>You get</span>
-            <ResourceIcon resource="ore" />
+            <LandingResource resource="ore" />
             <b>1</b>
           </div>
           <figcaption>Your call.</figcaption>

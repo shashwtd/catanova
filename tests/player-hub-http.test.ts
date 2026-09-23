@@ -244,6 +244,16 @@ test('history and presence have per-account limits and unauthenticated floods ar
 
 test('authenticated game sockets also keep their owner online while playing', async (t) => {
   const f = await fixture(t);
+  // Wait for the heartbeat's refresh itself, not a guess at how long one takes on a busy machine.
+  const touchedAt: number[] = [];
+  const touch = AccountPresence.prototype.touch;
+  AccountPresence.prototype.touch = function (this: AccountPresence, ...args: Parameters<typeof touch>) {
+    touchedAt.push(args[1]);
+    return touch.apply(this, args);
+  };
+  t.after(() => {
+    AccountPresence.prototype.touch = touch;
+  });
   const client = new Connection(f.server.url, newSession('Builder'), { accessToken: async () => 'Builder' });
   t.after(() => client.stop());
   client.start();
@@ -251,7 +261,8 @@ test('authenticated game sockets also keep their owner online while playing', as
   let friends = await (await f.request('/api/friends', 'Captain')).json();
   assert.equal(friends.friends[0].online, true);
   f.advance(ACCOUNT_PRESENCE_TTL_MS - 1);
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  const advanced = f.now();
+  await until(() => touchedAt.includes(advanced));
   f.advance(2);
   friends = await (await f.request('/api/friends', 'Captain')).json();
   assert.equal(friends.friends[0].online, true, 'transport pongs refresh authenticated presence');

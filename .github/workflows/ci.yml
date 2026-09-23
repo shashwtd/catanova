@@ -4,6 +4,8 @@ on:
   pull_request:
 permissions:
   contents: read
+# The same gate runs locally with `npm run ci` (scripts/ci.ts), so a change that
+# passes on a laptop passes here, and the other way round.
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -17,8 +19,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm run check
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run ci
   container:
     runs-on: ubuntu-latest
     steps:
@@ -28,19 +29,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Check deployment bootstrap and backup recovery
-        run: |
-          bash -n deploy/single-vm/bootstrap.sh
-          python3 -B -m unittest discover -s deploy/single-vm/backup -p 'test_*.py'
-      - name: Validate authenticated production deployment
-        env:
-          CATANOVA_DOMAIN: catanova.example
-          CATANOVA_REVISION: ${{ github.sha }}
-          SUPABASE_URL: https://example.supabase.co
-          SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_configuration_only
-          TURNSTILE_SITE_KEY: site_key_for_configuration_validation
-        run: docker compose --env-file deploy/single-vm/.env.example -f deploy/single-vm/compose.yaml config --quiet
-      - run: docker compose up --build --wait
-      - run: npm run probe
-      - if: always()
-        run: docker compose down -v
+      - run: npm run ci -- --docker

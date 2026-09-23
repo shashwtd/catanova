@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Catanova restore drill every week
+
+[Timer]
+# Wednesdays 21:40 UTC (Thursday 03:10 in India): a quiet hour, clear of the quarter-hour backups.
+OnCalendar=Wed *-*-* 21:40:00 UTC
+Persistent=true
+AccuracySec=1min
+Unit=catanova-drill.service
+
+[Install]
+WantedBy=timers.target

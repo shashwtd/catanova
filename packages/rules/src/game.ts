@@ -193,7 +193,9 @@ export function createGame(
   seats: { id: string; name: string }[],
   seed: number,
   random: () => number,
-  options: { diceMode?: DiceMode; victoryPoints?: number } = {},
+  // `board`: the island a lobby was already showing, played exactly as dealt. A seed
+  // only reproduces a board under the generator that dealt it, and generators change.
+  options: { diceMode?: DiceMode; victoryPoints?: number; board?: Board } = {},
 ): Game {
   requireRule(
     options.victoryPoints === undefined || validVictoryPoints(options.victoryPoints),
@@ -201,7 +203,8 @@ export function createGame(
   );
   requireRule(seats.length >= 2 && seats.length <= 4, 'Start with two to four players');
   requireRule(new Set(seats.map((p) => p.id)).size === seats.length, 'Seats must be unique');
-  const board = generateBoard(seed);
+  requireRule(!options.board || options.board.seed === seed >>> 0, 'The island does not match its seed');
+  const board = options.board ? structuredClone(options.board) : generateBoard(seed);
   const g: Game = {
     schema: 1,
     ruleset: RULESET,
@@ -456,14 +459,19 @@ export function noteStandIn(state: Game, playerId: string, taking: boolean): Gam
 export function resignPlayers(
   state: Game,
   playerIds: string[],
-  options: { reason?: 'disconnect' | 'leave'; winnerEligibleIds?: string[] } = {},
+  options: { reason?: 'disconnect' | 'leave'; winnerEligibleIds?: string[]; botIds?: string[] } = {},
 ): Game {
   if (state.phase === 'finished') return state;
   const departing = state.players.filter((p) => !p.resigned && playerIds.includes(p.id));
   const survivors = state.players.filter((p) => !p.resigned && !playerIds.includes(p.id));
   const eligible = (id: string) =>
     options.winnerEligibleIds === undefined || options.winnerEligibleIds.includes(id);
-  if (!departing.length && !(survivors.length === 1 && eligible(survivors[0]!.id))) return state;
+  // Bots keep a table going for the people at it; they are not a table of their
+  // own. Once nobody but bots is left the game is over, rather than paused for good.
+  const bot = (id: string) => !!options.botIds?.includes(id);
+  const onlyBotsLeft = survivors.length > 0 && survivors.every((p) => bot(p.id));
+  if (!departing.length && !onlyBotsLeft && !(survivors.length === 1 && eligible(survivors[0]!.id)))
+    return state;
   const g = structuredClone(state);
   for (const p of g.players)
     if (departing.some((other) => other.id === p.id)) {
@@ -490,7 +498,7 @@ export function resignPlayers(
   }
   updateAwards(g);
   const remaining = g.players.filter((p) => !p.resigned);
-  if (!remaining.length) {
+  if (!remaining.length || remaining.every((p) => bot(p.id))) {
     g.winner = null;
     g.finishReason = 'abandoned';
     g.phase = 'finished';
@@ -498,7 +506,12 @@ export function resignPlayers(
     g.discards = {};
     g.freeRoads = 0;
     g.setupVertex = null;
-    log(g, 'The game ended with no winner: every player left.');
+    log(
+      g,
+      remaining.length
+        ? 'The game ended with no winner: only bots were left at the table.'
+        : 'The game ended with no winner: every player left.',
+    );
     return g;
   }
   if (remaining.length === 1) {
@@ -546,7 +559,9 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     requireRule(total(a.resources) === g.discards[p.id], `Discard exactly ${g.discards[p.id]} cards`);
     transfer(p.hand, g.bank, a.resources);
     delete g.discards[p.id];
-    log(g, `${p.name} discarded ${total(a.resources)} cards.`);
+    // Discards go back to the bank in front of everyone (and the bank's counts
+    // show them anyway), so the record names them.
+    log(g, `${p.name} discarded ${resourceText(a.resources)}.`);
     if (!Object.keys(g.discards).length) {
       if (activePlayer(g).resigned) {
         advanceTurn(g, true);
@@ -775,6 +790,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
         'Choose two available bank resources (or the remainder if only one exists)',
       );
       transfer(g.bank, p.hand, a.resources);
+      log(g, `${p.name} took ${resourceText(a.resources)} from the bank with Year of Plenty.`);
     }
     if (card.kind === 'monopoly') {
       requireRule(a.resource, 'Choose a resource');

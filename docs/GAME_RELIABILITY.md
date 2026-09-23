@@ -15,10 +15,10 @@ The server already used cryptographic random integers from Node, independently o
 
 ## Lobby dice modes
 
-- **Natural (default, stored as `classic`):** two independent six-sided dice. Total 7 has a 6/36 chance; 2 and 12 each have a 1/36 chance. Old rooms and saves without a mode keep Classic behavior.
-- **Balanced:** draw without replacement from the 36 ordered dice pairs. Before a roll, refresh to all 36 pairs if 12 or fewer remain. Each remaining pair has weight 10, except pairs matching the previous total have weight 7. Select with the same unbiased server random sampler, remove the pair, and remember its total. This reduces short-game swings and repeat streaks while retaining the familiar frequency curve. Individual rolls are dependent; it does not promise exact percentages or equal resources.
+- **Natural (stored as `classic`):** two independent six-sided dice. Total 7 has a 6/36 chance; 2 and 12 each have a 1/36 chance. Old rooms and saves without a mode keep Classic behavior.
+- **Balanced (default for new rooms since 13 September 2026):** draw without replacement from the 36 ordered dice pairs. Before a roll, refresh to all 36 pairs if 12 or fewer remain. Each remaining pair has weight 10, except pairs matching the previous total have weight 7. Select with the same unbiased server random sampler, remove the pair, and remember its total. This reduces short-game swings and repeat streaks while retaining the familiar frequency curve. Individual rolls are dependent; it does not promise exact percentages or equal resources.
 
-This is Catanova's implementation of the [published Colonist deck-and-repeat-weight design](https://blog.colonist.io/designing-balanced-dice/), not a claim of identical current behavior. There are no score, seat, resource, catch-up, or player-specific adjustments (including for sevens). Natural remains the default.
+This is Catanova's implementation of the [published Colonist deck-and-repeat-weight design](https://blog.colonist.io/designing-balanced-dice/), not a claim of identical current behavior. There are no score, seat, resource, catch-up, or player-specific adjustments (including for sevens). New rooms default to Balanced; the host can choose Natural.
 
 The host chooses before starting; the choice is persisted and locked during play. The remaining balanced deck and previous total are stored with the authoritative game snapshot and omitted from every client projection. Duplicate commands replay their receipt without drawing again. Refreshing the page, reconnecting, and restarting the server cannot reset the deck.
 

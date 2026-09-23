@@ -35,6 +35,8 @@ test('one server serves client assets and same-origin WebSockets without exposin
   await writeFile(join(client, 'app.html'), '<!doctype html><title>Catanova room</title>');
   await mkdir(join(client, 'guide'));
   await writeFile(join(client, 'guide', 'index.html'), '<!doctype html><title>How to play Catanova</title>');
+  await mkdir(join(client, 'privacy'));
+  await writeFile(join(client, 'privacy', 'index.html'), '<!doctype html><title>Privacy at Catanova</title>');
   await writeFile(join(client, 'sitemap.xml'), '<urlset></urlset>');
   await writeFile(join(client, 'site.webmanifest'), '{"name":"Catanova"}');
   await writeFile(join(client, 'assets', 'game-123.js'), 'export const game = true;');
@@ -99,9 +101,16 @@ test('one server serves client assets and same-origin WebSockets without exposin
   assert.match(await guide.text(), /How to play Catanova/);
   assert.match(guide.headers.get('content-type')!, /text\/html/);
   assert.equal(guide.headers.get('x-robots-tag'), null);
+  const privacy = await fetch(origin + '/privacy/');
+  assert.equal(privacy.status, 200);
+  assert.match(await privacy.text(), /Privacy at Catanova/);
+  assert.match(privacy.headers.get('content-type')!, /text\/html/);
+  assert.equal(privacy.headers.get('x-robots-tag'), null);
   for (const [path, target] of [
     ['/guide', '/guide/'],
     ['/guide/index.html', '/guide/'],
+    ['/privacy', '/privacy/'],
+    ['/privacy/index.html', '/privacy/'],
     ['/index.html', '/'],
     ['/index.html?room=ABCD2345', '/?room=ABCD2345'],
   ]) {
@@ -153,6 +162,58 @@ test('one server serves client assets and same-origin WebSockets without exposin
   const ws = new WebSocket(server.url, { origin });
   await once(ws, 'open');
   ws.close();
+});
+
+test('pages may open sockets only to their own host, and production HTTPS pins HTTPS', async (t) => {
+  const client = await mkdtemp(join(tmpdir(), 'catanova-headers-'));
+  await writeFile(join(client, 'index.html'), '<!doctype html><title>Catanova</title>');
+  await mkdir(join(client, 'guide'));
+  await writeFile(join(client, 'guide', 'index.html'), '<!doctype html><title>How to play Catanova</title>');
+  const server = await startServer({ port: 0, databasePath: ':memory:', clientDirectory: client });
+  t.after(async () => {
+    await server.close();
+    await rm(client, { recursive: true, force: true });
+  });
+  const origin = `http://127.0.0.1:${server.port}`;
+  const connect = (policy: string) => /connect-src ([^;]*);/.exec(policy)![1]!;
+  // Closed after each response, so the server can shut down without waiting out keep-alive.
+  const get = (path: string, headers: Record<string, string> = {}) =>
+    rawRequest(origin + path, { ...headers, Connection: 'close' });
+  // Plain-http local play: its own ws:// origin, and no HSTS to pin localhost.
+  const local = await get('/');
+  const localPolicy = local.headers['content-security-policy'] as string;
+  assert.match(connect(localPolicy), new RegExp(`^'self' ws://127\\.0\\.0\\.1:${server.port}( |$)`));
+  assert.doesNotMatch(connect(localPolicy), /(?:^| )wss?:(?: |$)/, 'no socket to any host');
+  assert.equal(local.headers['strict-transport-security'], undefined);
+  // Production: Caddy terminates TLS and forwards the scheme; the Host is the site's.
+  const production = await get('/', { Host: 'catanova.io', 'X-Forwarded-Proto': 'https' });
+  const policy = production.headers['content-security-policy'] as string;
+  assert.match(connect(policy), /^'self' wss:\/\/catanova\.io( |$)/);
+  assert.doesNotMatch(connect(policy), /(?:^| )wss?:(?: |$)|ws:\/\//);
+  assert.equal(production.headers['strict-transport-security'], 'max-age=31536000; includeSubDomains');
+  const redirect = await get('/guide', { Host: 'catanova.io', 'X-Forwarded-Proto': 'https' });
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers['strict-transport-security'], 'max-age=31536000; includeSubDomains');
+  // HTTPS in front of a loopback name or an address never pins it.
+  for (const host of ['localhost:3000', 'catanova.localhost', '127.0.0.1:3000']) {
+    const response = await get('/', { Host: host, 'X-Forwarded-Proto': 'https' });
+    assert.equal(response.headers['strict-transport-security'], undefined, host);
+    assert.ok(connect(response.headers['content-security-policy'] as string).includes(`wss://${host}`));
+  }
+  assert.equal(
+    (await get('/', { Host: 'catanova.io', 'X-Forwarded-Proto': 'http' })).headers[
+      'strict-transport-security'
+    ],
+    undefined,
+  );
+  // A Host header cannot add sources or directives: anything but a plain host is left out.
+  for (const host of ["evil.example; script-src 'unsafe-inline' *", 'evil.example wss://evil.example']) {
+    const response = await get('/', { Host: host, 'X-Forwarded-Proto': 'https' });
+    const headers = `${response.headers['content-security-policy']} ${response.headers['strict-transport-security']}`;
+    assert.ok(!headers.includes('evil'), host);
+    assert.equal((headers.match(/script-src/g) ?? []).length, 1);
+    assert.match(connect(response.headers['content-security-policy'] as string), /^'self'( |$)/);
+  }
 });
 
 test('content-hashed WebP art is immutable while stable art URLs revalidate', async (t) => {

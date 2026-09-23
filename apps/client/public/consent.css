@@ -1,0 +1,77 @@
+/* The analytics question on the public pages. /analytics.js fetches this only
+   while a visitor has not answered, and opens the dialog once it has loaded.
+   It must be answered before the page can be used, so it sits over a dimmed
+   page, drawn like the landing footer: white type in the game's Barlow on the
+   same deep green. Accept all is the bright button; Deny is the same size and
+   plainly legible, only quieter. */
+.consent-dialog {
+  box-sizing: border-box;
+  width: min(430px, calc(100vw - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 22px 22px 18px;
+  border: 1px solid #fff4d433;
+  border-radius: 14px;
+  background: #143425f7;
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 18px 50px #04100bb3;
+  font:
+    500 15px/1.5 Barlow,
+    sans-serif;
+}
+.consent-dialog:focus {
+  outline: none;
+}
+.consent-dialog::backdrop {
+  background: #0a1c1499;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.consent-dialog p {
+  margin: 0 0 18px;
+  font: inherit;
+  color: inherit;
+  text-wrap: balance;
+}
+.consent-dialog a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.consent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.consent-dialog button {
+  flex: 1 1 140px;
+  min-height: 42px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  cursor: pointer;
+}
+.consent-dialog [data-consent-choice='granted'] {
+  border: 1px solid #fff4d4;
+  background: #fff4d4;
+  color: #36503f;
+  box-shadow: 0 2px 5px #0e241b40;
+}
+.consent-dialog [data-consent-choice='granted']:hover {
+  background: #fff9e5;
+}
+.consent-dialog [data-consent-choice='denied'] {
+  border: 1px solid #fff4d466;
+  background: transparent;
+  color: #ffffffd9;
+}
+.consent-dialog [data-consent-choice='denied']:hover {
+  background: #ffffff14;
+}
+.consent-dialog :focus-visible {
+  outline: 3px solid #fff2ca;
+  outline-offset: 3px;
+}

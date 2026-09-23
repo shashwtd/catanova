@@ -36,6 +36,23 @@ Use `scripts/export-branding.mjs` only when deliberately regenerating browser ic
 
 These are byte-size and behavior improvements, not a claim that an actual throttled-device benchmark or maximum player capacity has been measured.
 
+## Landing thumbnails
+
+The signed-out landing shows four avatars and two resources below the fold. It used to draw them from the full avatar and sprite atlases through inline SVG `<image>` elements, which download eagerly: 863,364 bytes on every first visit for six small pictures. The landing now has its own crops, loaded with `loading="lazy"`:
+
+| File               | Master                | Region (x, y, width, height) | Output          |
+| ------------------ | --------------------- | ---------------------------- | --------------- |
+| `landing-avatar-0` | `avatars-fantasy.png` | 6, 0, 350, 350               | 192 × 192, q 80 |
+| `landing-avatar-1` | `avatars-fantasy.png` | 368, 0, 350, 350             | 192 × 192, q 80 |
+| `landing-avatar-3` | `avatars-fantasy.png` | 1092, 0, 350, 350            | 192 × 192, q 80 |
+| `landing-avatar-5` | `avatars-fantasy.png` | 369, 350, 348, 348           | 192 × 192, q 80 |
+| `landing-timber`   | `sprites-fantasy.png` | 0, 0, 443.5, 443.5           | 72 × 72, q 90   |
+| `landing-rock`     | `sprites-fantasy.png` | 0, 443.5, 443.5, 443.5       | 72 × 72, q 90   |
+
+Each region is exactly what the game shows: the square that the avatar's `slice` viewBox keeps of its 362-pixel-wide cell, and one 512-unit sprite cell, which is 443.5 pixels of the 1774 × 887 master. Outputs are twice the largest display size (a 95 px medallion on a wide screen; the 36 px `.sprite` the trade icons have always been drawn at), which also covers a three-times phone showing the 57 px medallion. The six files total 49,582 bytes. On a production build, a first visit to `/` fell from 1,869,213 to 1,056,737 transferred bytes at 1440 × 900; on a 375 × 812 phone it is 1,047,513 until the trade example scrolls near.
+
+`optimize-art.mjs` exports whole images only and Sharp is not installed in the repository, so these were made once in Chromium: a Lanczos-3 resample of the PNG master on premultiplied RGBA, then `canvas.toBlob(…, 'image/webp', quality)`. Alpha survived encoding exactly. Against the atlas rendering at display size, the mean channel difference is 3–4 of 255 for the avatars and 2–3 for the resources; the atlas itself differs from its master by up to 1.5. The files are named by the first twelve hex digits of their SHA-256, like the other optimized art, but are deliberately not in `runtime-art.json`, whose export would rebuild them at full size. To remake one with Sharp instead, use `extract` with the region (rounded to whole pixels), `resize(size, size, { kernel: 'lanczos3' })` and `webp({ quality })`, then rename it by hash and update `apps/client/src/LandingFeatures.tsx`.
+
 ## Current development cards
 
 The September 2026 [readability pass](development-cards-readable.md) uses a new, smaller 768px atlas (96,886 bytes). The full-resolution table above and `runtime-art.json` record the legacy art exports, which remain available for old PNG URLs.
@@ -64,9 +81,10 @@ after an interface change.
 
 Direct Google Analytics 4 uses measurement ID `G-NGHVNKN7FZ`. It replaces
 GTM-W4XDJ2N4; the GTM container script and noscript iframe are no longer injected.
-`apps/client/src/analytics.ts` generates `/analytics.js`, which loads Google's
-`gtag/js` and configures GA4. Only the public homepage and guide inject it;
-private app entry routes do not. No Google Tag Manager publication is needed.
+`apps/client/src/analytics.ts` generates `/analytics.js`, which asks for consent
+and only then loads Google's `gtag/js` and configures GA4. Only the public
+homepage, guide and privacy page inject it; private app entry routes do not. No
+Google Tag Manager publication is needed.
 
 The same-origin loader preserves the inline-script CSP restriction. It skips
 non-production hostnames and sets sanitized page URL defaults before loading
@@ -90,5 +108,35 @@ collect private URLs or inputs; validate any future analytics changes in DebugVi
 No usernames, emails or room codes are deliberately added as event parameters.
 
 `GA_MEASUREMENT_ID=off` disables injection at build time. A different `G-…` value
-selects another property. The former `GTM_ID` setting is retired. Consent UI was
-not added as part of this replacement.
+selects another property. The former `GTM_ID` setting is retired.
+
+### Consent
+
+The loader uses Google Consent Mode v2 in what Google calls basic mode. Before
+anything else it sets `ad_storage`, `ad_user_data`, `ad_personalization` and
+`analytics_storage` to `denied`, and it does not fetch `gtag/js` at all until the
+visitor chooses **Accept all**. Without an answer, or after **Deny**,
+nothing is sent to Google Analytics, not even a cookieless ping. Allowing sends
+`gtag('consent', 'update', { analytics_storage: 'granted' })`, then the usual
+config and tag.
+
+A modal dialog asks on the loader's pages only, and the page cannot be used
+until it is answered: **Accept all** is the bright button, **Deny** an equally
+sized, quieter one. Escape does not close it, and if a browser closes it anyway it
+opens again; it asks on every visit until there is an answer. Its styles are
+`/consent.css`, fetched only while there is no answer, and the dialog opens once
+they have loaded. The history wrapper closes it as soon as the address leaves those
+pages, so it never shows in a room, the lobby or a game. The answer is kept in
+`localStorage` under `catanova.analytics-consent` (`granted` or `denied`); every
+access is guarded, so a browser that refuses storage is simply asked again next
+time. An answer given after the app has changed the address takes effect from the
+next public page load, because collection never resumes in a document once it has
+been disabled. **Deny** also expires `_ga` and `_ga_*` cookies left from
+before consent was asked.
+
+The dialog links to `/privacy/`, which says what is collected and carries the
+control for changing the answer later. That control is rendered hidden and the
+loader reveals and wires it, so where the loader does not run (another host, a
+build with measurement off, a blocker) no dead buttons are shown. The page's
+contact address is `PRIVACY_CONTACT` in `apps/client/src/PublicPages.tsx`,
+`privacy@catanova.io`, which Cloudflare Email Routing forwards to the owner.

@@ -57,6 +57,17 @@ export function latestRoll(previous: RoomState | null, next: RoomState) {
   return null;
 }
 
+/** The throw a range commits: its latest logged roll, else faces first shown in a new turn. */
+export function committedRoll(previous: RoomState, next: RoomState) {
+  const roll = latestRoll(previous, next);
+  if (roll) return roll;
+  const before = previous.game,
+    g = next.game;
+  return g?.dice && (!before?.dice || before.turn !== g.turn)
+    ? { id: `${next.roomId}:turn:${g.turn}:dice`, faces: g.dice }
+    : null;
+}
+
 /** Presentation retries may repeat a snapshot range; a committed roll still sounds once. */
 export class RollPresentationTracker {
   private seen = new Set<string>();
@@ -71,13 +82,13 @@ export class RollPresentationTracker {
     this.seen.add(id);
     if (this.seen.size > 128) this.seen.delete(this.seen.values().next().value!);
   }
-  accept(event: FeedbackEvent): FeedbackEvent {
+  /** `animate: false` settles a throw that newer queued moves have already overtaken. */
+  accept(event: FeedbackEvent, animate = true): FeedbackEvent {
     if (!event.dice) return event;
     const id = event.diceId ?? event.id;
-    if (!this.seen.has(id)) {
-      this.remember(id);
-      return event;
-    }
+    const fresh = !this.seen.has(id);
+    this.remember(id);
+    if (fresh && animate) return event;
     return {
       ...event,
       dice: undefined,
@@ -203,12 +214,12 @@ export function deriveFeedback(
     hand = g.players.find((p) => p.id === me)?.hand ?? (next.spectating ? emptyHand() : undefined);
   if (!old || !hand) return null;
   const lines = g.log.filter((e) => e.id > (before.log.at(-1)?.id ?? -1)).map((e) => e.text);
-  const roll = latestRoll(previous, next);
-  const dice = roll?.faces ?? (g.dice && (!before.dice || before.turn !== g.turn) ? g.dice : undefined);
+  const roll = committedRoll(previous, next);
+  const dice = roll?.faces;
   const event: FeedbackEvent = {
     id: `${next.roomId}:${next.revision}`,
     dice,
-    ...(dice ? { diceId: roll?.id ?? `${next.roomId}:turn:${g.turn}:dice` } : {}),
+    ...(roll ? { diceId: roll.id } : {}),
     notices: [],
     sounds: [],
     flights: [],
@@ -364,6 +375,8 @@ export function deriveFeedback(
 
 export type AwardCelebration = {
   id: string;
+  /** The snapshot that earned it; the celebration waits until the board shows that move. */
+  revision: number;
   kind: 'longestRoad' | 'largestArmy';
   name: 'Longest Road' | 'Largest Army';
   playerId: string;
@@ -386,6 +399,7 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
     return [
       {
         id: `${next.roomId}:${next.revision}:${kind}`,
+        revision: next.revision,
         kind,
         name: kind === 'longestRoad' ? 'Longest Road' : 'Largest Army',
         playerId: owner,

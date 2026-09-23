@@ -61,6 +61,16 @@ export function useAuth() {
   const accessToken = useCallback(async () => {
     if (!client.current) return undefined;
     const { data, error } = await client.current.auth.getSession();
+    // A token refresh that could not reach the sign-in service is not a sign-out.
+    const status = (error as { status?: number; name?: string } | null)?.status;
+    if (
+      error &&
+      ((error as { name?: string }).name === 'AuthRetryableFetchError' ||
+        status === 0 ||
+        status === 429 ||
+        (status ?? 0) >= 500)
+    )
+      throw new AccountApiError('AUTH_UNAVAILABLE', 'Sign-in service unavailable; retrying');
     if (error || !data.session) throw new AccountApiError('AUTH_REQUIRED', 'Please sign in again');
     if (data.session.user.id !== currentUser.current?.id)
       throw new AccountApiError('AUTH_REQUIRED', 'Your account session changed. Try again.');

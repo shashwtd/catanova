@@ -24,7 +24,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all two to four seats are connected and everyone else is ready. The host can configure an optional turn timer in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all two to four seats are connected and everyone else is ready. New rooms start with a 90-second turn timer, which the host can change or switch off in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
 Game and construction tools sit at top left; settings and leave sit at bottom left during play. Player portraits on the right share the brighter piece colors through banners and edges, with prominent points, card counts, awards and a current-turn marker. An offline symbol covers a disconnected player's portrait. Glossy resource cards and the development hand share the bottom shelf, with Trade to the left of Roll/End. Both actions follow your turn; opponents answer live offers through a separate notice. Scroll/pinch to zoom the flat board, or drag to pan the island and wood table together. Each harbor has two bridges to its eligible coastal corners.
 
@@ -55,14 +55,14 @@ out. [How the bots work, and what a game costs](docs/BOTS.md).
 
 ## A fairer starting island
 
-The default **balanced-v1** preset keeps the standard resource and number supplies, with explicit bounds:
+The default **balanced-v2** preset keeps the standard resource and number supplies, with explicit bounds:
 
 - No connected resource clusters larger than two tiles; every resource is spread across the island.
-- No adjacent 6/8 tiles, and no intersection above 11 production pips.
-- Each resource gets a reasonable share of production numbers.
-- Nine separated ports with the familiar ratios.
+- No 6 or 8 next to another 6 or 8, no equal numbers on neighbouring tiles, no 2 next to the 12, and no intersection above 11 production pips.
+- Each resource gets a reasonable share of production numbers: 2.5–4 pips per tile on average.
+- Nine separated ports with the familiar ratios, alternating with open sea around the coast like the official frame.
 
-Strong three-resource placements remain possible. Dice are independently random; there are no catch-up rolls. This is a named custom setup, separate from the official spiral/fixed presets. [Generation rules and tests](docs/MAP_GENERATION.md).
+Strong three-resource placements remain possible. New rooms use Balanced dice: each roll is drawn from a deck of the 36 dice combinations, refreshed after 24 rolls, and pairs matching the previous total are less likely, so rolls are not independent. The host can switch to Natural dice, which roll independently. Neither mode adjusts rolls for any player; there are no catch-up rolls. This is a named custom setup, separate from the official spiral/fixed presets. [Generation rules and tests](docs/MAP_GENERATION.md).
 
 ## One self-hostable distribution
 
@@ -101,12 +101,15 @@ npm run probe
 
 Use `npm run dev` for a build plus server watch. Add `npm run dev:client` in a second terminal for client hot reload at port 5173. `npm run format` formats source and documentation.
 
+The operator console (live operations, games, players and statistics, player feedback and an audit log) is a separate listener that production reaches only through Cloudflare Access and a Cloudflare Tunnel. Locally, `ADMIN_PORT=3100 ADMIN_AUTH=local-dev npm start` serves it at `http://127.0.0.1:3100`. [Admin console setup and security](docs/ADMIN.md).
+
 ## Project layout
 
 ```text
 apps/
   client/       React UI, flat terrain/SVG board, sound/effects, recoverable connection
   server/       Same-origin HTTP/WebSocket server, private snapshots, SQLite saves
+  admin/        Operator console, served only by the admin listener behind Cloudflare Access
 packages/
   protocol/     Shared messages and bounded input validation
   rules/        Pure rules engine, board topology, seeded balanced generation

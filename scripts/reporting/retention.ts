@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { decodeState } from '../../apps/server/src/journal.js';
 
 type AccountType = 'guest' | 'permanent' | 'unknown';
 type Outcome = 'points' | 'resignation' | 'abandoned' | 'running' | 'finishedUnknown';
@@ -70,9 +71,27 @@ export function readMatches(db: DatabaseSync): {
   const startQuery =
     db.prepare(`SELECT revision,public_entry,${cols.has('participants') ? 'participants' : 'NULL AS participants'} FROM game_events
     WHERE room_id=? AND revision<=? AND revision>? AND json_extract(public_entry,'$.kind')='start' ORDER BY revision DESC LIMIT 1`);
+  // Older snapshots keep a whole game on every row; newer ones compact it (see
+  // apps/server/src/journal.ts). Only the last row of each match is read, so
+  // decoding it here costs next to nothing.
+  const compact = cols.has('state_z');
   const endQuery =
-    db.prepare(`SELECT json_extract(state,'$.phase') phase,json_extract(state,'$.finishReason') reason
+    db.prepare(`SELECT state,${compact ? 'state_z,board_hash' : 'NULL AS state_z,NULL AS board_hash'}
     FROM game_events WHERE room_id=? AND revision<=? AND revision>? ORDER BY revision DESC LIMIT 1`);
+  const boardQuery = compact ? db.prepare('SELECT board FROM journal_boards WHERE hash=?') : undefined;
+  const ending = (roomId: string, revision: number, floor: number) => {
+    const row = endQuery.get(roomId, revision, floor) as
+      { state: string; state_z: Uint8Array | null; board_hash: string | null } | undefined;
+    if (!row) return undefined;
+    const compactRow = row.state === '' || row.state === '{}';
+    const board = compactRow ? (boardQuery?.get(row.board_hash)?.board as string | undefined) : undefined;
+    const game = !compactRow
+      ? (JSON.parse(row.state) as { phase?: string; finishReason?: string })
+      : row.state_z && board
+        ? decodeState(row.state_z, board)
+        : undefined;
+    return game ? { phase: game.phase, reason: game.finishReason } : undefined;
+  };
   const actionsQuery =
     db.prepare(`SELECT actor,public_entry,${cols.has('actor_kind') ? 'actor_kind' : 'NULL AS actor_kind'} FROM game_events
     WHERE room_id=? AND revision>=? AND revision<=? ORDER BY revision`);
@@ -101,7 +120,7 @@ export function readMatches(db: DatabaseSync): {
     }
     seen.add(key);
     if (row.archived) lower.set(row.source_room_id, row.revision);
-    const info = endQuery.get(row.source_room_id, row.revision, floor);
+    const info = ending(row.source_room_id, row.revision, floor);
     const roster = JSON.parse(row.players) as { id: string }[];
     const meta = start?.participants
       ? (JSON.parse(start.participants as string) as { id: string; bot: number; accountType?: string }[])

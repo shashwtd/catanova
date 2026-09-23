@@ -21,6 +21,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Check, Clock3, Dices, Trophy, Volume2, Music, Eye } from './GameIcons.js';
 import type { Preferences } from './preferences.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
+import { roomHostId } from '../../../packages/protocol/src/room-host.js';
 import {
   DEFAULT_ROOM_SETTINGS,
   DEFAULT_TURN_TIMER_SECONDS,
@@ -282,7 +283,7 @@ export function RoomConfiguration({
     [saving, setSaving] = useState(false),
     [error, setError] = useState('');
   const started = !!room?.game,
-    editable = !!room && !started && room.players[0]?.id === me,
+    editable = !!room && !started && roomHostId(room.players) === me,
     seconds = draft.turnTimerSeconds ?? DEFAULT_TURN_TIMER_SECONDS,
     timerEnabled = draft.turnTimerSeconds !== null,
     locked = !editable || busy || saving,

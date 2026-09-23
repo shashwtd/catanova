@@ -17,6 +17,8 @@ KillMode=control-group
 UMask=0077
 NoNewPrivileges=true
 ProtectSystem=strict
+# The only persistent write: status/backup.json. "-" keeps a missing folder from blocking backups.
+ReadWritePaths=-/srv/catanova/status
 ProtectHome=true
 PrivateTmp=true
 PrivateDevices=true

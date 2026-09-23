@@ -1,0 +1,39 @@
+[Unit]
+Description=Restore drill: prove the newest private backup restores into playable games
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+# backup.env names the storage account and container; drill.env holds DRILL_PING_URL.
+EnvironmentFile=/etc/catanova/backup.env
+EnvironmentFile=/etc/catanova/drill.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B /opt/catanova-backup/restore_drill.py
+# The private work folder must be a real host path: Docker resolves the verifier's bind mounts
+# itself, where this service's PrivateTmp would be invisible. Each run removes its own folder.
+StateDirectory=catanova-drill
+StateDirectoryMode=0700
+TimeoutStartSec=40min
+TimeoutStopSec=30s
+KillMode=control-group
+UMask=0077
+# `docker run` goes through /run/docker.sock, which is root-equivalent, so capabilities are not
+# narrowed here. The verifier container has no network, no capabilities, a read-only root and
+# sees only this run's private copy; the live database volume is never mounted.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=-/srv/catanova/status
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryMax=512M
+Nice=15
+IOSchedulingClass=idle

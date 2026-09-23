@@ -43,6 +43,18 @@ export function newSession(name: string, roomId?: string, profile?: Profile): Se
     token: Array.from(bytes, (n) => n.toString(16).padStart(2, '0')).join(''),
   };
 }
+/**
+ * Refusals that mean "not right now" rather than "no": the sign-in service or
+ * storage had a bad moment. A browser resuming a seat it already holds keeps
+ * reconnecting through them, with backoff, instead of giving the seat up.
+ */
+const TRANSIENT_ERRORS = new Set([
+  'AUTH_UNAVAILABLE',
+  'ACCOUNT_UNAVAILABLE',
+  'ACCOUNT_BUSY',
+  'STORAGE_ERROR',
+  'ROOM_RATE_LIMIT',
+]);
 /** Accepted moves remain pending until the corresponding authoritative snapshot is installed. */
 export class Connection {
   state: RoomState | null = null;
@@ -56,6 +68,10 @@ export class Connection {
   private watchdog?: ReturnType<typeof setInterval>;
   private syncTimer?: ReturnType<typeof setTimeout>;
   private lastReceived = 0;
+  /** The sign-in token the server last accepted for this socket, and one it is checking now. */
+  private authConfirmed?: string;
+  private authOffered?: string;
+  private authTimer?: ReturnType<typeof setInterval>;
   private lastSync = -Infinity;
   private replayAfterSync = false;
   private probes = new Map<string, number>();
@@ -80,6 +96,7 @@ export class Connection {
       minRetryMs?: number;
       maxRetryMs?: number;
       pingIntervalMs?: number;
+      authRefreshMs?: number;
     } = {},
   ) {
     if (options.pending && !session.spectating)
@@ -184,6 +201,8 @@ export class Connection {
           ws.close();
           return;
         }
+        this.authConfirmed = accessToken;
+        this.authOffered = undefined;
         const type = this.session.spectating
           ? 'spectate'
           : this.session.joined
@@ -198,8 +217,12 @@ export class Connection {
           ...(this.options.preloadGame ? { preloadGame: true } : {}),
           ...(accessToken ? { accessToken } : {}),
         });
-      } catch {
+      } catch (error) {
         if (this.socket !== ws) return;
+        if (this.session.joined && TRANSIENT_ERRORS.has((error as { code?: string }).code ?? '')) {
+          ws.close(); // Try again shortly; the seat is still ours.
+          return;
+        }
         this.stop();
         this.emit({ type: 'error', code: 'AUTH_REQUIRED', message: 'Please sign in again' });
       }
@@ -236,6 +259,9 @@ export class Connection {
         if (installed && this.pending) this.send(this.pending.message);
         this.probes.clear();
         this.ping();
+        clearInterval(this.authTimer);
+        if (this.options.accessToken)
+          this.authTimer = setInterval(() => void this.refreshAuth(ws), this.options.authRefreshMs ?? 30000);
         clearInterval(this.watchdog);
         this.watchdog = setInterval(() => {
           if (performance.now() - this.lastReceived > 30000) {
@@ -269,12 +295,27 @@ export class Connection {
           this.metrics.serverRevision = message.revision;
           if ((this.state?.revision ?? -1) < message.revision || this.metrics.syncIssue) this.sync();
         }
+      } else if (message.type === 'auth') {
+        if (message.ok) this.authConfirmed = this.authOffered;
+        this.authOffered = undefined;
+        return;
       } else if (message.type === 'error') {
         if (message.commandId && this.pending?.message.commandId === message.commandId) {
           this.pending.reject(new Error(`${message.code}: ${message.message}`));
           this.pending = undefined;
           clearTimeout(this.syncTimer);
           this.options.onPending?.(null);
+        }
+        if (this.authOffered && !message.commandId && message.code === 'INVALID_MESSAGE') {
+          // A server from before in-band refresh (a rollback). Stop offering; it
+          // closes the socket at expiry and the ordinary reconnect takes over.
+          this.authOffered = undefined;
+          clearInterval(this.authTimer);
+          return;
+        }
+        if (this.status !== 'connected' && this.session.joined && TRANSIENT_ERRORS.has(message.code)) {
+          ws.close(); // Reconnect with backoff rather than dropping a seat we hold.
+          return;
         }
         if (
           [
@@ -290,7 +331,6 @@ export class Connection {
             'GUEST_EXPIRED',
             'ONBOARDING_REQUIRED',
             'ACCOUNT_SETUP_REQUIRED',
-            'ACCOUNT_UNAVAILABLE',
             'STATE_INTEGRITY',
           ].includes(message.code) ||
           this.status !== 'connected'
@@ -304,6 +344,7 @@ export class Connection {
       clearTimeout(deadline);
       if (this.socket !== ws) return;
       clearInterval(this.watchdog);
+      clearInterval(this.authTimer);
       clearTimeout(this.syncTimer);
       if (event.code === 4001 || event.code === 4002) {
         this.stop();
@@ -324,6 +365,25 @@ export class Connection {
       const delay = Math.min(cap, base * 2 ** Math.min(this.attempt++, 6)) * (0.8 + Math.random() * 0.4);
       this.retryTimer = setTimeout(() => this.connect(), delay);
     };
+  }
+  /**
+   * Offer the server a refreshed sign-in token over the socket already open.
+   * The sign-in library renews its token shortly before expiry; passing the new
+   * one along replaces the old hourly disconnect-and-reconnect. If the offer is
+   * refused or never answered, the next check offers it again; if the old token
+   * runs out first, the server closes the socket and the normal reconnect runs.
+   */
+  private async refreshAuth(ws: WebSocket) {
+    if (this.status !== 'connected' || this.socket !== ws || this.authOffered) return;
+    let token: string | undefined;
+    try {
+      token = await this.options.accessToken?.();
+    } catch {
+      return;
+    }
+    if (!token || token === this.authConfirmed || this.socket !== ws || this.status !== 'connected') return;
+    this.authOffered = token;
+    this.send({ type: 'auth', accessToken: token });
   }
   private submit(
     operation:
@@ -387,6 +447,7 @@ export class Connection {
     this.stopped = true;
     clearTimeout(this.retryTimer);
     clearInterval(this.watchdog);
+    clearInterval(this.authTimer);
     clearTimeout(this.syncTimer);
     const old = this.socket;
     this.socket = null;

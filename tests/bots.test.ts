@@ -9,6 +9,8 @@ import { BOT_LEVELS, BOT_LEVEL_ODDS, randomBotLevel } from '../packages/protocol
 import { Lobby } from '../apps/client/src/Lobby.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { createGame, gameView, applyAction } from '../packages/rules/src/game.js';
+import type { Game, Hand } from '../packages/rules/src/game.js';
+import { seededRandom } from '../packages/rules/src/board.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 import {
   decide,
@@ -575,6 +577,86 @@ test('the driver holds its first move, cancels stale plans and commits one actio
   } finally {
     store.db.close();
   }
+});
+
+/** A bot, "me", on its own turn with one settlement on a corner that touches no
+ *  harbour, so every bank trade in these positions is at four to one. */
+function midGame(hand: Partial<Hand>): Game {
+  const game = createGame(
+    [
+      { id: 'me', name: 'Me' },
+      { id: 'b', name: 'B' },
+      { id: 'c', name: 'C' },
+    ],
+    5,
+    seededRandom(5),
+  );
+  const inland = game.board.vertices.find(
+    (v) => !game.board.ports.some((port) => v.edges.includes(port.edge)),
+  )!;
+  game.buildings[inland.id] = { player: 'me', kind: 'settlement' };
+  game.phase = 'actions';
+  game.active = 0;
+  game.turn = 6;
+  game.players[0]!.hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0, ...hand };
+  return game;
+}
+
+const offline = (game: Game, plan: BotPlan = initialPlan(game.turn)) =>
+  decide({ view: gameView(game, 'me'), board: game.board, meId: 'me', plan, jev: null });
+
+test('a bot with no decision service trades what it has spare for what its plan is missing', async () => {
+  // Saving for a settlement with five timber and no clay. Without a service the
+  // bot never worked out what it was short of, so it never traded at all.
+  const game = midGame({ wood: 5, sheep: 1, wheat: 1 });
+  const decision = await offline(game);
+  assert.deepEqual(decision.action, { kind: 'bankTrade', give: 'wood', receive: 'brick' });
+  assert.deepEqual(decision.plan.needs, ['brick'], 'and it remembers what it is short of');
+  const after = applyAction(game, 'me', decision.action, Math.random);
+  assert.equal(after.players[0]!.hand.brick, 1, 'the rules accept the trade');
+
+  // It never trades below what the purchase itself costs: five hay for a city
+  // is one more than the city needs, not four spare.
+  const city = midGame({ wheat: 5, ore: 1 });
+  const saving = await offline(city, { ...initialPlan(city.turn), focus: 'city' });
+  assert.notEqual(saving.action.kind, 'bankTrade', 'trading four hay would leave the city short of hay');
+});
+
+test('on a seven a bot keeps what its plan is saving for', async () => {
+  // Saving for a city, with the rock and hay for it and more besides. With no
+  // list of needs the bot used to keep the first resources it held, timber and
+  // sheep, and throw away the city.
+  const game = midGame({ wood: 3, sheep: 2, wheat: 2, ore: 3 });
+  game.phase = 'discard';
+  game.discards = { me: 5 };
+  const decision = await offline(game, { ...initialPlan(game.turn), focus: 'city' });
+  assert.deepEqual(decision.action, {
+    kind: 'discard',
+    resources: { wood: 3, brick: 0, sheep: 2, wheat: 0, ore: 0 },
+  });
+});
+
+test('bots with no decision service use the bank and harbours through a whole game', async () => {
+  const random = seededRandom(11);
+  const seats = ['a', 'b', 'c', 'd'].map((id) => ({ id, name: id }));
+  let game = createGame(seats, 11, random, { diceMode: 'balanced' });
+  const plans = new Map<string, BotPlan>();
+  const kinds: Record<string, number> = {};
+  while (!game.winner && game.turn < 600) {
+    const actor = game.phase === 'discard' ? Object.keys(game.discards)[0]! : game.players[game.active]!.id;
+    const decision = await decide({
+      view: gameView(game, actor),
+      board: game.board,
+      meId: actor,
+      plan: plans.get(actor) ?? initialPlan(game.turn),
+      jev: null,
+    });
+    plans.set(actor, decision.plan);
+    kinds[decision.action.kind] = (kinds[decision.action.kind] ?? 0) + 1;
+    game = applyAction(game, actor, decision.action, random);
+  }
+  assert.ok(game.winner, 'the game finishes');
+  assert.ok((kinds.bankTrade ?? 0) > 0, `bank and harbour trades: ${kinds.bankTrade ?? 0}`);
 });
 
 test('add-bot retries are idempotent and cannot reuse a readiness command receipt', () => {

@@ -33,8 +33,8 @@ function lobby(store: Store) {
 }
 function start(store: Store, seconds: TurnTimerSeconds | null = 40) {
   const room = lobby(store);
-  if (seconds !== null)
-    store.configureSettings(room.host, 'configure-timer', 0, { turnTimerSeconds: seconds });
+  // New rooms default to a timer; a test asking for none switches it off.
+  store.configureSettings(room.host, 'configure-timer', 0, { turnTimerSeconds: seconds });
   store.action(room.host, 'start-timed-game', readyLobby(store, room.host.room_id), { kind: 'start' });
   let step = 0;
   while (!store.loadGame(room.host.room_id)!.turn) {
@@ -80,7 +80,7 @@ test('settings are bounded, host-only, revision checked, durable and reset readi
   try {
     const { host, seats } = lobby(store),
       roomId = host.room_id;
-    assert.deepEqual(store.settings(roomId), { turnTimerSeconds: null, diceMode: 'balanced' });
+    assert.deepEqual(store.settings(roomId), { turnTimerSeconds: 90, diceMode: 'balanced' });
     assert.deepEqual(TURN_TIMER_STEPS, [40, 65, 90, 115, 140]);
     for (const seconds of [39, 41, 141, 60, '40', undefined, NaN])
       assert.throws(() => parseRoomSettings({ turnTimerSeconds: seconds }));
@@ -100,7 +100,7 @@ test('settings are bounded, host-only, revision checked, durable and reset readi
     );
     assert.equal(store.snapshot(roomId).revision, revision);
     assert.ok(store.snapshot(roomId).players.every((p) => p.ready));
-    assert.equal(store.settings(roomId).turnTimerSeconds, null);
+    assert.equal(store.settings(roomId).turnTimerSeconds, 90, 'the failed change left the default in place');
     store.db.exec('DROP TRIGGER fail_settings_receipt');
     assert.throws(
       () => store.configureSettings(host, 'stale-settings', 0, { turnTimerSeconds: 40 }),

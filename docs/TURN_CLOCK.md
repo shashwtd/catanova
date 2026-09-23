@@ -1,6 +1,6 @@
 # Lobby settings and turn clock
 
-The host can enable a turn timer before a game starts. The five slider stops are **40, 65, 90, 115, and 140 seconds**; enabling the slider initially selects 90 seconds. The timer is off by default. These are optional house rules layered over the unchanged base-game rules.
+New rooms start with a **90-second** turn timer. Before a game starts, the host can move it to any of the five slider stops, **40, 65, 90, 115, and 140 seconds**, or switch it off; switching it back on selects 90 seconds. Rooms created before this default keep the setting they were saved with. These are optional house rules layered over the unchanged base-game rules.
 
 Only the host can change these settings. Every change is saved, broadcast to the room, and resets the other players' readiness. Ready messages sent against older settings are rejected, so a delayed message cannot consent to an unseen change. The host's **Start** button is their consent; the host does not need a separate Ready step. Every other player must be ready and every seat must be connected before starting. Settings lock when the game starts.
 

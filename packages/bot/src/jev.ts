@@ -73,6 +73,40 @@ function confidenceOf(probabilities: Record<string, number> | undefined, probabi
   return Math.max(0, Math.min(1, (ordered[0] ?? 0) - (ordered[1] ?? 0)));
 }
 
+/**
+ * One answer off the wire, or null when it is not one.
+ *
+ * The reply comes from another company's service, so it is read as untrusted
+ * data: a null where an answer should be, a missing choice or a probability
+ * that is not a number is no answer at all. Reading it any other way turned a
+ * bad reply into a TypeError, which the bots treat as a bug rather than as the
+ * service being unavailable, so the seat stopped moving instead of playing on.
+ */
+function readAnswer(raw: unknown): Answer | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const answer = raw as Record<string, unknown>;
+  const probabilities = (
+    answer.probabilities && typeof answer.probabilities === 'object' ? answer.probabilities : {}
+  ) as Record<string, number>;
+  if (answer.type === 'choice') {
+    if (typeof answer.choice !== 'string' && typeof answer.choice !== 'number') return null;
+    return {
+      type: 'choice',
+      choice: String(answer.choice),
+      probabilities,
+      confidence: confidenceOf(probabilities),
+    };
+  }
+  if (answer.type === 'score') {
+    if (typeof answer.score !== 'number' || !Number.isFinite(answer.score)) return null;
+    return { type: 'score', score: answer.score, probabilities, confidence: confidenceOf(probabilities) };
+  }
+  // Anything else is read as a yes/no, as it always has been, but only when it
+  // carries a probability that is actually a number.
+  if (typeof answer.noul !== 'number' || !Number.isFinite(answer.noul)) return null;
+  return { type: 'noul', probability: answer.noul, confidence: confidenceOf(undefined, answer.noul) };
+}
+
 export class JevUnavailable extends Error {}
 
 export type JevClient = {
@@ -82,14 +116,20 @@ export type JevClient = {
 };
 
 export function createJevClient(
-  options: { route?: Route | null; timeoutMs?: number; fetchImpl?: typeof fetch } = {},
+  options: {
+    route?: Route | null;
+    timeoutMs?: number;
+    fetchImpl?: typeof fetch;
+    /** Injectable so tests can move through the breaker's rest. */
+    now?: () => number;
+  } = {},
 ): JevClient | null {
   const chosen = options.route === undefined ? route() : options.route;
   if (!chosen) return null;
   const timeoutMs = options.timeoutMs ?? 8000;
   const doFetch = options.fetchImpl ?? fetch;
 
-  return {
+  return withBreaker(options.now ?? Date.now, {
     model: chosen.model,
     async evaluate(state, questions) {
       const headers = {
@@ -120,29 +160,12 @@ export function createJevClient(
       }
 
       const answers: Record<string, Answer> = {};
-      for (const [id, raw] of Object.entries((payload?.answers ?? {}) as Record<string, any>)) {
-        const probabilities = (raw.probabilities ?? {}) as Record<string, number>;
-        if (raw.type === 'choice')
-          answers[id] = {
-            type: 'choice',
-            choice: String(raw.choice),
-            probabilities,
-            confidence: confidenceOf(probabilities),
-          };
-        else if (raw.type === 'score')
-          answers[id] = {
-            type: 'score',
-            score: Number(raw.score),
-            probabilities,
-            confidence: confidenceOf(probabilities),
-          };
-        else {
-          const probability = Number(raw.noul);
-          answers[id] = { type: 'noul', probability, confidence: confidenceOf(undefined, probability) };
-        }
+      const replied = payload?.answers && typeof payload.answers === 'object' ? payload.answers : {};
+      for (const id of Object.keys(questions)) {
+        const answer = readAnswer(Object.hasOwn(replied, id) ? replied[id] : null);
+        if (!answer) throw new JevUnavailable(`no answer for "${id}"`);
+        answers[id] = answer;
       }
-      for (const id of Object.keys(questions))
-        if (!answers[id]) throw new JevUnavailable(`no answer for "${id}"`);
 
       // TypeSafe bills input tokens only and does not return a cost, so it is
       // computed here at the published rate.
@@ -154,6 +177,49 @@ export function createJevClient(
         latencyMs: Date.now() - started,
         model: String(payload?.model ?? chosen.model),
       };
+    },
+  });
+}
+
+/** Failures in a row before the client stops asking, and for how long. */
+const BREAKER = { failures: 3, restMs: 60_000 } as const;
+
+/**
+ * Stop asking a service that has stopped answering.
+ *
+ * A request to a service that hangs holds the bot's move for the whole
+ * timeout, and in an outage every decision that needed judgement paid it:
+ * eight seconds at a time, well over a hundred times in a game of four bots.
+ * So after a few failures in a row this fails at once, without a request, and
+ * the bots play from their own judgement at full speed. When the rest is over
+ * one request is let through to see whether the service is back: a success
+ * opens it up again, another failure starts another rest.
+ *
+ * The count is shared by every seat the client serves, which on the server is
+ * every bot, so one table finding the service down spares all the others.
+ */
+function withBreaker(now: () => number, client: JevClient): JevClient {
+  let failures = 0;
+  let restingUntil = 0;
+  let probing = false;
+  return {
+    model: client.model,
+    async evaluate(state, questions) {
+      const tripped = failures >= BREAKER.failures;
+      if (tripped && (probing || now() < restingUntil))
+        throw new JevUnavailable(`decision service skipped after ${failures} failures in a row`);
+      if (tripped) probing = true;
+      try {
+        const evaluation = await client.evaluate(state, questions);
+        failures = 0;
+        return evaluation;
+      } catch (error) {
+        if (error instanceof JevUnavailable && ++failures >= BREAKER.failures)
+          restingUntil = now() + BREAKER.restMs;
+        throw error;
+      } finally {
+        if (tripped) probing = false;
+      }
     },
   };
 }

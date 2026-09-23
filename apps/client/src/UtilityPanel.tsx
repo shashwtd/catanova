@@ -27,7 +27,7 @@ export function UtilityPanel({
       key={tool ?? title}
       anchor={anchor}
       placement="beside"
-      width={tool === 'settings' ? 310 : tool === 'journal' ? 330 : 390}
+      width={tool === 'settings' || tool === 'feedback' ? 310 : tool === 'journal' ? 330 : 390}
       onClose={onClose}
     >
       {(dismiss) => (
