@@ -39,6 +39,10 @@ jobs:
           SUPABASE_URL: https://example.supabase.co
           SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_configuration_only
           TURNSTILE_SITE_KEY: site_key_for_configuration_validation
+          TUNNEL_TOKEN: tunnel_token_for_configuration_validation
+          ADMIN_ACCESS_TEAM_DOMAIN: catanova-ci.cloudflareaccess.com
+          ADMIN_ACCESS_AUD: '0000000000000000000000000000000000000000000000000000000000000000'
+          ADMIN_EMAILS: owner@example.com
         run: docker compose --env-file deploy/single-vm/.env.example -f deploy/single-vm/compose.yaml config --quiet
       - run: docker compose up --build --wait
       - run: npm run probe
