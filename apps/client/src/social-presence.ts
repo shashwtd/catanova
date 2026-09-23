@@ -1,3 +1,6 @@
+import type { FriendsState, PublicAccount } from '../../../packages/protocol/src/profile.js';
+import type { FriendPresenceChange } from '../../../packages/protocol/src/player-hub.js';
+
 export const SOCIAL_HEARTBEAT_MS = 25_000;
 export const SOCIAL_HEARTBEAT_TIMEOUT_MS = 15_000;
 
@@ -27,7 +30,41 @@ export function lastSeenLabel(at: number, now: number): string {
   return 'Last seen over a year ago';
 }
 
-/** One foreground heartbeat at a time; hidden tabs stop fetching and expire naturally on the server. */
+/** A friends list as the client holds it: presence fields are absent until known. */
+export type FriendsWithPresence = Omit<FriendsState, 'friends'> & {
+  friends: (PublicAccount & Partial<Omit<FriendPresenceChange, 'id'>>)[];
+};
+
+/** Where the viewer stands with an account: befriended, asked, asked by them, or neither. */
+export type FriendStatus = 'friends' | 'sent' | 'received' | 'none';
+
+export function friendStatus(state: FriendsState, id: string): FriendStatus {
+  if (state.friends.some((friend) => friend.id === id)) return 'friends';
+  if (state.outgoing.some((account) => account.id === id)) return 'sent';
+  if (state.incoming.some((account) => account.id === id)) return 'received';
+  return 'none';
+}
+
+/** One friend's pushed change applied to the list. An id not on the list leaves it untouched. */
+export function applyFriendChange(
+  state: FriendsWithPresence,
+  change: FriendPresenceChange,
+): FriendsWithPresence {
+  const index = state.friends.findIndex((friend) => friend.id === change.id);
+  if (index < 0) return state;
+  const { online: _online, lastSeenAt: _seen, watchable: _watchable, ...account } = state.friends[index]!;
+  const friends = [...state.friends];
+  friends[index] = {
+    ...account,
+    online: change.online,
+    ...(change.lastSeenAt === undefined ? {} : { lastSeenAt: change.lastSeenAt }),
+    ...(change.watchable ? { watchable: change.watchable } : {}),
+  };
+  return { ...state, friends };
+}
+
+/** The older HTTP heartbeat, one request at a time and only while visible. It now stands in for the
+ *  presence socket while that is down (see presence-socket.ts). */
 export function startSocialPresence(
   ping: (signal: AbortSignal) => Promise<unknown>,
   target: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>,

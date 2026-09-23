@@ -6,10 +6,14 @@
  * a scan of the whole journal never holds up a move: WAL readers see a
  * consistent snapshot and never block the game's writer.
  *
- * Journal rows are read only through their `phase` and `dice_total` columns
- * and their public entry. Saved states are never opened here.
+ * Journal rows are read through their `phase` and `dice_total` columns and
+ * their public entry. The only saved states opened are each game's first row,
+ * for the dice mode it was played with, which the room's current setting may
+ * no longer say.
  */
 import type { DatabaseSync } from 'node:sqlite';
+import { inflateGame, wholeRow } from '../journal.js';
+import type { JournalRow } from '../journal.js';
 import { readMatches, summarize } from '../../../../scripts/reporting/retention.js';
 import { renderCsv } from '../../../../scripts/reporting/render.js';
 import type { AdminStats, DiceSummary, RetentionReport } from './types.js';
@@ -73,22 +77,70 @@ export function chiSquarePValue(statistic: number, degreesOfFreedom: number): nu
   return gammaQ(degreesOfFreedom / 2, statistic / 2);
 }
 
-/** Observed totals 2–12 against two fair dice. */
-export function diceSummary(counts: number[]): DiceSummary {
+/** Chance of each total from 2 to 12 under the retired flat-totals rule: every total alike. */
+export const FLAT_DICE = Array<number>(11).fill(1 / 11);
+
+/**
+ * What a dice mode's totals should look like, and whether a χ² test of them
+ * means anything. Natural dice are two independent fair dice. Balanced dice
+ * draw from a deck of all 36 pairs, so in the long run they follow the same
+ * curve, but by design rather than chance: their rolls are not independent and
+ * a χ² test says nothing about fairness. Flat totals were independent draws of
+ * a total, each equally likely.
+ */
+export function diceModel(mode: string): { model: DiceSummary['model']; shares: number[] } {
+  if (mode === 'balanced') return { model: 'deck', shares: FAIR_DICE };
+  if (mode === 'flat') return { model: 'flat', shares: FLAT_DICE };
+  return { model: 'two-dice', shares: FAIR_DICE };
+}
+
+/**
+ * Observed totals 2–12 against what their dice mode expects. `mode` is a dice
+ * mode, or a map of rolls per mode for a mixture, whose expectation is the sum
+ * of theirs and which gets no χ² test.
+ */
+export function diceSummary(
+  counts: number[],
+  mode: string | Record<string, number> = 'classic',
+): DiceSummary {
   const rolls = counts.reduce((sum, n) => sum + n, 0);
-  const expected = FAIR_DICE.map((p) => Math.round(p * rolls * 100) / 100);
-  if (!rolls) return { rolls, counts, expected, chiSquare: null, pValue: null };
+  const parts = typeof mode === 'string' ? { [mode]: rolls } : mode;
+  const used = Object.keys(parts).filter((key) => parts[key]! > 0);
+  const single =
+    used.length <= 1 ? diceModel(used[0] ?? (typeof mode === 'string' ? mode : 'classic')) : null;
+  const model: DiceSummary['model'] = single ? single.model : 'mixed';
+  const expectedExact = Array.from({ length: 11 }, (_, i) =>
+    Object.entries(parts).reduce((sum, [key, n]) => sum + diceModel(key).shares[i]! * n, 0),
+  );
+  const expected = expectedExact.map((e) => Math.round(e * 100) / 100);
+  if (!rolls || model === 'deck' || model === 'mixed')
+    return { rolls, counts, expected, model, chiSquare: null, pValue: null };
   const chiSquare = counts.reduce((sum, observed, i) => {
-    const e = FAIR_DICE[i]! * rolls;
+    const e = expectedExact[i]!;
     return sum + (observed - e) ** 2 / e;
   }, 0);
   return {
     rolls,
     counts,
     expected,
+    model,
     chiSquare: Math.round(chiSquare * 1000) / 1000,
     pValue: Math.round(chiSquarePValue(chiSquare, 10) * 10000) / 10000,
   };
+}
+
+/** A saved game's dice mode, from a journal row in either form, without reading its board. */
+function rowDiceMode(row: JournalRow): string {
+  try {
+    const game = wholeRow(row)
+      ? (JSON.parse(row.state) as { diceMode?: unknown })
+      : row.state_z?.length
+        ? inflateGame(row.state_z)
+        : undefined;
+    return typeof game?.diceMode === 'string' ? game.diceMode : 'classic';
+  } catch {
+    return 'classic';
+  }
 }
 
 const isoDay = (at: number) => new Date(at).toISOString().slice(0, 10);
@@ -191,9 +243,11 @@ export function computeStats(db: DatabaseSync, now: number): AdminStats {
     bots.botSeats += count;
     if (count) bots.matchesWithBots++;
   }
-  // Dice, room by room through the journal's kind index, so only roll rows are
-  // visited. The mode is each room's current dice setting.
-  const modes = new Map(
+  // Dice, room by room through the journal's kind index, so only start and roll
+  // rows are visited. Each roll counts under the mode its own game was played
+  // with: the latest game start before it names it. A room's setting can have
+  // changed since, so it is only the fallback for a game with no start entry.
+  const settings = new Map(
     (
       db.prepare('SELECT room_id, settings FROM room_settings').all() as {
         room_id: string;
@@ -210,23 +264,33 @@ export function computeStats(db: DatabaseSync, now: number): AdminStats {
       return [row.room_id, mode];
     }),
   );
+  const starts = db.prepare(
+    `SELECT revision, state, state_z, board_hash FROM game_events
+     WHERE room_id = ? AND json_extract(public_entry, '$.kind') IN ('start', 'legacy') ORDER BY revision`,
+  );
   const rolls = db.prepare(
-    `SELECT dice_total AS total, count(*) AS n FROM game_events
+    `SELECT revision, dice_total AS total FROM game_events
      WHERE room_id = ? AND json_extract(public_entry, '$.kind') = 'roll' AND dice_total IS NOT NULL
-     GROUP BY dice_total`,
+     ORDER BY revision`,
   );
   const overall = Array<number>(11).fill(0);
   const byMode = new Map<string, number[]>();
   for (const { room_id: roomId } of db.prepare('SELECT DISTINCT room_id FROM game_events').all() as {
     room_id: string;
   }[]) {
-    const mode = modes.get(roomId) ?? 'classic';
-    const counts = byMode.get(mode) ?? byMode.set(mode, Array<number>(11).fill(0)).get(mode)!;
-    for (const row of rolls.all(roomId) as { total: number; n: number }[])
-      if (row.total >= 2 && row.total <= 12) {
-        overall[row.total - 2]! += row.n;
-        counts[row.total - 2]! += row.n;
-      }
+    const games = (starts.all(roomId) as (JournalRow & { revision: number })[]).map((row) => ({
+      revision: row.revision,
+      mode: rowDiceMode(row),
+    }));
+    let game = -1;
+    for (const row of rolls.all(roomId) as { revision: number; total: number }[]) {
+      while (game + 1 < games.length && games[game + 1]!.revision <= row.revision) game++;
+      if (row.total < 2 || row.total > 12) continue;
+      const mode = game >= 0 ? games[game]!.mode : (settings.get(roomId) ?? 'classic');
+      const counts = byMode.get(mode) ?? byMode.set(mode, Array<number>(11).fill(0)).get(mode)!;
+      overall[row.total - 2]!++;
+      counts[row.total - 2]!++;
+    }
   }
   const accounts = db
     .prepare('SELECT count(DISTINCT user_id) AS n FROM seats WHERE user_id IS NOT NULL')
@@ -243,11 +307,14 @@ export function computeStats(db: DatabaseSync, now: number): AdminStats {
     completed: { count: durations.length, medianMinutes: median(durations), medianTurns: median(turns) },
     bots,
     dice: {
-      overall: diceSummary(overall),
+      overall: diceSummary(
+        overall,
+        Object.fromEntries([...byMode].map(([mode, counts]) => [mode, counts.reduce((a, b) => a + b, 0)])),
+      ),
       byMode: Object.fromEntries(
         [...byMode]
           .filter(([, counts]) => counts.some(Boolean))
-          .map(([mode, counts]) => [mode, diceSummary(counts)]),
+          .map(([mode, counts]) => [mode, diceSummary(counts, mode)]),
       ),
     },
     totals: {

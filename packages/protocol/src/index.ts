@@ -15,6 +15,7 @@ import type { ReactionName } from './reactions.js';
 import type { BotLevel } from './bots.js';
 import { isPlayerColor } from './colors.js';
 import type { PlayerColor } from './colors.js';
+import type { FriendPresenceChange } from './player-hub.js';
 export { REACTIONS, REACTION_LIST, isReaction } from './reactions.js';
 export type { ReactionName } from './reactions.js';
 export { BOT_LEVELS, BOT_LEVEL_LABEL, BOT_NAMES, botName, isBotLevel, randomBotLevel } from './bots.js';
@@ -73,6 +74,10 @@ export type RoomPlayer = {
   ready?: boolean;
   disconnectedAt?: number;
   resignAt?: number;
+  /** The seat's account when it is signed in with Google, so the people at the
+   *  table, or watching it, can send a friend request. Absent for guests, bots
+   *  and players without an account, and never in an invite preview. */
+  accountId?: string;
 };
 export type RoomState = {
   previousResults?: MatchResults;
@@ -97,7 +102,7 @@ export type RoomPreview = {
   roomId: string;
   roomCode?: string;
   board: Board;
-  players: Omit<RoomPlayer, 'connected'>[];
+  players: Omit<RoomPlayer, 'connected' | 'accountId'>[];
   started: boolean;
   settings?: RoomSettings;
 };
@@ -135,7 +140,9 @@ export type ClientMessage =
   | { type: 'statistics' }
   | { type: 'ping'; nonce: string }
   /** A fresh sign-in token for the socket already open, so it need not reconnect every hour. */
-  | { type: 'auth'; accessToken: string };
+  | { type: 'auth'; accessToken: string }
+  /** Open a presence socket: a signed-in tab outside any room, so friends see it online. */
+  | { type: 'presence'; version: number; accessToken: string };
 export type ServerMessage =
   | { type: 'welcome'; playerId: string; state: RoomState; version: number }
   | { type: 'state'; state: RoomState }
@@ -153,7 +160,11 @@ export type ServerMessage =
   | { type: 'reaction'; playerId: string; name: string; reaction: ReactionName; at: number }
   | { type: 'error'; code: string; message: string; commandId?: string }
   /** Whether a refreshed token was accepted; if not, the client simply offers it again later. */
-  | { type: 'auth'; ok: boolean; expiresAt?: number };
+  | { type: 'auth'; ok: boolean; expiresAt?: number }
+  /** A presence socket was accepted. */
+  | { type: 'presence'; ok: true }
+  /** A friend came online, went offline or changed where they can be watched. */
+  | { type: 'friend'; friend: FriendPresenceChange };
 
 /** Bounds and a strict operation whitelist keep untrusted messages out of the store. */
 export function parseClientMessage(input: string): ClientMessage {
@@ -254,6 +265,12 @@ export function parseClientMessage(input: string): ClientMessage {
     if (typeof v.accessToken !== 'string' || !v.accessToken || v.accessToken.length > 16000)
       throw new Error('Invalid authentication');
     return { type: 'auth', accessToken: v.accessToken };
+  }
+  if (v.type === 'presence') {
+    if (v.version !== PROTOCOL_VERSION) throw new Error('Unsupported protocol version');
+    if (typeof v.accessToken !== 'string' || !v.accessToken || v.accessToken.length > 16000)
+      throw new Error('Invalid authentication');
+    return { type: 'presence', version: v.version, accessToken: v.accessToken };
   }
   throw new Error('Unknown or invalid operation');
 }

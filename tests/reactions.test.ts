@@ -9,8 +9,9 @@ import {
   REACTION_LIST,
   isReaction,
   REACTION_BURST,
-  REACTION_MIN_GAP_MS,
+  REACTION_WINDOW_MS,
   reactionAllowedAt,
+  reactionWaitMs,
 } from '../packages/protocol/src/reactions.js';
 import { ReactionButton, ReactionLayer, scrollEdges } from '../apps/client/src/Reactions.js';
 import { ReactionFace } from '../apps/client/src/ReactionArt.js';
@@ -101,19 +102,27 @@ test('the tray fades an edge only where there is more of the set beyond it', () 
   assert.deepEqual(scrollEdges(157.5, 300, 142), { above: true, below: false });
 });
 
-test('the rate limit allows a burst and then rests, by one shared rule', () => {
-  assert.ok(REACTION_BURST >= 3, 'a few in a row is part of the fun');
-  assert.ok(REACTION_MIN_GAP_MS >= 250, 'but not a hose');
+test('tapping away is fine, and a stream waits out only a short cooldown, by one shared rule', () => {
+  assert.ok(REACTION_BURST >= 8, 'a run of laughs is the point');
+  assert.ok(REACTION_WINDOW_MS <= 5000, 'the longest wait is a short cooldown, never the rest of the game');
 
-  assert.ok(reactionAllowedAt([], 10_000), 'the first one always goes');
-  assert.ok(!reactionAllowedAt([10_000], 10_000 + REACTION_MIN_GAP_MS - 1), 'too soon after the last');
-  assert.ok(reactionAllowedAt([10_000], 10_000 + REACTION_MIN_GAP_MS), 'and fine once the beat has passed');
-
-  // A full burst rests until the oldest falls out of the window.
-  const burst = Array.from({ length: REACTION_BURST }, (_, i) => 10_000 + i * REACTION_MIN_GAP_MS);
-  const last = burst[burst.length - 1]!;
-  assert.ok(!reactionAllowedAt(burst, last + REACTION_MIN_GAP_MS), 'a stream is refused');
-  assert.ok(reactionAllowedAt(burst, 10_000 + 6000), 'and allowed again once the window has rolled');
+  assert.equal(reactionWaitMs([], 10_000), 0, 'the first one always goes');
+  // As fast as a thumb can tap, the whole burst goes out.
+  const burst = Array.from({ length: REACTION_BURST }, (_, i) => 10_000 + i * 100);
+  for (let i = 1; i < REACTION_BURST; i++) assert.equal(reactionWaitMs(burst.slice(0, i), burst[i]!), 0);
+  // One more waits until the first of them is a window old, and no longer.
+  const after = burst.at(-1)! + 100;
+  assert.equal(reactionWaitMs(burst, after), 10_000 + REACTION_WINDOW_MS - after);
+  assert.ok(!reactionAllowedAt(burst, after));
+  assert.ok(reactionAllowedAt(burst, 10_000 + REACTION_WINDOW_MS), 'and goes the moment it is');
+  // Times from a clock that has since jumped back are not held against anyone.
+  assert.equal(
+    reactionWaitMs(
+      burst.map((time) => time + 3_600_000),
+      after,
+    ),
+    0,
+  );
 });
 
 test('a reaction face fills its button, and no icon rule quietly shrinks it', () => {

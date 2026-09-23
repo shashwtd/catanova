@@ -35,6 +35,7 @@ import { BoardViewport } from '../BoardViewport.js';
 import { ResourceHand } from '../ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from '../DevelopmentCards.js';
 import { PlayerRail } from '../PlayerRail.js';
+import type { FriendStatus } from '../social-presence.js';
 import { Dices, ArrowLeftRight, NextTurn, X, Settings2, House, Route, Castle } from '../GameIcons.js';
 import {
   createGame,
@@ -56,6 +57,7 @@ const seats = names.map((name, i) => ({
   ready: i !== 0,
   connected: true,
   profile: { ...defaultProfile(name), avatar: i + 3 },
+  accountId: `preview-account-${i}`,
 }));
 const me = seats[0]!.id;
 const room: RoomState = {
@@ -167,6 +169,10 @@ export function LoungePreview() {
     null,
   );
   const [showAwards, setShowAwards] = useState(false);
+  /** Local friendships for the rail's friend button: one sample player has asked already. */
+  const [friendships, setFriendships] = useState<Record<string, FriendStatus>>({
+    [seats[2]!.accountId]: 'received',
+  });
   const [availableBuilds, setAvailableBuilds] = useState(true);
   const [selectedBuild, setSelectedBuild] = useState<BuildMode>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
@@ -436,7 +442,17 @@ export function LoungePreview() {
               }}
             />
           )}
-          <PlayerRail room={currentRoom} game={displayedGame} me={me} />
+          <PlayerRail
+            room={currentRoom}
+            game={displayedGame}
+            me={me}
+            friendship={{
+              self: seats[0]!.accountId,
+              status: (id) => friendships[id] ?? 'none',
+              request: async (id) => setFriendships((current) => ({ ...current, [id]: 'sent' })),
+              accept: async (id) => setFriendships((current) => ({ ...current, [id]: 'friends' })),
+            }}
+          />
           <GameTools
             onClosePanel={() => setPanel(null)}
             panel={panel}

@@ -6,6 +6,7 @@ import {
   FriendRequestQueue,
   SOCIAL_HEARTBEAT_MS,
   SOCIAL_HEARTBEAT_TIMEOUT_MS,
+  friendStatus,
   lastSeenLabel,
   startSocialPresence,
 } from '../apps/client/src/social-presence.js';
@@ -66,6 +67,15 @@ function clock() {
     },
   };
 }
+
+test('where the viewer stands with an account follows the friends list', () => {
+  const account = (id: string) => ({ id, username: id, isGuest: false, profile: defaultProfile(id) });
+  const state = { friends: [account('ana')], incoming: [account('bo')], outgoing: [account('cy')] };
+  assert.equal(friendStatus(state, 'ana'), 'friends');
+  assert.equal(friendStatus(state, 'bo'), 'received');
+  assert.equal(friendStatus(state, 'cy'), 'sent');
+  assert.equal(friendStatus(state, 'dee'), 'none');
+});
 
 test('social presence immediately checks in, repeats in the foreground and cleans up completely', async () => {
   const page = new Page(),

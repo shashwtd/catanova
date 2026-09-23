@@ -1,26 +1,27 @@
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import type {
   GameDetail as Detail,
   GameListItem,
+  GameResult,
   GamesPage,
   PrivateGameState,
   RoomStatus,
   SeatSummary,
 } from '../../server/src/admin/types.js';
-import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
+import type { HistoryEntry, RoomState } from '../../../packages/protocol/src/index.js';
 import type { Game } from '../../../packages/rules/src/game.js';
 import { RESOURCE_NAMES, RESOURCES } from '../../../packages/rules/src/index.js';
 import { api, ApiError, useApi } from '../api.js';
-import { count, short, time } from '../format.js';
+import { accountLabel, count, diceLabel, phaseLabel, short, time } from '../format.js';
 import {
   Badge,
-  Columns,
   Empty,
   Failure,
   Json,
   Loading,
   Notice,
+  PlayerColour,
   Section,
   Stat,
   Table,
@@ -28,7 +29,8 @@ import {
   When,
 } from '../ui.js';
 import type { Tone } from '../ui.js';
-import { FAIR_DICE_SHARE, go } from '../route.js';
+import { go } from '../route.js';
+import { GameAnalyticsView } from './GameAnalytics.js';
 
 const STATUS_TONE: Record<RoomStatus, Tone> = {
   live: 'good',
@@ -51,33 +53,63 @@ export function StatusBadge({ status }: { status: RoomStatus }) {
   return <Badge tone={STATUS_TONE[status]}>{status}</Badge>;
 }
 
-/** A seat as a compact chip: name plus what is going on with it. */
-export function SeatChip({ seat }: { seat: SeatSummary }) {
+/**
+ * A seat as a compact chip: name, points once a game is on, and what is going
+ * on with it. Connection only matters while a game can still be played, so a
+ * finished game's seats are never flagged offline.
+ */
+export function SeatChip({
+  seat,
+  points,
+  winner = false,
+  over = false,
+}: {
+  seat: SeatSummary;
+  points?: number | null;
+  winner?: boolean;
+  over?: boolean;
+}) {
   const flags = [
     seat.bot ? `bot${seat.botLevel ? ` · ${seat.botLevel}` : ''}` : null,
-    seat.standIn ? 'bot standing in' : null,
+    !over && seat.standIn ? 'bot standing in' : null,
     seat.resigned ? 'resigned' : null,
     seat.departed ? 'left' : null,
-    !seat.bot && !seat.connected && !seat.resigned && !seat.departed ? 'offline' : null,
+    !over && !seat.bot && !seat.connected && !seat.resigned && !seat.departed ? 'offline' : null,
   ].filter(Boolean);
   const state =
     seat.resigned || seat.departed
       ? 'gone'
-      : seat.bot || seat.standIn
+      : seat.bot || (!over && seat.standIn)
         ? 'bot'
-        : seat.connected
-          ? 'on'
-          : 'off';
+        : over
+          ? 'done'
+          : seat.connected
+            ? 'on'
+            : 'off';
   return (
-    <span className={`seat seat-${state}`} title={flags.join(', ') || 'connected'}>
+    <span className={`seat seat-${state}`} title={flags.join(', ') || (over ? 'played' : 'connected')}>
       <i aria-hidden="true" />
       {seat.name}
+      {points !== undefined && points !== null && (
+        <span className="seat-points" title={`${points} points`}>
+          {points}
+          {winner && ' ★'}
+        </span>
+      )}
       {flags.length > 0 && <span className="seat-flags">{flags.join(' · ')}</span>}
     </span>
   );
 }
 
+const RESULT_TEXT: Record<GameResult['reason'], (winner: string | null) => string> = {
+  points: (winner) => `${winner ?? 'Someone'} won`,
+  resignation: (winner) => `${winner ?? 'Someone'} won by resignation`,
+  abandoned: () => 'No winner',
+};
+
 function GameRow({ game, now }: { game: GameListItem; now: number }) {
+  const over = game.status === 'finished';
+  const seated = game.players.length;
   return (
     <tr>
       <td>
@@ -89,18 +121,35 @@ function GameRow({ game, now }: { game: GameListItem; now: number }) {
         <StatusBadge status={game.status} />
         {game.error && <Badge tone="critical">{game.error}</Badge>}
       </td>
-      <td className="seats">
-        {game.players.map((seat) => (
-          <SeatChip key={seat.id} seat={seat} />
-        ))}
+      <td className="cell-wide">
+        <div className="seats">
+          {game.players.map((seat) => (
+            <SeatChip
+              key={seat.id}
+              seat={seat}
+              points={seat.points}
+              winner={game.result?.winnerId === seat.id}
+              over={over}
+            />
+          ))}
+        </div>
       </td>
-      <td>{game.phase ?? '—'}</td>
-      <td className="num">{game.turn ?? '—'}</td>
-      <td className="num">{game.revision}</td>
-      <td className="nowrap">
+      <td className="nowrap cell-wide">
+        {game.result ? (
+          RESULT_TEXT[game.result.reason](game.result.winner)
+        ) : game.turn !== null ? (
+          <>
+            Turn {game.turn}
+            <span className="muted"> · {phaseLabel(game.phase).toLowerCase()}</span>
+          </>
+        ) : (
+          <span className="muted">{seated} seated</span>
+        )}
+      </td>
+      <td className="nowrap hide-phone">
         <When at={game.createdAt} now={now} />
       </td>
-      <td className="nowrap">
+      <td className="nowrap cell-end">
         <When at={game.lastActivity} now={now} />
       </td>
     </tr>
@@ -179,16 +228,14 @@ export function Games({ params }: { params: URLSearchParams }) {
           actions={loading ? <span className="muted">Refreshing…</span> : undefined}
           className="wide"
         >
-          <Table className="games">
+          <Table className="games stacked">
             <thead>
               <tr>
                 <th>Room</th>
                 <th>Status</th>
                 <th>Players</th>
-                <th>Phase</th>
-                <th className="num">Turn</th>
-                <th className="num">Rev</th>
-                <th>Started</th>
+                <th>Game</th>
+                <th className="hide-phone">Started</th>
                 <th>Active</th>
               </tr>
             </thead>
@@ -262,10 +309,10 @@ function History({
   if (!entries.length) return <Empty>No moves recorded in this round.</Empty>;
   return (
     <>
-      <Table className="history">
+      <Table className="history stacked">
         <thead>
           <tr>
-            <th className="num">Rev</th>
+            <th className="num hide-phone">Rev</th>
             <th className="num">Turn</th>
             <th>Kind</th>
             <th>What happened</th>
@@ -275,18 +322,21 @@ function History({
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.revision}>
-              <td className="num">{entry.revision}</td>
-              <td className="num">{entry.turn}</td>
+              <td className="num hide-phone">{entry.revision}</td>
+              <td className="num nowrap">
+                <span className="phone-only muted">turn </span>
+                {entry.turn}
+              </td>
               <td>
                 <code>{entry.kind}</code>
                 {entry.automatic && <span className="muted"> · auto</span>}
               </td>
-              <td>
+              <td className="cell-wide">
                 {entry.lines.map((line, index) => (
                   <div key={index}>{line}</div>
                 ))}
               </td>
-              <td className="nowrap">{time(Date.parse(entry.at))}</td>
+              <td className="nowrap cell-end">{time(Date.parse(entry.at))}</td>
             </tr>
           ))}
         </tbody>
@@ -459,12 +509,134 @@ function EndGame({ detail, onEnded }: { detail: Detail; onEnded: () => void }) {
   );
 }
 
+function Pair({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="pair">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+/** A finished game's result as the table was told it. */
+export function resultText(game: NonNullable<RoomState['game']>): string {
+  const winner = game.players.find((player) => player.id === game.winner);
+  if (!winner) return 'No winner: the game was abandoned';
+  if (game.finishReason === 'resignation') return `${winner.name} won: everyone else resigned`;
+  return `${winner.name} won with ${winner.points} points`;
+}
+
+/**
+ * Who is at the table and what it is waiting for, worded the way the game
+ * treats it. While anyone is at a live table, an absent player keeps their
+ * seat and a bot plays it after half a minute; seats are only given up once
+ * the table has been empty for the whole grace period (it is then paused).
+ */
+function TableState({ data, now }: { data: Detail; now: number }) {
+  const game = data.snapshot?.game;
+  const name = (id: string) => data.seats.find((seat) => seat.id === id)?.name ?? short(id);
+  if (data.status === 'lobby' || data.status === 'empty') {
+    const seated = data.seats.filter((seat) => !seat.departed);
+    return (
+      <Section title="Lobby">
+        <dl className="pairs">
+          <Pair label="Seated">
+            {seated.length} of 4 · {seated.filter((seat) => seat.ready || seat.bot).length} ready
+          </Pair>
+          <Pair label="Connected">
+            {seated.filter((seat) => !seat.bot && seat.connected).length} of{' '}
+            {seated.filter((seat) => !seat.bot).length} people
+          </Pair>
+        </dl>
+      </Section>
+    );
+  }
+  if (data.status === 'finished' || !game) {
+    return (
+      <Section title="Result">
+        <dl className="pairs">
+          <Pair label="Ended">
+            {game && game.phase === 'finished' ? resultText(game) : <span className="muted">—</span>}
+          </Pair>
+          <Pair label="Last move">
+            <When at={data.lastActivity} now={now} />
+          </Pair>
+        </dl>
+      </Section>
+    );
+  }
+  const people = data.seats.filter(
+    (seat) => !seat.bot && !seat.resigned && !seat.departed && game.players.some((p) => p.id === seat.id),
+  );
+  const standIns = new Map(data.standIns.map((standIn) => [standIn.playerId, standIn]));
+  const clock = data.clock;
+  const discarding = Object.keys(game.discards ?? {});
+  return (
+    <Section title="Table">
+      <dl className="pairs">
+        <Pair label="State">
+          {data.presence.paused ? (
+            <>
+              Paused: nobody has been at the table since <When at={data.presence.pausedAt} now={now} />
+            </>
+          ) : (
+            `Live: ${people.filter((seat) => seat.connected).length} of ${people.length} people at the table`
+          )}
+        </Pair>
+        <Pair label="Up now">
+          {`${name(game.players[game.active]?.id ?? '')} · turn ${game.turn} · ${phaseLabel(game.phase).toLowerCase()}`}
+        </Pair>
+        <Pair label="Turn clock">
+          {!clock ? (
+            game.turn === 0 ? (
+              'none during setup'
+            ) : (
+              'no turn timer'
+            )
+          ) : data.presence.paused ? (
+            'held until someone is back'
+          ) : clock.pausedAt !== undefined ? (
+            `stopped while ${discarding.map(name).join(', ') || 'players'} discard`
+          ) : (
+            <>
+              {name(clock.playerId)}&rsquo;s turn ends <When at={clock.deadlineAt} now={now} />
+            </>
+          )}
+        </Pair>
+        {data.presence.absent.map((absent) => {
+          const standIn = standIns.get(absent.playerId);
+          return (
+            <Pair key={absent.playerId} label={name(absent.playerId)}>
+              away since <When at={absent.disconnectedAt} now={now} />
+              {data.presence.paused ? (
+                <>
+                  {' '}
+                  · gives up the seat <When at={absent.resignAt} now={now} /> unless someone returns
+                </>
+              ) : standIn ? (
+                <>
+                  {' '}
+                  · a bot ({standIn.level}) has played for them since <When at={standIn.since} now={now} />
+                </>
+              ) : (
+                <>
+                  {' '}
+                  · a bot takes the seat <When at={absent.standInAt} now={now} />
+                </>
+              )}
+            </Pair>
+          );
+        })}
+      </dl>
+    </Section>
+  );
+}
+
 export function GameDetail({ roomId }: { roomId: string }) {
   const { data, error, reload } = useApi<Detail>(`/api/admin/games/${encodeURIComponent(roomId)}`, 15_000);
   if (!data) return error ? <Failure error={error} retry={reload} /> : <Loading />;
   const now = Date.now();
   const game = data.snapshot?.game;
-  const clockPlayer = data.seats.find((seat) => seat.id === data.clock?.playerId)?.name;
   return (
     <div className="stack">
       <p>
@@ -484,74 +656,31 @@ export function GameDetail({ roomId }: { roomId: string }) {
           <div className="stats">
             <Stat label="Room id" value={<code className="small">{data.roomId}</code>} />
             <Stat
+              label="Turn"
+              value={game ? game.turn : '—'}
+              hint={game ? phaseLabel(game.phase) : undefined}
+            />
+            <Stat
+              label="Started"
+              value={<When at={data.createdAt} now={now} />}
+              hint={data.round ? 'this round' : undefined}
+            />
+            <Stat label="Last activity" value={<When at={data.lastActivity} now={now} />} />
+            <Stat
+              label="Dice"
+              value={diceLabel(game?.diceMode ?? data.settings.diceMode)}
+              hint={`${
+                data.settings.turnTimerSeconds ? `${data.settings.turnTimerSeconds} s turns` : 'no turn timer'
+              } · ${game?.victoryPoints ?? data.settings.victoryPoints ?? 10} points to win`}
+            />
+            <Stat
               label="Revision"
               value={data.revision}
               {...(data.round ? { hint: `this round began after ${data.round}` } : {})}
             />
-            <Stat label="Phase" value={game?.phase ?? '—'} hint={game ? `turn ${game.turn}` : undefined} />
-            <Stat label="Started" value={<When at={data.createdAt} now={now} />} />
-            <Stat label="Last activity" value={<When at={data.lastActivity} now={now} />} />
-            <Stat
-              label="Settings"
-              value={String(data.settings?.diceMode ?? 'classic')}
-              hint={
-                data.settings?.turnTimerSeconds
-                  ? `${String(data.settings.turnTimerSeconds)}s turns`
-                  : 'no turn timer'
-              }
-            />
           </div>
         </Section>
-        <Section title="Clock and presence">
-          <dl className="pairs">
-            <div className="pair">
-              <dt>Paused</dt>
-              <dd>{data.presence.paused ? 'Yes: nobody is connected' : 'No'}</dd>
-            </div>
-            <div className="pair">
-              <dt>Turn clock</dt>
-              <dd>
-                {data.clock ? (
-                  <>
-                    {clockPlayer ?? short(data.clock.playerId)} · turn {data.clock.turn}
-                    {data.presence.paused ? (
-                      ' · held while the room is paused'
-                    ) : (
-                      <>
-                        {' '}
-                        · ends <When at={data.clock.deadlineAt} now={now} />
-                        {data.clock.pausedAt !== undefined && ' (paused for discards)'}
-                      </>
-                    )}
-                  </>
-                ) : (
-                  'None'
-                )}
-              </dd>
-            </div>
-            {data.presence.absent.map((absent) => (
-              <div key={absent.playerId} className="pair">
-                <dt>
-                  {data.seats.find((seat) => seat.id === absent.playerId)?.name ?? short(absent.playerId)}
-                </dt>
-                <dd>
-                  away since <When at={absent.disconnectedAt} now={now} /> · resigns{' '}
-                  <When at={absent.resignAt} now={now} />
-                </dd>
-              </div>
-            ))}
-            {data.standIns.map((standIn) => (
-              <div key={standIn.playerId} className="pair">
-                <dt>
-                  {data.seats.find((seat) => seat.id === standIn.playerId)?.name ?? short(standIn.playerId)}
-                </dt>
-                <dd>
-                  bot ({standIn.level}) standing in since <When at={standIn.since} now={now} />
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </Section>
+        <TableState data={data} now={now} />
       </div>
       <Section title="Seats" className="wide">
         <Table>
@@ -570,7 +699,8 @@ export function GameDetail({ roomId }: { roomId: string }) {
               return (
                 <tr key={seat.id}>
                   <td>
-                    <SeatChip seat={seat} />
+                    <SeatChip seat={seat} over={data.status === 'finished'} />
+                    {game?.winner === seat.id && <span className="seat-points"> ★ winner</span>}
                     {!game && seat.ready && <Badge tone="good">ready</Badge>}
                   </td>
                   <td>
@@ -581,38 +711,28 @@ export function GameDetail({ roomId }: { roomId: string }) {
                     ) : (
                       <span className="muted">{seat.bot ? 'bot' : 'local seat'}</span>
                     )}
-                    {seat.accountType && <span className="muted"> · {seat.accountType}</span>}
+                    {seat.accountType && <span className="muted"> · {accountLabel(seat.accountType)}</span>}
                   </td>
                   <td className="num">{view?.points ?? '—'}</td>
                   <td className="num">{view ? `${view.resourceCount} res · ${view.cardCount} dev` : '—'}</td>
-                  <td>{seat.color ?? '—'}</td>
+                  <td>
+                    <PlayerColour color={seat.color} chosen={seat.colorChosen} />
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </Table>
       </Section>
-      {data.statistics && data.statistics.rolls > 0 && (
-        <Section title={`Dice this round (${data.statistics.rolls} rolls)`} className="wide">
-          <Columns
-            label="Rolls of each total this round, against two fair dice"
-            categories={Array.from({ length: 11 }, (_, i) => String(i + 2))}
-            series={[{ name: 'Rolled', slot: 1, values: data.statistics.diceCounts }]}
-            reference={{
-              name: 'Two fair dice',
-              values: FAIR_DICE_SHARE.map((p) => Math.round(p * data.statistics!.rolls * 10) / 10),
-            }}
-          />
-        </Section>
+      {game && (
+        <GameAnalyticsView roomId={data.roomId} live={data.status === 'live' || data.status === 'paused'} />
       )}
-      <Section title="Move history" className="wide">
-        <History roomId={data.roomId} first={data.history} />
-      </Section>
       {data.rounds.length > 0 && (
         <Section title="Earlier rounds in this room" className="wide">
           <Table>
             <thead>
               <tr>
+                <th>Round</th>
                 <th>Started</th>
                 <th>Finished</th>
                 <th className="num">Turns</th>
@@ -622,8 +742,11 @@ export function GameDetail({ roomId }: { roomId: string }) {
             <tbody>
               {data.rounds.map((round) => (
                 <tr key={round.archiveId}>
-                  <td>{time(round.startedAt)}</td>
-                  <td>{time(round.finishedAt)}</td>
+                  <td>
+                    <a href={`#/games/${data.roomId}?round=${round.archiveId}`}>How it went</a>
+                  </td>
+                  <td className="nowrap">{time(round.startedAt)}</td>
+                  <td className="nowrap">{time(round.finishedAt)}</td>
                   <td className="num">{round.turns}</td>
                   <td>{round.winner ?? <span className="muted">no winner</span>}</td>
                 </tr>
@@ -632,6 +755,9 @@ export function GameDetail({ roomId }: { roomId: string }) {
           </Table>
         </Section>
       )}
+      <Section title="Move history" className="wide">
+        <History roomId={data.roomId} first={data.history} />
+      </Section>
       <Section title="Public snapshot" className="wide">
         <details>
           <summary>What a spectator is sent</summary>

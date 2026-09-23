@@ -17,11 +17,11 @@ import type {
 import { accountApi, AccountApiError } from './account-api.js';
 import { beginGoogleSignIn, beginGuestSignIn, completeGoogleLink } from './auth-flow.js';
 import { safeEntryPath, navigationRoomReference, roomPath } from './navigation.js';
-import { FriendRequestQueue, startSocialPresence } from './social-presence.js';
+import { FriendRequestQueue, applyFriendChange, startSocialPresence } from './social-presence.js';
+import type { FriendsWithPresence } from './social-presence.js';
+import { PresenceSocket } from './presence-socket.js';
 type GameIdentity = Pick<User, 'id' | 'is_anonymous'>;
-type ClientFriendsState = Omit<FriendsState, 'friends'> & {
-  friends: (PublicAccount & { online?: boolean })[];
-};
+type ClientFriendsState = FriendsWithPresence;
 export type RuntimeConfig = {
   auth: { url: string; publishableKey: string } | null;
   mode: 'local' | 'authenticated';
@@ -290,17 +290,51 @@ export function useAuth() {
   useEffect(() => {
     if (!account?.registered || guestExpired) return;
     const owner = account.id;
-    return startSocialPresence(async (signal) => {
-      const token = await accessToken();
-      if (!signal.aborted && currentUser.current?.id === owner) await accountApi.presence(token, signal);
-    }, document);
-  }, [account?.id, account?.registered, guestExpired, accessToken]);
+    let socketUp = false;
+    // Online for as long as Catanova is open, and told of friends the moment they change.
+    const socket = new PresenceSocket({
+      url: `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`,
+      accessToken,
+      onFriend: (change) => {
+        if (currentUser.current?.id !== owner) return;
+        setFriends((current) => {
+          const next = applyFriendChange(current, change);
+          // Someone who just accepted a request is not on the list yet: fetch it.
+          if (next === current && change.online) void refreshFriends().catch(() => {});
+          return next;
+        });
+      },
+      onConnected: (connected) => {
+        socketUp = connected;
+      },
+      window,
+      document,
+    });
+    socket.start();
+    // The older heartbeat stands in only while the socket is down. It starts once the socket has
+    // had time to connect: an early heartbeat would outlive a tab closed soon after opening, and
+    // hold back the moment friends are told it left.
+    let stopHeartbeat = () => {};
+    const fallback = setTimeout(() => {
+      stopHeartbeat = startSocialPresence(async (signal) => {
+        if (socketUp) return;
+        const token = await accessToken();
+        if (!signal.aborted && currentUser.current?.id === owner) await accountApi.presence(token, signal);
+      }, document);
+    }, 8000);
+    return () => {
+      clearTimeout(fallback);
+      socket.stop();
+      stopHeartbeat();
+    };
+  }, [account?.id, account?.registered, guestExpired, accessToken, refreshFriends]);
   useEffect(() => {
     if (!account?.registered || account.isGuest) return;
     const refresh = () => {
       if (document.visibilityState === 'visible') void refreshFriends().catch(() => {});
     };
-    const interval = setInterval(refresh, 30000);
+    // Changes arrive over the presence socket as they happen; this only catches anything missed.
+    const interval = setInterval(refresh, 60000);
     window.addEventListener('focus', refresh);
     window.addEventListener('online', refresh);
     document.addEventListener('visibilitychange', refresh);

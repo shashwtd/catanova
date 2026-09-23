@@ -207,6 +207,97 @@
 .playing .player-profile:has(> .profile-held-awards > :nth-child(2)) .profile-name-row {
   padding-right: 65px;
 }
+/* Road length and Knights played on a plate at the foot of the portrait. It
+   gives way to an absence label, which sits in the same place. */
+.playing .profile-portrait > .profile-award-counts {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  bottom: -8px;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 6px 1px 3px;
+  border-radius: 9px;
+  background: #2b1d14e8;
+  box-shadow:
+    0 1px 3px #0008,
+    inset 0 0 0 1px #e9c98a40;
+  color: #f1e2bf;
+  font:
+    700 13px/1 Barlow,
+    sans-serif;
+  white-space: nowrap;
+}
+.playing .profile-portrait:has(> .profile-absence) > .profile-award-counts {
+  display: none;
+}
+.profile-award-counts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.profile-award-counts > [data-held='true'] {
+  color: #ffd978;
+}
+/* A friend request from the table, on the portrait's corner. Hidden until the
+   card is hovered, focused or tapped; a touch screen cannot press it unseen. */
+.playing .profile-portrait > .profile-friend {
+  position: absolute;
+  z-index: 8;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #e9c98a80;
+  border-radius: 50%;
+  background: #2b1d14f2;
+  box-shadow: 0 1px 4px #000a;
+  color: #f7e8c4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.playing .player-profile:is(:hover, :focus-within, [data-friend-reveal]) .profile-friend {
+  opacity: 1;
+}
+.playing .profile-portrait > .profile-friend[data-status='received'] {
+  background: #8a6526f2;
+  color: #fff3cf;
+}
+.playing .profile-portrait > .profile-friend[data-status='sent'] {
+  color: #cfe8c4;
+}
+@media (hover: none) {
+  .playing .player-profile:not([data-friend-reveal]) .profile-friend {
+    pointer-events: none;
+  }
+}
+@media (max-width: 700px), (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .profile-portrait > .profile-award-counts {
+    bottom: -5px;
+    gap: 3px;
+    padding: 0 4px 0 2px;
+    font-size: 10px;
+  }
+  .profile-award-counts .game-icon {
+    width: 12px;
+    height: 12px;
+  }
+  .playing .profile-portrait > .profile-friend {
+    top: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+  }
+  .profile-friend .game-icon {
+    width: 13px;
+    height: 13px;
+  }
+}
 /* A soft wash has no cut edge. Only the backdrop fades; the emblem and lettering stay crisp. */
 .playing .award-celebration {
   isolation: isolate;

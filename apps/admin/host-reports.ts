@@ -1,4 +1,5 @@
 import type { StatusFile } from '../server/src/admin/types.js';
+import { bytes, count, duration, time } from './format.js';
 import type { Tone } from './ui.js';
 
 /**
@@ -19,6 +20,56 @@ export const HOST_REPORTS = [
 export const REPORT_FIELDS = ['result', 'reason', 'durationSeconds'];
 /** Shown elsewhere (the run time) or saying nothing the heading does not. */
 export const HIDDEN_FIELDS = new Set(['timestamp', 'schema', 'kind']);
+/** Names for the fields the host's scripts write; anything else is spelled out from its key. */
+const FIELD_LABELS: Record<string, string> = { reason: 'Reason', durationSeconds: 'Took', bytes: 'Size' };
+
+/** `lastGoodBackup` or `last_good_backup` as "Last good backup". */
+export function fieldLabel(key: string): string {
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** A field's value as text: sizes, durations and times in words, a nested object as its pairs. */
+export function fieldValue(key: string, value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (typeof value === 'number') {
+    if (/seconds$/i.test(key)) return value < 60 ? `${Math.round(value * 10) / 10} s` : duration(value);
+    if (/bytes$/i.test(key)) return bytes(value);
+    return count(value);
+  }
+  if (typeof value === 'string') {
+    const at = /^\d{4}-\d{2}-\d{2}T/.test(value) ? Date.parse(value) : NaN;
+    return Number.isFinite(at) ? time(at) : value;
+  }
+  if (Array.isArray(value))
+    return value.map((item) => (typeof item === 'object' ? JSON.stringify(item) : String(item))).join(', ');
+  return Object.entries(value as Record<string, unknown>)
+    .map(([name, item]) => `${fieldLabel(name).toLowerCase()} ${fieldValue(name, item)}`)
+    .join(' · ');
+}
+
+/**
+ * A report's fields in reading order, as label and text. The run time is
+ * shown on its own and the result is the badge, so neither repeats here.
+ */
+export function reportFields(file: Extract<StatusFile, { state: 'ok' }>) {
+  return Object.entries(file.data)
+    .filter(
+      ([key, value]) =>
+        !HIDDEN_FIELDS.has(key) && !(key === 'result' && (value === 'success' || value === 'failure')),
+    )
+    .sort(
+      ([a], [b]) =>
+        (REPORT_FIELDS.indexOf(a) + 1 || 99) - (REPORT_FIELDS.indexOf(b) + 1 || 99) || a.localeCompare(b),
+    )
+    .map(([key, value]) => ({ key, label: fieldLabel(key), value: fieldValue(key, value) }));
+}
 
 export type ReportVerdict = { tone: Tone; label: string };
 

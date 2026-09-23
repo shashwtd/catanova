@@ -40,6 +40,26 @@ test('one account can reconnect across browsers but cannot enter another room du
   }
 });
 
+test('a seat signed in with Google shows its account to the table, and never in an invite preview', () => {
+  const store = new Store(':memory:');
+  try {
+    const host = store.enter('create', token(20), '', undefined, { ...identity('Host'), isGuest: false });
+    store.enter('join', token(21), '', host.room_id, { ...identity('Visitor'), isGuest: true });
+    store.enter('join', token(22), 'Local', host.room_id);
+    const accounts = (players: { name: string; accountId?: string }[]) =>
+      players.map(({ name, accountId }) => [name, accountId]);
+    assert.deepEqual(accounts(store.snapshot(host.room_id, host.id).players), [
+      ['Host', 'Host'],
+      ['Visitor', undefined],
+      ['Local', undefined],
+    ]);
+    assert.deepEqual(accounts(store.snapshot(host.room_id, '@spectator').players)[0], ['Host', 'Host']);
+    assert.ok(store.preview(host.room_id).players.every((player) => !('accountId' in player)));
+  } finally {
+    store.close();
+  }
+});
+
 test('starting checks every account, including a ready guest with another lobby open', () => {
   const store = new Store(':memory:');
   try {

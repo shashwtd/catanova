@@ -4,6 +4,7 @@ import WebSocket from 'ws';
 import { startServer } from '../apps/server/src/server.js';
 import { newSession } from '../apps/client/src/connection.js';
 import { PROTOCOL_VERSION } from '../packages/protocol/src/index.js';
+import { REACTION_BURST, REACTION_WINDOW_MS } from '../packages/protocol/src/reactions.js';
 import type { ClientMessage, ServerMessage, RoomState } from '../packages/protocol/src/index.js';
 
 async function until(check: () => boolean) {
@@ -61,25 +62,18 @@ test('accepted reactions reach each player and spectator once, without revisions
   a.send({ type: 'react', reaction: 'laugh' });
   await until(() => [a, b, watcher].every((c) => c.reactions().length === 1));
   assert.equal(a.reactions()[0]!.playerId, a.welcome.playerId);
-  // Sequential ping is a barrier after the rejected reactions.
-  a.send({ type: 'react', reaction: 'angry' });
-  a.send({ type: 'ping', nonce: 'too-soon' });
-  await until(() => a.messages.some((m) => m.type === 'pong' && m.nonce === 'too-soon'));
-  assert.equal(a.reactions().length, 1);
-  for (let i = 0; i < 3; i++) {
-    now += 500;
-    a.send({ type: 'react', reaction: 'nice' });
-    await until(() => watcher.reactions().length === i + 2);
-  }
-  now += 500;
+  // A run sent as fast as it can be all arrives, up to the burst.
+  for (let i = 1; i < REACTION_BURST; i++) a.send({ type: 'react', reaction: 'nice' });
+  await until(() => watcher.reactions().length === REACTION_BURST);
+  // One more is refused until the cooldown ends. A sequential ping is a barrier after it.
   a.send({ type: 'react', reaction: 'shock' });
   a.send({ type: 'ping', nonce: 'burst-limit' });
   await until(() => a.messages.some((m) => m.type === 'pong' && m.nonce === 'burst-limit'));
-  assert.equal(a.reactions().length, 4);
+  assert.equal(a.reactions().length, REACTION_BURST);
   watcher.send({ type: 'react', reaction: 'evil' });
   await until(() => watcher.messages.some((m) => m.type === 'error' && m.code === 'SPECTATOR_READ_ONLY'));
-  now += 6000;
+  now += REACTION_WINDOW_MS;
   a.send({ type: 'react', reaction: 'pleading' });
-  await until(() => [a, b, watcher].every((c) => c.reactions().length === 5));
+  await until(() => [a, b, watcher].every((c) => c.reactions().length === REACTION_BURST + 1));
   assert.equal(server.store.snapshot(room).revision, revision);
 });

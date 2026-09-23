@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { HOST_REPORTS, reportVerdict, reportedAt } from '../apps/admin/host-reports.js';
+import {
+  HOST_REPORTS,
+  fieldLabel,
+  fieldValue,
+  reportFields,
+  reportVerdict,
+  reportedAt,
+} from '../apps/admin/host-reports.js';
+import { time } from '../apps/admin/format.js';
 import type { StatusFile } from '../apps/server/src/admin/types.js';
 
 const MINUTE = 60_000;
@@ -34,6 +42,44 @@ test('host reports are judged by their result and by how recently their job ran'
     verdict(report({ ok: true, timestamp: at(1) })),
     'Reported',
     'an unknown shape is not called OK',
+  );
+});
+
+test('report fields read as words: sizes, durations, times and nested checks, without repeating the badge', () => {
+  const file: StatusFile = {
+    state: 'ok',
+    modifiedAt: now,
+    data: {
+      schema: 1,
+      kind: 'backup',
+      timestamp: '2026-09-23T08:00:00Z',
+      result: 'success',
+      reason: 'uploaded',
+      durationSeconds: 4.1,
+      bytes: 1843200,
+      lastGoodBackup: '2026-09-23T07:45:00Z',
+      checks: { health: 'ok', diskFree: true },
+      container: 'catanova-backups',
+    },
+  };
+  assert.deepEqual(
+    reportFields(file as Extract<StatusFile, { state: 'ok' }>).map((field) => [field.label, field.value]),
+    [
+      ['Reason', 'uploaded'],
+      ['Took', '4.1 s'],
+      ['Size', '1.8 MB'],
+      ['Checks', 'health ok · disk free yes'],
+      ['Container', 'catanova-backups'],
+      ['Last good backup', time(Date.parse('2026-09-23T07:45:00Z'))],
+    ],
+  );
+  assert.equal(fieldValue('durationSeconds', 125), '2m 5s');
+  assert.equal(fieldValue('files', 1200), '1,200');
+  assert.equal(fieldLabel('restore_drill_status'), 'Restore drill status');
+  // An unknown result is not the badge's to say, so it stays.
+  assert.deepEqual(
+    reportFields({ state: 'ok', modifiedAt: now, data: { result: 'partial' } }).map((field) => field.value),
+    ['partial'],
   );
 });
 

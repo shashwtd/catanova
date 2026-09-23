@@ -20,10 +20,26 @@ import { serveClient } from './static.js';
 import { GameLaunch } from './game-launch.js';
 import { RoomInviteService } from './room-invites.js';
 import { AccountPresence } from './account-presence.js';
+import { PresenceHub } from './presence-hub.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { BotDriver } from './bots.js';
 import { serverErrors } from './admin/errors.js';
 import { PlayerFeedback } from './feedback.js';
+
+/**
+ * The account a Supabase access token names. Read only from a token Supabase
+ * has just accepted for the same request, so the claim is already verified.
+ */
+function tokenSubject(token: string | undefined): string | undefined {
+  const payload = token?.split('.')[1];
+  if (!payload) return undefined;
+  try {
+    const subject = (JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { sub?: unknown }).sub;
+    return typeof subject === 'string' && /^[0-9a-f-]{36}$/i.test(subject) ? subject : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Validation errors must release a pending command without reflecting arbitrary payload text. */
 function validationCommandId(input: string): string | undefined {
@@ -44,6 +60,8 @@ export async function startServer(
     databasePath?: string;
     allowedOrigins?: string[];
     heartbeatMs?: number;
+    /** How long an account stays online after its last socket closes (presence-hub.ts). */
+    presenceGraceMs?: number;
     clientDirectory?: string;
     auth?: AuthConfig | null;
     verifyIdentity?: VerifyIdentity;
@@ -68,6 +86,8 @@ export async function startServer(
   const hubRequests = new RoomAccessLimit(120);
   const historyRequests = new RoomAccessLimit(30);
   const presenceRequests = new RoomAccessLimit(12);
+  // Opening a presence socket asks Supabase who the tab belongs to; reconnects are cheap but not free.
+  const presenceJoins = new RoomAccessLimit(60);
   // Every other account route reaches Supabase too; generous, but not unlimited.
   const accountRequests = new RoomAccessLimit(120);
   // Resuming a saved seat bypasses the code-guessing limit so a flaky network
@@ -78,11 +98,39 @@ export async function startServer(
   // and lock everybody else out. Joined sockets are not counted per address, so
   // friends behind one home router or mobile carrier are unaffected.
   const maxSockets = Number(process.env.MAX_SOCKETS ?? 400);
+  const MAX_PRESENCE_SOCKETS = Math.max(50, Math.floor(maxSockets / 2));
   const UNJOINED_PER_ADDRESS = 12,
     UNJOINED_TOTAL = Math.max(24, Math.floor(maxSockets / 4));
   const unjoinedByAddress = new Map<string, number>();
   let unjoined = 0;
-  const accountPresence = new AccountPresence();
+  // Who has Catanova open, told to their friends as it changes (presence-hub.ts).
+  const presence: PresenceHub<WebSocket> = new PresenceHub<WebSocket>({
+    now,
+    graceMs: options.presenceGraceMs,
+    send: (ws, friend) => send(ws, { type: 'friend', friend }),
+    friendIds: async (token) =>
+      accounts ? (await accounts.friends(token)).friends.map((friend) => friend.id) : [],
+    markSeen: (userId, at) => {
+      try {
+        store.markSeen(userId, at);
+      } catch (error) {
+        console.error('Could not record when an account was last seen:', error);
+      }
+    },
+    lastSeen: (userId) => friendLastSeen(userId),
+    watchable: (userId) => watchableRoom(userId),
+    heartbeat: (userId): boolean => accountPresence.heartbeat(userId, now()),
+    onError: (error) =>
+      console.warn(
+        JSON.stringify({
+          event: 'presence_friends_unavailable',
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      ),
+  });
+  const accountPresence: AccountPresence = new AccountPresence(10_000, (userId): boolean =>
+    presence.isOnline(userId),
+  );
   const siteKey =
     options.captcha === null
       ? undefined
@@ -208,14 +256,11 @@ export async function startServer(
             request.method === 'GET'
               ? store.accountPrivacy(account.id)
               : store.saveAccountPrivacy(account.id, parseAccountPrivacy(await body()));
-        } else if (request.method === 'GET' && url.pathname === '/api/friends')
-          result = accountPresence.friends(
-            await accounts.friends(token),
-            now(),
-            watchableRoom,
-            friendLastSeen,
-          );
-        else if (request.method === 'GET' && url.pathname === '/api/account/room-invites')
+        } else if (request.method === 'GET' && url.pathname === '/api/friends') {
+          const state = await accounts.friends(token);
+          rememberFriends(token, state);
+          result = accountPresence.friends(state, now(), watchableRoom, friendLastSeen);
+        } else if (request.method === 'GET' && url.pathname === '/api/account/room-invites')
           result = await roomInvites!.list(token);
         else if (request.method === 'POST' && url.pathname === '/api/account/room-invites')
           result = await roomInvites!.send(token, await body());
@@ -227,12 +272,9 @@ export async function startServer(
           const value = await body();
           if (typeof value.action !== 'string' || typeof value.other !== 'string')
             throw accountFailure('FRIEND_INVALID');
-          result = accountPresence.friends(
-            await accounts.friendAction(token, value.action, value.other),
-            now(),
-            watchableRoom,
-            friendLastSeen,
-          );
+          const state = await accounts.friendAction(token, value.action, value.other);
+          rememberFriends(token, state);
+          result = accountPresence.friends(state, now(), watchableRoom, friendLastSeen);
         } else {
           response.writeHead(404).end();
           return;
@@ -385,6 +427,8 @@ export async function startServer(
     },
   });
   const sessions = new Map<WebSocket, Seat>();
+  /** Signed-in tabs outside any room, kept open only so their accounts count as online. */
+  const presenceSockets = new Set<WebSocket>();
   // Watchers never acquire a seat, presence deadline, or authority to send moves.
   const spectators = new Map<WebSocket, string>();
   const activeSeats = new Map<string, WebSocket>();
@@ -403,6 +447,15 @@ export async function startServer(
   const watchableRoom = (userId: string) => store.watchableRoomOf(userId);
   /** Only for a friend who left the switch on. Off means the field is simply
    *  absent, not zero or "a long time ago": the client is told nothing. */
+  /** Keep the presence hub's copy of a caller's friends as fresh as the list it just fetched. */
+  const rememberFriends = (token: string | undefined, state: { friends: { id: string }[] }) => {
+    const caller = tokenSubject(token);
+    if (caller)
+      presence.setFriends(
+        caller,
+        state.friends.map((friend) => friend.id),
+      );
+  };
   const friendLastSeen = (userId: string) =>
     store.accountPrivacy(userId).shareLastSeen ? store.lastSeen(userId) : null;
   function snapshot(roomId: string, viewer: string): RoomState {
@@ -426,9 +479,9 @@ export async function startServer(
     for (const [ws, seat] of sessions) if (seat.room_id === roomId) send(ws, message);
   }
   /** Reactions are chat, not moves, so they are rate limited here rather than
-   *  receipted in the store. A burst is fine; a stream is not. The picker
-   *  applies the same shared rule, so a player sees the control rest for a beat
-   *  instead of sending calls that are dropped on arrival. */
+   *  receipted in the store. A run of taps is fine; a stream waits out a short
+   *  cooldown. The picker applies the same shared rule, so a player sees the
+   *  faces rest instead of sending calls that are dropped on arrival. */
   const reactionRate = new Map<string, number[]>();
   let nextReactionSweep = 0;
   function reactionAllowed(seatId: string) {
@@ -473,6 +526,25 @@ export async function startServer(
         });
       }
     }
+    try {
+      noticeWatchable(roomId);
+    } catch (error) {
+      console.error('Could not update where friends can watch:', error);
+    }
+  }
+  /** Rooms whose game can be watched now, so a game starting or finishing reaches friends at once. */
+  const watchableRooms = new Set<string>();
+  function noticeWatchable(roomId: string) {
+    const row = store.db.prepare('SELECT phase FROM game_phases WHERE room_id = ?').get(roomId) as
+      { phase: string | null } | undefined;
+    const watchable = !!row && row.phase !== 'finished';
+    if (watchable === watchableRooms.has(roomId)) return;
+    if (watchable) watchableRooms.add(roomId);
+    else watchableRooms.delete(roomId);
+    const seated = store.db
+      .prepare('SELECT user_id FROM seats WHERE room_id = ? AND departed = 0 AND user_id IS NOT NULL')
+      .all(roomId) as { user_id: string }[];
+    for (const { user_id: userId } of seated) presence.roomChanged(userId);
   }
   const launches = new GameLaunch({
     now,
@@ -537,11 +609,10 @@ export async function startServer(
     ws.on('error', () => ws.terminate());
     ws.on('pong', () => {
       alive.add(ws);
-      if (accountIdentity && (sessions.has(ws) || spectators.has(ws)))
-        accountPresence.touch(accountIdentity.id, now(), accountIdentity.expiresAt);
     });
     const handshakeTimeout = setTimeout(() => {
-      if (!sessions.has(ws) && !spectators.has(ws)) ws.close(1008, 'Join a room first');
+      if (!sessions.has(ws) && !spectators.has(ws) && !presenceSockets.has(ws))
+        ws.close(1008, 'Join a room first');
     }, 12000);
     handshakeTimeout.unref();
     let windowStart = Date.now();
@@ -671,7 +742,7 @@ export async function startServer(
             }
             spectators.set(ws, roomId);
             joined();
-            if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
+            if (identity) void presence.add(ws, 'game', identity, message.accessToken);
             clearTimeout(handshakeTimeout);
             send(ws, {
               type: 'welcome',
@@ -706,7 +777,7 @@ export async function startServer(
           joined();
           if (message.preloadGame) preloadClients.add(ws);
           activeSeats.set(seat.id, ws);
-          if (identity) accountPresence.touch(identity.id, now(), identity.expiresAt);
+          if (identity) void presence.add(ws, 'game', identity, message.accessToken);
           clearTimeout(handshakeTimeout);
           send(ws, {
             type: 'welcome',
@@ -715,6 +786,40 @@ export async function startServer(
             version: PROTOCOL_VERSION,
           });
           broadcast(seat.room_id);
+        } else if (message.type === 'presence') {
+          // A signed-in tab outside any room: it keeps its account online and hears friends change.
+          if (sessions.has(ws) || spectators.has(ws) || presenceSockets.has(ws))
+            throw new ProtocolError('ALREADY_JOINED', 'Socket already joined');
+          if (authenticating) throw new ProtocolError('ALREADY_JOINING', 'Joining is already in progress');
+          if (!verify || !accounts)
+            throw new ProtocolError('ACCOUNT_SETUP_REQUIRED', 'Accounts are not configured on this server');
+          // Game seats come first: presence gives way before the server is full.
+          if (presenceSockets.size >= MAX_PRESENCE_SOCKETS)
+            throw new ProtocolError('PRESENCE_BUSY', 'Too many open tabs right now');
+          if (!presenceJoins.consume(address, now()).allowed)
+            throw new ProtocolError('ROOM_RATE_LIMIT', 'Too many connections. Wait a minute and try again.');
+          authenticating = true;
+          let identity: Identity;
+          try {
+            identity = await verify(message.accessToken);
+          } finally {
+            authenticating = false;
+          }
+          if (ws.readyState !== WebSocket.OPEN) return;
+          if (identity.expiresAt <= Date.now())
+            throw accountFailure(
+              identity.guestExpiresAt !== undefined && identity.guestExpiresAt <= Date.now()
+                ? 'GUEST_EXPIRED'
+                : 'AUTH_REQUIRED',
+            );
+          accountToken = message.accessToken;
+          accountIdentity = identity;
+          setAuthDeadline();
+          presenceSockets.add(ws);
+          joined();
+          clearTimeout(handshakeTimeout);
+          send(ws, { type: 'presence', ok: true });
+          void presence.add(ws, 'presence', identity, message.accessToken);
         } else if (message.type === 'auth') {
           // A fresh token for this socket's account, so a signed-in player is not
           // disconnected every time their token expires (hourly). An outage at the
@@ -749,6 +854,12 @@ export async function startServer(
           setAuthDeadline();
           send(ws, { type: 'auth', ok: true, expiresAt: identity.expiresAt });
         } else {
+          if (presenceSockets.has(ws)) {
+            if (message.type !== 'ping')
+              throw new ProtocolError('PRESENCE_ONLY', 'A presence socket only keeps a signed-in tab online');
+            send(ws, { type: 'pong', nonce: message.nonce, serverNow: now() });
+            return;
+          }
           const watchedRoom = spectators.get(ws);
           if (watchedRoom) {
             if (accountIdentity && accountIdentity.expiresAt <= Date.now())
@@ -999,6 +1110,8 @@ export async function startServer(
     });
     ws.on('close', () => {
       joined();
+      presenceSockets.delete(ws);
+      presence.remove(ws);
       spectators.delete(ws);
       clearTimeout(handshakeTimeout);
       clearTimeout(authExpiry);
@@ -1126,9 +1239,12 @@ export async function startServer(
         seats: [...activeSeats].filter(([, ws]) => ws.readyState === WebSocket.OPEN).map(([id]) => id),
       }),
       broadcast,
+      /** Signed-in accounts with Catanova open, from the presence hub. */
+      online: () => presence.list(),
     },
     async close() {
       closing = true;
+      presence.close();
       bots.stop();
       clearInterval(heartbeat);
       clearInterval(launchScheduler);

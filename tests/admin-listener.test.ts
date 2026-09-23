@@ -292,6 +292,8 @@ test('the public game server never serves admin routes or the admin build', asyn
     '/api/admin',
     '/api/admin/session',
     '/api/admin/overview',
+    '/api/admin/metrics',
+    '/api/admin/system',
     '/api/admin/games',
     '/api/admin/audit',
     '/admin',

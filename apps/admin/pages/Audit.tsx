@@ -13,16 +13,62 @@ const ACTION_TONE: Record<string, Tone> = {
   'feedback.reopen': 'neutral',
 };
 
-function Target({ target }: { target: string | null }) {
+/** "roomCode" becomes "room code". */
+const words = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+
+function detailValue(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value.join(', ');
+  return JSON.stringify(value);
+}
+
+const ROOM_ID = /^[0-9a-f-]{36}$/;
+
+/** A game is named by the room code the entry recorded, as everywhere else here. */
+function roomCodeOf(entry: AuditEntry): string | null {
+  return entry.target && ROOM_ID.test(entry.target) && typeof entry.detail.roomCode === 'string'
+    ? entry.detail.roomCode
+    : null;
+}
+
+/** Each recorded detail named in words with its value, leaving out a room code already shown as the target. */
+export function detailPairs(entry: AuditEntry): [string, string][] {
+  const named = roomCodeOf(entry) !== null;
+  return Object.entries(entry.detail)
+    .filter(([key]) => !(named && key === 'roomCode'))
+    .map(([key, value]) => [words(key), detailValue(value)]);
+}
+
+function Target({ entry }: { entry: AuditEntry }) {
+  const { target } = entry;
   if (!target) return <span className="muted">—</span>;
   if (target.startsWith('feedback:')) return <a href="#/feedback?status=all">{target}</a>;
-  if (/^[0-9a-f-]{36}$/.test(target))
+  if (ROOM_ID.test(target))
     return (
-      <a href={`#/games/${target}`} className="mono">
-        {short(target)}
+      <a href={`#/games/${target}`} className="mono" title={target}>
+        {roomCodeOf(entry) ?? short(target)}
       </a>
     );
   return <code>{target}</code>;
+}
+
+/** "revision 51 · turn 12": lines break after a separator, never before one or after a name. */
+function Details({ entry }: { entry: AuditEntry }) {
+  const pairs = detailPairs(entry);
+  if (!pairs.length) return <span className="muted">—</span>;
+  return (
+    <>
+      {pairs.map(([name, value], index) => (
+        <span key={name}>
+          {index > 0 && <span className="muted">{'\u00a0· '}</span>}
+          <span className="muted">{name}</span>
+          {'\u00a0'}
+          {value}
+        </span>
+      ))}
+    </>
+  );
 }
 
 export function Audit() {
@@ -58,7 +104,7 @@ export function Audit() {
         <Empty>Nothing recorded yet.</Empty>
       ) : (
         <Section title="Audit log" className="wide">
-          <Table>
+          <Table className="stacked">
             <thead>
               <tr>
                 <th>When</th>
@@ -73,19 +119,22 @@ export function Audit() {
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id}>
-                  <td className="nowrap">{time(entry.at)}</td>
-                  <td className="nowrap">{entry.actor}</td>
-                  <td>
+                  <td className="nowrap cell-end">{time(entry.at)}</td>
+                  <td className="nowrap cell-wide">
+                    <span className="phone-only muted">by </span>
+                    {entry.actor}
+                  </td>
+                  <td className="cell-first">
                     <Badge tone={ACTION_TONE[entry.action] ?? 'neutral'}>{entry.action}</Badge>
                   </td>
                   <td>
-                    <Target target={entry.target} />
+                    <Target entry={entry} />
                   </td>
-                  <td>
-                    <code className="small wrap">{JSON.stringify(entry.detail)}</code>
+                  <td className="cell-rest">
+                    <Details entry={entry} />
                   </td>
-                  <td>{entry.ip ?? '—'}</td>
-                  <td>
+                  <td className="nowrap">{entry.ip ?? '—'}</td>
+                  <td className="cell-rest">
                     <code className="small" title={entry.requestId}>
                       {short(entry.requestId)}
                     </code>

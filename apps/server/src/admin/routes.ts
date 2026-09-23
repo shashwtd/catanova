@@ -5,10 +5,21 @@
  */
 import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRoute } from './api.js';
+import { METRICS_RANGES, metricsHistory } from './metrics.js';
 import type { RuntimeMetrics } from './metrics.js';
+import type { MetricsRange } from './types.js';
 import { overview } from './overview.js';
-import { ROOM_PARAM, endGame, gameDetail, gameHistory, listGames, privateGame } from './rooms.js';
-import { playerDetail, searchPlayers } from './players.js';
+import { systemReport } from './system.js';
+import {
+  ROOM_PARAM,
+  endGame,
+  gameAnalytics,
+  gameDetail,
+  gameHistory,
+  listGames,
+  privateGame,
+} from './rooms.js';
+import { listPlayers, playerDetail } from './players.js';
 import { feedbackRoutes } from './feedback.js';
 import { RETENTION_DAYS } from './analysis-runner.js';
 import type { Analysis } from './analysis-runner.js';
@@ -30,13 +41,39 @@ export function coreRoutes(
   const room = (suffix = '') => new RegExp(`^/api/admin/games/${ROOM_PARAM}${suffix}$`);
   return [
     ...feedbackRoutes(context),
-    { method: 'GET', path: /^\/api\/admin\/overview$/, handle: () => overview(context, metrics, rooms) },
+    {
+      method: 'GET',
+      path: /^\/api\/admin\/overview$/,
+      handle: ({ query }) => overview(context, metrics, rooms, query),
+    },
+    { method: 'GET', path: /^\/api\/admin\/system$/, handle: () => systemReport(context, metrics, rooms) },
+    {
+      // The in-memory performance history: a sample a minute since the process started, up to a day.
+      method: 'GET',
+      path: /^\/api\/admin\/metrics$/,
+      handle: ({ query }) => {
+        const range = query.get('range') ?? '1h';
+        if (!Object.hasOwn(METRICS_RANGES, range))
+          throw new AdminRequestError(
+            400,
+            'INVALID_RANGE',
+            `Choose ${Object.keys(METRICS_RANGES).join(', ')}`,
+          );
+        return metricsHistory(metrics, range as MetricsRange, context.now());
+      },
+    },
     { method: 'GET', path: /^\/api\/admin\/games$/, handle: ({ query }) => listGames(context, rooms, query) },
     { method: 'GET', path: room(), handle: ({ params }) => gameDetail(context, params[0]!) },
     {
       method: 'GET',
       path: room('/history'),
       handle: ({ params, query }) => gameHistory(context, params[0]!, query),
+    },
+    {
+      // How a game went: public information only, read from the journal in the analysis worker.
+      method: 'GET',
+      path: room('/analytics'),
+      handle: ({ params, query }) => gameAnalytics(context, analysis, params[0]!, query),
     },
     {
       method: 'GET',
@@ -51,7 +88,7 @@ export function coreRoutes(
     {
       method: 'GET',
       path: /^\/api\/admin\/players$/,
-      handle: ({ query }) => searchPlayers(context, rooms, query),
+      handle: ({ query }) => listPlayers(context, rooms, query),
     },
     {
       method: 'GET',
