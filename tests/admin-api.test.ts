@@ -357,7 +357,8 @@ test('games are listed by status and searchable, and a game’s detail shows its
   assert.ok(view.players.every((player) => player.hand === undefined && player.cards === undefined));
   assert.ok(!('deck' in view) && view.deckCount > 0);
   assert.ok(detail.history.entries.length > 0);
-  assert.equal(detail.statistics!.rolls, store.statistics(paused).rolls);
+  // The dice of a game are in its analytics now, worked out off the game's thread.
+  assert.ok(!('statistics' in detail));
   const older = await get<{ entries: HistoryEntry[] }>(
     `/api/admin/games/${paused}/history?before=${detail.history.entries.at(-1)!.revision}`,
   );

@@ -264,7 +264,6 @@ export type GameDetail = {
     absent: { playerId: string; disconnectedAt: number; standInAt: number; resignAt: number }[];
   };
   clock: TurnClock | null;
-  statistics: { rolls: number; diceCounts: number[] } | null;
   history: { entries: HistoryEntry[]; hasMore: boolean };
   rounds: {
     archiveId: string;

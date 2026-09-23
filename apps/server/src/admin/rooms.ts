@@ -252,13 +252,6 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
       snapshot = null;
     }
   }
-  let statistics: GameDetail['statistics'] = null;
-  try {
-    const value = store.statistics(roomId);
-    statistics = { rolls: value.rolls, diceCounts: value.diceCounts };
-  } catch {
-    statistics = null;
-  }
   const code = store.roomCode(roomId) ?? null;
   const rounds = store.db
     .prepare(
@@ -310,7 +303,6 @@ export function gameDetail(context: AdminContext, reference: string): GameDetail
       ),
     },
     clock: store.clock(roomId) ?? null,
-    statistics,
     history: store.history(roomId),
     rounds: rounds.map((round) => {
       const players = JSON.parse(round.players) as { id: string; name: string }[];
