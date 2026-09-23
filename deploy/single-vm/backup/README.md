@@ -26,11 +26,12 @@ These are operator instructions, not evidence that installation or cloud provisi
    sudo install -m 0644 deploy/single-vm/backup/backup.py /opt/catanova-backup/backup.py
    sudo install -d -m 0700 /etc/catanova
    sudo install -m 0600 deploy/single-vm/backup/.env.example /etc/catanova/backup.env
+   sudo install -d -m 0755 /srv/catanova/status
    sudo install -m 0644 deploy/single-vm/backup/catanova-backup.service /etc/systemd/system/catanova-backup.service
    sudo install -m 0644 deploy/single-vm/backup/catanova-backup.timer /etc/systemd/system/catanova-backup.timer
    ```
 
-   Set all three values in `/etc/catanova/backup.env`. This file holds the database path, account name and container name only; never put tokens or storage keys there. Preserve an existing configuration when updating the worker rather than copying the example over it again.
+   Set the three required values in `/etc/catanova/backup.env`: the database path, account name and container name. `BACKUP_PING_URL` is the optional dead-man's-switch URL described under [Pings and status](#pings-and-status); `CATANOVA_STATUS_DIRECTORY` defaults to `/srv/catanova/status`. Never put tokens or storage keys there. Preserve an existing configuration when updating the worker rather than copying the example over it again; add any new optional lines from `.env.example` by hand.
 
 4. Validate and run once before enabling the schedule:
 
@@ -45,6 +46,17 @@ These are operator instructions, not evidence that installation or cloud provisi
    ```
 
 An inactive oneshot service after a successful run is normal; inspect its exit result and the uploaded blob. On later releases, install the new worker/unit files, reload systemd, and run the service once to validate them.
+
+## Pings and status
+
+After every run, the worker reports what already happened; the report can never change the result or exit status.
+
+- **Status file.** It atomically replaces `/srv/catanova/status/backup.json` (mode 0644, so the admin console can read it through a read-only mount): `timestamp`, `result` (`success`/`failure`), `reason`, `durationSeconds`, the blob name, compressed `archiveBytes`, uncompressed `snapshotBytes`, `sha256`, and `lastSuccess` with the same details for the newest successful upload. A failed run keeps the previous `lastSuccess`, so a monitor can alert on the age of the newest good backup rather than on one failed run. The file holds no tokens, URLs or game data. A missing status folder is logged and skipped; the unit may write only there.
+- **Ping.** When `BACKUP_PING_URL` is set, success sends `POST <url>` and failure sends `POST <url>/fail`, each with a one-line plain-text summary: the blob name, sizes and SHA-256, or the same fixed failure reason the journal shows. This is the [healthchecks.io](https://healthchecks.io/docs/http_api/) convention; the service alerts when pings stop, so a VM that is down or a timer that stopped firing is caught too. Only `https://` URLs without credentials are accepted. A ping has a ten-second bound, runs outside the backup's own deadline and is never retried. A delivery problem is logged as `backup ping not delivered: <reason>` without the URL.
+
+## A local archive for drills
+
+`backup.py --local-output FILE.gz` runs the same read-only snapshot, validation and compression as the service, then writes the archive to a new local file (0600) instead of uploading it. It reads only `CATANOVA_BACKUP_DATABASE_PATH`, never contacts Azure, never overwrites a file, and sends no ping or status. It prints the archive's SHA-256 for the restore drill's `--sha256` option. The automated restore test uses this path; an operator can also use it for a private pre-maintenance copy. Keep the file in a root-only directory: it contains every game.
 
 ## Schedule and operating limits
 
@@ -92,4 +104,4 @@ Fifteen-minute scheduling is a target, not a guaranteed recovery point. Failures
 python3 -B -m unittest discover -s deploy/single-vm/backup -v
 ```
 
-The tests keep a WAL writer open and prove that committed state, events and command receipts survive as one standalone database while an uncommitted move is excluded. They stub all metadata and Blob connections, exercise integrity/error handling and private-temp cleanup, and cannot provision or contact Azure. Live role assignment, systemd isolation and off-host restoration still need verification on the deployed Linux VM.
+The tests keep a WAL writer open and prove that committed state, events and command receipts survive as one standalone database while an uncommitted move is excluded. They stub all metadata and Blob connections, exercise integrity/error handling and private-temp cleanup, and cannot provision or contact Azure. Pings go to a loopback HTTP stub: success and `/fail` bodies, and a rejected, unreachable, slow or stalled endpoint never failing a good backup. Live role assignment, systemd isolation and off-host restoration still need verification on the deployed Linux VM.
