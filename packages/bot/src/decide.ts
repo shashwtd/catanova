@@ -20,7 +20,7 @@ import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../rules/src/index.js';
 import { CARD_NAMES } from '../../rules/src/game.js';
 import type { Resource } from '../../rules/src/index.js';
 import type { Board } from '../../rules/src/board.js';
-import { roadSites } from '../../rules/src/game.js';
+import { roadSites, settlementSites } from '../../rules/src/game.js';
 import type { CardKind, GameAction, GameView, Hand } from '../../rules/src/game.js';
 import { choice, noul, JevUnavailable } from './jev.js';
 import type { JevClient, Question } from './jev.js';
@@ -37,6 +37,7 @@ import {
   robberTargets,
   leaderOf,
   handTotal,
+  seatLabel,
 } from './heuristics.js';
 import { ARCHETYPES, describe, initialPlan, planIsStale } from './plan.js';
 import type { Archetype, BotPlan, Focus, Threat } from './plan.js';
@@ -221,7 +222,15 @@ const FOCUS_COST: Record<Focus, keyof typeof COSTS | null> = {
  */
 function effectiveFocus(plan: BotPlan, view: GameView): Focus {
   const { legal, deckCount } = view;
-  const reachable = legal.settlements.length > 0 || legal.roads.length > 0;
+  // Asked of the board, not of the hand: the legal lists are empty whenever a
+  // road is unaffordable, which is most of the time, and reading them here
+  // turned every settlement plan into a card plan until the timber and clay
+  // for a road were already in hand.
+  const me = view.players.find((p) => p.hand);
+  const reachable =
+    !!me &&
+    me.pieces.settlements < 5 &&
+    (settlementSites(view, me.id).length > 0 || (me.pieces.roads < 15 && roadSites(view, me.id).length > 0));
   if (plan.focus === 'settlement' && !reachable) return deckCount > 0 ? 'card' : 'city';
   if (
     plan.focus === 'city' &&
@@ -232,6 +241,18 @@ function effectiveFocus(plan: BotPlan, view: GameView): Focus {
   if (plan.focus === 'card' && deckCount === 0) return legal.cities.length ? 'city' : 'settlement';
   if (plan.focus === 'save') return legal.cities.length ? 'city' : 'settlement';
   return plan.focus;
+}
+
+/**
+ * Everything the current focus costs, not just the part still missing: this is
+ * what a seven leaves in hand. Keeping only the missing part protected nothing
+ * already collected, so a bot with the hay for a city threw the hay away, and a
+ * bot with no list at all kept whatever came first in the resource order, which
+ * put rock and hay last.
+ */
+function focusCost(plan: BotPlan, view: GameView): Hand {
+  const cost = FOCUS_COST[effectiveFocus(plan, view)];
+  return { ...(cost ? COSTS[cost] : { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }) };
 }
 
 const none = (plan: BotPlan, action: GameAction, explain: string): Decision => ({
@@ -250,12 +271,12 @@ function summarise(ctx: DecideContext) {
   const me = view.players.find((p) => p.id === meId);
   const hand = handOf(view);
   const leader = leaderOf(view, meId);
-  const named = (id: string | null) => view.players.find((p) => p.id === id)?.name ?? 'nobody';
+  const named = (id: string | null) => seatLabel(view, meId, id);
   const best = (field: 'roadLength' | 'knights') =>
     view.players.reduce((n, p) => Math.max(n, p[field] ?? 0), 0);
   return {
     me: {
-      name: me?.name ?? 'bot',
+      name: named(meId),
       points: me?.points ?? 0,
       hand: Object.fromEntries(
         RESOURCES.filter((r) => hand[r]).map((r) => [RESOURCE_NAMES[r].toLowerCase(), hand[r]]),
@@ -269,9 +290,9 @@ function summarise(ctx: DecideContext) {
     },
     opponents: view.players
       .filter((p) => p.id !== meId)
-      .map((p) => ({ name: p.name, points: p.points, cards: p.resourceCount, knights: p.knights })),
+      .map((p) => ({ name: named(p.id), points: p.points, cards: p.resourceCount, knights: p.knights })),
     target_to_win: view.victoryPoints ?? 10,
-    leader: leader ? `${leader.name} on ${leader.points}` : 'nobody yet',
+    leader: leader ? `${named(leader.id)} on ${leader.points}` : 'nobody yet',
     my_plan: {
       strategy: plan.archetype,
       saving_for: plan.focus,
@@ -296,8 +317,8 @@ function summarise(ctx: DecideContext) {
     ...(contests(ctx.level, ctx.standIn).readsTheTable
       ? {
           awards: {
-            longest_road: `${named(view.longestRoad)} holds it; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
-            largest_army: `${named(view.largestArmy)} holds it; most knights played is ${best('knights')}, mine is ${me?.knights ?? 0}`,
+            longest_road: `held by ${named(view.longestRoad)}; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
+            largest_army: `held by ${named(view.largestArmy)}; most knights played is ${best('knights')}, mine is ${me?.knights ?? 0}`,
           },
           points_still_needed: (view.victoryPoints ?? 10) - (me?.points ?? 0),
         }
@@ -376,12 +397,9 @@ export async function decide(ctx: DecideContext): Promise<Decision> {
 
   if (view.phase === 'discard') {
     const count = Math.floor(handTotal(hand) / 2);
-    const keep = plan.needs.length
-      ? plan.needs
-      : (RESOURCES.filter((r) => hand[r] > 0).slice(0, 2) as Resource[]);
     return none(
       plan,
-      { kind: 'discard', resources: discardChoice(hand, keep, count) },
+      { kind: 'discard', resources: discardChoice(hand, focusCost(plan, view), count) },
       `Discarding ${count}, keeping what the plan needs.`,
     );
   }
@@ -401,15 +419,23 @@ export async function decide(ctx: DecideContext): Promise<Decision> {
   }
 
   // --- rungs that need judgement ------------------------------------------
+  // When the service fails the same rung is answered again without it, which
+  // is exactly how a bot with no key plays. A thinner fallback used to live
+  // here: it built a city or a settlement and otherwise passed, never a road,
+  // a card or a trade, so its starting roads never reached a new corner and a
+  // table whose service was down stalled at about four points each.
   try {
-    if (view.phase === 'setupSettlement') return await openingPlacement(ctx, plan);
-    if (view.phase === 'robber') return await placeRobber(ctx, plan);
-    if (view.phase === 'actions') return await takeTurn(ctx, plan);
+    return await judge(ctx, plan);
   } catch (error) {
     if (!(error instanceof JevUnavailable)) throw error;
-    return { ...degradedMove(ctx, plan), degraded: true };
+    return { ...(await judge({ ...ctx, jev: null }, plan)), degraded: true };
   }
+}
 
+async function judge(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
+  if (ctx.view.phase === 'setupSettlement') return openingPlacement(ctx, plan);
+  if (ctx.view.phase === 'robber') return placeRobber(ctx, plan);
+  if (ctx.view.phase === 'actions') return takeTurn(ctx, plan);
   return none(plan, { kind: 'endTurn' }, 'Nothing to do.');
 }
 
@@ -467,7 +493,9 @@ async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision>
       const on = hex.vertices
         .map((v) => view.buildings[v])
         .filter(Boolean)
-        .map((b) => `${view.players.find((p) => p.id === b!.player)?.name ?? '?'}'s ${b!.kind}`);
+        .map((b) =>
+          b!.player === meId ? `my ${b!.kind}` : `${seatLabel(view, meId, b!.player)}'s ${b!.kind}`,
+        );
       return [
         String(id),
         {
@@ -521,7 +549,13 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
   if (cities.length) moves.city = 'upgrade a settlement to a city: one point and double production';
   if (roads.length && can.includes('road')) moves.road = 'build a road toward a corner or for longest road';
   if (legal.canBuyCard) moves.card = 'buy a development card';
-  const trade = bankTrade(hand, legal.rates, plan.needs, view.bank);
+  // What the focus still needs, worked out from this hand at every decision.
+  // It used to be refreshed only when the decision service answered, so a bot
+  // playing without one kept the empty list it started with, and a trade needs
+  // something to receive: it never traded with the bank or a harbour at all.
+  const focus = FOCUS_COST[effectiveFocus(plan, view)];
+  const { needs, surplus } = needsAndSurplus(hand, focus);
+  const trade = bankTrade(hand, legal.rates, needs, view.bank, focus ? COSTS[focus] : undefined);
   if (trade)
     moves.trade = `trade ${RESOURCE_NAMES[trade.give].toLowerCase()} to the bank for the ${RESOURCE_NAMES[trade.receive].toLowerCase()} the plan needs`;
   const kinds = playableKinds(ctx);
@@ -544,15 +578,13 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
     return none(plan, { kind: 'endTurn' }, 'Nothing affordable; holding resources.');
   if (Object.keys(moves).length === 1 && moves.endTurn)
     return none(plan, { kind: 'endTurn' }, 'Nothing affordable; holding resources.');
-  // One real option and no plan to revisit is not worth a decision either.
-  if (Object.keys(moves).length === 2 && moves.trade && !plan.needs.length)
-    return none(plan, { kind: 'endTurn' }, 'Only a trade available and nothing to save for.');
 
   const targetTaken = plan.targetSite !== null && !!view.buildings[plan.targetSite];
   const threat = threatOf(ctx);
   const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat, everyFewTurns: planLife });
 
   const fallback = (): Decision => {
+    const current = { ...plan, needs, surplus };
     // A card held to the end of the game was worth nothing. With no decision
     // service to ask, playing one beats passing on the turn, and the strongest
     // of them is picked here rather than the first that came out of the deck.
@@ -569,9 +601,9 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
               : legal.canBuyCard
                 ? { kind: 'buyCard' }
                 : card
-                  ? playCard(ctx, plan, card)
+                  ? playCard(ctx, current, card)
                   : { kind: 'endTurn' };
-    return { ...none(plan, action, 'Playing the plan without the decision service.'), degraded: true };
+    return { ...none(current, action, 'Playing the plan without the decision service.'), degraded: true };
   };
   if (!jev) return fallback();
 
@@ -662,11 +694,7 @@ async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
 
   const nextPlan = stale
     ? readPlan(ctx, ev.answers, threat, plan.targetSite ?? corners[0] ?? null)
-    : {
-        ...plan,
-        decisions: plan.decisions + 1,
-        needs: needsAndSurplus(hand, FOCUS_COST[effectiveFocus(plan, view)]).needs,
-      };
+    : { ...plan, decisions: plan.decisions + 1, needs };
   return {
     action,
     plan: nextPlan,
@@ -703,34 +731,4 @@ function playCard(ctx: DecideContext, plan: BotPlan, cardId: string): GameAction
   }
   if (kind === 'monopoly') return { kind: 'playCard', cardId, resource: wanted[0] ?? 'ore' };
   return { kind: 'playCard', cardId };
-}
-
-/** Used when the decision service cannot be reached at all. */
-function degradedMove(ctx: DecideContext, plan: BotPlan): Decision {
-  const { board, view } = ctx;
-  if (view.phase === 'setupSettlement') {
-    const options = rankCorners(board, view.legal.settlements, 1);
-    return none(
-      plan,
-      { kind: 'settlement', vertex: options[0] ?? view.legal.settlements[0] ?? 0 },
-      'Strongest corner by production.',
-    );
-  }
-  if (view.phase === 'robber') {
-    const hex =
-      rankRobberHexes(board, view, ctx.meId, 1, contests(ctx.level, ctx.standIn).leaderWeight)[0] ??
-      view.robber;
-    const victim = robberTargets(view, hex, ctx.meId)[0];
-    return none(plan, { kind: 'robber', hex, ...(victim ? { victim } : {}) }, 'Blocking the strongest tile.');
-  }
-  const can = affordable(handOf(view));
-  if (view.legal.cities.length && can.includes('city'))
-    return none(plan, { kind: 'city', vertex: view.legal.cities[0]! }, 'Upgrading to a city.');
-  if (view.legal.settlements.length && can.includes('settlement'))
-    return none(
-      plan,
-      { kind: 'settlement', vertex: rankCorners(board, view.legal.settlements, 1)[0]! },
-      'Taking a corner.',
-    );
-  return none(plan, { kind: 'endTurn' }, 'Holding resources.');
 }
