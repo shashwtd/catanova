@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { ROOM_CODE_LEASE_MS, Store } from '../apps/server/src/store.js';
 import type { Identity } from '../apps/server/src/auth.js';
 import { RoomIndex, countActivity } from '../apps/server/src/admin/room-index.js';
+import { indexAccounts } from '../apps/server/src/admin/accounts-index.js';
 import { Analysis } from '../apps/server/src/admin/analysis-runner.js';
 import { AdminRequestError } from '../apps/server/src/admin/api.js';
 import { newSession } from '../apps/client/src/connection.js';
@@ -219,4 +220,24 @@ test('games and players are counted since the start of the day and week the page
   const index = new RoomIndex({ databasePath: path, db: store.db, leaseMs: ROOM_CODE_LEASE_MS });
   t.after(() => index.close());
   assert.deepEqual(await index.activity(now, now - 5 * HOUR, now - 72 * HOUR), activity);
+});
+
+test('an account goes by the name it last sat down with and the sign-in it last used', async (t) => {
+  const { store, lobby } = await database(t);
+  t.after(() => store.close());
+  const id = '00000000-0000-4000-8000-000000000401';
+  const as = (name: string, isGuest?: boolean): Identity => ({
+    id,
+    name,
+    expiresAt: Date.now() + 3_600_000,
+    profile: defaultProfile(name),
+    ...(isGuest === undefined ? {} : { isGuest }),
+  });
+  lobby('Robin', as('Robin', true)); // a guest first
+  lobby('Rob', as('Rob', false)); // then signed in with Google
+  lobby('Robin', as('Robin')); // then a seat from before sign-in types were recorded
+  const [account] = indexAccounts(store.db);
+  assert.deepEqual(account!.names, ['Robin', 'Rob'], 'newest first, each once');
+  assert.equal(account!.name, 'Robin');
+  assert.equal(account!.accountType, 'permanent', 'the latest sign-in type recorded, not the first');
 });
