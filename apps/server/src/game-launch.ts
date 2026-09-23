@@ -1,4 +1,5 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
+import { roomHostId } from '../../../packages/protocol/src/room-host.js';
 import { ProtocolError } from './store.js';
 
 export const LAUNCH_MIN_MS = 2_000;
@@ -52,12 +53,12 @@ export class GameLaunch {
     if (state.game) throw new ProtocolError('GAME_STARTED', 'This game is already underway');
     if (state.revision !== request.revision)
       throw new ProtocolError('STALE_STATE', 'The room changed; try again');
-    if (state.players[0]?.id !== request.hostId)
+    if (roomHostId(state.players) !== request.hostId)
       throw new ProtocolError('NOT_HOST', 'Only the host can start');
     if (state.players.length < 2) throw new ProtocolError('NOT_ENOUGH_PLAYERS', 'Invite at least one player');
     if (state.players.some((p) => !p.connected))
       throw new ProtocolError('NOT_CONNECTED', 'Wait for everyone to reconnect');
-    if (state.players.slice(1).some((p) => !p.ready))
+    if (state.players.some((p) => p.id !== request.hostId && !p.ready))
       throw new ProtocolError('NOT_READY', 'Wait for everyone to be ready');
     this.pending.set(request.roomId, {
       ...request,

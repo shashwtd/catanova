@@ -8,6 +8,7 @@ import {
   ROOM_CODE_LENGTH,
 } from '../../../packages/protocol/src/room-reference.js';
 import { botName, randomBotLevel } from '../../../packages/protocol/src/bots.js';
+import { roomHostId } from '../../../packages/protocol/src/room-host.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { availableColors, isPlayerColor } from '../../../packages/protocol/src/colors.js';
 import type { PlayerColor } from '../../../packages/protocol/src/colors.js';
@@ -869,7 +870,11 @@ export class Store {
         ...(addBot ? { addBot: true } : {}),
       }),
     );
-    return this.transaction(() => {
+    // The in-memory bot list only follows a committed seat change: a rolled-back
+    // kick or add would otherwise leave a bot treated as an absent person (with a
+    // resignation deadline and a stand-in of its own), or the reverse.
+    let botRemoved: string | undefined, botAdded: string | undefined;
+    const receipt = this.transaction(() => {
       this.rejectSettingsReceipt(seat, commandId);
       for (const table of ['receipts', 'game_receipts', 'leave_receipts'])
         if (
@@ -902,7 +907,7 @@ export class Store {
       if (!room.players.some((p) => p.id === seat.id))
         throw new ProtocolError('SEAT_LEFT', 'You left this lobby');
       if (kickPlayerId) {
-        if (room.players[0]?.id !== seat.id)
+        if (roomHostId(room.players) !== seat.id)
           throw new ProtocolError('NOT_HOST', 'Only the host can remove players');
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
@@ -911,10 +916,10 @@ export class Store {
         this.db
           .prepare('UPDATE seats SET departed = 1, ready = 0 WHERE id = ? AND room_id = ?')
           .run(kickPlayerId, seat.room_id);
-        this.botSeats.delete(kickPlayerId);
+        botRemoved = kickPlayerId;
       }
       if (addBot) {
-        if (room.players[0]?.id !== seat.id)
+        if (roomHostId(room.players) !== seat.id)
           throw new ProtocolError('NOT_HOST', 'Only the host can add a bot');
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
@@ -933,7 +938,7 @@ export class Store {
           // The token hash is random and never shared, so no client handshake
           // can ever resolve to a bot's seat.
           .run(id, seat.room_id, hash(randomUUID()), name, null, JSON.stringify(botProfile), level);
-        this.botSeats.add(id);
+        botAdded = id;
       }
       if (color) {
         // First come, first served, and checked here rather than in the browser:
@@ -959,6 +964,9 @@ export class Store {
       this.renewRoomCode(seat.room_id);
       return { revision, counter: room.counter, duplicate: false };
     });
+    if (botRemoved) this.botSeats.delete(botRemoved);
+    if (botAdded) this.botSeats.add(botAdded);
+    return receipt;
   }
   /** Rooms with a game still running, not paused, and at least one seat a bot
    *  owes a move for: a bot the host added, or a seat a bot is holding for
@@ -1111,7 +1119,7 @@ export class Store {
       const room = this.snapshot(seat.room_id);
       if (this.loadGame(seat.room_id))
         throw new ProtocolError('GAME_STARTED', 'Game settings are locked after starting');
-      if (room.players[0]?.id !== seat.id)
+      if (roomHostId(room.players) !== seat.id)
         throw new ProtocolError('NOT_HOST', 'Only the host can change game settings');
       if (room.revision !== expectedRevision)
         throw new ProtocolError('STALE_STATE', 'The lobby changed; review the latest settings');
@@ -1121,7 +1129,13 @@ export class Store {
           'INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET settings = excluded.settings, revision = excluded.revision',
         )
         .run(seat.room_id, JSON.stringify(settings), revision);
-      this.db.prepare('UPDATE seats SET ready = 0 WHERE room_id = ? AND departed = 0').run(seat.room_id);
+      // People confirm the new settings; bots have nothing to confirm and would
+      // otherwise keep Start disabled until they were removed and added again.
+      this.db
+        .prepare(
+          'UPDATE seats SET ready = CASE WHEN bot = 1 THEN 1 ELSE 0 END WHERE room_id = ? AND departed = 0',
+        )
+        .run(seat.room_id);
       this.db.prepare('UPDATE rooms SET revision = ? WHERE id = ?').run(revision, seat.room_id);
       this.db
         .prepare('INSERT INTO settings_receipts VALUES (?, ?, ?, ?, ?, ?)')
@@ -1706,9 +1720,9 @@ export class Store {
       let next: Game;
       if (action.kind === 'start') {
         if (current) throw new ProtocolError('GAME_STARTED', 'This game is already underway');
-        if (room.players[0]?.id !== seat.id)
+        if (roomHostId(room.players) !== seat.id)
           throw new ProtocolError('NOT_HOST', 'Only the room creator can start the game');
-        if (!room.players.slice(1).every((p) => p.ready))
+        if (!room.players.every((p) => p.id === seat.id || p.ready))
           throw new ProtocolError('NOT_READY', 'Every other player must be ready');
         // Recheck every account inside the start transaction: another browser may have
         // started a different lobby after these players joined or pressed Ready.

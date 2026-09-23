@@ -19,6 +19,7 @@ export { REACTIONS, REACTION_LIST, isReaction } from './reactions.js';
 export type { ReactionName } from './reactions.js';
 export { BOT_LEVELS, BOT_LEVEL_LABEL, BOT_NAMES, botName, isBotLevel, randomBotLevel } from './bots.js';
 export type { BotLevel } from './bots.js';
+export { roomHostId } from './room-host.js';
 export {
   PLAYER_COLORS,
   PLAYER_COLOR_LIST,
