@@ -118,6 +118,8 @@ export type LiveGame = {
   startedAt: number | null;
   lastActivity: number | null;
   players: (SeatSummary & { points: number })[];
+  /** This turn's roll once it is made, as everyone at the table saw it; null before it. */
+  dice: [number, number] | null;
 };
 
 /** The dashboard: who is here, what is being played, how the server is doing, and what needs a look. */
@@ -373,6 +375,21 @@ export type DiceSummary = {
   model: 'two-dice' | 'deck' | 'flat' | 'mixed';
   chiSquare: number | null;
   pValue: number | null;
+  /**
+   * Which two dice made each roll, as the table saw them: 36 counts of
+   * ordered pairs, the first die's value times six plus the second's (each
+   * from 1, so index (first − 1) × 6 + (second − 1)). `unpaired` rolls had a
+   * total but no readable pair and are left out of `pairs`.
+   */
+  pairs?: number[];
+  unpaired?: number;
+  /**
+   * Each pair's expected count where the dice mode gives it exactly: 1 in
+   * 36 for two fair dice, or each total's share split among its pairs for
+   * the retired flat totals. Null for Balanced dice, whose deck only comes
+   * close to 1 in 36, and for a mixture of modes.
+   */
+  pairExpected?: number[] | null;
 };
 
 /** Resource counts by type: Timber (wood), Clay (brick), Sheep, Hay (wheat), Rock (ore). */

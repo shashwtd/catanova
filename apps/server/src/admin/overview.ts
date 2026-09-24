@@ -87,6 +87,7 @@ export async function overview(
         target: game.victoryPoints ?? DEFAULT_VICTORY_POINTS,
         startedAt: roundStartedAt(store, room.id),
         lastActivity: room.lastActivity,
+        dice: game.dice ? [game.dice[0], game.dice[1]] : null,
         players: tableSeats(seatRows(store, room.id), game, connections).map((seat) => {
           const player = game.players.find((candidate) => candidate.id === seat.id)!;
           return { ...seat, points: score(game, player, false) };

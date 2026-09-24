@@ -30,6 +30,7 @@ import {
 import { Badge, Empty, Failure, LineChart, Loading, Notice, Section, Tabs, When } from '../ui.js';
 import type { LineSeries } from '../ui.js';
 import { SeatChip, StatusBadge } from './Games.js';
+import { DicePair } from '../dice.js';
 import { HostReportLines } from './HostReports.js';
 
 const ONLINE_SHOWN = 12;
@@ -192,7 +193,15 @@ function LiveGames({ data }: { data: AdminOverview }) {
                     </div>
                   </td>
                   <td className="cell-wide">
-                    <div className="nowrap">Turn {game.turn}</div>
+                    <div className="nowrap">
+                      Turn {game.turn}
+                      {game.dice && (
+                        <>
+                          {' '}
+                          <DicePair dice={game.dice} size={14} />
+                        </>
+                      )}
+                    </div>
                     <div className="muted small">
                       {phaseLabel(game.phase)}
                       {game.target !== 10 && ` · first to ${game.target}`}

@@ -483,7 +483,10 @@ export function Columns({
   height?: number;
   /** The first column's heading in the table of numbers; no table without it. */
   table?: string;
-  /** Something drawn under each column's axis label, such as the dice that make a total. */
+  /**
+   * Something drawn under each column's axis label, such as the dice that
+   * make a total: `height` tall, drawn from the top of that strip.
+   */
   below?: { height: number; draw: (index: number, center: number, band: number) => ReactNode };
   /** The columns recede so that the lines over them lead. */
   soft?: boolean;
@@ -601,7 +604,11 @@ export function Columns({
                     {labels[i]}
                   </text>
                 )}
-                {below && <g className="chart-below">{below.draw(i, center(i), band)}</g>}
+                {below && (
+                  <g className="chart-below" transform={`translate(0,${height})`}>
+                    {below.draw(i, center(i), band)}
+                  </g>
+                )}
               </g>
             );
           })}

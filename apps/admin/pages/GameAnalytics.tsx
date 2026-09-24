@@ -12,6 +12,7 @@ import { useApi } from '../api.js';
 import { accountLabel, count, diceLabel, duration, time } from '../format.js';
 import { Badge, Columns, Empty, Failure, LineChart, Loading, Section, Stat, Table, When } from '../ui.js';
 import { DiceTable, expectationName, fairness, rollCount, totalLabel } from './Stats.js';
+import { PairGrid, totalDice } from '../dice.js';
 
 type Slot = 1 | 2 | 3 | 4;
 /** Each player keeps one chart colour everywhere on the page, by their place in turn order. */
@@ -525,28 +526,45 @@ export function GameAnalyticsView({
       <Section title="Points by turn" className="wide">
         <PointsChart game={game} />
       </Section>
+      <Section title={`Dice (${count(game.dice.rolls)} rolls)`} className="wide">
+        {game.dice.rolls ? (
+          <>
+            <div className="duo dice-views">
+              <div>
+                <h3>Totals</h3>
+                <Columns
+                  label={`Rolls of each total in this game, against ${expectationName(game.dice).toLowerCase()}`}
+                  categories={Array.from({ length: 11 }, (_, i) => String(i + 2))}
+                  pointLabel={totalLabel}
+                  format={rollCount}
+                  series={[{ name: 'Rolled', slot: 1, values: game.dice.counts }]}
+                  reference={{ name: expectationName(game.dice), values: game.dice.expected }}
+                  below={totalDice((i) => i + 2)}
+                  height={230}
+                />
+                <p className="muted small">{fairness(game.dice)}</p>
+              </div>
+              {game.dice.pairs && (
+                <div>
+                  <h3>Which pairs came up</h3>
+                  <PairGrid
+                    dice={game.dice}
+                    label="How often each pair of dice came up in this game, first die by second"
+                  />
+                </div>
+              )}
+            </div>
+            <DiceTable dice={game.dice} />
+          </>
+        ) : (
+          <Empty>No dice rolled yet.</Empty>
+        )}
+      </Section>
       <div className="grid">
-        <Section title={`Dice (${count(game.dice.rolls)} rolls)`}>
-          {game.dice.rolls ? (
-            <>
-              <Columns
-                label={`Rolls of each total in this game, against ${expectationName(game.dice).toLowerCase()}`}
-                categories={Array.from({ length: 11 }, (_, i) => String(i + 2))}
-                pointLabel={totalLabel}
-                format={rollCount}
-                series={[{ name: 'Rolled', slot: 1, values: game.dice.counts }]}
-                reference={{ name: expectationName(game.dice), values: game.dice.expected }}
-              />
-              <p className="muted small">{fairness(game.dice)}</p>
-              <DiceTable dice={game.dice} />
-            </>
-          ) : (
-            <Empty>No dice rolled yet.</Empty>
-          )}
-        </Section>
         <Section title="Longest Road and Largest Army">
           <Awards game={game} />
-          <h3>Bots, stand-ins and the turn timer</h3>
+        </Section>
+        <Section title="Bots, stand-ins and the turn timer">
           <Bots game={game} />
         </Section>
       </div>

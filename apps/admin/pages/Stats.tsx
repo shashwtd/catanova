@@ -9,6 +9,7 @@ import type {
 import { api, ApiError, useApi } from '../api.js';
 import { count, dateAxis, dayLabel, diceLabel, percent, time, weekLabel } from '../format.js';
 import { Columns, countMax, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
+import { PairGrid, totalDice } from '../dice.js';
 
 const TOTALS = Array.from({ length: 11 }, (_, i) => String(i + 2));
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
@@ -342,18 +343,34 @@ export function Stats() {
           <Section title={`Dice, all games (${count(stats.dice.overall.rolls)} rolls)`} className="wide">
             {stats.dice.overall.rolls ? (
               <>
-                <Columns
-                  label={`Rolls of each total across every game, against ${expectationName(stats.dice.overall).toLowerCase()}`}
-                  categories={TOTALS}
-                  pointLabel={totalLabel}
-                  format={rollCount}
-                  series={[{ name: 'Rolled', slot: 1, values: stats.dice.overall.counts }]}
-                  reference={{
-                    name: expectationName(stats.dice.overall),
-                    values: stats.dice.overall.expected,
-                  }}
-                />
-                <p className="muted">{fairness(stats.dice.overall)}</p>
+                <div className="duo dice-views">
+                  <div>
+                    <h3>Totals</h3>
+                    <Columns
+                      label={`Rolls of each total across every game, against ${expectationName(stats.dice.overall).toLowerCase()}`}
+                      categories={TOTALS}
+                      pointLabel={totalLabel}
+                      format={rollCount}
+                      series={[{ name: 'Rolled', slot: 1, values: stats.dice.overall.counts }]}
+                      reference={{
+                        name: expectationName(stats.dice.overall),
+                        values: stats.dice.overall.expected,
+                      }}
+                      below={totalDice((i) => i + 2)}
+                      height={230}
+                    />
+                    <p className="muted">{fairness(stats.dice.overall)}</p>
+                  </div>
+                  {stats.dice.overall.pairs && (
+                    <div>
+                      <h3>Which pairs came up</h3>
+                      <PairGrid
+                        dice={stats.dice.overall}
+                        label="How often each pair of dice came up across every game, first die by second"
+                      />
+                    </div>
+                  )}
+                </div>
                 <DiceTable dice={stats.dice.overall} />
                 {Object.keys(stats.dice.byMode).length > 1 &&
                   Object.entries(stats.dice.byMode).map(([mode, dice]) => (

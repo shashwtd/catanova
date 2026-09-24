@@ -94,14 +94,52 @@ export function diceModel(mode: string): { model: DiceSummary['model']; shares: 
   return { model: 'two-dice', shares: FAIR_DICE };
 }
 
+/** How many ordered pairs of two dice make each total: 1 for 2, 6 for 7, 1 for 12. */
+const ways = (total: number) => 6 - Math.abs(7 - total);
+
+/**
+ * How likely each ordered pair is (index (first − 1) × 6 + (second − 1))
+ * where a dice model says so exactly: 1 in 36 for two independent fair
+ * dice; for the retired flat totals, each total's 1 in 11 split evenly
+ * among its pairs. The balanced deck comes close to 1 in 36 in the long run
+ * but not exactly (its penalty on repeating a total shifts a little weight
+ * from 7 to 2 and 12), and a mixture has no single answer: null for both.
+ */
+export function pairShares(model: DiceSummary['model']): number[] | null {
+  if (model === 'two-dice') return Array<number>(36).fill(1 / 36);
+  if (model === 'flat')
+    return Array.from({ length: 36 }, (_, i) => 1 / 11 / ways(Math.floor(i / 6) + (i % 6) + 2));
+  return null;
+}
+
+/**
+ * Which ordered pair a journal row's public entry says was rolled, as an
+ * index into `pairs`, or null when it does not say or does not add up to the
+ * row's total. The engine writes "<name> rolled <first> + <second> =
+ * <total>." at the end of the line, and the match is anchored to the end of
+ * a JSON string (a quote a name cannot put there unescaped), so a player
+ * named to look like a roll cannot move it.
+ */
+export function rollPair(entry: string, total: number): number | null {
+  const match = / rolled ([1-6]) \+ ([1-6]) = (\d{1,2})\."/.exec(entry);
+  if (!match) return null;
+  const first = Number(match[1]),
+    second = Number(match[2]);
+  if (first + second !== total || Number(match[3]) !== total) return null;
+  return (first - 1) * 6 + (second - 1);
+}
+
 /**
  * Observed totals 2–12 against what their dice mode expects. `mode` is a dice
  * mode, or a map of rolls per mode for a mixture, whose expectation is the sum
- * of theirs and which gets no χ² test.
+ * of theirs and which gets no χ² test. With `pairs`, the summary also says
+ * which two dice made the rolls, and what each pair should count where the
+ * mode says exactly (see pairShares); pairs are never tested.
  */
 export function diceSummary(
   counts: number[],
   mode: string | Record<string, number> = 'classic',
+  paired?: { pairs: number[]; unpaired: number },
 ): DiceSummary {
   const rolls = counts.reduce((sum, n) => sum + n, 0);
   const parts = typeof mode === 'string' ? { [mode]: rolls } : mode;
@@ -113,8 +151,19 @@ export function diceSummary(
     Object.entries(parts).reduce((sum, [key, n]) => sum + diceModel(key).shares[i]! * n, 0),
   );
   const expected = expectedExact.map((e) => Math.round(e * 100) / 100);
+  const withPairs = paired
+    ? (() => {
+        const read = paired.pairs.reduce((sum, n) => sum + n, 0);
+        const shares = pairShares(model);
+        return {
+          pairs: paired.pairs,
+          unpaired: paired.unpaired,
+          pairExpected: shares ? shares.map((share) => Math.round(share * read * 100) / 100) : null,
+        };
+      })()
+    : {};
   if (!rolls || model === 'deck' || model === 'mixed')
-    return { rolls, counts, expected, model, chiSquare: null, pValue: null };
+    return { rolls, counts, expected, model, chiSquare: null, pValue: null, ...withPairs };
   const chiSquare = counts.reduce((sum, observed, i) => {
     const e = expectedExact[i]!;
     return sum + (observed - e) ** 2 / e;
@@ -126,6 +175,7 @@ export function diceSummary(
     model,
     chiSquare: Math.round(chiSquare * 1000) / 1000,
     pValue: Math.round(chiSquarePValue(chiSquare, 10) * 10000) / 10000,
+    ...withPairs,
   };
 }
 
@@ -268,13 +318,21 @@ export function computeStats(db: DatabaseSync, now: number): AdminStats {
     `SELECT revision, state, state_z, board_hash FROM game_events
      WHERE room_id = ? AND json_extract(public_entry, '$.kind') IN ('start', 'legacy') ORDER BY revision`,
   );
+  // The public entry says which two dice made the total ("Ann rolled 3 + 4 = 7."); it is on the
+  // row already read for the total, so the pairs cost no further reads.
   const rolls = db.prepare(
-    `SELECT revision, dice_total AS total FROM game_events
+    `SELECT revision, dice_total AS total, public_entry AS entry FROM game_events
      WHERE room_id = ? AND json_extract(public_entry, '$.kind') = 'roll' AND dice_total IS NOT NULL
      ORDER BY revision`,
   );
-  const overall = Array<number>(11).fill(0);
-  const byMode = new Map<string, number[]>();
+  type Tally = { counts: number[]; pairs: number[]; unpaired: number };
+  const tally = (): Tally => ({
+    counts: Array<number>(11).fill(0),
+    pairs: Array<number>(36).fill(0),
+    unpaired: 0,
+  });
+  const overall = tally();
+  const byMode = new Map<string, Tally>();
   for (const { room_id: roomId } of db.prepare('SELECT DISTINCT room_id FROM game_events').all() as {
     room_id: string;
   }[]) {
@@ -283,13 +341,16 @@ export function computeStats(db: DatabaseSync, now: number): AdminStats {
       mode: rowDiceMode(row),
     }));
     let game = -1;
-    for (const row of rolls.all(roomId) as { revision: number; total: number }[]) {
+    for (const row of rolls.all(roomId) as { revision: number; total: number; entry: string }[]) {
       while (game + 1 < games.length && games[game + 1]!.revision <= row.revision) game++;
       if (row.total < 2 || row.total > 12) continue;
       const mode = game >= 0 ? games[game]!.mode : (settings.get(roomId) ?? 'classic');
-      const counts = byMode.get(mode) ?? byMode.set(mode, Array<number>(11).fill(0)).get(mode)!;
-      overall[row.total - 2]!++;
-      counts[row.total - 2]!++;
+      const pair = rollPair(row.entry, row.total);
+      for (const counted of [overall, byMode.get(mode) ?? byMode.set(mode, tally()).get(mode)!]) {
+        counted.counts[row.total - 2]!++;
+        if (pair === null) counted.unpaired++;
+        else counted.pairs[pair]!++;
+      }
     }
   }
   const accounts = db
@@ -308,13 +369,16 @@ export function computeStats(db: DatabaseSync, now: number): AdminStats {
     bots,
     dice: {
       overall: diceSummary(
+        overall.counts,
+        Object.fromEntries(
+          [...byMode].map(([mode, { counts }]) => [mode, counts.reduce((a, b) => a + b, 0)]),
+        ),
         overall,
-        Object.fromEntries([...byMode].map(([mode, counts]) => [mode, counts.reduce((a, b) => a + b, 0)])),
       ),
       byMode: Object.fromEntries(
         [...byMode]
-          .filter(([, counts]) => counts.some(Boolean))
-          .map(([mode, counts]) => [mode, diceSummary(counts, mode)]),
+          .filter(([, { counts }]) => counts.some(Boolean))
+          .map(([mode, counted]) => [mode, diceSummary(counted.counts, mode, counted)]),
       ),
     },
     totals: {

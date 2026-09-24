@@ -19,6 +19,7 @@ import {
 } from '../apps/admin/ui.js';
 import type { Delta } from '../apps/admin/ui.js';
 import { movingAverage, rangeView } from '../apps/admin/pages/Growth.js';
+import { DicePair, PairGrid, pairFor, totalDice } from '../apps/admin/dice.js';
 import type { GrowthReport, GrowthSeries } from '../apps/server/src/admin/types.js';
 import { parseRoute } from '../apps/admin/route.js';
 import {
@@ -367,6 +368,46 @@ test('a heatmap shades each cell by its value on one hue, marks a week under way
     /<td class="nowrap">Week of 14 Sep<\/td><td class="num">x<\/td><td class="num">—<\/td>/,
   );
   assert.match(markup, /0%<\/span><span class="heat-scale"/);
+});
+
+test('dice are drawn with pips, the first ivory and the second teal, and the grid of pairs reads each one', () => {
+  const pair = renderToStaticMarkup(createElement(DicePair, { dice: [3, 4] }));
+  assert.doesNotMatch(pair, /style=/);
+  assert.match(pair, /role="img" aria-label="rolled 3 and 4"/);
+  assert.match(pair, /class="die die-first".*class="die die-second"/s);
+  assert.equal((pair.match(/class="die-pip"/g) ?? []).length, 7, 'three pips and four');
+  assert.deepEqual(
+    [pairFor(2), pairFor(7), pairFor(12)],
+    [
+      [1, 1],
+      [3, 4],
+      [6, 6],
+    ],
+  );
+  const pairs = Array.from({ length: 36 }, (_, i) => (i === 2 * 6 + 3 ? 9 : 2));
+  const summary = {
+    ...diceSummary(
+      FAIR_DICE.map((p) => p * 79),
+      'classic',
+      { pairs, unpaired: 0 },
+    ),
+  };
+  const grid = renderToStaticMarkup(createElement(PairGrid, { dice: summary, label: 'Pairs' }));
+  assert.doesNotMatch(grid, /style=/);
+  assert.equal((grid.match(/class="heat heat-/g) ?? []).length, 36, 'a cell for every ordered pair');
+  assert.equal((grid.match(/class="die die-first"/g) ?? []).length, 6, 'the first die down the side');
+  assert.equal((grid.match(/class="die die-second"/g) ?? []).length, 6, 'the second die across');
+  assert.match(
+    grid,
+    /class="heat heat-6"[^>]*><\/rect><text[^>]*>9<\/text>/,
+    'the most rolled pair is the brightest',
+  );
+  assert.match(grid, /Doubles 12 of 79 \(15\.2%\); two fair dice roll one in six\./);
+  // Under a totals chart, each total's most even pair.
+  const below = renderToStaticMarkup(
+    createElement('svg', null, totalDice((i) => i + 2).draw(5, 100, 40) as never),
+  );
+  assert.equal((below.match(/class="die-pip"/g) ?? []).length, 7, 'a total of 7 is drawn as 3 and 4');
 });
 
 test('a seat colour is the game’s own swatch and name, with no inline style', () => {

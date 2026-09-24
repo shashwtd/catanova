@@ -31,6 +31,7 @@ import {
 import type { Tone } from '../ui.js';
 import { go } from '../route.js';
 import { GameAnalyticsView } from './GameAnalytics.js';
+import { DicePair } from '../dice.js';
 
 const STATUS_TONE: Record<RoomStatus, Tone> = {
   live: 'good',
@@ -585,6 +586,12 @@ function TableState({ data, now }: { data: Detail; now: number }) {
         </Pair>
         <Pair label="Up now">
           {`${name(game.players[game.active]?.id ?? '')} · turn ${game.turn} · ${phaseLabel(game.phase).toLowerCase()}`}
+          {game.dice && (
+            <>
+              {' '}
+              · rolled <DicePair dice={game.dice} size={15} />
+            </>
+          )}
         </Pair>
         <Pair label="Turn clock">
           {!clock ? (

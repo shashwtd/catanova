@@ -23,6 +23,13 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+  /* The game's own dice: the first ivory with slate pips, the second teal with cream ones. */
+  --die-1-face: #efe5cf;
+  --die-1-edge: #a8977a;
+  --die-1-pip: #33474d;
+  --die-2-face: #3f7886;
+  --die-2-edge: #1d4552;
+  --die-2-pip: #f6ead0;
   --radius: 8px;
   font-family:
     system-ui,
@@ -1060,6 +1067,54 @@ details > summary {
   border-radius: 2px;
 }
 
+/* Dice: a rounded face lit from the top left, its thickness showing below and to the right. */
+.die-svg {
+  display: inline-block;
+  flex: none;
+  overflow: visible;
+}
+.die-first .die-face {
+  fill: var(--die-1-face);
+}
+.die-first .die-edge {
+  fill: var(--die-1-edge);
+}
+.die-first .die-pip {
+  fill: var(--die-1-pip);
+}
+.die-second .die-face {
+  fill: var(--die-2-face);
+}
+.die-second .die-edge {
+  fill: var(--die-2-edge);
+}
+.die-second .die-pip {
+  fill: var(--die-2-pip);
+}
+.die-shine {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-opacity: 0.5;
+}
+.die-second .die-shine {
+  stroke-opacity: 0.22;
+}
+.dice-pair {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  vertical-align: -3px;
+}
+/* The totals chart and the grid of pairs, side by side on a wide screen. */
+.dice-views {
+  align-items: start;
+}
+.dice-views h3 {
+  margin-top: 0;
+}
+
 /* Overview: a row of headline numbers, then who is here and what is being played */
 .kpis {
   display: grid;
@@ -1239,9 +1294,12 @@ select {
   .page {
     padding: 12px 12px 40px;
   }
-  .grid,
-  .duo {
+  .grid {
     grid-template-columns: 1fr;
+  }
+  /* A chart wider than the screen scrolls inside its card rather than widening the page. */
+  .duo {
+    grid-template-columns: minmax(0, 1fr);
   }
   .kpis.trend-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
