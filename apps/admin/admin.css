@@ -798,7 +798,8 @@ details > summary {
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  /* A legend that wraps on a phone keeps its rows close. */
+  gap: 4px 14px;
   margin-top: 6px;
   color: var(--ink-2);
   font-size: 12px;

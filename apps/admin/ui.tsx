@@ -458,6 +458,33 @@ export function columnTip(
 }
 
 /**
+ * Where a chart's columns go, given the width there is and how many there
+ * are: each column's band between a fine minimum and a maximum past which a
+ * few columns would drift too far apart, and the bar in it, never over 24px.
+ * From 4px down, as 90 days on a phone, a bar is a fine stroke placed to the
+ * hundredth of a pixel so the whole range still fits; only below 2px does the
+ * frame scroll. Wider bands keep whole-pixel bars.
+ */
+export function columnLayout(available: number, n: number, left = 36) {
+  const band = Math.max(2, Math.min(72, available ? (available - left - 6) / n : 22));
+  const thin = band < 4;
+  const gap = thin ? band * 0.4 : Math.min(12, Math.max(2, Math.round(band * 0.3)));
+  const width = thin
+    ? Math.round((band - gap) * 100) / 100
+    : Math.max(2, Math.min(24, Math.floor(band - gap)));
+  const center = (i: number) => left + i * band + band / 2;
+  return {
+    band,
+    width,
+    chartWidth: Math.ceil(left + n * band + 6),
+    center,
+    /** A bar's left edge: on a whole pixel, or to the hundredth when thin. */
+    x: (i: number) =>
+      thin ? Math.round((center(i) - width / 2) * 100) / 100 : Math.round(center(i) - width / 2),
+  };
+}
+
+/**
  * Columns over categories: one series, or stacked series with a 2px surface
  * gap between segments, and optionally lines drawn through them (a trend) and
  * a thin tick across each (the fair-dice expectation). Hovering, tapping or
@@ -524,18 +551,12 @@ export function Columns({
     axisHeight = 22,
     extraHeight = below?.height ?? 0;
   const plot = height - top - axisHeight;
-  // Columns share the width available, between a thin minimum (the frame scrolls below it) and a
-  // maximum past which a few columns would drift too far apart; a bar itself is never over 24px.
-  const band = Math.max(4, Math.min(72, available ? (available - left - 6) / n : 22));
-  const gap = Math.min(12, Math.max(2, Math.round(band * 0.3)));
-  const width = Math.max(2, Math.min(24, Math.floor(band - gap)));
-  const chartWidth = Math.ceil(left + n * band + 6);
+  const { band, width, chartWidth, center, x: barX } = columnLayout(available, n, left);
   const totals = categories.map((_, i) => series.reduce((sum, s) => sum + (s.values[i] ?? 0), 0));
   const lineValues = lines.flatMap((line) => line.values.filter((v): v is number => v !== null));
   const max = fixedMax ?? countMax(Math.max(1, ...totals, ...lineValues, ...(reference?.values ?? [])));
   const scale = (value: number) => (value / max) * plot;
   const baseline = top + plot;
-  const center = (i: number) => left + i * band + band / 2;
   const labelOf = axis?.(band);
   const every = Math.max(1, Math.ceil((Math.max(0, ...categories.map((c) => c.length)) * 6.2 + 10) / band));
   const labels = categories.map((category, i) => (labelOf ? labelOf(i) : i % every === 0 ? category : null));
@@ -583,7 +604,7 @@ export function Columns({
             </g>
           ))}
           {categories.map((category, i) => {
-            const x = Math.round(center(i) - width / 2);
+            const x = barX(i);
             let base = baseline;
             const segments = series
               .map((s) => ({ s, value: s.values[i] ?? 0 }))

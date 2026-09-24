@@ -9,6 +9,7 @@ import { build } from 'vite';
 import { loadAdminAssets } from '../apps/server/src/admin/assets.js';
 import {
   Columns,
+  columnLayout,
   Empty,
   Heatmap,
   LineChart,
@@ -175,6 +176,30 @@ test('every column says exactly what it is: its whole date and each value there,
     /class="chart-line line-ink" d="M[\d.]+,[\d.]+L[\d.]+,[\d.]+"/,
     'the line starts at its first value',
   );
+});
+
+test('columns fit the width there is: whole-pixel bars when wide, fine strokes for 90 days on a phone', () => {
+  // A desktop card: 30 days in whole pixels, a bar never over 24px, with a gap of at least 2px.
+  const wide = columnLayout(560, 30);
+  assert.ok(wide.chartWidth <= 560);
+  assert.ok(Number.isInteger(wide.width) && wide.width <= 24);
+  for (let i = 0; i < 30; i++) assert.ok(Number.isInteger(wide.x(i)));
+  assert.ok(wide.x(1) - (wide.x(0) + wide.width) >= 2);
+  assert.equal(columnLayout(1200, 3).width, 24, 'a few columns stay thin');
+  // A phone card (about 311px): all 90 days fit, each a stroke over a pixel wide with a gap beside it.
+  const phone = columnLayout(311, 90);
+  assert.ok(phone.chartWidth <= 311, `${phone.chartWidth}px`);
+  assert.ok(phone.width >= 1 && phone.width < phone.band);
+  for (let i = 1; i < 90; i++) {
+    const gap = phone.x(i) - (phone.x(i - 1) + phone.width);
+    assert.ok(gap > 0.9 && gap < 1.4, `gap ${gap} before column ${i}`);
+    assert.equal(phone.x(i), Math.round(phone.x(i) * 100) / 100);
+  }
+  // The last bar ends inside the chart.
+  assert.ok(phone.x(89) + phone.width <= phone.chartWidth);
+  // Only past 2px a column does the frame scroll.
+  assert.ok(columnLayout(311, 200).chartWidth > 311);
+  assert.equal(columnLayout(311, 200).band, 2);
 });
 
 test('date axes label what fits: every day, Mondays, months or quarters, and the year where it changes', () => {
