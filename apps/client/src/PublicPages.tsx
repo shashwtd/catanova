@@ -62,7 +62,7 @@ export const PUBLIC_PAGES = [
  */
 export const PRIVACY_CONTACT = 'contact@catanova.io';
 /** The date the privacy page last changed, shown on the page and in its structured data. */
-export const PRIVACY_UPDATED = { text: '23 September 2026', iso: '2026-09-23' } as const;
+export const PRIVACY_UPDATED = { text: '24 September 2026', iso: '2026-09-24' } as const;
 
 /**
  * The questions people actually arrive with.
@@ -1405,37 +1405,19 @@ export function PublicGuide() {
   );
 }
 
-/** Every service that handles data for Catanova, and what it does. */
 /**
- * Who helps run Catanova, by what each does rather than by name: the page
- * says what happens to a visitor's data without listing the stack. Google is
- * named where the visitor meets Google itself, in sign-in and in analytics.
- */
-const PRIVACY_SERVICES = [
-  ['Hosting', 'Runs our game server and stores its database.'],
-  [
-    'Sign-in and accounts',
-    'Keeps your account: your username, avatar and friends, and your Google email address if you continue with Google.',
-  ],
-  ['Guest check', 'Checks that a new guest is a person when you choose Play as guest.'],
-  [
-    'Bot moves',
-    'Works out moves for bots from the state of the game. It receives that game state, not your name or email.',
-  ],
-  ['Email', 'Delivers messages sent to our contact address.'],
-  ['Google Analytics', 'Counts visits to the home page, the guide and this page, only if you accept.'],
-] as const;
-
-/**
- * What Catanova keeps, who else handles it, and how to have it deleted.
+ * The privacy policy, written the way most sites write theirs: numbered
+ * sections of plain prose that a player can skim and forget.
  *
- * Every sentence is a claim about the code, and each one can be traced to it:
- * `supabase/schema.sql` for accounts, friends and the seven-day guest expiry,
- * the game server's store for games, last-seen times and the switch that
- * hides them, the room access limits for IP addresses, and `analytics.ts` for
- * the consent control below, which that loader wires up. Change one of those
- * and this page has to change with it. It says what is kept and why, and names
- * the services that help only by what they do.
+ * It is calm, not vague. Every sentence is still a claim about the code, and
+ * each one can be traced to it: `supabase/schema.sql` for accounts, friends and
+ * the seven-day guest expiry; the game server's store for games, last-seen
+ * times and the switch that hides them; the room access limits for IP
+ * addresses; `home-hint.ts` for the one cookie; `SendFeedback.tsx` for what
+ * feedback carries; and `analytics.ts` for the consent control below, which
+ * that loader wires up. Change one of those and this page has to change with
+ * it. Services are named by what they do; Google is named where a player meets
+ * Google itself, in sign-in and in analytics.
  */
 export function PublicPrivacy() {
   return (
@@ -1460,87 +1442,85 @@ export function PublicPrivacy() {
           <span aria-hidden="true">›</span>
           Privacy
         </p>
-        <h1>Privacy</h1>
+        <h1>Privacy Policy</h1>
         <p className="guide-subtitle">Last updated: {PRIVACY_UPDATED.text}</p>
         <p className="guide-lead">
-          Catanova is a free game you play in your browser. This page lists what it keeps about you, who
-          helps run it, and how to have your data deleted.
+          This Privacy Policy describes how Catanova (“Catanova”, “we”, “us” or “our”) collects, uses and
+          shares information in connection with the catanova.io website and the Catanova game (together, the
+          “Service”).
         </p>
-        <section aria-labelledby="privacy-keep">
+        <section aria-labelledby="privacy-collect">
           <div className="guide-heading">
-            <h2 id="privacy-keep">What we keep</h2>
+            <h2 id="privacy-collect">1. Information we collect</h2>
           </div>
-          <ul className="privacy-list">
-            <li>
-              <strong>Your account.</strong> The username and avatar you choose, and your friends list. If
-              you continue with Google, also the email address of your Google account; Catanova does not use
-              your Google name or photo.
-            </li>
-            <li>
-              <strong>Guest profiles.</strong> A guest profile expires after seven days without activity. Its
-              username and avatar are then deleted, and the name can be taken again. Games it played stay in
-              our game records.
-            </li>
-            <li>
-              <strong>Your games.</strong> Every game you play: each move, the result and who played, linked
-              to your account. That is what lets you reconnect and see your match history. These records are
-              not deleted automatically.
-            </li>
-            <li>
-              <strong>What other players see.</strong> Your username and avatar appear at the table, and
-              players signed in with Google can find you by username. Friends see whether you are online and
-              can watch a game you are playing. They also see how long ago you were last online, unless you
-              turn off <em>Show when you were last online</em> in Settings, under Privacy.
-            </li>
-            <li>
-              <strong>IP addresses.</strong> Used only briefly, to protect the game from abuse, and never
-              stored.
-            </li>
-            <li>
-              <strong>Visits to these pages.</strong> Only if you allow analytics. See{' '}
-              <a href="#analytics">Analytics</a>.
-            </li>
-            <li>
-              <strong>In your browser.</strong> Your sign-in session, the seat you are playing, your settings
-              and your analytics answer are kept in this browser’s storage. Catanova itself sets no cookies.
-            </li>
-          </ul>
+          <p>
+            <em>Information you provide.</em> When you set up a profile, you choose a username and an avatar.
+            If you continue with Google, we receive the email address of your Google account; Catanova does
+            not use your Google name or photo. If you add friends, we keep your friends list. If you send us
+            feedback or an email, we receive what you send.
+          </p>
+          <p>
+            <em>Information created when you play.</em> The Service keeps a record of the games you take part
+            in, such as the moves made, the result and who played. This lets you reconnect to a game, see your
+            match history and keeps games fair.
+          </p>
+          <p>
+            <em>Technical information.</em> Like most websites, the Service receives technical information
+            from your browser, such as your IP address and browser type. IP addresses are used briefly to
+            protect the Service from abuse and are not stored. If you choose to include technical details with
+            feedback, we also receive the room code, game version, browser, screen size, connection and the
+            last error shown, never your cards.
+          </p>
         </section>
-        <section aria-labelledby="privacy-services">
+        <section aria-labelledby="privacy-use">
           <div className="guide-heading">
-            <h2 id="privacy-services">Who else handles it</h2>
+            <h2 id="privacy-use">2. How we use information</h2>
           </div>
-          <figure className="guide-table-figure">
-            <figcaption>Services that handle data for Catanova</figcaption>
-            <div className="guide-table-scroll">
-              <table className="guide-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Service</th>
-                    <th scope="col">What it does</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {PRIVACY_SERVICES.map(([name, role]) => (
-                    <tr key={name}>
-                      <th scope="row">{name}</th>
-                      <td>{role}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </figure>
+          <p>We use the information we collect to:</p>
+          <ul className="privacy-list">
+            <li>provide, operate and maintain the Service, including your profile, friends and games;</li>
+            <li>let you reconnect to games and see your match history;</li>
+            <li>show your friends when you are online, as described below;</li>
+            <li>keep the Service secure and prevent abuse and cheating;</li>
+            <li>understand how the Service is used and improve it; and</li>
+            <li>respond to your messages and feedback.</li>
+          </ul>
+          <p>We do not sell your personal information, and we do not use it for advertising.</p>
+        </section>
+        <section aria-labelledby="privacy-players">
+          <div className="guide-heading">
+            <h2 id="privacy-players">3. What other players can see</h2>
+          </div>
+          <p>
+            Your username and avatar are shown to other players in the rooms and games you join, and players
+            at your table can send you a friend request. Players signed in with Google can find you by
+            username. Your friends can see whether you are online and can watch a game you are playing. They
+            can also see how long ago you were last online, unless you turn off{' '}
+            <em>Show when you were last online</em> in Settings, under Privacy.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-storage">
+          <div className="guide-heading">
+            <h2 id="privacy-storage">4. Cookies and browser storage</h2>
+          </div>
+          <p>
+            The Service keeps some information in your browser’s storage so that it works properly, such as
+            your sign-in session, the seat you are playing, your settings and your analytics choice. It also
+            sets one small cookie that remembers this browser is signed in, so that catanova.io can open your
+            home directly; the cookie contains no name or other personal details. Google Analytics sets its
+            own cookies only if you allow analytics.
+          </p>
         </section>
         <section id="analytics" className="privacy-section" aria-labelledby="privacy-analytics">
           <div className="guide-heading">
-            <h2 id="privacy-analytics">Analytics</h2>
+            <h2 id="privacy-analytics">5. Analytics</h2>
           </div>
           <p>
-            If you allow it, Google Analytics records visits to the home page, the guide and this page, with
-            the usual details it collects about your device and browser, and sets its own cookies. Room codes,
-            invitation links and the page you came from are removed first, and it never runs in rooms or
-            games. Until you allow it, Google’s analytics code is not loaded at all.
+            If you allow it, we use Google Analytics to understand how visitors use the home page, the guide
+            and this page. It records visits with the usual details it collects about your device and browser,
+            and sets its own cookies. Room codes, invitation links and the page you came from are removed
+            first, and it never runs in rooms or games. Until you allow it, Google’s analytics code is not
+            loaded at all. You can change your choice at any time:
           </p>
           <div className="privacy-choice" data-consent-control="" hidden>
             <div aria-live="polite">
@@ -1554,10 +1534,10 @@ export function PublicPrivacy() {
             </div>
             <div className="privacy-choice-actions">
               <button type="button" data-consent-choice="granted">
-                Accept all
+                Allow
               </button>
               <button type="button" data-consent-choice="denied">
-                Deny
+                Don’t allow
               </button>
             </div>
           </div>
@@ -1567,13 +1547,98 @@ export function PublicPrivacy() {
             </p>
           </noscript>
         </section>
-        <section aria-labelledby="privacy-delete">
+        <section aria-labelledby="privacy-providers">
           <div className="guide-heading">
-            <h2 id="privacy-delete">Deleting your data</h2>
+            <h2 id="privacy-providers">6. Service providers</h2>
           </div>
           <p>
-            There is no delete button yet. To have your account or your games deleted, or to ask what we hold
-            about you, email <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a> with your username.
+            We use service providers to help us run the Service. They handle information on our behalf and
+            only as needed to provide their service:
+          </p>
+          <ul className="privacy-list">
+            <li>Hosting, which runs our game server and stores its database;</li>
+            <li>Sign-in and accounts, which keeps your account;</li>
+            <li>Guest check, which checks that a new guest is a person;</li>
+            <li>
+              Bot moves, which works out moves for bots from the state of a game and receives that game state,
+              not your name or email;
+            </li>
+            <li>Email, which delivers messages sent to our contact address; and</li>
+            <li>Google Analytics, only if you allow it.</li>
+          </ul>
+          <p>
+            We may also disclose information where the law requires it, or to protect the safety and rights of
+            Catanova, our players or others.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-retention">
+          <div className="guide-heading">
+            <h2 id="privacy-retention">7. How long we keep information</h2>
+          </div>
+          <p>
+            We keep information for as long as it is needed to provide the Service and for the purposes in
+            this policy. A guest profile expires after seven days without activity: its username and avatar
+            are then deleted and the name can be taken again, while the games it played remain part of our
+            game records. Account information is kept until you ask us to delete it, and game records are kept
+            so that match history and results remain available.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-security">
+          <div className="guide-heading">
+            <h2 id="privacy-security">8. Security</h2>
+          </div>
+          <p>
+            We take reasonable measures to protect the information we hold. No method of transmission or
+            storage is completely secure, however, and we cannot guarantee absolute security.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-children">
+          <div className="guide-heading">
+            <h2 id="privacy-children">9. Children</h2>
+          </div>
+          <p>
+            The Service is not directed to children under 13, and we do not knowingly collect personal
+            information from children under 13. If you believe a child has given us personal information,
+            please contact us and we will delete it.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-transfers">
+          <div className="guide-heading">
+            <h2 id="privacy-transfers">10. Where information is processed</h2>
+          </div>
+          <p>
+            The Service and our service providers may process information in countries other than the one
+            where you live. Wherever it is processed, we protect it as this policy describes.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-rights">
+          <div className="guide-heading">
+            <h2 id="privacy-rights">11. Your choices and rights</h2>
+          </div>
+          <p>
+            You can change your username and avatar, turn off <em>Show when you were last online</em>, and
+            change your analytics choice at any time. Depending on where you live, you may also have the right
+            to access, correct or delete the personal information we hold about you, or to object to certain
+            uses of it. There is no delete button yet; to make a request, email{' '}
+            <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a> with your username.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-changes">
+          <div className="guide-heading">
+            <h2 id="privacy-changes">12. Changes to this policy</h2>
+          </div>
+          <p>
+            We may update this policy from time to time. When we do, we will change the date at the top of
+            this page.
+          </p>
+        </section>
+        <section aria-labelledby="privacy-contact">
+          <div className="guide-heading">
+            <h2 id="privacy-contact">13. Contact us</h2>
+          </div>
+          <p>
+            If you have any questions about this policy, email{' '}
+            <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a>.
           </p>
         </section>
         <footer className="guide-footer">

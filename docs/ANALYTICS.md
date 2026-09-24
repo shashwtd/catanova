@@ -4,8 +4,9 @@ Gameplay lives in the Azure game server's SQLite database. Supabase owns authent
 usernames and social data; it is not the dice or match-history database.
 
 Website visits are a separate, much smaller record: Google Analytics 4 runs on the
-public pages only, and only for visitors who choose **Accept all** in the consent
-banner. Google's tag is not loaded before that answer. See
+public pages only, and only for visitors who answer **Yes** to the one-line question
+above the landing footer, or choose **Allow** on the privacy page. Google's tag is not
+loaded before that answer. See
 [Measurement](art/RUNTIME.md#measurement) for how the loader keeps room codes out of it.
 
 ## What is recorded today

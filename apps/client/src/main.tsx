@@ -49,6 +49,7 @@ import {
   roomNavigationState,
   navigationRoomReference,
   accountHomePath,
+  rememberHome,
   previewJoinReference,
 } from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
@@ -669,6 +670,10 @@ function App() {
     return () => clearTimeout(timer);
   }, [room?.launch?.id]);
 
+  // Where "/" should open next time: the server sends a signed-in player straight to /play.
+  useEffect(() => {
+    if (!auth.loading) rememberHome(accountHomePath(auth));
+  }, [auth.loading, auth.canPlay, auth.config?.mode, auth.profile.name]);
   useEffect(() => {
     if (auth.loading || room || invite || location.pathname === '/auth/callback') return;
     const destination = accountHomePath(auth);

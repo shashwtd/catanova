@@ -9,7 +9,13 @@ import {
   roomPath,
   safeEntryPath,
   shouldResume,
+  rememberHome,
 } from '../apps/client/src/navigation.js';
+import {
+  HOME_HINT_COOKIE,
+  HOME_HINT_MAX_AGE_SECONDS,
+  hasHomeHint,
+} from '../packages/protocol/src/home-hint.js';
 import { newSession } from '../apps/client/src/connection.js';
 
 const id = '9bfec3ad-0a2c-47d1-bfe5-735a3e2dc25f';
@@ -74,4 +80,37 @@ test('joining a short link uses the exact previewed permanent identity instead o
   const reused = { roomId: '0bfec3ad-0a2c-47d1-bfe5-735a3e2dc25f', roomCode: 'AB2C' };
   assert.equal(previewJoinReference('AB2C', room), id);
   assert.notEqual(previewJoinReference('AB2C', room), reused.roomId);
+});
+
+test('the home hint is kept while a player’s home is /play and cleared when it is not', () => {
+  const jar = { cookie: '' };
+  // Read through a function: an assertion would otherwise narrow the property for good.
+  const written = (): string => jar.cookie;
+  rememberHome('/play', jar, true);
+  assert.equal(
+    written(),
+    `${HOME_HINT_COOKIE}=play; Max-Age=${HOME_HINT_MAX_AGE_SECONDS}; Path=/; SameSite=Lax; Secure`,
+  );
+  rememberHome('/', jar, true);
+  assert.equal(written(), `${HOME_HINT_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax; Secure`);
+  rememberHome('/play', jar, false);
+  assert.ok(!written().includes('Secure'), 'a local playtest over plain http can keep it too');
+  const blocked = {
+    get cookie() {
+      return '';
+    },
+    set cookie(_value: string) {
+      throw new Error('cookies are blocked');
+    },
+  };
+  assert.doesNotThrow(() => rememberHome('/play', blocked, true), 'blocked cookies only cost the shortcut');
+  assert.equal(hasHomeHint(`theme=dark; ${HOME_HINT_COOKIE}=play`), true);
+  for (const other of [
+    undefined,
+    '',
+    `${HOME_HINT_COOKIE}=`,
+    `${HOME_HINT_COOKIE}=playing`,
+    `x${HOME_HINT_COOKIE}=play`,
+  ])
+    assert.equal(hasHomeHint(other), false, String(other));
 });

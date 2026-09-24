@@ -101,6 +101,12 @@ export function coreRoutes(
       handle: ({ query }) => analysis.stats(query.get('refresh') === '1'),
     },
     {
+      // How play has grown: aggregates only, from the match index, in the analysis worker.
+      method: 'GET',
+      path: /^\/api\/admin\/growth$/,
+      handle: ({ query }) => analysis.growth(query.get('refresh') === '1'),
+    },
+    {
       method: 'GET',
       path: /^\/api\/admin\/reports\/retention$/,
       handle: ({ query }) => {

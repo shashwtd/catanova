@@ -5,6 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { TLSSocket } from 'node:tls';
 import { ART_REDIRECTS } from './art-redirects.js';
 import { isRoomReference, normalizeRoomReference } from '../../../packages/protocol/src/room-reference.js';
+import { hasHomeHint } from '../../../packages/protocol/src/home-hint.js';
 
 const types: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -156,6 +157,17 @@ export async function serveClient(
     response.writeHead(307, { Location: artRedirect, 'Cache-Control': 'no-cache' }).end();
     return;
   }
+  // A browser that opens the player's home goes straight there, before any page
+  // is drawn, instead of showing the landing page while the app checks its
+  // session. Only a bare "/": an invitation or anything else in the address
+  // keeps its page. The hint proves nothing; /play still checks the session.
+  if (path === '/') {
+    response.setHeader('Vary', 'Accept-Encoding, Cookie');
+    if (!search && hasHomeHint(request.headers.cookie)) {
+      response.writeHead(302, { Location: '/play', 'Cache-Control': 'no-store' }).end();
+      return;
+    }
+  }
   const roomReference = /^\/room\/([^/]+)\/?$/i.exec(path)?.[1];
   const isAppRoute =
     path === '/' ||
@@ -185,7 +197,7 @@ export async function serveClient(
     let servedInfo = info;
     let encoding: Encoding = 'identity';
     if (textAsset.test(file)) {
-      response.setHeader('Vary', 'Accept-Encoding');
+      if (path !== '/') response.setHeader('Vary', 'Accept-Encoding');
       let acceptable = false;
       for (const candidate of encodings(request.headers['accept-encoding'])) {
         if (candidate === 'identity') {

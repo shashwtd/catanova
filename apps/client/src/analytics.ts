@@ -17,10 +17,17 @@ export const PRIVATE_PREFIXES = ['/room', '/join', '/invite', '/auth'] as const;
  */
 export const MEASURED_PATHS = ['/', '/guide/', '/privacy/'] as const;
 
+/**
+ * The only page that asks, and it asks quietly: one small line placed just
+ * above the landing footer, over the scenery, that scrolls with the page and
+ * covers nothing. The privacy page keeps its own control; no other page asks.
+ */
+export const ASK_PATHS = ['/'] as const;
+
 /** Where a visitor's answer is kept in this browser: `granted` or `denied`. */
 export const CONSENT_STORAGE_KEY = 'catanova.analytics-consent';
 
-/** The banner's styles. Fetched only while a visitor has not answered. */
+/** The question's styles. Fetched only while a visitor has not answered. */
 export const CONSENT_STYLESHEET = '/consent.css';
 
 /**
@@ -52,6 +59,7 @@ export function analyticsLoader(measurementId: string): string {
   // A delayed loader may execute after the app has already navigated.
   var pages = ${JSON.stringify([...MEASURED_PATHS])};
   if (pages.indexOf(location.pathname) < 0) return;
+  var asking = ${JSON.stringify([...ASK_PATHS])};
   var prefixes = ${JSON.stringify([...PRIVATE_PREFIXES])};
   var path = location.pathname.split(/[?#]/)[0] || '/';
   for (var i = 0; i < prefixes.length; i++)
@@ -79,13 +87,16 @@ export function analyticsLoader(measurementId: string): string {
   }
   measurePath(path);
   var banner = null;
+  var watcher = null;
   function dismiss() {
     if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
     banner = null;
+    if (watcher) watcher.disconnect();
+    watcher = null;
   }
-  // The question belongs to the public pages; it never follows anyone into a room.
+  // The question belongs to the landing page; it never follows anyone elsewhere.
   function leaveIfPrivate() {
-    if (pages.indexOf(location.pathname) < 0) dismiss();
+    if (asking.indexOf(location.pathname) < 0) dismiss();
   }
   // Enhanced measurement can supply event-level raw URLs, overriding gtag defaults.
   // Keep this document public-only: stop before any history mutation and never
@@ -174,37 +185,54 @@ export function analyticsLoader(measurementId: string): string {
     for (var i = 0; i < buttons.length; i++) listen(buttons[i]);
     reflect();
   }
+  // The landing footer marks where the question goes: just above it.
+  function anchor() {
+    return document.querySelectorAll('[data-consent-anchor]')[0] || null;
+  }
+  // Placed in the page rather than fixed to the screen, so it scrolls with the
+  // page and never sits over a button or a link. It stays hidden until placed.
+  function place() {
+    if (!banner) return;
+    var footer = anchor();
+    if (!footer) return dismiss();
+    if (!footer.getBoundingClientRect) return;
+    var top = footer.getBoundingClientRect().top + (window.pageYOffset || 0) - banner.offsetHeight - 10;
+    banner.style.top = Math.max(0, Math.round(top)) + 'px';
+    banner.style.visibility = 'visible';
+  }
   function ask() {
-    if (choice() || pages.indexOf(location.pathname) < 0) return;
+    if (choice() || asking.indexOf(location.pathname) < 0 || !anchor()) return;
     var style = document.createElement('link');
     style.rel = 'stylesheet';
     style.href = '${CONSENT_STYLESHEET}';
     // Appear styled or not at all; unanswered means nothing is measured.
     style.onload = function () {
-      if (banner || choice() || pages.indexOf(location.pathname) < 0) return;
+      if (banner || choice() || asking.indexOf(location.pathname) < 0 || !anchor()) return;
       banner = document.createElement('section');
-      banner.className = 'consent-banner';
+      banner.className = 'consent-ask';
       banner.setAttribute('aria-label', 'Analytics');
-      var text = document.createElement('p');
-      text.textContent = 'May we use Google Analytics to count visits? ' +
-        'It runs only on these public pages, never in your games. ';
-      var more = document.createElement('a');
-      more.href = '/privacy/';
-      more.textContent = 'Privacy';
-      text.appendChild(more);
-      var actions = document.createElement('div');
-      actions.className = 'consent-actions';
-      [['denied', 'Deny'], ['granted', 'Accept all']].forEach(function (option) {
+      var text = document.createElement('span');
+      text.textContent = 'Count visits with Google Analytics?';
+      banner.appendChild(text);
+      [['granted', 'Yes'], ['denied', 'No']].forEach(function (option) {
         var button = document.createElement('button');
         button.type = 'button';
         button.setAttribute('data-consent-choice', option[0]);
         button.textContent = option[1];
         button.addEventListener('click', function () { choose(option[0]); });
-        actions.appendChild(button);
+        banner.appendChild(button);
       });
-      banner.appendChild(text);
-      banner.appendChild(actions);
       document.body.appendChild(banner);
+      place();
+      window.addEventListener('resize', place);
+      window.addEventListener('load', place);
+      // Fonts arriving and the app settling can move the footer after that.
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+      if (window.ResizeObserver) {
+        watcher = new window.ResizeObserver(place);
+        watcher.observe(document.body);
+        watcher.observe(anchor());
+      }
     };
     document.head.appendChild(style);
   }

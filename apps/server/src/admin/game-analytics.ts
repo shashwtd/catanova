@@ -171,7 +171,9 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
   const botSeats = new Set<string>();
   const pointsByTurn = new Map<number, number[]>();
   const dice = Array<number>(11).fill(0);
-  let sevens = 0;
+  const pairs = Array<number>(36).fill(0);
+  let sevens = 0,
+    unpaired = 0;
   const awards: GameAnalytics['awards'] = [];
   const robberMoves: GameAnalytics['robberMoves'] = [];
   const trades: GameAnalytics['trades'] = [];
@@ -365,6 +367,10 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       }
     if (kind === 'roll' && row.dice !== null && row.dice >= 2 && row.dice <= 12) {
       dice[row.dice - 2]!++;
+      // The saved game holds both dice of the roll it has just made.
+      const [first, second] = game.dice ?? [];
+      if (first && second && first + second === row.dice) pairs[(first - 1) * 6 + (second - 1)]!++;
+      else unpaired++;
       if (row.dice === 7) {
         sevens++;
         if (actor) actor.robber.sevens++;
@@ -456,7 +462,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       turns,
       byPlayer: order.map((_, index) => turns.map((number) => pointsByTurn.get(number)![index]!)),
     },
-    dice: { ...diceSummary(dice, mode), sevens },
+    dice: { ...diceSummary(dice, mode, { pairs, unpaired }), sevens },
     awards,
     robberMoves,
     trades,

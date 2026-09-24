@@ -7,10 +7,17 @@ import type {
   RetentionReport,
 } from '../../server/src/admin/types.js';
 import { api, ApiError, useApi } from '../api.js';
-import { count, diceLabel, percent, time } from '../format.js';
-import { Columns, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
+import { count, dateAxis, dayLabel, diceLabel, minutes, percent, time, weekLabel } from '../format.js';
+import { Columns, countMax, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
+import { PairGrid, totalDice } from '../dice.js';
 
 const TOTALS = Array.from({ length: 11 }, (_, i) => String(i + 2));
+const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+
+/** A dice chart's column by name: "Total 7". */
+export const totalLabel = (index: number) => `Total ${index + 2}`;
+/** Rolls are whole; an expectation reads to a tenth. */
+export const rollCount = (value: number) => (Number.isInteger(value) ? count(value) : value.toFixed(1));
 
 export function DiceTable({ dice }: { dice: DiceSummary }) {
   return (
@@ -173,6 +180,11 @@ export function Stats() {
     `/api/admin/stats${refresh ? `?refresh=1&n=${refresh}` : ''}`,
   );
   const stats = data?.value;
+  const days = stats?.days.map((day) => day.day) ?? [];
+  const weeks = stats?.weeks.map((week) => week.week) ?? [];
+  const gamesMax = countMax(
+    Math.max(1, ...(stats?.days ?? []).flatMap((day) => [day.started, day.finished + day.abandoned])),
+  );
   return (
     <div className="stack">
       <div className="toolbar">
@@ -209,62 +221,98 @@ export function Stats() {
               <div className="stats">
                 <Stat
                   label="Median game"
-                  value={
-                    stats.completed.medianMinutes === null ? '—' : `${stats.completed.medianMinutes} min`
-                  }
-                  hint={`${stats.completed.medianTurns ?? '—'} turns · ${stats.completed.count} finished`}
+                  value={minutes(stats.completed.medianMinutes)}
+                  hint={`${stats.completed.medianTurns ?? '—'} turns · ${count(stats.completed.count)} finished`}
                 />
                 <Stat
                   label="Bot seats"
                   value={percent(stats.bots.botSeats, stats.bots.seats)}
-                  hint={`${stats.bots.botSeats} of ${stats.bots.seats} seats`}
+                  hint={`${count(stats.bots.botSeats)} of ${count(stats.bots.seats)} seats`}
                 />
                 <Stat
                   label="Games with bots"
                   value={percent(stats.bots.matchesWithBots, stats.bots.matches)}
-                  hint={`${stats.bots.matchesWithBots} of ${stats.bots.matches}`}
+                  hint={`${count(stats.bots.matchesWithBots)} of ${count(stats.bots.matches)}`}
                 />
               </div>
             </Section>
           </div>
-          <Section title="Games started per day" className="wide">
-            <Columns
-              label="Games started per day over the last 30 days"
-              categories={stats.days.map((day) => day.day.slice(5))}
-              series={[{ name: 'Started', slot: 1, values: stats.days.map((day) => day.started) }]}
-              every={5}
-            />
-          </Section>
-          <Section title="Games ended per day" className="wide">
-            <Columns
-              label="Games finished and abandoned per day over the last 30 days"
-              categories={stats.days.map((day) => day.day.slice(5))}
-              series={[
-                { name: 'Finished', slot: 3, values: stats.days.map((day) => day.finished) },
-                { name: 'Abandoned', slot: 2, values: stats.days.map((day) => day.abandoned) },
-              ]}
-              every={5}
-            />
-          </Section>
-          <Section title="Players per day" className="wide">
-            <Columns
-              label="Distinct accounts that played each day"
-              categories={stats.days.map((day) => day.day.slice(5))}
-              series={[{ name: 'Players', slot: 1, values: stats.days.map((day) => day.players) }]}
-              every={5}
-            />
-          </Section>
-          <Section title="Players per week" className="wide">
-            <Columns
-              label="Distinct accounts that played each week"
-              categories={stats.weeks.map((week) => week.week.slice(5))}
-              series={[{ name: 'Players', slot: 1, values: stats.weeks.map((week) => week.players) }]}
-            />
-            <p className="footnote">
-              Distinct accounts that started a match that day or week (UTC; weeks start on Monday). Local
-              seats without an account are not counted.
-            </p>
-          </Section>
+          {/* Games and players, each pair side by side; the two game charts share a scale. */}
+          <div className="duo">
+            <Section
+              title="Games started per day"
+              actions={
+                <span className="card-note">
+                  {count(sum(stats.days.map((day) => day.started)))} in 30 days
+                </span>
+              }
+            >
+              <Columns
+                label="Games started per day over the last 30 days"
+                categories={days}
+                axis={(band) => dateAxis(days, band)}
+                pointLabel={(i) => dayLabel(days[i]!)}
+                series={[{ name: 'Started', slot: 1, values: stats.days.map((day) => day.started) }]}
+                max={gamesMax}
+              />
+            </Section>
+            <Section
+              title="Games ended per day"
+              actions={
+                <span className="card-note">
+                  {count(sum(stats.days.map((day) => day.finished)))} finished ·{' '}
+                  {count(sum(stats.days.map((day) => day.abandoned)))} abandoned
+                </span>
+              }
+            >
+              <Columns
+                label="Games finished and abandoned per day over the last 30 days"
+                categories={days}
+                axis={(band) => dateAxis(days, band)}
+                pointLabel={(i) => dayLabel(days[i]!)}
+                series={[
+                  { name: 'Finished', slot: 3, values: stats.days.map((day) => day.finished) },
+                  { name: 'Abandoned', slot: 2, values: stats.days.map((day) => day.abandoned) },
+                ]}
+                max={gamesMax}
+              />
+            </Section>
+          </div>
+          <div className="duo">
+            <Section
+              title="Players per day"
+              actions={
+                <span className="card-note">
+                  up to {count(Math.max(0, ...stats.days.map((day) => day.players)))} a day
+                </span>
+              }
+            >
+              <Columns
+                label="Distinct accounts that played each day"
+                categories={days}
+                axis={(band) => dateAxis(days, band)}
+                pointLabel={(i) => dayLabel(days[i]!)}
+                series={[{ name: 'Players', slot: 1, values: stats.days.map((day) => day.players) }]}
+              />
+            </Section>
+            <Section
+              title="Players per week"
+              actions={<span className="card-note">{count(stats.weeks.at(-1)?.players ?? 0)} this week</span>}
+            >
+              <Columns
+                label="Distinct accounts that played each week"
+                categories={weeks}
+                axis={(band) => dateAxis(weeks, band, 'week')}
+                pointLabel={(i) => weekLabel(weeks[i]!)}
+                series={[{ name: 'Players', slot: 1, values: stats.weeks.map((week) => week.players) }]}
+                table="Week (UTC)"
+              />
+            </Section>
+          </div>
+          <p className="footnote">
+            Days and weeks are UTC; weeks start on Monday. Players are distinct accounts that started a match
+            that day or week; local seats without an account are not counted.
+          </p>
           <details className="card wide">
             <summary>Daily numbers</summary>
             <Table className="compact">
@@ -280,7 +328,7 @@ export function Stats() {
               <tbody>
                 {[...stats.days].reverse().map((day) => (
                   <tr key={day.day}>
-                    <td>{day.day}</td>
+                    <td className="nowrap">{dayLabel(day.day)}</td>
                     <td className="num">{day.started}</td>
                     <td className="num">{day.finished}</td>
                     <td className="num">{day.abandoned}</td>
@@ -293,16 +341,34 @@ export function Stats() {
           <Section title={`Dice, all games (${count(stats.dice.overall.rolls)} rolls)`} className="wide">
             {stats.dice.overall.rolls ? (
               <>
-                <Columns
-                  label={`Rolls of each total across every game, against ${expectationName(stats.dice.overall).toLowerCase()}`}
-                  categories={TOTALS}
-                  series={[{ name: 'Rolled', slot: 1, values: stats.dice.overall.counts }]}
-                  reference={{
-                    name: expectationName(stats.dice.overall),
-                    values: stats.dice.overall.expected,
-                  }}
-                />
-                <p className="muted">{fairness(stats.dice.overall)}</p>
+                <div className="duo dice-views">
+                  <div>
+                    <h3>Totals</h3>
+                    <Columns
+                      label={`Rolls of each total across every game, against ${expectationName(stats.dice.overall).toLowerCase()}`}
+                      categories={TOTALS}
+                      pointLabel={totalLabel}
+                      format={rollCount}
+                      series={[{ name: 'Rolled', slot: 1, values: stats.dice.overall.counts }]}
+                      reference={{
+                        name: expectationName(stats.dice.overall),
+                        values: stats.dice.overall.expected,
+                      }}
+                      below={totalDice((i) => i + 2)}
+                      height={230}
+                    />
+                    <p className="muted">{fairness(stats.dice.overall)}</p>
+                  </div>
+                  {stats.dice.overall.pairs && (
+                    <div>
+                      <h3>Which pairs came up</h3>
+                      <PairGrid
+                        dice={stats.dice.overall}
+                        label="How often each pair of dice came up across every game, first die by second"
+                      />
+                    </div>
+                  )}
+                </div>
                 <DiceTable dice={stats.dice.overall} />
                 {Object.keys(stats.dice.byMode).length > 1 &&
                   Object.entries(stats.dice.byMode).map(([mode, dice]) => (

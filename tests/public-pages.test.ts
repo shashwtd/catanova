@@ -282,11 +282,11 @@ test('the privacy page is linked from the public pages and says what is kept wit
   const home = await readFile(join(directory, 'index.html'), 'utf8');
   const guide = await readFile(join(directory, 'guide', 'index.html'), 'utf8');
   const privacy = await readFile(join(directory, 'privacy', 'index.html'), 'utf8');
-  // The landing footer and the guide link here; the banner's link is covered with the loader.
+  // The landing footer and the guide link here.
   assert.ok(home.includes('<a href="/privacy/">Privacy</a>'));
   assert.ok(guide.includes('<a href="/privacy/">Privacy</a>'));
   assert.ok(privacy.includes(`<title>${PUBLIC_PAGES[2].title}</title>`));
-  assert.equal(PRIVACY_UPDATED.text, '23 September 2026');
+  assert.equal(PRIVACY_UPDATED.text, '24 September 2026');
   assert.ok(privacy.includes(`Last updated: ${PRIVACY_UPDATED.text}`));
   assert.ok(privacy.includes('<link rel="stylesheet" href="/guide/guide.css">'));
   // Like the guide it ships no code of its own; the measurement loader wires the control up.
@@ -312,6 +312,22 @@ test('the privacy page is linked from the public pages and says what is kept wit
     /last_active_at <= now\(\) - interval '7 days'/,
   );
   assert.ok(privacy.includes('Show when you were last online'));
+  // The one cookie Catanova sets is disclosed, and what feedback carries is what the form says.
+  assert.ok(privacy.includes('one small cookie that remembers this browser is signed in'));
+  assert.ok(!privacy.includes('sets no cookies'));
+  assert.match(
+    await readFile('packages/protocol/src/home-hint.ts', 'utf8'),
+    /HOME_HINT_COOKIE = 'catanova-home'/,
+  );
+  assert.ok(
+    privacy.includes('room code, game version, browser, screen size, connection and the last error shown'),
+  );
+  assert.ok(
+    (await readFile('apps/client/src/SendFeedback.tsx', 'utf8')).includes(
+      'Room code, game version, browser, screen size, connection and the last error shown',
+    ),
+    'the page lists what the feedback form says it sends',
+  );
   assert.ok(
     (await readFile('apps/client/src/GameSettings.tsx', 'utf8')).includes('Show when you were last online'),
     'the page names the switch Settings actually shows',

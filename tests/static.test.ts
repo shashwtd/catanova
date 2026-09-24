@@ -11,6 +11,7 @@ import { WebSocket } from 'ws';
 import { startServer } from '../apps/server/src/server.js';
 import { precompressClient } from '../scripts/precompress-client.js';
 import { ART_REDIRECTS } from '../apps/server/src/art-redirects.js';
+import { HOME_HINT_COOKIE } from '../packages/protocol/src/home-hint.js';
 
 function rawRequest(url: string, headers: Record<string, string> = {}, method = 'GET') {
   return new Promise<{ status: number; headers: IncomingHttpHeaders; body: Buffer }>((resolve, reject) => {
@@ -425,4 +426,41 @@ test('prebuilt text variants negotiate quality and retain correct wire lengths, 
   await precompressClient(directory);
   await assert.rejects(stat(join(directory, 'assets', 'game-123.js.br')), { code: 'ENOENT' });
   await assert.rejects(stat(join(directory, 'assets', 'game-123.js.gz')), { code: 'ENOENT' });
+});
+
+test('a browser that opens the player’s home goes from / straight to /play, and nobody else moves', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'catanova-home-hint-'));
+  await writeFile(join(directory, 'index.html'), '<!doctype html><title>Catanova</title>');
+  await writeFile(join(directory, 'app.html'), '<!doctype html><title>Catanova room</title>');
+  const server = await startServer({ port: 0, databasePath: ':memory:', clientDirectory: directory });
+  t.after(async () => {
+    await server.close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const origin = `http://127.0.0.1:${server.port}`;
+  for (const method of ['GET', 'HEAD'])
+    for (const cookie of [`${HOME_HINT_COOKIE}=play`, `theme=dark; ${HOME_HINT_COOKIE}=play; other=1`]) {
+      const response = await rawRequest(origin + '/', { Cookie: cookie }, method);
+      assert.equal(response.status, 302, `${method} ${cookie}`);
+      assert.equal(response.headers.location, '/play');
+      assert.equal(response.headers['cache-control'], 'no-store');
+      assert.match(response.headers.vary!, /Cookie/);
+      assert.equal(response.body.length, 0);
+    }
+  // No hint, another value, or anything more in the address: "/" is its own page.
+  for (const [path, cookie] of [
+    ['/', ''],
+    ['/', `${HOME_HINT_COOKIE}=`],
+    ['/', `${HOME_HINT_COOKIE}=later`],
+    ['/?room=ABCD2345', `${HOME_HINT_COOKIE}=play`],
+    ['/?utm_source=newsletter', `${HOME_HINT_COOKIE}=play`],
+  ] as const) {
+    const response = await rawRequest(origin + path, cookie ? { Cookie: cookie } : {});
+    assert.equal(response.status, 200, `${path} ${cookie}`);
+    assert.equal(response.headers.vary, 'Accept-Encoding, Cookie', 'caches keep the two answers apart');
+  }
+  // /play never bounces, so a hint whose session has gone cannot loop.
+  const play = await rawRequest(origin + '/play', { Cookie: `${HOME_HINT_COOKIE}=play` });
+  assert.equal(play.status, 200);
+  assert.match(play.body.toString(), /Catanova room/);
 });

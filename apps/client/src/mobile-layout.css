@@ -159,10 +159,12 @@
     width: 20px;
     height: 20px;
   }
-  .game-dialog input:not([type='range']),
+  /* Switches keep their pill; their label is the 44px touch target. One :not() list
+     keeps this rule's specificity, so later input rules such as the dice options still win. */
+  .game-dialog input:not([type='range'], [role='switch']),
   .entry-world .field input,
   .lobby .field input,
-  .playing .floating-panel input:not([type='range']) {
+  .playing .floating-panel input:not([type='range'], [role='switch']) {
     font-size: 16px;
     min-height: 44px;
   }
