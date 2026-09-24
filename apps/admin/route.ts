@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 export const PAGES = [
   { id: 'overview', label: 'Overview' },
+  { id: 'growth', label: 'Growth' },
   { id: 'games', label: 'Games' },
   { id: 'players', label: 'Players' },
   { id: 'stats', label: 'Stats' },

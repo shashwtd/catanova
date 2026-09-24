@@ -500,6 +500,87 @@ export type AdminStats = {
   };
 };
 
+/** The Growth tab's ranges: the last 30 days, 90 days, year, or everything since the first game. */
+export type GrowthRange = '30d' | '90d' | '1y' | 'all';
+
+/**
+ * One granularity of the growth report, as parallel arrays with one entry per
+ * UTC day, week (from Monday) or month. Games are placed by when they started
+ * (`started`, seats, bots) or ended (`finished`, `abandoned`, lengths);
+ * accounts by when they played (`active`, `trailing`) or first played
+ * (`newPlayers`, `accounts`). Only accounts count as players: local seats and
+ * bots do not.
+ */
+export type GrowthSeries = {
+  /** Each bucket's first day: 2026-09-16, a Monday, or the 1st of a month. */
+  start: string[];
+  started: number[];
+  /** Games that ended in the bucket with a winner. */
+  finished: number[];
+  /** Games that ended in the bucket with none. */
+  abandoned: number[];
+  /** Distinct accounts that started a game in the bucket. */
+  active: number[];
+  /** Distinct accounts that started a game in the 7 days (days) or 28 days (weeks, months) to the bucket's end. */
+  trailing: number[];
+  /** Accounts whose first game started in the bucket. */
+  newPlayers: number[];
+  /** Accounts that had played a game by the bucket's end. */
+  accounts: number[];
+  /** Seats in the games started in the bucket, how many of them bots filled, and games with a bot. */
+  seats: number[];
+  botSeats: number[];
+  withBots: number[];
+  /** Games won in the bucket with a known start: how many, and their median and middle half, in minutes. */
+  lengths: { games: number[]; median: (number | null)[]; low: (number | null)[]; high: (number | null)[] };
+};
+
+/** Totals over one stretch of time, [from, to). */
+export type GrowthPeriod = {
+  from: number;
+  to: number;
+  started: number;
+  finished: number;
+  abandoned: number;
+  /** Distinct accounts that started a game in the period. */
+  active: number;
+  /** Accounts whose first game started in the period. */
+  newPlayers: number;
+  /** Accounts that had played before the period began, and by its end. */
+  accountsBefore: number;
+  accountsAfter: number;
+  seats: number;
+  botSeats: number;
+  withBots: number;
+  /** Games won in the period, and their median length in minutes. */
+  lengthGames: number;
+  medianMinutes: number | null;
+  /** New players of the period's weekly cohorts whose following week is over, and how many played in it. */
+  nextWeek: { players: number; returned: number };
+};
+
+/**
+ * How play has grown (growth.ts): series by day (the last 90), week and month
+ * since the first game; each range's totals against the period before it
+ * (null where that period reaches back before the first game); and the
+ * latest weekly cohorts of new players.
+ */
+export type GrowthReport = {
+  generatedAt: number;
+  /** When the first recorded game started; null before any. */
+  firstGameAt: number | null;
+  days: GrowthSeries;
+  weeks: GrowthSeries;
+  months: GrowthSeries;
+  periods: Record<GrowthRange, { current: GrowthPeriod; previous: GrowthPeriod | null }>;
+  /**
+   * New players by the week (from Monday) of their first game, newest last:
+   * `active[k]` is how many played in the k-th week after it, so `active[0]`
+   * is the whole cohort. The current week is still under way.
+   */
+  cohorts: { week: string; active: number[] }[];
+};
+
 export type { FeedbackItem } from '../feedback.js';
 
 export type FeedbackPage = {

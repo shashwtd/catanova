@@ -114,6 +114,12 @@ export const dayLabel = (iso: string, now = Date.now()) =>
 /** A week named by its Monday: "Week of 15 Sep". */
 export const weekLabel = (iso: string, now = Date.now()) => `Week of ${dayMonth(iso, now)}`;
 
+/** A month named by its first day: "September 2026". */
+export const monthLabel = (iso: string) => {
+  const date = new Date(utcDay(iso));
+  return `${new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(date)} ${date.getUTCFullYear()}`;
+};
+
 /**
  * Which of a run of UTC days, or of weeks named by their Monday, to label on a
  * chart's axis, given the width each one has: every one when there is room,
@@ -126,7 +132,7 @@ export const weekLabel = (iso: string, now = Date.now()) => `Week of ${dayMonth(
 export function dateAxis(
   days: string[],
   band: number,
-  unit: 'day' | 'week' = 'day',
+  unit: 'day' | 'week' | 'month' = 'day',
 ): (index: number) => string | null {
   const fits = (every: number, characters = 7) => every * band >= characters * 6.2 + 14;
   const dates = days.map((day) => new Date(utcDay(day)));
@@ -134,6 +140,17 @@ export function dateAxis(
   // A day in an earlier year than the chart's latest says which.
   const latest = days.length ? utcDay(days.at(-1)!) : Date.now();
   const label = (i: number) => dayMonth(days[i]!, latest);
+  if (unit === 'month') {
+    // Every month by name when it fits, else every quarter or year; the year on January and the first.
+    const every = fits(1, 3.5) ? 1 : fits(3, 8) ? 3 : 12;
+    const first = dates.findIndex((date) => date.getUTCMonth() % every === 0);
+    return (i) => {
+      const date = dates[i]!;
+      if (date.getUTCMonth() % every) return null;
+      const month = MONTHS[date.getUTCMonth()]!;
+      return date.getUTCMonth() === 0 || i === first ? `${month} ${date.getUTCFullYear()}` : month;
+    };
+  }
   if (fits(1)) return label;
   if (fits(2)) return (i) => (back(i) % 2 === 0 ? label(i) : null);
   if (unit === 'day' && fits(7)) return (i) => (dates[i]!.getUTCDay() === 1 ? label(i) : null);
@@ -155,6 +172,30 @@ export function dateAxis(
       ? `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
       : MONTHS[date.getUTCMonth()]!;
   };
+}
+
+/** A change against an earlier value, as a signed share: "+12%", "−8%", or null when there is nothing to compare. */
+export function change(now: number, before: number | null | undefined): string | null {
+  if (before === null || before === undefined || before === 0) return null;
+  const share = ((now - before) / before) * 100;
+  const rounded = Math.abs(share) >= 10 ? Math.round(share) : Math.round(share * 10) / 10;
+  return rounded === 0 ? '±0%' : `${rounded > 0 ? '+' : '−'}${numberFormat.format(Math.abs(rounded))}%`;
+}
+
+/** A difference in percentage points: "+2.5 pts", "−1 pt". */
+export function points(now: number, before: number | null | undefined): string | null {
+  if (before === null || before === undefined) return null;
+  const delta = Math.round((now - before) * 10) / 10;
+  if (delta === 0) return '±0 pts';
+  return `${delta > 0 ? '+' : '−'}${Math.abs(delta)} pt${Math.abs(delta) === 1 ? '' : 's'}`;
+}
+
+/** Minutes as "38 min" or "1 h 12 min". */
+export function minutes(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  const total = Math.round(value);
+  if (total < 60) return `${total} min`;
+  return `${Math.floor(total / 60)} h${total % 60 ? ` ${total % 60} min` : ''}`;
 }
 
 /** Dice modes by the names players see in the lobby. */

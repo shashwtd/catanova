@@ -209,7 +209,9 @@ export type Tip = { title: string; rows: TipRow[] };
 
 /** A tooltip as one sentence, for screen readers following the arrow keys. */
 export const tipText = (tip: Tip) =>
-  `${tip.title}: ${tip.rows.map((row) => `${row.name} ${row.value}`.trim()).join(', ')}`;
+  `${tip.title}: ${tip.rows
+    .map((row) => (row.mark === 'none' ? `${row.value} ${row.name}` : `${row.name} ${row.value}`).trim())
+    .join(', ')}`;
 
 const TIP_CHAR = 6.3;
 
@@ -456,6 +458,7 @@ export function Columns({
   table,
   below,
   soft = false,
+  partial,
 }: {
   /** What the chart shows: its accessible name and the table's caption. */
   label: string;
@@ -484,6 +487,8 @@ export function Columns({
   below?: { height: number; draw: (index: number, center: number, band: number) => ReactNode };
   /** The columns recede so that the lines over them lead. */
   soft?: boolean;
+  /** A column still filling up, such as today, drawn fainter so it does not read as a fall. */
+  partial?: number;
 }) {
   const [frame, available] = useWidth(0);
   const figure = useRef<HTMLElement>(null);
@@ -561,7 +566,7 @@ export function Columns({
             return (
               <g
                 key={category}
-                className={`chart-column${i === active ? ' is-active' : ''}${soft ? ' soft' : ''}`}
+                className={`chart-column${i === active ? ' is-active' : ''}${soft ? ' soft' : ''}${i === partial ? ' partial' : ''}`}
               >
                 <rect className="chart-slot" x={left + i * band} y={top} width={band} height={plot} />
                 {segments.map((segment, k) => {
@@ -746,8 +751,9 @@ export function LineChart({
   x,
   series,
   domain,
-  ticks,
-  tickLabel,
+  ticks = [],
+  tickLabel = String,
+  axis,
   pointLabel,
   format,
   xTitle,
@@ -769,8 +775,10 @@ export function LineChart({
   x: number[];
   series: LineSeries[];
   domain?: [number, number];
-  ticks: number[];
-  tickLabel: (x: number) => string;
+  ticks?: number[];
+  tickLabel?: (x: number) => string;
+  /** Instead of `ticks`: the labelled points, chosen once the plot's width is known (such as dates that fit). */
+  axis?: (plotWidth: number) => { x: number; label: string }[];
   pointLabel: (x: number) => string;
   format: (value: number) => string;
   /** The x column's name in the table. */
@@ -820,7 +828,7 @@ export function LineChart({
     })
     .filter(({ i }) => i >= 0);
   const labelled = series.length > 1 && series.length <= 4 && width >= 360;
-  const right = labelled ? Math.min(96, 16 + Math.max(...series.map((s) => s.name.length)) * 6.6) : 12;
+  const right = labelled ? Math.min(120, 16 + Math.max(...series.map((s) => s.name.length)) * 6.6) : 12;
   const plot = { width: Math.max(40, width - left - right), height: height - top - bottom };
   const sx = (value: number) => left + (x1 === x0 ? 0 : ((value - x0) / (x1 - x0)) * plot.width);
   const sy = (value: number) => top + plot.height - (value / max) * plot.height;
@@ -929,19 +937,21 @@ export function LineChart({
               </text>
             </g>
           ))}
-          {ticks.map((tick) => (
-            <text
-              key={tick}
-              className="chart-axis"
-              x={sx(tick)}
-              y={top + plot.height + 14}
-              textAnchor={
-                sx(tick) < left + 20 ? 'start' : sx(tick) > left + plot.width - 20 ? 'end' : 'middle'
-              }
-            >
-              {tickLabel(tick)}
-            </text>
-          ))}
+          {(axis ? axis(plot.width) : ticks.map((tick) => ({ x: tick, label: tickLabel(tick) }))).map(
+            (tick) => (
+              <text
+                key={tick.x}
+                className="chart-axis"
+                x={sx(tick.x)}
+                y={top + plot.height + 14}
+                textAnchor={
+                  sx(tick.x) < left + 20 ? 'start' : sx(tick.x) > left + plot.width - 20 ? 'end' : 'middle'
+                }
+              >
+                {tick.label}
+              </text>
+            ),
+          )}
           {axisTitle && (
             <text className="chart-axis-title" x={left + plot.width} y={height - 2} textAnchor="end">
               {axisTitle}
@@ -1066,6 +1076,345 @@ export function LineChart({
           }))}
         />
       )}
+    </figure>
+  );
+}
+
+/**
+ * A small line of recent values for a stat tile: the de-emphasis grey, with
+ * the latest point in the accent. Decorative: the tile states its value and
+ * the chart below has the detail.
+ */
+export function Sparkline({ values, zero = true }: { values: (number | null)[]; zero?: boolean }) {
+  const [frame, width] = useWidth(120);
+  const height = 30,
+    pad = 4;
+  const present = values.flatMap((value, i) => (value === null ? [] : [{ i, value }]));
+  if (present.length < 2) return <div className="spark" ref={frame} aria-hidden="true" />;
+  const numbers = present.map((point) => point.value);
+  const low = zero ? Math.min(0, ...numbers) : Math.min(...numbers);
+  const high = Math.max(...numbers) === low ? low + 1 : Math.max(...numbers);
+  const sx = (i: number) => pad + (values.length === 1 ? 0 : (i / (values.length - 1)) * (width - 2 * pad));
+  const sy = (value: number) => height - pad - ((value - low) / (high - low)) * (height - 2 * pad);
+  let d = '',
+    open = false;
+  values.forEach((value, i) => {
+    if (value === null) {
+      open = false;
+      return;
+    }
+    d += `${open ? 'L' : 'M'}${sx(i).toFixed(1)},${sy(value).toFixed(1)}`;
+    open = true;
+  });
+  const last = present.at(-1)!;
+  const wash = zero
+    ? `M${sx(present[0]!.i).toFixed(1)},${height - pad}L${d.slice(1).replaceAll('M', 'L')}L${sx(last.i).toFixed(1)},${height - pad}Z`
+    : '';
+  return (
+    <div className="spark" ref={frame} aria-hidden="true">
+      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
+        {wash && <path className="spark-wash" d={wash} />}
+        <path className="spark-line" d={d} />
+        <circle className="spark-dot" cx={sx(last.i)} cy={sy(last.value)} r={3} />
+      </svg>
+    </div>
+  );
+}
+
+/** A change against the previous period, with its direction in words and an arrow, never colour alone. */
+export type Delta = {
+  /** "+12%", "−3 pts", or null when there is nothing to compare with. */
+  text: string | null;
+  /** What it is compared with: "vs the previous 30 days". */
+  against: string;
+  /** Whether a rise is good news (green) or bad (red); null when it is neither. */
+  good: boolean | null;
+};
+
+export function DeltaBadge({ delta }: { delta: Delta }) {
+  if (!delta.text)
+    return (
+      <span
+        className="delta delta-none"
+        title={`Nothing to compare with ${delta.against.replace(/^vs /, '')}`}
+      >
+        no earlier data
+      </span>
+    );
+  const direction = delta.text.startsWith('+') ? 'up' : delta.text.startsWith('−') ? 'down' : 'flat';
+  const tone =
+    direction === 'flat' || delta.good === null
+      ? 'neutral'
+      : (direction === 'up') === delta.good
+        ? 'good'
+        : 'bad';
+  return (
+    <span className={`delta delta-${tone}`} title={`${delta.text} ${delta.against}`}>
+      {direction !== 'flat' && <span aria-hidden="true">{direction === 'up' ? '↑' : '↓'}</span>}
+      {delta.text.replace(/^[+−]/, '')}
+      <span className="sr-only">
+        {' '}
+        {direction === 'up' ? 'up' : direction === 'down' ? 'down' : 'unchanged'} {delta.against}
+      </span>
+    </span>
+  );
+}
+
+/** A headline number with its change against the previous period and a sparkline of the period. */
+export function TrendStat({
+  label,
+  value,
+  delta,
+  hint,
+  spark,
+  zero = true,
+}: {
+  label: string;
+  value: ReactNode;
+  delta?: Delta;
+  hint?: ReactNode;
+  spark?: (number | null)[];
+  /** Whether the sparkline starts from zero (counts) or from its lowest value (a running total). */
+  zero?: boolean;
+}) {
+  return (
+    <div className="kpi trend-stat">
+      <span className="stat-label">{label}</span>
+      <span className="trend-figure">
+        <span className="kpi-value">{value}</span>
+        {delta && <DeltaBadge delta={delta} />}
+      </span>
+      {hint !== undefined && <span className="stat-hint">{hint}</span>}
+      {spark && <Sparkline values={spark} zero={zero} />}
+    </div>
+  );
+}
+
+/** One cell of a heatmap: its value, the text written in it where it fits, and whether it is still filling up. */
+export type HeatCell = { value: number; text?: string; partial?: boolean } | null;
+
+/** The shade a heatmap gives a value: 0 for none, then six steps of one hue up to `max`. */
+export const heatStep = (value: number, max: number) =>
+  value <= 0 || max <= 0 ? 0 : Math.min(6, Math.max(1, Math.ceil((value / max) * 6)));
+
+/**
+ * A grid of cells shaded by value on one hue, darkest near nothing and
+ * brightest at `max`, with rows and columns labelled at its edges and a scale
+ * underneath. Each cell has a tooltip on hover, tap or the arrow keys, and
+ * the numbers are in a table. A null cell is not drawn (such as a week that
+ * has not happened yet).
+ */
+export function Heatmap({
+  label,
+  rows,
+  columns,
+  cells,
+  max,
+  tip,
+  rowTitle,
+  columnTitle,
+  asideTitle,
+  scale,
+  labelWidth = 44,
+  cellHeight,
+  maxCell = 44,
+  table,
+}: {
+  label: string;
+  /** Each row's label (text, or an SVG drawing `labelWidth` wide) and an optional number beside it. */
+  rows: {
+    key: string;
+    label: string | ((x: number, y: number, size: number) => ReactNode);
+    aside?: string;
+  }[];
+  columns: { key: string; label: string | ((x: number, y: number, size: number) => ReactNode) }[];
+  cells: HeatCell[][];
+  max: number;
+  tip: (row: number, column: number) => Tip;
+  rowTitle?: string;
+  columnTitle?: string;
+  /** The heading over the numbers beside the rows. */
+  asideTitle?: string;
+  /** What the lightest and brightest ends of the scale mean. */
+  scale: { low: string; high: string };
+  labelWidth?: number;
+  /** A fixed row height; cells are square without one. */
+  cellHeight?: number;
+  maxCell?: number;
+  table: { head: string; row: (row: number) => string; value: (row: number, column: number) => string };
+}) {
+  const [frame, available] = useWidth(360);
+  const figure = useRef<HTMLElement>(null);
+  const [reading, setReading] = useReading(figure);
+  const asideWidth = rows.some((row) => row.aside !== undefined) ? 46 : 0;
+  const head = columnTitle ? 34 : 20;
+  const gap = 2;
+  const cell = Math.max(
+    12,
+    Math.min(maxCell, Math.floor((available - labelWidth - asideWidth - 4) / Math.max(1, columns.length))),
+  );
+  const rowHeight = cellHeight ?? cell;
+  // The drawing may be wider than the grid, leaving room beside it for a tooltip.
+  const grid = labelWidth + asideWidth + cell * columns.length + 4;
+  const width = Math.max(grid, available);
+  const height = Math.max(head + rowHeight * rows.length + 4, 26 + 16 * 4 + 4);
+  const count = rows.length * columns.length;
+  const active = reading && reading.index < count ? reading.index : null;
+  const activeRow = active === null ? null : Math.floor(active / columns.length);
+  const activeColumn = active === null ? null : active % columns.length;
+  const shown = activeRow !== null && activeColumn !== null ? tip(activeRow, activeColumn) : null;
+  const cellX = (c: number) => labelWidth + asideWidth + c * cell;
+  const cellY = (r: number) => head + r * rowHeight;
+  const move = (index: number | null) => setReading(index === null ? null : { index, by: 'keys' });
+  const at = (event: ReactPointerEvent<SVGRectElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const c = Math.floor(((event.clientX - box.left) / box.width) * columns.length);
+    const r = Math.floor(((event.clientY - box.top) / box.height) * rows.length);
+    return (
+      Math.max(0, Math.min(rows.length - 1, r)) * columns.length +
+      Math.max(0, Math.min(columns.length - 1, c))
+    );
+  };
+  const text = cell >= 30 && rowHeight >= 18;
+  return (
+    <figure className="chart heatmap" ref={figure}>
+      <div className="chart-scroll" ref={frame}>
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          width={width}
+          height={height}
+          role="img"
+          aria-label={label}
+          tabIndex={0}
+          onKeyDown={(event) => readingKeys(event, active, count, move, columns.length)}
+          onFocus={() => active === null && count > 0 && move(0)}
+          onBlur={() => setReading(null)}
+        >
+          {columnTitle && (
+            <text className="chart-axis-title" x={labelWidth + asideWidth} y={10}>
+              {columnTitle}
+            </text>
+          )}
+          {rowTitle && (
+            <text className="chart-axis-title" x={0} y={head - 6}>
+              {rowTitle}
+            </text>
+          )}
+          {asideTitle && (
+            <text className="chart-axis-title" x={labelWidth + asideWidth - 6} y={head - 6} textAnchor="end">
+              {asideTitle}
+            </text>
+          )}
+          {columns.map((column, c) =>
+            typeof column.label === 'string' ? (
+              <text
+                key={column.key}
+                className="chart-axis"
+                x={cellX(c) + cell / 2}
+                y={head - 6}
+                textAnchor="middle"
+              >
+                {column.label}
+              </text>
+            ) : (
+              <g key={column.key}>{column.label(cellX(c) + cell / 2, head - 10, Math.min(16, cell - 6))}</g>
+            ),
+          )}
+          {rows.map((row, r) => (
+            <g key={row.key}>
+              {typeof row.label === 'string' ? (
+                <text className="chart-axis" x={0} y={cellY(r) + rowHeight / 2 + 3.5}>
+                  {row.label}
+                </text>
+              ) : (
+                row.label(labelWidth / 2, cellY(r) + rowHeight / 2, Math.min(16, rowHeight - 6))
+              )}
+              {row.aside !== undefined && (
+                <text
+                  className="chart-axis heat-aside"
+                  x={labelWidth + asideWidth - 6}
+                  y={cellY(r) + rowHeight / 2 + 3.5}
+                  textAnchor="end"
+                >
+                  {row.aside}
+                </text>
+              )}
+              {columns.map((column, c) => {
+                const value = cells[r]?.[c];
+                if (!value) return null;
+                const step = heatStep(value.value, max);
+                const selected = activeRow === r && activeColumn === c;
+                return (
+                  <g key={column.key}>
+                    <rect
+                      className={`heat heat-${step}${value.partial ? ' heat-partial' : ''}${selected ? ' is-active' : ''}`}
+                      x={cellX(c) + gap / 2}
+                      y={cellY(r) + gap / 2}
+                      width={cell - gap}
+                      height={rowHeight - gap}
+                      rx={3}
+                    />
+                    {text && value.text && (
+                      <text
+                        className={`heat-text${step >= 4 ? ' on-light' : ''}`}
+                        x={cellX(c) + cell / 2}
+                        y={cellY(r) + rowHeight / 2 + 3.5}
+                        textAnchor="middle"
+                      >
+                        {value.text}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          ))}
+          {shown && activeRow !== null && activeColumn !== null && (
+            <TipBox
+              tip={shown}
+              x={cellX(activeColumn) + cell / 2}
+              y={Math.max(0, Math.min(height - tipSize(shown).height, cellY(activeRow)))}
+              min={0}
+              max={width}
+              offset={cell / 2 + 6}
+            />
+          )}
+          <rect
+            className="chart-hit"
+            x={labelWidth + asideWidth}
+            y={head}
+            width={cell * columns.length}
+            height={rowHeight * rows.length}
+            onPointerMove={(event) => setReading({ index: at(event), by: pointerKind(event) })}
+            onPointerDown={(event) => setReading({ index: at(event), by: pointerKind(event) })}
+            onPointerLeave={(event) => event.pointerType === 'mouse' && setReading(null)}
+          />
+        </svg>
+      </div>
+      <p className="sr-only" aria-live="polite">
+        {reading?.by === 'keys' && shown ? tipText(shown) : ''}
+      </p>
+      <figcaption className="legend heat-legend">
+        <span>{scale.low}</span>
+        <span className="heat-scale" aria-hidden="true">
+          {[1, 2, 3, 4, 5, 6].map((step) => (
+            <i key={step} className={`heat-swatch heat-${step}`} />
+          ))}
+        </span>
+        <span>{scale.high}</span>
+      </figcaption>
+      <ChartTable
+        label={label}
+        head={table.head}
+        columns={columns.map((column, c) =>
+          typeof column.label === 'string' ? column.label : String(c + 1),
+        )}
+        rows={rows.map((row, r) => ({
+          key: row.key,
+          label: table.row(r),
+          cells: columns.map((_, c) => (cells[r]?.[c] ? table.value(r, c) : '—')),
+        }))}
+      />
     </figure>
   );
 }

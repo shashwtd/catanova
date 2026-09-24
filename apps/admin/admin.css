@@ -188,6 +188,13 @@ h3 {
 .toolbar p {
   margin: 0;
 }
+/* A toolbar's far end: when the page was worked out, and its button. */
+.toolbar-end {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
 .title-row {
   display: flex;
   align-items: center;
@@ -694,6 +701,13 @@ details > summary {
 .chart-column.soft.is-active path {
   opacity: 0.7;
 }
+/* A day, week or month still under way: fainter, so its shortness does not read as a fall. */
+.chart-column.partial path {
+  opacity: 0.3;
+}
+.chart-column.partial.is-active path {
+  opacity: 0.5;
+}
 .columns-chart svg,
 .heatmap svg {
   touch-action: pan-y;
@@ -929,6 +943,123 @@ details > summary {
   white-space: nowrap;
 }
 
+/* Sparklines: the de-emphasis grey, the latest point in the accent. */
+.spark {
+  width: 100%;
+  height: 30px;
+  margin-top: 8px;
+}
+.spark svg {
+  display: block;
+}
+.spark-line {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.spark-wash {
+  fill: var(--muted);
+  opacity: 0.1;
+}
+.spark-dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+/* A headline number, its change against the period before, and its sparkline. */
+.trend-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.delta-good {
+  color: #7fd67f;
+}
+.delta-bad {
+  color: #f19a9a;
+}
+.delta-none {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Heatmaps: one hue, receding to the surface near nothing and brightest at the top of the scale. */
+.heat-0 {
+  fill: var(--surface-2);
+  background: var(--surface-2);
+}
+.heat-1 {
+  fill: #104281;
+  background: #104281;
+}
+.heat-2 {
+  fill: #1c5cab;
+  background: #1c5cab;
+}
+.heat-3 {
+  fill: #2a78d6;
+  background: #2a78d6;
+}
+.heat-4 {
+  fill: #5598e7;
+  background: #5598e7;
+}
+.heat-5 {
+  fill: #86b6ef;
+  background: #86b6ef;
+}
+.heat-6 {
+  fill: #b7d3f6;
+  background: #b7d3f6;
+}
+.heat.is-active {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+/* A week still under way: its share can only grow. */
+.heat-partial {
+  opacity: 0.5;
+}
+.heat-text {
+  fill: var(--ink);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.heat-text.on-light {
+  fill: var(--page);
+}
+.heat-aside {
+  fill: var(--ink-2);
+}
+.heat-legend {
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.heat-scale {
+  display: inline-flex;
+  gap: 2px;
+}
+.heat-swatch {
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+}
+
 /* Overview: a row of headline numbers, then who is here and what is being played */
 .kpis {
   display: grid;
@@ -954,6 +1085,17 @@ details > summary {
 }
 .kpi .stat-hint {
   margin-top: 2px;
+}
+/* Headline numbers with their change and a sparkline: four to a row, two on a phone. */
+.kpis.trend-stats {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+/* However long a tile's words run, its sparkline lines up with its neighbours' along the bottom. */
+.trend-stat .stat-hint {
+  margin-bottom: 8px;
+}
+.trend-stat .spark {
+  margin-top: auto;
 }
 .minis {
   display: grid;
@@ -1100,6 +1242,9 @@ select {
   .grid,
   .duo {
     grid-template-columns: 1fr;
+  }
+  .kpis.trend-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
