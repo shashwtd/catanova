@@ -9,6 +9,7 @@ import { build } from 'vite';
 import { loadAdminAssets } from '../apps/server/src/admin/assets.js';
 import {
   Columns,
+  Empty,
   Heatmap,
   LineChart,
   PlayerColour,
@@ -475,6 +476,20 @@ test('the machine is drawn from its readings, as decoration beside the number, a
   // Windows are lit while a game is being played.
   assert.match(drawings[7]!, /art-window-lit/);
   assert.doesNotMatch(draw(createElement(Settlement, { live: 0 })), /art-window-lit/);
+  // An empty state can show what is missing above its words; without a drawing it is the plain line.
+  const empty = draw(
+    createElement(Empty, {
+      art: createElement(Meeples, { online: 0, playing: 0 }),
+      children: 'Nobody is online.',
+    }),
+  );
+  assert.match(empty, /^<div class="empty with-art"><svg class="art art-people"[^>]*aria-hidden="true"/);
+  assert.match(empty, /<\/svg><p>Nobody is online\.<\/p><\/div>$/);
+  assert.match(empty, /class="art-meeple-empty"/, 'an outline where a player would stand');
+  assert.equal(
+    draw(createElement(Empty, { children: 'No rolls yet.' })),
+    '<p class="empty">No rolls yet.</p>',
+  );
   // Every animation in the stylesheet sits inside a block that only applies when motion is welcome.
   const css = await readFile('apps/admin/admin.css', 'utf8');
   const start = css.indexOf('@media (prefers-reduced-motion: no-preference)');

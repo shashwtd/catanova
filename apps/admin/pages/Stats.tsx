@@ -7,7 +7,7 @@ import type {
   RetentionReport,
 } from '../../server/src/admin/types.js';
 import { api, ApiError, useApi } from '../api.js';
-import { count, dateAxis, dayLabel, diceLabel, percent, time, weekLabel } from '../format.js';
+import { count, dateAxis, dayLabel, diceLabel, minutes, percent, time, weekLabel } from '../format.js';
 import { Columns, countMax, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
 import { PairGrid, totalDice } from '../dice.js';
 
@@ -221,20 +221,18 @@ export function Stats() {
               <div className="stats">
                 <Stat
                   label="Median game"
-                  value={
-                    stats.completed.medianMinutes === null ? '—' : `${stats.completed.medianMinutes} min`
-                  }
-                  hint={`${stats.completed.medianTurns ?? '—'} turns · ${stats.completed.count} finished`}
+                  value={minutes(stats.completed.medianMinutes)}
+                  hint={`${stats.completed.medianTurns ?? '—'} turns · ${count(stats.completed.count)} finished`}
                 />
                 <Stat
                   label="Bot seats"
                   value={percent(stats.bots.botSeats, stats.bots.seats)}
-                  hint={`${stats.bots.botSeats} of ${stats.bots.seats} seats`}
+                  hint={`${count(stats.bots.botSeats)} of ${count(stats.bots.seats)} seats`}
                 />
                 <Stat
                   label="Games with bots"
                   value={percent(stats.bots.matchesWithBots, stats.bots.matches)}
-                  hint={`${stats.bots.matchesWithBots} of ${stats.bots.matches}`}
+                  hint={`${count(stats.bots.matchesWithBots)} of ${count(stats.bots.matches)}`}
                 />
               </div>
             </Section>

@@ -100,7 +100,15 @@ export function Loading({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
-export function Empty({ children }: { children: ReactNode }) {
+export function Empty({ children, art }: { children: ReactNode; art?: ReactNode }) {
+  // With a drawing of what is missing (art.tsx) above the words.
+  if (art)
+    return (
+      <div className="empty with-art">
+        {art}
+        <p>{children}</p>
+      </div>
+    );
   return <p className="empty">{children}</p>;
 }
 

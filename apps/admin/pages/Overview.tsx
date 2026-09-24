@@ -33,7 +33,7 @@ import { Badge, Empty, Failure, LineChart, Loading, Notice, Section, Tabs, When 
 import type { LineSeries } from '../ui.js';
 import { SeatChip, StatusBadge } from './Games.js';
 import { DicePair } from '../dice.js';
-import { CpuChip, Meeples, MemoryStick, Plug, Stopwatch } from '../art.js';
+import { CpuChip, Meeples, MemoryStick, Plug, Settlement, Stopwatch } from '../art.js';
 import { HostReportLines } from './HostReports.js';
 
 const ONLINE_SHOWN = 12;
@@ -146,7 +146,7 @@ function WhoIsOnline({ data }: { data: AdminOverview }) {
           )}
         </>
       ) : (
-        <Empty>Nobody is online right now.</Empty>
+        <Empty art={<Meeples online={0} playing={0} />}>Nobody is online right now.</Empty>
       )}
       {data.online.counts.spectators > 0 && (
         <p className="footnote">
@@ -227,7 +227,7 @@ function LiveGames({ data }: { data: AdminOverview }) {
           )}
         </>
       ) : (
-        <Empty>No games being played right now.</Empty>
+        <Empty art={<Settlement live={0} />}>No games being played right now.</Empty>
       )}
     </Section>
   );

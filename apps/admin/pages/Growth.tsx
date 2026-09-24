@@ -45,6 +45,7 @@ import {
   TrendStat,
 } from '../ui.js';
 import type { Delta, HeatCell } from '../ui.js';
+import { Settlement } from '../art.js';
 
 const DAY = 86_400_000;
 
@@ -398,7 +399,7 @@ export function Growth({ params }: { params: URLSearchParams }) {
     return (
       <div className="stack">
         {toolbar}
-        <Empty>No games yet. Growth starts with the first one.</Empty>
+        <Empty art={<Settlement live={0} />}>No games yet. Growth starts with the first one.</Empty>
       </div>
     );
   const view = rangeView(report, range);

@@ -192,7 +192,7 @@ export function Games({ params }: { params: URLSearchParams }) {
             label: (
               <>
                 {STATUS_LABELS[value]}
-                {data && value !== 'all' && <span className="count">{data.counts[value]}</span>}
+                {data && value !== 'all' && <span className="count">{count(data.counts[value])}</span>}
               </>
             ),
           }))}

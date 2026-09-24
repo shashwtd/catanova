@@ -291,6 +291,22 @@ details.card[open] > summary {
   color: var(--muted);
   text-align: center;
 }
+/* An empty state with a drawing of what is missing, quietly, above the words. */
+.empty.with-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 18px 16px;
+}
+.empty.with-art .art {
+  width: auto;
+  height: 52px;
+  opacity: 0.75;
+}
+.empty.with-art p {
+  margin: 0;
+}
 .loading {
   margin: 0;
 }
