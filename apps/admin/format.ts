@@ -91,6 +91,137 @@ export function timeTicks(from: number, to: number): number[] {
   return ticks;
 }
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Midnight UTC of a UTC day written as 2026-09-16. */
+export const utcDay = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+
+/** The UTC day of a moment, as 2026-09-16. */
+export const isoDay = (at: number) => new Date(at).toISOString().slice(0, 10);
+
+/** "16 Sep", with the year when it is not the current one: "16 Sep 2025". */
+export function dayMonth(iso: string, now = Date.now()): string {
+  const date = new Date(utcDay(iso));
+  const year = date.getUTCFullYear() === new Date(now).getUTCFullYear() ? '' : ` ${date.getUTCFullYear()}`;
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}${year}`;
+}
+
+/** A UTC day in full: "Tue 16 Sep" (or "Tue 16 Sep 2025" in another year). */
+export const dayLabel = (iso: string, now = Date.now()) =>
+  `${WEEKDAYS[new Date(utcDay(iso)).getUTCDay()]} ${dayMonth(iso, now)}`;
+
+/** A week named by its Monday: "Week of 15 Sep". */
+export const weekLabel = (iso: string, now = Date.now()) => `Week of ${dayMonth(iso, now)}`;
+
+/** A month named by its first day: "September 2026". */
+export const monthLabel = (iso: string) => {
+  const date = new Date(utcDay(iso));
+  return `${new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(date)} ${date.getUTCFullYear()}`;
+};
+
+/**
+ * Which of a run of UTC days, or of weeks named by their Monday, to label on a
+ * chart's axis, given the width each one has: every one when there is room,
+ * otherwise every other one, Mondays, every other Monday, or the first of each
+ * month, quarter or year, whichever first keeps the labels clear of each
+ * other; where years would leave one label alone, quarters or half-years when
+ * they fit as written. Alternate labels are counted back from the latest, so
+ * the latest is labelled. Days read "16 Sep"; months by name, with the year on
+ * January and on the first month labelled (unless a January follows it among
+ * quarters or half-years that only fit that way).
+ */
+export function dateAxis(
+  days: string[],
+  band: number,
+  unit: 'day' | 'week' | 'month' = 'day',
+): (index: number) => string | null {
+  const fits = (every: number, characters = 7) => every * band >= characters * 6.2 + 14;
+  const dates = days.map((day) => new Date(utcDay(day)));
+  const back = (i: number) => days.length - 1 - i;
+  // A day in an earlier year than the chart's latest says which.
+  const latest = days.length ? utcDay(days.at(-1)!) : Date.now();
+  const label = (i: number) => dayMonth(days[i]!, latest);
+  if (unit === 'month') {
+    // Every month by name when it fits, else every quarter or year; the year on January and the first.
+    const every = fits(1, 3.5) ? 1 : fits(3, 8) ? 3 : 12;
+    const first = dates.findIndex((date) => date.getUTCMonth() % every === 0);
+    return (i) => {
+      const date = dates[i]!;
+      if (date.getUTCMonth() % every) return null;
+      const month = MONTHS[date.getUTCMonth()]!;
+      return date.getUTCMonth() === 0 || i === first ? `${month} ${date.getUTCFullYear()}` : month;
+    };
+  }
+  if (fits(1)) return label;
+  if (fits(2)) return (i) => (back(i) % 2 === 0 ? label(i) : null);
+  if (unit === 'day' && fits(7)) return (i) => (dates[i]!.getUTCDay() === 1 ? label(i) : null);
+  if (unit === 'day' && fits(14)) {
+    const lastMonday = dates.findLastIndex((date) => date.getUTCDay() === 1);
+    return (i) => (dates[i]!.getUTCDay() === 1 && ((lastMonday - i) / 7) % 2 === 0 ? label(i) : null);
+  }
+  const perMonth = unit === 'day' ? 30.4 : 4.35;
+  const months = fits(perMonth, 8) ? 1 : fits(3 * perMonth, 8) ? 3 : 12;
+  // A day opens its month on the 1st; a week, when its Monday is among the month's first seven days.
+  const opens = (i: number, every: number) =>
+    (unit === 'day' ? dates[i]!.getUTCDate() === 1 : dates[i]!.getUTCDate() <= 7) &&
+    dates[i]!.getUTCMonth() % every === 0;
+  const monthly = (every: number, firstYear = true) => {
+    const first = days.findIndex((_, i) => opens(i, every));
+    return (i: number) => {
+      if (!opens(i, every)) return null;
+      const date = dates[i]!;
+      return date.getUTCMonth() === 0 || (firstYear && i === first)
+        ? `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+        : MONTHS[date.getUTCMonth()]!;
+    };
+  };
+  const chosen = monthly(months);
+  const shown = (pick: (i: number) => string | null) =>
+    days.flatMap((_, i) => (pick(i) === null ? [] : [{ i, text: pick(i)! }]));
+  if (months < 12 || shown(chosen).length > 1) return chosen;
+  // Years alone can leave a single label, as for a year and a bit on a phone. Quarters or
+  // half-years read better when their labels, as written, clear each other; the first then goes
+  // without its year, since the January after it names the year.
+  for (const every of [3, 6]) {
+    const pick = monthly(every, false);
+    const labels = shown(pick);
+    const named = labels.some(({ i }) => dates[i]!.getUTCMonth() === 0);
+    const clear = labels.every(
+      (label, k) =>
+        k === 0 ||
+        (label.i - labels[k - 1]!.i) * band >=
+          ((label.text.length + labels[k - 1]!.text.length) / 2) * 6.2 + 14,
+    );
+    if (named && labels.length > 1 && clear) return pick;
+  }
+  return chosen;
+}
+
+/** A change against an earlier value, as a signed share: "+12%", "−8%", or null when there is nothing to compare. */
+export function change(now: number, before: number | null | undefined): string | null {
+  if (before === null || before === undefined || before === 0) return null;
+  const share = ((now - before) / before) * 100;
+  const rounded = Math.abs(share) >= 10 ? Math.round(share) : Math.round(share * 10) / 10;
+  return rounded === 0 ? '±0%' : `${rounded > 0 ? '+' : '−'}${numberFormat.format(Math.abs(rounded))}%`;
+}
+
+/** A difference in percentage points: "+2.5 pts", "−1 pt". */
+export function points(now: number, before: number | null | undefined): string | null {
+  if (before === null || before === undefined) return null;
+  const delta = Math.round((now - before) * 10) / 10;
+  if (delta === 0) return '±0 pts';
+  return `${delta > 0 ? '+' : '−'}${Math.abs(delta)} pt${Math.abs(delta) === 1 ? '' : 's'}`;
+}
+
+/** Minutes as "38 min" or "1 h 12 min". */
+export function minutes(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  const total = Math.round(value);
+  if (total < 60) return `${total} min`;
+  return `${Math.floor(total / 60)} h${total % 60 ? ` ${total % 60} min` : ''}`;
+}
+
 /** Dice modes by the names players see in the lobby. */
 export const DICE_LABELS: Record<string, string> = {
   classic: 'Natural',

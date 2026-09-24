@@ -3,7 +3,7 @@ import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, totalmem } from 'node:os';
 import { startServer } from '../apps/server/src/server.js';
 import { Store } from '../apps/server/src/store.js';
 import type { Identity } from '../apps/server/src/auth.js';
@@ -11,7 +11,14 @@ import { startAdminServer } from '../apps/server/src/admin/listener.js';
 import type { GameRuntime, OnlineAccount } from '../apps/server/src/admin/api.js';
 import { whoIsOnline } from '../apps/server/src/admin/online.js';
 import type { AdminConfig } from '../apps/server/src/admin/config.js';
-import { chiSquarePValue, computeStats, diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
+import {
+  chiSquarePValue,
+  computeStats,
+  diceSummary,
+  FAIR_DICE,
+  pairShares,
+  rollPair,
+} from '../apps/server/src/admin/analysis.js';
 import type {
   AdminOverview,
   AdminStats,
@@ -234,6 +241,10 @@ test('the System tab reports the process, sockets, rooms, database, status files
   assert.equal(overview.revision, 'deadbeef');
   assert.equal(overview.process.node, process.version);
   assert.ok(overview.process.memory.rss > 0 && overview.process.uptimeSeconds >= 0);
+  // What the process may use: the container's limit where one is set, else the machine's memory.
+  assert.ok(overview.process.memory.limit >= overview.process.memory.rss);
+  assert.ok(overview.process.memory.limit <= totalmem());
+  assert.ok(['container', 'machine'].includes(overview.process.memory.limitKind));
   assert.ok(overview.load.window.eventLoop.maxMs >= 0 && overview.load.cores >= 1);
   assert.deepEqual(overview.sockets, { total: 2, players: 2, spectators: 0, pending: 0 });
   assert.deepEqual(overview.players, { connectedSeats: 2, distinctPlayers: 2 });
@@ -477,6 +488,7 @@ test('Overview is the glance: who is online, the live games, today’s and this 
   assert.deepEqual(overview.activity.players, { day: 3, week: 3 });
   assert.deepEqual(overview.activity.newPlayers, { day: 3, week: 3 });
   assert.ok(overview.performance.rssBytes > 0 && overview.performance.sockets === 2);
+  assert.ok(overview.performance.memoryLimitBytes >= overview.performance.rssBytes);
   assert.equal(overview.status.backup.state === 'ok' && overview.status.backup.data.result, 'failure');
   assert.ok(overview.errors.recent.length <= 5 && overview.errors.total >= overview.errors.recent.length);
   assert.match(overview.errors.recent[0]!.message, /Overview test: a recent error/);
@@ -811,6 +823,24 @@ test('statistics come from a worker on a read-only connection, and match the jou
   assert.equal(stats.dice.byMode.classic!.rolls, rolls);
   assert.equal(stats.dice.byMode.balanced, undefined, 'modes without rolls are left out');
   assert.deepEqual(stats.dice.overall.counts, store.statistics(paused).diceCounts);
+  // The pairs read from each roll's public line are the dice its saved game holds.
+  const pairs = Array<number>(36).fill(0);
+  for (const { revision } of store.db
+    .prepare(
+      "SELECT revision FROM game_events WHERE room_id = ? AND json_extract(public_entry, '$.kind') = 'roll'",
+    )
+    .all(paused) as { revision: number }[]) {
+    const [first, second] = store.journalState(paused, revision)!.dice!;
+    pairs[(first - 1) * 6 + (second - 1)]!++;
+  }
+  assert.deepEqual(stats.dice.overall.pairs, pairs);
+  assert.equal(stats.dice.overall.unpaired, 0);
+  assert.deepEqual(stats.dice.byMode.classic!.pairs, pairs);
+  assert.deepEqual(
+    stats.dice.byMode.classic!.pairExpected,
+    Array(36).fill(Math.round((rolls / 36) * 100) / 100),
+    'two fair dice: every pair one in 36',
+  );
   assert.equal(stats.dice.overall.expected.length, 11);
   assert.ok(stats.dice.overall.pValue! >= 0 && stats.dice.overall.pValue! <= 1);
   // The same numbers as computing on the game's own connection.
@@ -847,6 +877,33 @@ test('the retention report runs on demand in the worker and is cached for ten mi
     store.db.prepare("SELECT count(*) AS n FROM admin_audit WHERE action = 'report.retention'").get()!.n,
     2,
   );
+});
+
+test('a roll’s pair is read from the end of its public line, and only when it adds up to the total', () => {
+  const entry = (lines: string[]) =>
+    JSON.stringify({ revision: 9, actor: 's1', kind: 'roll', turn: 3, lines });
+  assert.equal(rollPair(entry(['Ann rolled 3 + 4 = 7.', 'Bo received 1 Clay.']), 7), 2 * 6 + 3);
+  assert.equal(rollPair(entry(['Ann rolled 6 + 6 = 12.']), 12), 35);
+  assert.equal(rollPair(entry(['Ann rolled 1 + 1 = 2.']), 2), 0);
+  // A name made to look like a roll cannot move it: only the line's own end counts.
+  assert.equal(rollPair(entry(['Eve rolled 6 + 6 = 12. rolled 1 + 2 = 3.']), 3), 1);
+  assert.equal(rollPair(entry(['Eve rolled 6 + 6 = 12." rolled 1 + 2 = 3.']), 3), 1);
+  // A line that does not add up to the row's total, or names no pair, gives none.
+  assert.equal(rollPair(entry(['Ann rolled 3 + 4 = 7.']), 8), null);
+  assert.equal(rollPair(entry(['Ann rolled 7.']), 7), null);
+  // Pairs are shown, never tested; their expectation is given only where a mode fixes it exactly.
+  const pairs = { pairs: Array<number>(36).fill(2), unpaired: 1 };
+  const totals = FAIR_DICE.map((p) => p * 72);
+  const natural = diceSummary(totals, 'classic', pairs);
+  assert.deepEqual(natural.pairExpected, Array(36).fill(2));
+  assert.equal(natural.unpaired, 1);
+  assert.equal(diceSummary(totals, 'balanced', pairs).pairExpected, null);
+  assert.equal(diceSummary(totals, { classic: 36, balanced: 36 }, pairs).pairExpected, null);
+  const flat = pairShares('flat')!;
+  assert.equal(Math.round(flat.reduce((a, b) => a + b, 0) * 1e9) / 1e9, 1);
+  assert.equal(flat[0], 1 / 11, 'a flat 2 can only be 1 and 1');
+  assert.equal(flat[2 * 6 + 3], 1 / 11 / 6, 'a flat 7 is split six ways');
+  assert.equal(pairShares('deck'), null);
 });
 
 test('dice statistics compare fairly with two fair dice', () => {

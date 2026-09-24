@@ -1,8 +1,8 @@
 /**
  * Runs the expensive admin reads in a worker thread and caches the answers.
  *
- * Statistics and the retention report scan the whole match index and, for
- * dice, every roll in the journal. `node:sqlite` is synchronous, so doing that
+ * Statistics, growth and the retention report scan the whole match index
+ * and, for dice, every roll in the journal. `node:sqlite` is synchronous, so doing that
  * on the game's own connection would stall every table in play for as long as
  * the scan takes. Each job instead gets a short-lived worker with its own
  * read-only connection, one job of each kind at a time, and its answer is kept
@@ -16,19 +16,22 @@ import { AdminRequestError } from './api.js';
 import { computeRetention, computeStats } from './analysis.js';
 import { computeGameAnalytics } from './game-analytics.js';
 import type { GameAnalyticsJob } from './game-analytics.js';
+import { computeGrowth } from './growth.js';
 import { serverErrors } from './errors.js';
-import type { AdminStats, Cached, GameAnalytics, RetentionReport } from './types.js';
+import type { AdminStats, Cached, GameAnalytics, GrowthReport, RetentionReport } from './types.js';
 
 const noop = () => {};
 
 export type AnalysisJob =
   | { kind: 'stats'; now: number }
+  | { kind: 'growth'; now: number }
   | { kind: 'retention'; now: number; days: number }
   | ({ kind: 'game'; now: number } & GameAnalyticsJob);
 
 /** Runs one job on a connection: the worker's own, or the game's for a private in-memory database. */
 export function runJob(db: DatabaseSync, job: AnalysisJob): unknown {
   if (job.kind === 'stats') return computeStats(db, job.now);
+  if (job.kind === 'growth') return computeGrowth(db, job.now);
   if (job.kind === 'retention') return computeRetention(db, job.now, job.days);
   return computeGameAnalytics(db, job);
 }
@@ -147,6 +150,14 @@ export class Analysis {
   stats(refresh = false): Promise<Cached<AdminStats>> {
     return this.cached('stats', refresh ? STATS_MIN_REFRESH_MS : STATS_CACHE_MS, () => ({
       kind: 'stats',
+      now: this.options.now(),
+    }));
+  }
+
+  /** How play has grown (growth.ts): kept as long as statistics, and recomputed on request as often. */
+  growth(refresh = false): Promise<Cached<GrowthReport>> {
+    return this.cached('growth', refresh ? STATS_MIN_REFRESH_MS : STATS_CACHE_MS, () => ({
+      kind: 'growth',
       now: this.options.now(),
     }));
   }

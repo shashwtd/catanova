@@ -10,6 +10,7 @@ import { onSessionExpired, useApi } from './api.js';
 import { PAGES, useRoute } from './route.js';
 import { Failure } from './ui.js';
 import { Overview } from './pages/Overview.js';
+import { Growth } from './pages/Growth.js';
 import { GameDetail, Games } from './pages/Games.js';
 import { GameRound } from './pages/GameAnalytics.js';
 import { PlayerDetail, Players } from './pages/Players.js';
@@ -61,6 +62,7 @@ function App() {
       <main className="page">
         <Failure error={session.error?.code === 'SESSION' ? undefined : session.error} />
         {route.page === 'overview' && <Overview />}
+        {route.page === 'growth' && <Growth params={route.params} />}
         {route.page === 'games' &&
           (route.id ? (
             route.params.get('round') ? (

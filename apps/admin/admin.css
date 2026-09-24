@@ -23,6 +23,13 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+  /* The game's own dice: the first ivory with slate pips, the second teal with cream ones. */
+  --die-1-face: #efe5cf;
+  --die-1-edge: #a8977a;
+  --die-1-pip: #33474d;
+  --die-2-face: #3f7886;
+  --die-2-edge: #1d4552;
+  --die-2-pip: #f6ead0;
   --radius: 8px;
   font-family:
     system-ui,
@@ -172,6 +179,12 @@ h3 {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
   gap: 14px;
 }
+/* Two charts of one kind side by side, stacked only on a phone. */
+.duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -181,6 +194,13 @@ h3 {
 }
 .toolbar p {
   margin: 0;
+}
+/* A toolbar's far end: when the page was worked out, and its button. */
+.toolbar-end {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 .title-row {
   display: flex;
@@ -200,6 +220,49 @@ h3 {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+/* A card's headline figure beside its title, such as a chart's total; it drops below when there is no room. */
+.card-head:has(.card-note) {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.card-note {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+/* A card with a drawing (art.tsx): the drawing in a column beside the content, under the title. */
+.card.with-art {
+  display: grid;
+  align-content: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'head head'
+    'art body';
+  column-gap: 20px;
+}
+.with-art > .card-head {
+  grid-area: head;
+}
+.with-art > .card-body {
+  grid-area: body;
+  min-width: 0;
+}
+.card-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  grid-area: art;
+  padding-top: 2px;
+}
+.card-art .art {
+  width: auto;
+  height: 76px;
+}
+/* Two drawings share the column. */
+.card-art .art:nth-child(2) {
+  height: 64px;
 }
 details.card > summary {
   cursor: pointer;
@@ -227,6 +290,22 @@ details.card[open] > summary {
   border-radius: var(--radius);
   color: var(--muted);
   text-align: center;
+}
+/* An empty state with a drawing of what is missing, quietly, above the words. */
+.empty.with-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 18px 16px;
+}
+.empty.with-art .art {
+  width: auto;
+  height: 52px;
+  opacity: 0.75;
+}
+.empty.with-art p {
+  margin: 0;
 }
 .loading {
   margin: 0;
@@ -663,11 +742,41 @@ details > summary {
   stroke: var(--axis);
   stroke-width: 1;
 }
-.chart-hit {
+.chart-hit,
+.chart-slot {
   fill: transparent;
 }
-.chart-column:hover .chart-hit {
-  fill: rgba(255, 255, 255, 0.04);
+/* The column being read lifts: a faint wash behind it. */
+.chart-column.is-active .chart-slot {
+  fill: rgba(255, 255, 255, 0.05);
+}
+/* Columns recede when lines drawn over them carry the story. */
+.chart-column.soft path {
+  opacity: 0.45;
+}
+.chart-column.soft.is-active path {
+  opacity: 0.7;
+}
+/* A day, week or month still under way: fainter, so its shortness does not read as a fall. */
+.chart-column.partial path {
+  opacity: 0.3;
+}
+.chart-column.partial.is-active path {
+  opacity: 0.5;
+}
+.columns-chart svg,
+.heatmap svg {
+  touch-action: pan-y;
+}
+.columns-chart svg:focus,
+.heatmap svg:focus {
+  outline: none;
+}
+.columns-chart svg:focus-visible,
+.heatmap svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
 }
 .chart-reference {
   stroke: var(--ink);
@@ -689,7 +798,8 @@ details > summary {
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  /* A legend that wraps on a phone keeps its rows close. */
+  gap: 4px 14px;
   margin-top: 6px;
   color: var(--ink-2);
   font-size: 12px;
@@ -765,6 +875,16 @@ details > summary {
 .line-bg-4 {
   background: var(--series-4);
 }
+/* Ink: a trend or reference line drawn over the series, never a series itself. */
+.line-ink {
+  stroke: var(--ink-2);
+}
+.dot-ink {
+  fill: var(--ink-2);
+}
+.line-bg-ink {
+  background: var(--ink-2);
+}
 .swatch-line {
   width: 14px;
   height: 2px;
@@ -788,6 +908,28 @@ details > summary {
 }
 .chart-area {
   opacity: 0.1;
+}
+/* A range around a line, such as the middle half of game lengths. */
+.chart-band-area,
+.chart-tip-band {
+  opacity: 0.18;
+}
+.swatch-band {
+  width: 14px;
+  height: 8px;
+  opacity: 0.35;
+}
+.area-bg-1 {
+  background: var(--series-1);
+}
+.area-bg-2 {
+  background: var(--series-2);
+}
+.area-bg-3 {
+  background: var(--series-3);
+}
+.area-bg-4 {
+  background: var(--series-4);
 }
 .area-1 {
   fill: var(--series-1);
@@ -858,6 +1000,504 @@ details > summary {
   white-space: nowrap;
 }
 
+/* Sparklines: the de-emphasis grey, the latest point in the accent. */
+.spark {
+  width: 100%;
+  height: 30px;
+  margin-top: 8px;
+}
+.spark svg {
+  display: block;
+}
+.spark-line {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.spark-wash {
+  fill: var(--muted);
+  opacity: 0.1;
+}
+.spark-dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+/* A headline number, its change against the period before, and its sparkline. */
+.trend-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.delta-good {
+  color: #7fd67f;
+}
+.delta-bad {
+  color: #f19a9a;
+}
+.delta-none {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Heatmaps: one hue, receding to the surface near nothing and brightest at the top of the scale. */
+.heat-0 {
+  fill: var(--surface-2);
+  background: var(--surface-2);
+}
+.heat-1 {
+  fill: #104281;
+  background: #104281;
+}
+.heat-2 {
+  fill: #1c5cab;
+  background: #1c5cab;
+}
+.heat-3 {
+  fill: #2a78d6;
+  background: #2a78d6;
+}
+.heat-4 {
+  fill: #5598e7;
+  background: #5598e7;
+}
+.heat-5 {
+  fill: #86b6ef;
+  background: #86b6ef;
+}
+.heat-6 {
+  fill: #b7d3f6;
+  background: #b7d3f6;
+}
+.heat.is-active {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+/* A week still under way: its share can only grow. */
+.heat-partial {
+  opacity: 0.5;
+}
+.heat-text {
+  fill: var(--ink);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.heat-text.on-light {
+  fill: var(--page);
+}
+.heat-aside {
+  fill: var(--ink-2);
+}
+.heat-legend {
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+.heat-scale {
+  display: inline-flex;
+  gap: 2px;
+}
+.heat-swatch {
+  width: 16px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* Dice: a rounded face lit from the top left, its thickness showing below and to the right. */
+.die-svg {
+  display: inline-block;
+  flex: none;
+  overflow: visible;
+}
+.die-first .die-face {
+  fill: var(--die-1-face);
+}
+.die-first .die-edge {
+  fill: var(--die-1-edge);
+}
+.die-first .die-pip {
+  fill: var(--die-1-pip);
+}
+.die-second .die-face {
+  fill: var(--die-2-face);
+}
+.die-second .die-edge {
+  fill: var(--die-2-edge);
+}
+.die-second .die-pip {
+  fill: var(--die-2-pip);
+}
+.die-shine {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-opacity: 0.5;
+}
+.die-second .die-shine {
+  stroke-opacity: 0.22;
+}
+.dice-pair {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  vertical-align: -3px;
+}
+/* The totals chart and the grid of pairs, side by side on a wide screen. */
+.dice-views {
+  align-items: start;
+}
+.dice-views h3 {
+  margin-top: 0;
+}
+
+/*
+ * Drawings of the machine (art.tsx): flat shapes, a lighter top and a darker
+ * side, light from the top left and a soft shadow underneath. Bodies are the
+ * surfaces a step or two lighter; what a reading means takes the status
+ * colours (calm is the accent, busy the warning, hot the critical).
+ */
+.art {
+  display: block;
+  flex: none;
+  overflow: visible;
+  --art-level: var(--accent);
+  --art-level-soft: #9cc6f5;
+}
+.art-busy {
+  --art-level: var(--warning);
+  --art-level-soft: #fcd680;
+}
+.art-hot {
+  --art-level: var(--critical);
+  --art-level-soft: #ee8f8f;
+}
+.art-ground {
+  fill: #000;
+  opacity: 0.38;
+}
+.art-top {
+  fill: #3a3a36;
+}
+.art-side {
+  fill: #1f1f1d;
+}
+.art-top-light {
+  fill: #fff;
+  opacity: 0.1;
+}
+.art-metal {
+  fill: #9a988f;
+}
+.art-dot {
+  fill: #6b6a64;
+}
+.art-tick {
+  stroke: #5d5c57;
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+/* The processor: its die glows in the level's colour, brighter with load. */
+.art-glow {
+  fill: var(--art-level);
+}
+.art-glow-1 {
+  opacity: 0.55;
+}
+.art-glow-2 {
+  opacity: 0.26;
+}
+.art-glow-3 {
+  opacity: 0.12;
+}
+.art-die {
+  fill: var(--art-level-soft);
+}
+.art-die-cores {
+  fill: var(--art-level);
+  opacity: 0.55;
+}
+/* The memory stick: a green board with gold contacts; its chips fill in the level's colour. */
+.art-board {
+  fill: #1f6a52;
+}
+.art-board-side {
+  fill: #123f31;
+}
+.art-board-light {
+  fill: #fff;
+  opacity: 0.14;
+}
+.art-gold {
+  fill: #c9973a;
+}
+.art-notch {
+  fill: var(--surface);
+}
+.art-chip {
+  fill: #151514;
+}
+.art-chip-light {
+  fill: #fff;
+  opacity: 0.13;
+}
+.art-chip-fill {
+  fill: var(--art-level);
+}
+.art-sweep {
+  fill: #fff;
+  opacity: 0;
+}
+/* The stopwatch: its arc and the light on its rim read the level. */
+.art-rim {
+  fill: #4a4945;
+}
+.art-face {
+  fill: #121211;
+}
+.art-arc {
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.art-busy .art-arc {
+  stroke: var(--warning);
+}
+.art-hot .art-arc {
+  stroke: var(--critical);
+}
+.art-hand {
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.art-hand-cap {
+  fill: var(--ink);
+}
+.art-orbit-dot {
+  fill: var(--accent);
+}
+/* The plug: its socket's light is on while anything is connected. */
+.art-slot {
+  fill: var(--page);
+}
+.art-led {
+  fill: #4a4945;
+}
+.art-plug .art-led,
+.art-database .art-led {
+  fill: var(--good);
+}
+.art-plug:not(.art-calm) .art-led {
+  fill: #4a4945;
+}
+.art-cable {
+  fill: none;
+  stroke: #4e4d48;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
+.art-plug-body-side {
+  fill: #32312d;
+}
+.art-plug-body {
+  fill: #64635d;
+}
+.art-grip {
+  fill: #4a4944;
+}
+/* The disk: a tank filled to the share in use. */
+.art-fill {
+  fill: var(--art-level);
+  opacity: 0.8;
+}
+.art-fill-top {
+  fill: var(--art-level-soft);
+}
+.art-glass {
+  fill: none;
+  stroke: #4a4945;
+  stroke-width: 1.2;
+}
+.art-glass-light {
+  fill: #fff;
+  opacity: 0.08;
+}
+.art-lid {
+  fill: #2a2a27;
+}
+/* The database: blue platters stacked, lit from above. */
+.art-db-top {
+  fill: #4d78ad;
+}
+.art-db-side {
+  fill: #2c4f7c;
+}
+.art-db-shade {
+  fill: #203c61;
+}
+.art-db-light {
+  fill: #fff;
+  opacity: 0.18;
+}
+/* Meeples: those playing in the players' colours on a field hex, the rest in grey. */
+.art-meeple-idle {
+  fill: #5d5c57;
+}
+.art-meeple-shade {
+  fill: #000;
+  opacity: 0.35;
+}
+.art-meeple-light {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 0.8;
+  stroke-linecap: round;
+  opacity: 0.45;
+}
+.art-meeple-empty {
+  fill: none;
+  stroke: #5d5c57;
+  stroke-width: 0.8;
+}
+.art-hex-top {
+  fill: #b8944f;
+}
+.art-hex-side {
+  fill: #6f5829;
+}
+/* The rooms: a settlement and a city in two players' colours; each face a shade darker away from the light. */
+.art-coral {
+  fill: #ef7756;
+}
+.art-coral-side {
+  fill: #a9492f;
+}
+.art-coral-roof {
+  fill: #f6987b;
+}
+.art-coral-roof-back {
+  fill: #c65a3e;
+}
+.art-sky {
+  fill: #54b3dc;
+}
+.art-sky-side {
+  fill: #2d7897;
+}
+.art-sky-roof {
+  fill: #86cbe8;
+}
+.art-sky-roof-back {
+  fill: #3a8fb4;
+}
+.art-window {
+  fill: #242422;
+}
+.art-window-lit {
+  fill: #ffd66b;
+}
+/* Motion only for those who have not asked for less of it: slow, and never in the way. */
+@media (prefers-reduced-motion: no-preference) {
+  .art-cpu-glow .art-glow-3,
+  .art-cpu-glow .art-glow-2 {
+    animation: art-breathe 3.4s ease-in-out infinite;
+  }
+  .art-busy .art-cpu-glow .art-glow-3,
+  .art-busy .art-cpu-glow .art-glow-2 {
+    animation-duration: 2s;
+  }
+  .art-hot .art-cpu-glow .art-glow-3,
+  .art-hot .art-cpu-glow .art-glow-2 {
+    animation-duration: 1.1s;
+  }
+  .art-sweep {
+    animation: art-sweep 7s ease-in-out infinite;
+  }
+  .art-orbit {
+    transform-box: view-box;
+    transform-origin: 32px 35px;
+    animation: art-orbit 8s linear infinite;
+  }
+  .art-plug.art-calm .art-led {
+    animation: art-breathe 2.6s ease-in-out infinite;
+  }
+  .art-database .art-led {
+    animation: art-blink 3.2s steps(1) infinite;
+  }
+  .art-database .art-led-2 {
+    animation-delay: 1.3s;
+  }
+  .art-meeple-playing {
+    animation: art-bob 2.8s ease-in-out infinite;
+  }
+  .art-meeple-playing:nth-of-type(2n) {
+    animation-delay: -1.4s;
+  }
+}
+@keyframes art-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes art-sweep {
+  0%,
+  70% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  72% {
+    opacity: 0.12;
+  }
+  90% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+@keyframes art-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes art-blink {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 0.25;
+  }
+  94% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.25;
+  }
+}
+@keyframes art-bob {
+  50% {
+    transform: translateY(-0.9px);
+  }
+}
+
 /* Overview: a row of headline numbers, then who is here and what is being played */
 .kpis {
   display: grid;
@@ -884,6 +1524,17 @@ details > summary {
 .kpi .stat-hint {
   margin-top: 2px;
 }
+/* Headline numbers with their change and a sparkline: four to a row, two on a phone. */
+.kpis.trend-stats {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+/* However long a tile's words run, its sparkline lines up with its neighbours' along the bottom. */
+.trend-stat .stat-hint {
+  margin-bottom: 8px;
+}
+.trend-stat .spark {
+  margin-top: auto;
+}
 .minis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
@@ -895,6 +1546,34 @@ details > summary {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 4px;
+}
+/* A performance chart's heading: a drawing of the thing, then its name over its reading now. */
+.mini-head.with-art {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+/* A fixed box, so every heading's words start at the same place whatever the drawing's shape. */
+.mini-head.with-art > .art {
+  width: 74px;
+  height: 54px;
+}
+.mini-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.mini-heading .mini-now {
+  color: var(--muted);
+  font-weight: 400;
+  white-space: normal;
+}
+.mini-heading .mini-now strong {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
 }
 .mini-head h3 {
   margin: 0;
@@ -1028,6 +1707,31 @@ select {
   }
   .grid {
     grid-template-columns: 1fr;
+  }
+  /* A chart wider than the screen scrolls inside its card rather than widening the page. */
+  .duo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kpis.trend-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* On a phone a card's drawing moves up beside its title, and the content has the width. */
+  .card.with-art {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head art'
+      'body body';
+    column-gap: 10px;
+  }
+  .card-art {
+    flex-direction: row;
+    align-items: flex-end;
+    margin: -8px -6px 2px 0;
+    padding-top: 0;
+  }
+  .card-art .art,
+  .card-art .art:nth-child(2) {
+    height: 50px;
   }
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));

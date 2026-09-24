@@ -104,6 +104,27 @@ test('a finished game reads back from its journal: result, standings, points by 
   assert.equal(analytics.diceMode, game.diceMode);
   assert.equal(analytics.dice.model, game.diceMode === 'balanced' ? 'deck' : 'two-dice');
   assert.equal(analytics.dice.sevens, analytics.dice.counts[5]);
+  // Which two dice made each roll, from the saved game after it: every roll has its pair.
+  const pairs = Array<number>(36).fill(0);
+  for (const { revision } of store.db
+    .prepare(
+      `SELECT revision FROM game_events WHERE room_id = ? AND revision BETWEEN ? AND ?
+       AND json_extract(public_entry, '$.kind') = 'roll'`,
+    )
+    .all(rooms.finished, analytics.fromRevision, analytics.toRevision) as { revision: number }[]) {
+    const [first, second] = store.journalState(rooms.finished, revision)!.dice!;
+    pairs[(first - 1) * 6 + (second - 1)]!++;
+  }
+  assert.deepEqual(analytics.dice.pairs, pairs);
+  assert.equal(analytics.dice.unpaired, 0);
+  // Each total is the sum along its diagonal of pairs.
+  for (let total = 2; total <= 12; total++)
+    assert.equal(
+      pairs.reduce((sum, n, i) => sum + (Math.floor(i / 6) + (i % 6) + 2 === total ? n : 0), 0),
+      analytics.dice.counts[total - 2],
+    );
+  // A pair's expectation is only given where the dice mode says it exactly: not for the balanced deck.
+  assert.equal(analytics.dice.pairExpected === null, game.diceMode === 'balanced');
   assert.equal(
     analytics.robberMoves.length,
     rowsOf(store, rooms.finished, analytics.fromRevision, analytics.toRevision, 'robber'),

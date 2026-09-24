@@ -8,6 +8,7 @@
  * unavailable.
  */
 import { readFile, stat, statfs } from 'node:fs/promises';
+import { totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { AdminContext } from './api.js';
 import type { RoomIndex, RoomSummary } from './room-index.js';
@@ -38,6 +39,18 @@ export async function readStatusFile(directory: string, name: string): Promise<S
       modifiedAt,
     };
   }
+}
+
+/**
+ * How much memory this process may use: its container's limit where one is
+ * set (the cgroup limit Node reads), otherwise the machine's memory.
+ */
+export function memoryLimit(): { limit: number; limitKind: 'container' | 'machine' } {
+  const machine = totalmem();
+  const container = process.constrainedMemory?.() ?? 0;
+  return container > 0 && container < machine
+    ? { limit: container, limitKind: 'container' }
+    : { limit: machine, limitKind: 'machine' };
 }
 
 async function size(path: string): Promise<number | null> {
@@ -101,6 +114,7 @@ export async function systemReport(
         heapTotal: memory.heapTotal,
         external: memory.external,
         arrayBuffers: memory.arrayBuffers,
+        ...memoryLimit(),
       },
     },
     load: metrics.snapshot(),
