@@ -345,7 +345,7 @@ export function EntryScreen({
             )}
           </section>
         </div>
-        <footer className="landing-footer">
+        <footer className="landing-footer" data-consent-anchor="">
           <a href="/guide/">How to play</a>
           <a href="https://github.com/shashwtd/catanova" target="_blank" rel="noopener noreferrer">
             <GitHubMark />

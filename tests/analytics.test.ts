@@ -23,6 +23,8 @@ class FakeElement {
   async = false;
   hidden = false;
   onload: (() => void) | null = null;
+  style: Record<string, string> = {};
+  offsetHeight = 32;
   constructor(readonly tagName: string) {}
   setAttribute(name: string, value: string) {
     this.attributes.set(name, value);
@@ -111,7 +113,15 @@ function page({
   storage,
   cookies = '',
   privacy = false,
-}: { pathname?: string; stored?: string; storage?: 'throws'; cookies?: string; privacy?: boolean } = {}) {
+  footer = pathname === '/',
+}: {
+  pathname?: string;
+  stored?: string;
+  storage?: 'throws';
+  cookies?: string;
+  privacy?: boolean;
+  footer?: boolean;
+} = {}) {
   const location = { hostname: 'catanova.io', origin: 'https://catanova.io', pathname };
   const saved = new Map<string, string>(stored ? [[CONSENT_STORAGE_KEY, stored]] : []);
   const listeners = new Map<string, { callback: () => void; capture: boolean }>();
@@ -146,6 +156,13 @@ function page({
   const body = root.appendChild(new FakeElement('body'));
   head.appendChild(new FakeElement('script'));
   if (privacy) body.appendChild(privacyControl());
+  // The landing footer, which marks where the question goes; it moves when the window does.
+  let footerTop = 700;
+  const anchor = element('footer', { 'data-consent-anchor': '' }) as FakeElement & {
+    getBoundingClientRect(): { top: number };
+  };
+  anchor.getBoundingClientRect = () => ({ top: footerTop });
+  if (footer) body.appendChild(anchor);
   const cookieWrites: string[] = [];
   const document = {
     title: 'Catanova',
@@ -171,7 +188,7 @@ function page({
     events.filter((event): event is IArguments => typeof (event as IArguments)[0] === 'string');
   const tags = () => head.children.filter((node) => node.tagName === 'script' && node.src);
   const stylesheet = () => head.find((node) => node.tagName === 'link');
-  const banner = () => body.find((node) => node.className === 'consent-banner');
+  const banner = () => body.find((node) => node.className === 'consent-ask');
   const button = (choice: string) =>
     banner()?.find((node) => node.getAttribute('data-consent-choice') === choice);
   const control = () => body.querySelectorAll('[data-consent-control]')[0];
@@ -207,6 +224,11 @@ function page({
     banner,
     button,
     run,
+    /** The landing footer moves, as it does when the window is resized. */
+    moveFooter(top: number) {
+      footerTop = top;
+      listeners.get('resize')?.callback();
+    },
     /** The banner is added only once its stylesheet has loaded. */
     showBanner() {
       stylesheet()?.onload?.();
@@ -257,18 +279,16 @@ test('nothing reaches Google until the visitor allows it, and the answer is reme
   assert.equal(index(visit.commands(), 'config'), -1);
   assert.equal(index(visit.commands(), 'js'), -1);
   assert.equal(visit.stylesheet()?.href, CONSENT_STYLESHEET);
-  assert.equal(visit.banner(), undefined, 'the banner waits for its styles');
+  assert.equal(visit.banner(), undefined, 'the question waits for its styles');
   const banner = visit.showBanner()!;
   assert.equal(banner.tagName, 'section');
-  assert.match(banner.find((node) => node.tagName === 'p')!.textContent, /Google Analytics/);
-  const privacy = banner.find((node) => node.tagName === 'a')!;
-  assert.deepEqual([privacy.href, privacy.textContent], ['/privacy/', 'Privacy']);
-  assert.equal(visit.button('granted')?.textContent, 'Accept all');
-  assert.equal(visit.button('denied')?.textContent, 'Deny');
+  assert.equal(banner.getAttribute('aria-label'), 'Analytics');
   assert.deepEqual(
-    banner.find((node) => node.className === 'consent-actions')!.children.map((node) => node.textContent),
-    ['Deny', 'Accept all'],
+    banner.children.map((node) => node.textContent),
+    ['Count visits with Google Analytics?', 'Yes', 'No'],
   );
+  assert.equal(visit.button('granted')?.textContent, 'Yes');
+  assert.equal(visit.button('denied')?.textContent, 'No');
   visit.button('granted')!.click();
   assert.equal(visit.banner(), undefined);
   assert.equal(visit.saved.get(CONSENT_STORAGE_KEY), 'granted');
@@ -307,13 +327,30 @@ test('storage that refuses access still asks, and the answer holds for the page'
   assert.equal(visit.tags().length, 1);
 });
 
-test('the question stays on the public pages and never follows anyone into a room', () => {
-  const visit = page({ pathname: '/guide/' });
+test('the question sits just above the landing footer and moves with it, covering nothing', () => {
+  const visit = page();
+  const banner = visit.showBanner()!;
+  // 700 is the footer's top; the question is 32 tall and keeps 10 clear of it.
+  assert.deepEqual(banner.style, { top: '658px', visibility: 'visible' });
+  visit.moveFooter(465);
+  assert.equal(banner.style.top, '423px', 'placed again when the window changes');
+  // Where the footer has gone, so does the question.
+  const bare = page({ footer: false });
+  assert.equal(bare.stylesheet(), undefined, 'no footer to sit above: nothing is asked');
+});
+
+test('only the landing page asks, and the question never follows anyone off it', () => {
+  for (const pathname of ['/guide/', '/privacy/']) {
+    const elsewhere = page({ pathname, privacy: pathname === '/privacy/' });
+    assert.equal(elsewhere.stylesheet(), undefined, `${pathname} does not ask`);
+    assert.equal(elsewhere.showBanner(), undefined);
+  }
+  const visit = page();
   visit.showBanner();
   visit.listeners.get('hashchange')!.callback();
-  assert.ok(visit.banner(), 'a contents link on the guide keeps it');
-  visit.history.replaceState(null, '', '/guide/');
-  assert.ok(visit.banner(), 'rewriting the same public address keeps it');
+  assert.ok(visit.banner(), 'a hash change keeps it');
+  visit.history.replaceState(null, '', '/');
+  assert.ok(visit.banner(), 'rewriting the same address keeps it');
   visit.history.pushState(null, '', '/room/ABCD');
   assert.equal(visit.banner(), undefined);
   // An answer given after the address changed is kept for the next public page,
@@ -420,16 +457,10 @@ test('the privacy page control shows the stored answer and changes it later', ()
   ]);
 });
 
-test('an unanswered visitor to the privacy page can answer in the banner or the control', () => {
+test('an unanswered visitor to the privacy page can answer in its control', () => {
   const visit = page({ pathname: '/privacy/', privacy: true });
   assert.deepEqual(visit.shown(), { states: ['unset'], pressed: ['granted:false', 'denied:false'] });
-  assert.ok(visit.showBanner());
   visit.controlButton('granted').click();
-  assert.equal(visit.banner(), undefined, 'answering in the control also answers the banner');
   assert.deepEqual(visit.shown(), { states: ['granted'], pressed: ['granted:true', 'denied:false'] });
   assert.equal(visit.tags().length, 1);
-  const banner = page({ pathname: '/privacy/', privacy: true });
-  banner.showBanner();
-  banner.button('denied')!.click();
-  assert.deepEqual(banner.shown().states, ['denied'], 'and the banner updates the control');
 });

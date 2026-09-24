@@ -1,85 +1,56 @@
-/* The analytics question on the public pages. /analytics.js fetches this only
-   while a visitor has not answered, and adds the banner once it has loaded.
-   It is drawn like the landing footer: white type in the game's Barlow on the
-   same blurred green shade, low enough to leave the play buttons clear. */
-.consent-banner {
-  position: fixed;
-  inset: auto 0 0;
-  z-index: 40;
-  isolation: isolate;
+/* The analytics question, on the landing page only. /analytics.js fetches
+   this only while a visitor has not answered, and places the line just above
+   the landing footer, over the scenery. It is positioned in the page rather
+   than fixed to the screen, so it scrolls with the page and covers nothing:
+   the footer's links, the play buttons and the card all stay clear. */
+.consent-ask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  visibility: hidden;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 10px 22px;
-  padding: 26px 20px max(14px, env(safe-area-inset-bottom));
-  color: #fff;
-  text-align: center;
+  gap: 2px 4px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin-inline: auto;
+  padding: 3px 4px 3px 13px;
+  border-radius: 999px;
+  background: #112e24a6;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: inset 0 0 0 1px #fff4d42b;
+  color: #ffffffd1;
   font:
-    500 14px/1.45 Barlow,
+    500 12.5px/1.3 Barlow,
     sans-serif;
 }
-.consent-banner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(180deg, #173c2d00, #143425d9 26px, #112e24f2);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  -webkit-mask-image: linear-gradient(180deg, transparent, #000 26px);
-  mask-image: linear-gradient(180deg, transparent, #000 26px);
+.consent-ask span {
+  margin-right: 4px;
 }
-.consent-banner p {
-  margin: 0;
-  font: inherit;
+.consent-ask button {
+  min-height: 26px;
+  padding: 3px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   color: inherit;
-  text-wrap: balance;
-}
-.consent-banner a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.consent-actions {
-  display: flex;
-  gap: 10px;
-}
-.consent-banner button {
-  min-height: 36px;
-  padding: 6px 15px;
-  border-radius: 8px;
   font:
-    600 14px/1.2 Barlow,
+    600 12.5px/1.2 Barlow,
     sans-serif;
   cursor: pointer;
 }
-.consent-banner [data-consent-choice='granted'] {
-  border: 1px solid #fff4d4;
-  background: #fff4d4;
-  color: #36503f;
-  box-shadow: 0 2px 5px #0e241b40;
+.consent-ask [data-consent-choice='granted'] {
+  background: #fff4d424;
+  color: #fff4d4;
 }
-.consent-banner [data-consent-choice='granted']:hover {
-  background: #fff9e5;
+.consent-ask button:hover {
+  background: #ffffff21;
 }
-.consent-banner [data-consent-choice='denied'] {
-  border: 1px solid #fff4d499;
-  background: transparent;
-  color: #fff;
-}
-.consent-banner [data-consent-choice='denied']:hover {
-  background: #ffffff1a;
-}
-.consent-banner :focus-visible {
-  outline: 3px solid #fff2ca;
-  outline-offset: 3px;
-}
-@media (max-width: 650px) {
-  .consent-banner {
-    gap: 9px;
-    padding-inline: 16px;
-    font-size: 13px;
-  }
+.consent-ask :focus-visible {
+  outline: 2px solid #fff2ca;
+  outline-offset: 2px;
 }
