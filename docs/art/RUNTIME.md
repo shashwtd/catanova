@@ -115,27 +115,30 @@ selects another property. The former `GTM_ID` setting is retired.
 The loader uses Google Consent Mode v2 in what Google calls basic mode. Before
 anything else it sets `ad_storage`, `ad_user_data`, `ad_personalization` and
 `analytics_storage` to `denied`, and it does not fetch `gtag/js` at all until the
-visitor chooses **Accept all**. Without an answer, or after **Deny**,
+visitor says yes. Without an answer, or after a no,
 nothing is sent to Google Analytics, not even a cookieless ping. Allowing sends
 `gtag('consent', 'update', { analytics_storage: 'granted' })`, then the usual
 config and tag.
 
-A small banner along the bottom asks on the loader's pages only, without
-covering the page: **Accept all** is the bright button, **Deny** a quieter one.
-It has no close button, so it stays until it is answered, and it asks again on
-every visit until there is an answer. Its styles are `/consent.css`, fetched only
-while there is no answer, and the banner appears once they have loaded. The
-history wrapper removes it as soon as the address leaves those pages, so it never
-shows in a room, the lobby or a game. The answer is kept in
+Only the landing page asks, and quietly: one small, translucent line, "Count
+visits with Google Analytics? **Yes** / **No**", placed 10px above the landing
+footer, which marks the spot with `data-consent-anchor`. The loader positions it
+in the page rather than fixing it to the screen, so it scrolls with the page and
+covers nothing: not the footer's links, the card or its buttons. It stays hidden
+until placed, is placed again on resize, and is not shown where there is no footer
+to sit above. It asks again on every visit until there is an answer. Its styles
+are `/consent.css`, fetched only while there is no answer, and the line appears
+once they have loaded. The history wrapper removes it as soon as the address
+leaves the landing page, so it never shows in a room, the lobby or a game. The answer is kept in
 `localStorage` under `catanova.analytics-consent` (`granted` or `denied`); every
 access is guarded, so a browser that refuses storage is simply asked again next
 time. An answer given after the app has changed the address takes effect from the
 next public page load, because collection never resumes in a document once it has
-been disabled. **Deny** also expires `_ga` and `_ga_*` cookies left from
+been disabled. A no also expires `_ga` and `_ga_*` cookies left from
 before consent was asked.
 
-The banner links to `/privacy/`, which says what is collected and carries the
-control for changing the answer later. That control is rendered hidden and the
+The footer's Privacy link leads to `/privacy/`, which says what is collected and
+carries the control (**Allow** / **Don't allow**) for changing the answer later. That control is rendered hidden and the
 loader reveals and wires it, so where the loader does not run (another host, a
 build with measurement off, a blocker) no dead buttons are shown. The page's
 contact address is `PRIVACY_CONTACT` in `apps/client/src/PublicPages.tsx`,
