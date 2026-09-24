@@ -87,9 +87,12 @@ export function analyticsLoader(measurementId: string): string {
   }
   measurePath(path);
   var banner = null;
+  var watcher = null;
   function dismiss() {
     if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
     banner = null;
+    if (watcher) watcher.disconnect();
+    watcher = null;
   }
   // The question belongs to the landing page; it never follows anyone elsewhere.
   function leaveIfPrivate() {
@@ -223,6 +226,13 @@ export function analyticsLoader(measurementId: string): string {
       place();
       window.addEventListener('resize', place);
       window.addEventListener('load', place);
+      // Fonts arriving and the app settling can move the footer after that.
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+      if (window.ResizeObserver) {
+        watcher = new window.ResizeObserver(place);
+        watcher.observe(document.body);
+        watcher.observe(anchor());
+      }
     };
     document.head.appendChild(style);
   }

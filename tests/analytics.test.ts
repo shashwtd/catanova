@@ -114,6 +114,7 @@ function page({
   cookies = '',
   privacy = false,
   footer = pathname === '/',
+  watchLayout = false,
 }: {
   pathname?: string;
   stored?: string;
@@ -121,6 +122,7 @@ function page({
   cookies?: string;
   privacy?: boolean;
   footer?: boolean;
+  watchLayout?: boolean;
 } = {}) {
   const location = { hostname: 'catanova.io', origin: 'https://catanova.io', pathname };
   const saved = new Map<string, string>(stored ? [[CONSENT_STORAGE_KEY, stored]] : []);
@@ -163,6 +165,24 @@ function page({
   };
   anchor.getBoundingClientRect = () => ({ top: footerTop });
   if (footer) body.appendChild(anchor);
+  // A browser's layout observer, when the test asks for one.
+  const layout = {
+    observed: [] as FakeElement[],
+    callback: null as (() => void) | null,
+    disconnected: false,
+  };
+  if (watchLayout)
+    window.ResizeObserver = class {
+      constructor(callback: () => void) {
+        layout.callback = callback;
+      }
+      observe(node: FakeElement) {
+        layout.observed.push(node);
+      }
+      disconnect() {
+        layout.disconnected = true;
+      }
+    };
   const cookieWrites: string[] = [];
   const document = {
     title: 'Catanova',
@@ -229,6 +249,14 @@ function page({
       footerTop = top;
       listeners.get('resize')?.callback();
     },
+    /** The footer moves without a resize, as when fonts arrive; the layout observer sees it. */
+    settleFooter(top: number) {
+      footerTop = top;
+      layout.callback?.();
+    },
+    layout,
+    anchor,
+    body,
     /** The banner is added only once its stylesheet has loaded. */
     showBanner() {
       stylesheet()?.onload?.();
@@ -334,6 +362,14 @@ test('the question sits just above the landing footer and moves with it, coverin
   assert.deepEqual(banner.style, { top: '658px', visibility: 'visible' });
   visit.moveFooter(465);
   assert.equal(banner.style.top, '423px', 'placed again when the window changes');
+  // Fonts and the app settling move the footer too, and the question follows it.
+  const settling = page({ watchLayout: true });
+  const line = settling.showBanner()!;
+  assert.deepEqual(settling.layout.observed, [settling.body, settling.anchor]);
+  settling.settleFooter(690);
+  assert.equal(line.style.top, '648px');
+  settling.button('denied')!.click();
+  assert.equal(settling.layout.disconnected, true, 'answered: nothing left to watch');
   // Where the footer has gone, so does the question.
   const bare = page({ footer: false });
   assert.equal(bare.stylesheet(), undefined, 'no footer to sit above: nothing is asked');
