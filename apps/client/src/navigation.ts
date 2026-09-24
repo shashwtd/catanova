@@ -4,6 +4,7 @@ import {
   isShortRoomCode,
   normalizeRoomReference,
 } from '../../../packages/protocol/src/room-reference.js';
+import { homeHintCookie } from '../../../packages/protocol/src/home-hint.js';
 
 export const validRoomCode = (value: string) => isRoomReference(normalizeRoomReference(value));
 export function invitationCode(pathname: string, search: string): string | null {
@@ -22,6 +23,22 @@ export function shouldResume(saved: Session | undefined, invite: string | null):
 }
 export const roomPath = (reference: string) => `/room/${normalizeRoomReference(reference)}`;
 export const PLAYER_HOME_PATH = '/play';
+/**
+ * Keep the server's hint of where "/" should open in step with the player's
+ * home, so a signed-in player skips the landing page next time. See
+ * packages/protocol/src/home-hint.ts.
+ */
+export function rememberHome(
+  home: string,
+  target: { cookie: string } = document,
+  secure = location.protocol === 'https:',
+) {
+  try {
+    target.cookie = homeHintCookie(home === PLAYER_HOME_PATH, secure);
+  } catch {
+    // Cookies can be blocked; "/" then shows the landing page first, as it always did.
+  }
+}
 type NavigableRoom = { roomId: string; roomCode?: string };
 /** The address bar is short; durable copy/share links still use roomPath(room.roomId). */
 export function browserRoomPath(room: NavigableRoom): string {
