@@ -54,7 +54,16 @@ export type AdminSystem = {
     uptimeSeconds: number;
     node: string;
     pid: number;
-    memory: { rss: number; heapUsed: number; heapTotal: number; external: number; arrayBuffers: number };
+    /** `limit` is what the process may use: its container's limit, or else the machine's memory. */
+    memory: {
+      rss: number;
+      heapUsed: number;
+      heapTotal: number;
+      external: number;
+      arrayBuffers: number;
+      limit: number;
+      limitKind: 'container' | 'machine';
+    };
   };
   load: { window: LoopWindow; windowSeconds: number; loadAverage: number[]; cores: number };
   sockets: { total: number; players: number; spectators: number; pending: number };
@@ -137,6 +146,8 @@ export type AdminOverview = {
     windowSeconds: number;
     rssBytes: number;
     heapUsedBytes: number;
+    /** What the process may use: its container's limit, or else the machine's memory. */
+    memoryLimitBytes: number;
     sockets: number;
   };
   status: AdminSystem['status'];

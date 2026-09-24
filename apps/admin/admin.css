@@ -231,6 +231,39 @@ h3 {
   font-size: 12px;
   white-space: nowrap;
 }
+/* A card with a drawing (art.tsx): the drawing in a column beside the content, under the title. */
+.card.with-art {
+  display: grid;
+  align-content: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'head head'
+    'art body';
+  column-gap: 20px;
+}
+.with-art > .card-head {
+  grid-area: head;
+}
+.with-art > .card-body {
+  grid-area: body;
+  min-width: 0;
+}
+.card-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  grid-area: art;
+  padding-top: 2px;
+}
+.card-art .art {
+  width: auto;
+  height: 76px;
+}
+/* Two drawings share the column. */
+.card-art .art:nth-child(2) {
+  height: 64px;
+}
 details.card > summary {
   cursor: pointer;
   color: var(--ink-2);
@@ -1115,6 +1148,339 @@ details > summary {
   margin-top: 0;
 }
 
+/*
+ * Drawings of the machine (art.tsx): flat shapes, a lighter top and a darker
+ * side, light from the top left and a soft shadow underneath. Bodies are the
+ * surfaces a step or two lighter; what a reading means takes the status
+ * colours (calm is the accent, busy the warning, hot the critical).
+ */
+.art {
+  display: block;
+  flex: none;
+  overflow: visible;
+  --art-level: var(--accent);
+  --art-level-soft: #9cc6f5;
+}
+.art-busy {
+  --art-level: var(--warning);
+  --art-level-soft: #fcd680;
+}
+.art-hot {
+  --art-level: var(--critical);
+  --art-level-soft: #ee8f8f;
+}
+.art-ground {
+  fill: #000;
+  opacity: 0.38;
+}
+.art-top {
+  fill: #3a3a36;
+}
+.art-side {
+  fill: #1f1f1d;
+}
+.art-top-light {
+  fill: #fff;
+  opacity: 0.1;
+}
+.art-metal {
+  fill: #9a988f;
+}
+.art-dot {
+  fill: #6b6a64;
+}
+.art-tick {
+  stroke: #5d5c57;
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+/* The processor: its die glows in the level's colour, brighter with load. */
+.art-glow {
+  fill: var(--art-level);
+}
+.art-glow-1 {
+  opacity: 0.55;
+}
+.art-glow-2 {
+  opacity: 0.26;
+}
+.art-glow-3 {
+  opacity: 0.12;
+}
+.art-die {
+  fill: var(--art-level-soft);
+}
+.art-die-cores {
+  fill: var(--art-level);
+  opacity: 0.55;
+}
+/* The memory stick: a green board with gold contacts; its chips fill in the level's colour. */
+.art-board {
+  fill: #1f6a52;
+}
+.art-board-side {
+  fill: #123f31;
+}
+.art-board-light {
+  fill: #fff;
+  opacity: 0.14;
+}
+.art-gold {
+  fill: #c9973a;
+}
+.art-notch {
+  fill: var(--surface);
+}
+.art-chip {
+  fill: #151514;
+}
+.art-chip-light {
+  fill: #fff;
+  opacity: 0.13;
+}
+.art-chip-fill {
+  fill: var(--art-level);
+}
+.art-sweep {
+  fill: #fff;
+  opacity: 0;
+}
+/* The stopwatch: its arc and the light on its rim read the level. */
+.art-rim {
+  fill: #4a4945;
+}
+.art-face {
+  fill: #121211;
+}
+.art-arc {
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.art-busy .art-arc {
+  stroke: var(--warning);
+}
+.art-hot .art-arc {
+  stroke: var(--critical);
+}
+.art-hand {
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.art-hand-cap {
+  fill: var(--ink);
+}
+.art-orbit-dot {
+  fill: var(--accent);
+}
+/* The plug: its socket's light is on while anything is connected. */
+.art-slot {
+  fill: var(--page);
+}
+.art-led {
+  fill: #4a4945;
+}
+.art-plug .art-led,
+.art-database .art-led {
+  fill: var(--good);
+}
+.art-plug:not(.art-calm) .art-led {
+  fill: #4a4945;
+}
+.art-cable {
+  fill: none;
+  stroke: #4e4d48;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
+.art-plug-body-side {
+  fill: #32312d;
+}
+.art-plug-body {
+  fill: #64635d;
+}
+.art-grip {
+  fill: #4a4944;
+}
+/* The disk: a tank filled to the share in use. */
+.art-fill {
+  fill: var(--art-level);
+  opacity: 0.8;
+}
+.art-fill-top {
+  fill: var(--art-level-soft);
+}
+.art-glass {
+  fill: none;
+  stroke: #4a4945;
+  stroke-width: 1.2;
+}
+.art-glass-light {
+  fill: #fff;
+  opacity: 0.08;
+}
+.art-lid {
+  fill: #2a2a27;
+}
+/* The database: blue platters stacked, lit from above. */
+.art-db-top {
+  fill: #4d78ad;
+}
+.art-db-side {
+  fill: #2c4f7c;
+}
+.art-db-shade {
+  fill: #203c61;
+}
+.art-db-light {
+  fill: #fff;
+  opacity: 0.18;
+}
+/* Meeples: those playing in the players' colours on a field hex, the rest in grey. */
+.art-meeple-idle {
+  fill: #5d5c57;
+}
+.art-meeple-shade {
+  fill: #000;
+  opacity: 0.35;
+}
+.art-meeple-light {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 0.8;
+  stroke-linecap: round;
+  opacity: 0.45;
+}
+.art-meeple-empty {
+  fill: none;
+  stroke: #5d5c57;
+  stroke-width: 0.8;
+}
+.art-hex-top {
+  fill: #b8944f;
+}
+.art-hex-side {
+  fill: #6f5829;
+}
+/* The rooms: a settlement and a city in two players' colours; each face a shade darker away from the light. */
+.art-coral {
+  fill: #ef7756;
+}
+.art-coral-side {
+  fill: #a9492f;
+}
+.art-coral-roof {
+  fill: #f6987b;
+}
+.art-coral-roof-back {
+  fill: #c65a3e;
+}
+.art-sky {
+  fill: #54b3dc;
+}
+.art-sky-side {
+  fill: #2d7897;
+}
+.art-sky-roof {
+  fill: #86cbe8;
+}
+.art-sky-roof-back {
+  fill: #3a8fb4;
+}
+.art-window {
+  fill: #242422;
+}
+.art-window-lit {
+  fill: #ffd66b;
+}
+/* Motion only for those who have not asked for less of it: slow, and never in the way. */
+@media (prefers-reduced-motion: no-preference) {
+  .art-cpu-glow .art-glow-3,
+  .art-cpu-glow .art-glow-2 {
+    animation: art-breathe 3.4s ease-in-out infinite;
+  }
+  .art-busy .art-cpu-glow .art-glow-3,
+  .art-busy .art-cpu-glow .art-glow-2 {
+    animation-duration: 2s;
+  }
+  .art-hot .art-cpu-glow .art-glow-3,
+  .art-hot .art-cpu-glow .art-glow-2 {
+    animation-duration: 1.1s;
+  }
+  .art-sweep {
+    animation: art-sweep 7s ease-in-out infinite;
+  }
+  .art-orbit {
+    transform-box: view-box;
+    transform-origin: 32px 35px;
+    animation: art-orbit 8s linear infinite;
+  }
+  .art-plug.art-calm .art-led {
+    animation: art-breathe 2.6s ease-in-out infinite;
+  }
+  .art-database .art-led {
+    animation: art-blink 3.2s steps(1) infinite;
+  }
+  .art-database .art-led-2 {
+    animation-delay: 1.3s;
+  }
+  .art-meeple-playing {
+    animation: art-bob 2.8s ease-in-out infinite;
+  }
+  .art-meeple-playing:nth-of-type(2n) {
+    animation-delay: -1.4s;
+  }
+}
+@keyframes art-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes art-sweep {
+  0%,
+  70% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  72% {
+    opacity: 0.12;
+  }
+  90% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+@keyframes art-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes art-blink {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 0.25;
+  }
+  94% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.25;
+  }
+}
+@keyframes art-bob {
+  50% {
+    transform: translateY(-0.9px);
+  }
+}
+
 /* Overview: a row of headline numbers, then who is here and what is being played */
 .kpis {
   display: grid;
@@ -1163,6 +1529,34 @@ details > summary {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 4px;
+}
+/* A performance chart's heading: a drawing of the thing, then its name over its reading now. */
+.mini-head.with-art {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+/* A fixed box, so every heading's words start at the same place whatever the drawing's shape. */
+.mini-head.with-art > .art {
+  width: 74px;
+  height: 54px;
+}
+.mini-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.mini-heading .mini-now {
+  color: var(--muted);
+  font-weight: 400;
+  white-space: normal;
+}
+.mini-heading .mini-now strong {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
 }
 .mini-head h3 {
   margin: 0;
@@ -1303,6 +1697,24 @@ select {
   }
   .kpis.trend-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* On a phone a card's drawing moves up beside its title, and the content has the width. */
+  .card.with-art {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head art'
+      'body body';
+    column-gap: 10px;
+  }
+  .card-art {
+    flex-direction: row;
+    align-items: flex-end;
+    margin: -8px -6px 2px 0;
+    padding-top: 0;
+  }
+  .card-art .art,
+  .card-art .art:nth-child(2) {
+    height: 50px;
   }
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));

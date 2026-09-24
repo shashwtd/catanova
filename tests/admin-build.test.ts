@@ -20,6 +20,16 @@ import {
 import type { Delta } from '../apps/admin/ui.js';
 import { movingAverage, rangeView } from '../apps/admin/pages/Growth.js';
 import { DicePair, PairGrid, pairFor, totalDice } from '../apps/admin/dice.js';
+import {
+  CpuChip,
+  Database,
+  DiskTank,
+  Meeples,
+  MemoryStick,
+  Plug,
+  Settlement,
+  Stopwatch,
+} from '../apps/admin/art.js';
 import type { GrowthReport, GrowthSeries } from '../apps/server/src/admin/types.js';
 import { parseRoute } from '../apps/admin/route.js';
 import {
@@ -408,6 +418,81 @@ test('dice are drawn with pips, the first ivory and the second teal, and the gri
     createElement('svg', null, totalDice((i) => i + 2).draw(5, 100, 40) as never),
   );
   assert.equal((below.match(/class="die-pip"/g) ?? []).length, 7, 'a total of 7 is drawn as 3 and 4');
+});
+
+test('the machine is drawn from its readings, as decoration beside the number, and moves only when motion is welcome', async () => {
+  const draw = (element: ReturnType<typeof createElement>) => renderToStaticMarkup(element);
+  const drawings = [
+    draw(createElement(CpuChip, { percent: 12 })),
+    draw(createElement(MemoryStick, { used: 50, limit: 100 })),
+    draw(createElement(Stopwatch, { ms: 3 })),
+    draw(createElement(Plug, { sockets: 3 })),
+    draw(createElement(DiskTank, { used: 40, total: 100 })),
+    draw(createElement(Database)),
+    draw(createElement(Meeples, { online: 9, playing: 2 })),
+    draw(createElement(Settlement, { live: 1 })),
+  ];
+  for (const drawing of drawings) {
+    assert.doesNotMatch(drawing, /style=/);
+    assert.match(
+      drawing,
+      /^<svg class="art art-[a-z]+[^"]*"[^>]*aria-hidden="true"/,
+      'the number beside it says it',
+    );
+  }
+  // Each reading's level: calm, busy or hot.
+  assert.match(drawings[0]!, /art-cpu art-calm/);
+  assert.match(draw(createElement(CpuChip, { percent: 55 })), /art-cpu art-busy/);
+  assert.match(draw(createElement(CpuChip, { percent: 92 })), /art-cpu art-hot/);
+  assert.match(draw(createElement(Stopwatch, { ms: 30 })), /art-loop art-busy/);
+  assert.match(draw(createElement(Stopwatch, { ms: 300 })), /art-loop art-hot/);
+  assert.match(
+    draw(createElement(DiskTank, { used: 85, total: 100 })),
+    /art-disk art-busy/,
+    'under a fifth free',
+  );
+  assert.match(
+    draw(createElement(DiskTank, { used: 95, total: 100 })),
+    /art-disk art-hot/,
+    'under a tenth free',
+  );
+  // Memory chips fill from the left with the share in use: half is two of four.
+  assert.equal((drawings[1]!.match(/class="art-chip-fill"/g) ?? []).length, 2);
+  assert.equal(
+    (draw(createElement(MemoryStick, { used: 0, limit: 100 })).match(/art-chip-fill/g) ?? []).length,
+    0,
+  );
+  // The plug is home with its light on while anything is connected, pulled out when nothing is.
+  assert.match(drawings[3]!, /art-plug art-calm/);
+  assert.match(
+    draw(createElement(Plug, { sockets: 0 })),
+    /^<svg class="art art-plug"[^>]*>.*translate\(-8,0\)/s,
+  );
+  // Up to five meeples, those playing in the players' colours.
+  assert.equal((drawings[6]!.match(/class="art-meeple(?: art-meeple-idle)?"/g) ?? []).length, 5);
+  assert.equal((drawings[6]!.match(/class="art-meeple art-meeple-idle"/g) ?? []).length, 3);
+  assert.match(drawings[6]!, new RegExp(`fill="${PLAYER_COLORS.coral}"`));
+  // Windows are lit while a game is being played.
+  assert.match(drawings[7]!, /art-window-lit/);
+  assert.doesNotMatch(draw(createElement(Settlement, { live: 0 })), /art-window-lit/);
+  // Every animation in the stylesheet sits inside a block that only applies when motion is welcome.
+  const css = await readFile('apps/admin/admin.css', 'utf8');
+  const start = css.indexOf('@media (prefers-reduced-motion: no-preference)');
+  assert.ok(start > 0);
+  let depth = 0,
+    end = start;
+  for (let i = css.indexOf('{', start); i < css.length; i++) {
+    if (css[i] === '{') depth++;
+    else if (css[i] === '}' && --depth === 0) {
+      end = i;
+      break;
+    }
+  }
+  for (const match of css.matchAll(/animation(?:-[a-z]+)?\s*:/g))
+    assert.ok(
+      match.index! > start && match.index! < end,
+      `animation at ${match.index} is outside the motion block`,
+    );
 });
 
 test('a seat colour is the game’s own swatch and name, with no inline style', () => {

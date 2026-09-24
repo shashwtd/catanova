@@ -11,12 +11,26 @@ export function Section({
   actions,
   children,
   className = '',
+  art,
 }: {
   title: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** A drawing of what the card is about (art.tsx): beside its content, or by its title on a phone. */
+  art?: ReactNode;
 }) {
+  if (art)
+    return (
+      <section className={`card with-art ${className}`}>
+        <header className="card-head">
+          <h2>{title}</h2>
+          {actions && <div className="card-actions">{actions}</div>}
+        </header>
+        <div className="card-art">{art}</div>
+        <div className="card-body">{children}</div>
+      </section>
+    );
   return (
     <section className={`card ${className}`}>
       <header className="card-head">

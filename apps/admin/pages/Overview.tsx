@@ -5,6 +5,7 @@
  * detail.
  */
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import type {
   AdminOverview,
   LiveGame,
@@ -21,6 +22,7 @@ import {
   dayClock,
   duration,
   localWindows,
+  percent,
   phaseLabel,
   relative,
   short,
@@ -31,6 +33,7 @@ import { Badge, Empty, Failure, LineChart, Loading, Notice, Section, Tabs, When 
 import type { LineSeries } from '../ui.js';
 import { SeatChip, StatusBadge } from './Games.js';
 import { DicePair } from '../dice.js';
+import { CpuChip, Meeples, MemoryStick, Plug, Stopwatch } from '../art.js';
 import { HostReportLines } from './HostReports.js';
 
 const ONLINE_SHOWN = 12;
@@ -230,6 +233,19 @@ function LiveGames({ data }: { data: AdminOverview }) {
   );
 }
 
+/** A performance chart's heading: a drawing of the thing, its name, and its reading now. */
+function MiniHead({ art, title, children }: { art: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <div className="mini-head with-art">
+      {art}
+      <div className="mini-heading">
+        <h3>{title}</h3>
+        <span className="mini-now">{children}</span>
+      </div>
+    </div>
+  );
+}
+
 const RANGES: { value: MetricsRange; label: string; ms: number }[] = [
   { value: '1h', label: '1 h', ms: 3_600_000 },
   { value: '6h', label: '6 h', ms: 6 * 3_600_000 },
@@ -345,10 +361,9 @@ function Performance({ data }: { data: AdminOverview }) {
       )}
       <div className="minis">
         <div>
-          <div className="mini-head">
-            <h3>Event-loop delay</h3>
-            <span className="mini-now">{window.eventLoop.p99Ms} ms p99 now</span>
-          </div>
+          <MiniHead art={<Stopwatch ms={window.eventLoop.p99Ms} />} title="Event-loop delay">
+            <strong>{window.eventLoop.p99Ms} ms</strong> p99 now
+          </MiniHead>
           {chart(
             'Event-loop delay: the worst 1% of timer waits (p99) in each minute, in milliseconds',
             'ms',
@@ -357,10 +372,9 @@ function Performance({ data }: { data: AdminOverview }) {
           )}
         </div>
         <div>
-          <div className="mini-head">
-            <h3>CPU</h3>
-            <span className="mini-now">{window.cpuPercent}% now</span>
-          </div>
+          <MiniHead art={<CpuChip percent={window.cpuPercent} />} title="CPU">
+            <strong>{window.cpuPercent}%</strong> of a core now
+          </MiniHead>
           {chart(
             'Process CPU use, as a share of one core, averaged over each minute',
             '% of a core',
@@ -369,10 +383,14 @@ function Performance({ data }: { data: AdminOverview }) {
           )}
         </div>
         <div>
-          <div className="mini-head">
-            <h3>Memory</h3>
-            <span className="mini-now">{bytes(data.performance.rssBytes)} now</span>
-          </div>
+          <MiniHead
+            art={<MemoryStick used={data.performance.rssBytes} limit={data.performance.memoryLimitBytes} />}
+            title="Memory"
+          >
+            <strong>{bytes(data.performance.rssBytes)}</strong> now,{' '}
+            {percent(data.performance.rssBytes, data.performance.memoryLimitBytes)} of{' '}
+            {bytes(data.performance.memoryLimitBytes)}
+          </MiniHead>
           {chart(
             'Memory: resident size and JavaScript heap in use, in megabytes',
             'MB',
@@ -384,10 +402,9 @@ function Performance({ data }: { data: AdminOverview }) {
           )}
         </div>
         <div>
-          <div className="mini-head">
-            <h3>Sockets</h3>
-            <span className="mini-now">{count(data.performance.sockets)} now</span>
-          </div>
+          <MiniHead art={<Plug sockets={data.performance.sockets} />} title="Sockets">
+            <strong>{count(data.performance.sockets)}</strong> open now
+          </MiniHead>
           {chart(
             'Open WebSocket connections: players, spectators and handshakes',
             'sockets',
@@ -397,12 +414,13 @@ function Performance({ data }: { data: AdminOverview }) {
           )}
         </div>
         <div>
-          <div className="mini-head">
-            <h3>People</h3>
-            <span className="mini-now">
-              {count(data.online.counts.online)} online · {count(data.online.counts.playing)} playing
-            </span>
-          </div>
+          <MiniHead
+            art={<Meeples online={data.online.counts.online} playing={data.online.counts.playing} />}
+            title="People"
+          >
+            <strong>{count(data.online.counts.online)}</strong> online ·{' '}
+            <strong>{count(data.online.counts.playing)}</strong> playing
+          </MiniHead>
           {chart(
             'People online and people playing at a table',
             'people',

@@ -8,6 +8,7 @@ import { useApi } from '../api.js';
 import { bytes, count, duration, percent, time } from '../format.js';
 import { Badge, Empty, Failure, Loading, Notice, Section, Stat, Table, When } from '../ui.js';
 import { HostReports } from './HostReports.js';
+import { CpuChip, Database, DiskTank, MemoryStick, Plug, Settlement, Stopwatch } from '../art.js';
 
 export function ErrorTable({ errors, now }: { errors: ServerErrorEntry[]; now: number }) {
   return (
@@ -64,7 +65,7 @@ export function System() {
       </div>
       <Failure error={error} retry={reload} />
       <div className="grid">
-        <Section title="Process">
+        <Section title="Process" art={<MemoryStick used={proc.memory.rss} limit={proc.memory.limit} />}>
           <div className="stats">
             <Stat label="Revision" value={<code>{data.revision?.slice(0, 12) ?? '—'}</code>} />
             <Stat label="Uptime" value={duration(proc.uptimeSeconds)} />
@@ -79,9 +80,24 @@ export function System() {
               value={bytes(proc.memory.external)}
               hint={`${bytes(proc.memory.arrayBuffers)} in buffers`}
             />
+            <Stat
+              label="May use"
+              value={bytes(proc.memory.limit)}
+              hint={`${percent(proc.memory.rss, proc.memory.limit)} in use · ${
+                proc.memory.limitKind === 'container' ? 'container limit' : 'all of the machine'
+              }`}
+            />
           </div>
         </Section>
-        <Section title="Load">
+        <Section
+          title="Load"
+          art={
+            <>
+              <CpuChip percent={load.window.cpuPercent} />
+              <Stopwatch ms={loop.p99Ms} />
+            </>
+          }
+        >
           <div className="stats">
             <Stat
               label="Event loop delay (p99)"
@@ -99,7 +115,7 @@ export function System() {
             Delay and CPU cover the last {load.windowSeconds} seconds. Overview charts the last day.
           </p>
         </Section>
-        <Section title="Connections">
+        <Section title="Connections" art={<Plug sockets={sockets.total} />}>
           <div className="stats">
             <Stat label="Sockets" value={count(sockets.total)} />
             <Stat label="Seated players" value={count(sockets.players)} hint="connected to a seat" />
@@ -113,7 +129,7 @@ export function System() {
             />
           </div>
         </Section>
-        <Section title="Rooms">
+        <Section title="Rooms" art={<Settlement live={'error' in rooms ? 0 : rooms.live} />}>
           {'error' in rooms ? (
             <Notice tone="critical">Room counts are unavailable: {rooms.error}</Notice>
           ) : (
@@ -137,7 +153,7 @@ export function System() {
             </>
           )}
         </Section>
-        <Section title="Database">
+        <Section title="Database" art={<Database />}>
           <div className="stats">
             <Stat label="File" value={bytes(database.fileBytes)} />
             <Stat
@@ -157,7 +173,14 @@ export function System() {
             <code className="path">{database.path}</code>
           </p>
         </Section>
-        <Section title="Disk">
+        <Section
+          title="Disk"
+          art={
+            'freeBytes' in disk ? (
+              <DiskTank used={disk.totalBytes - disk.freeBytes} total={disk.totalBytes} />
+            ) : undefined
+          }
+        >
           {'freeBytes' in disk ? (
             <>
               <div className="stats">

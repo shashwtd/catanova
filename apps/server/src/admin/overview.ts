@@ -20,7 +20,7 @@ import { whoIsOnline } from './online.js';
 import { indexRoom } from './room-index.js';
 import type { RoomIndex } from './room-index.js';
 import { liveState, openGame, roundStartedAt, seatRows, tableSeats } from './rooms.js';
-import { hostReports } from './system.js';
+import { hostReports, memoryLimit } from './system.js';
 import type { AdminOverview, LiveGame } from './types.js';
 
 /** Games listed on Overview; the Games tab has the rest. */
@@ -119,6 +119,7 @@ export async function overview(
       windowSeconds,
       rssBytes: memory.rss,
       heapUsedBytes: memory.heapUsed,
+      memoryLimitBytes: memoryLimit().limit,
       sockets: sockets.total,
     },
     status: await hostReports(config.statusDir),

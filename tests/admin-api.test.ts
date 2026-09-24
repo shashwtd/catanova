@@ -3,7 +3,7 @@ import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, totalmem } from 'node:os';
 import { startServer } from '../apps/server/src/server.js';
 import { Store } from '../apps/server/src/store.js';
 import type { Identity } from '../apps/server/src/auth.js';
@@ -241,6 +241,10 @@ test('the System tab reports the process, sockets, rooms, database, status files
   assert.equal(overview.revision, 'deadbeef');
   assert.equal(overview.process.node, process.version);
   assert.ok(overview.process.memory.rss > 0 && overview.process.uptimeSeconds >= 0);
+  // What the process may use: the container's limit where one is set, else the machine's memory.
+  assert.ok(overview.process.memory.limit >= overview.process.memory.rss);
+  assert.ok(overview.process.memory.limit <= totalmem());
+  assert.ok(['container', 'machine'].includes(overview.process.memory.limitKind));
   assert.ok(overview.load.window.eventLoop.maxMs >= 0 && overview.load.cores >= 1);
   assert.deepEqual(overview.sockets, { total: 2, players: 2, spectators: 0, pending: 0 });
   assert.deepEqual(overview.players, { connectedSeats: 2, distinctPlayers: 2 });
@@ -484,6 +488,7 @@ test('Overview is the glance: who is online, the live games, today’s and this 
   assert.deepEqual(overview.activity.players, { day: 3, week: 3 });
   assert.deepEqual(overview.activity.newPlayers, { day: 3, week: 3 });
   assert.ok(overview.performance.rssBytes > 0 && overview.performance.sockets === 2);
+  assert.ok(overview.performance.memoryLimitBytes >= overview.performance.rssBytes);
   assert.equal(overview.status.backup.state === 'ok' && overview.status.backup.data.result, 'failure');
   assert.ok(overview.errors.recent.length <= 5 && overview.errors.total >= overview.errors.recent.length);
   assert.match(overview.errors.recent[0]!.message, /Overview test: a recent error/);
