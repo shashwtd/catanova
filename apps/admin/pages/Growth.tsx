@@ -431,7 +431,11 @@ export function Growth({ params }: { params: URLSearchParams }) {
       <div className="duo">
         <Section
           title="Accounts"
-          actions={note(`${count(current.accountsAfter)} · ${count(current.newPlayers)} new ${inRange}`)}
+          actions={note(
+            option.days === null
+              ? `${count(current.accountsAfter)} ${inRange}`
+              : `${count(current.accountsAfter)} · ${count(current.newPlayers)} new ${inRange}`,
+          )}
         >
           <LineChart
             label={`Accounts that had played a game, ${unit} by ${unit}`}
