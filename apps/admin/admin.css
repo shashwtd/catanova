@@ -172,6 +172,12 @@ h3 {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
   gap: 14px;
 }
+/* Two charts of one kind side by side, stacked only on a phone. */
+.duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -200,6 +206,16 @@ h3 {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+/* A card's headline figure beside its title, such as a chart's total; it drops below when there is no room. */
+.card-head:has(.card-note) {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.card-note {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 details.card > summary {
   cursor: pointer;
@@ -1081,7 +1097,8 @@ select {
   .page {
     padding: 12px 12px 40px;
   }
-  .grid {
+  .grid,
+  .duo {
     grid-template-columns: 1fr;
   }
   .stats {

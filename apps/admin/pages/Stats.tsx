@@ -8,9 +8,10 @@ import type {
 } from '../../server/src/admin/types.js';
 import { api, ApiError, useApi } from '../api.js';
 import { count, dateAxis, dayLabel, diceLabel, percent, time, weekLabel } from '../format.js';
-import { Columns, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
+import { Columns, countMax, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
 
 const TOTALS = Array.from({ length: 11 }, (_, i) => String(i + 2));
+const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
 /** A dice chart's column by name: "Total 7". */
 export const totalLabel = (index: number) => `Total ${index + 2}`;
@@ -180,6 +181,9 @@ export function Stats() {
   const stats = data?.value;
   const days = stats?.days.map((day) => day.day) ?? [];
   const weeks = stats?.weeks.map((week) => week.week) ?? [];
+  const gamesMax = countMax(
+    Math.max(1, ...(stats?.days ?? []).flatMap((day) => [day.started, day.finished + day.abandoned])),
+  );
   return (
     <div className="stack">
       <div className="toolbar">
@@ -234,50 +238,82 @@ export function Stats() {
               </div>
             </Section>
           </div>
-          <Section title="Games started per day" className="wide">
-            <Columns
-              label="Games started per day over the last 30 days"
-              categories={days}
-              axis={(band) => dateAxis(days, band)}
-              pointLabel={(i) => dayLabel(days[i]!)}
-              series={[{ name: 'Started', slot: 1, values: stats.days.map((day) => day.started) }]}
-            />
-          </Section>
-          <Section title="Games ended per day" className="wide">
-            <Columns
-              label="Games finished and abandoned per day over the last 30 days"
-              categories={days}
-              axis={(band) => dateAxis(days, band)}
-              pointLabel={(i) => dayLabel(days[i]!)}
-              series={[
-                { name: 'Finished', slot: 3, values: stats.days.map((day) => day.finished) },
-                { name: 'Abandoned', slot: 2, values: stats.days.map((day) => day.abandoned) },
-              ]}
-            />
-          </Section>
-          <Section title="Players per day" className="wide">
-            <Columns
-              label="Distinct accounts that played each day"
-              categories={days}
-              axis={(band) => dateAxis(days, band)}
-              pointLabel={(i) => dayLabel(days[i]!)}
-              series={[{ name: 'Players', slot: 1, values: stats.days.map((day) => day.players) }]}
-            />
-          </Section>
-          <Section title="Players per week" className="wide">
-            <Columns
-              label="Distinct accounts that played each week"
-              categories={weeks}
-              axis={(band) => dateAxis(weeks, band, 'week')}
-              pointLabel={(i) => weekLabel(weeks[i]!)}
-              series={[{ name: 'Players', slot: 1, values: stats.weeks.map((week) => week.players) }]}
-              table="Week (UTC)"
-            />
-            <p className="footnote">
-              Distinct accounts that started a match that day or week (UTC; weeks start on Monday). Local
-              seats without an account are not counted.
-            </p>
-          </Section>
+          {/* Games and players, each pair side by side; the two game charts share a scale. */}
+          <div className="duo">
+            <Section
+              title="Games started per day"
+              actions={
+                <span className="card-note">
+                  {count(sum(stats.days.map((day) => day.started)))} in 30 days
+                </span>
+              }
+            >
+              <Columns
+                label="Games started per day over the last 30 days"
+                categories={days}
+                axis={(band) => dateAxis(days, band)}
+                pointLabel={(i) => dayLabel(days[i]!)}
+                series={[{ name: 'Started', slot: 1, values: stats.days.map((day) => day.started) }]}
+                max={gamesMax}
+              />
+            </Section>
+            <Section
+              title="Games ended per day"
+              actions={
+                <span className="card-note">
+                  {count(sum(stats.days.map((day) => day.finished)))} finished ·{' '}
+                  {count(sum(stats.days.map((day) => day.abandoned)))} abandoned
+                </span>
+              }
+            >
+              <Columns
+                label="Games finished and abandoned per day over the last 30 days"
+                categories={days}
+                axis={(band) => dateAxis(days, band)}
+                pointLabel={(i) => dayLabel(days[i]!)}
+                series={[
+                  { name: 'Finished', slot: 3, values: stats.days.map((day) => day.finished) },
+                  { name: 'Abandoned', slot: 2, values: stats.days.map((day) => day.abandoned) },
+                ]}
+                max={gamesMax}
+              />
+            </Section>
+          </div>
+          <div className="duo">
+            <Section
+              title="Players per day"
+              actions={
+                <span className="card-note">
+                  up to {count(Math.max(0, ...stats.days.map((day) => day.players)))} a day
+                </span>
+              }
+            >
+              <Columns
+                label="Distinct accounts that played each day"
+                categories={days}
+                axis={(band) => dateAxis(days, band)}
+                pointLabel={(i) => dayLabel(days[i]!)}
+                series={[{ name: 'Players', slot: 1, values: stats.days.map((day) => day.players) }]}
+              />
+            </Section>
+            <Section
+              title="Players per week"
+              actions={<span className="card-note">{count(stats.weeks.at(-1)?.players ?? 0)} this week</span>}
+            >
+              <Columns
+                label="Distinct accounts that played each week"
+                categories={weeks}
+                axis={(band) => dateAxis(weeks, band, 'week')}
+                pointLabel={(i) => weekLabel(weeks[i]!)}
+                series={[{ name: 'Players', slot: 1, values: stats.weeks.map((week) => week.players) }]}
+                table="Week (UTC)"
+              />
+            </Section>
+          </div>
+          <p className="footnote">
+            Days and weeks are UTC; weeks start on Monday. Players are distinct accounts that started a match
+            that day or week; local seats without an account are not counted.
+          </p>
           <details className="card wide">
             <summary>Daily numbers</summary>
             <Table className="compact">

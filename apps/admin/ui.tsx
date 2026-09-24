@@ -175,8 +175,8 @@ export const niceMax = (value: number) => {
   return Math.ceil(value / step) * step;
 };
 
-/** A top for a count axis whose middle tick is a whole number too. */
-const countMax = (value: number) => {
+/** A top for a count axis whose middle tick is a whole number too; charts side by side can share one. */
+export const countMax = (value: number) => {
   const nice = niceMax(value);
   return nice % 2 ? nice + 1 : nice;
 };
@@ -494,8 +494,9 @@ export function Columns({
     axisHeight = 22,
     extraHeight = below?.height ?? 0;
   const plot = height - top - axisHeight;
-  // Columns share the width available, between a thin minimum (the frame scrolls below it) and a readable maximum.
-  const band = Math.max(4, Math.min(56, available ? (available - left - 6) / n : 22));
+  // Columns share the width available, between a thin minimum (the frame scrolls below it) and a
+  // maximum past which a few columns would drift too far apart; a bar itself is never over 24px.
+  const band = Math.max(4, Math.min(72, available ? (available - left - 6) / n : 22));
   const gap = Math.min(12, Math.max(2, Math.round(band * 0.3)));
   const width = Math.max(2, Math.min(24, Math.floor(band - gap)));
   const chartWidth = Math.ceil(left + n * band + 6);
