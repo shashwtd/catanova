@@ -91,6 +91,72 @@ export function timeTicks(from: number, to: number): number[] {
   return ticks;
 }
 
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Midnight UTC of a UTC day written as 2026-09-16. */
+export const utcDay = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+
+/** The UTC day of a moment, as 2026-09-16. */
+export const isoDay = (at: number) => new Date(at).toISOString().slice(0, 10);
+
+/** "16 Sep", with the year when it is not the current one: "16 Sep 2025". */
+export function dayMonth(iso: string, now = Date.now()): string {
+  const date = new Date(utcDay(iso));
+  const year = date.getUTCFullYear() === new Date(now).getUTCFullYear() ? '' : ` ${date.getUTCFullYear()}`;
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}${year}`;
+}
+
+/** A UTC day in full: "Tue 16 Sep" (or "Tue 16 Sep 2025" in another year). */
+export const dayLabel = (iso: string, now = Date.now()) =>
+  `${WEEKDAYS[new Date(utcDay(iso)).getUTCDay()]} ${dayMonth(iso, now)}`;
+
+/** A week named by its Monday: "Week of 15 Sep". */
+export const weekLabel = (iso: string, now = Date.now()) => `Week of ${dayMonth(iso, now)}`;
+
+/**
+ * Which of a run of UTC days, or of weeks named by their Monday, to label on a
+ * chart's axis, given the width each one has: every one when there is room,
+ * otherwise every other one, Mondays, every other Monday, or the first of each
+ * month, quarter or year, whichever first keeps the labels clear of each
+ * other. Alternate labels are counted back from the latest, so the latest is
+ * labelled. Days read "16 Sep"; months by name, with the year on January and
+ * on the first month labelled.
+ */
+export function dateAxis(
+  days: string[],
+  band: number,
+  unit: 'day' | 'week' = 'day',
+): (index: number) => string | null {
+  const fits = (every: number, characters = 7) => every * band >= characters * 6.2 + 14;
+  const dates = days.map((day) => new Date(utcDay(day)));
+  const back = (i: number) => days.length - 1 - i;
+  // A day in an earlier year than the chart's latest says which.
+  const latest = days.length ? utcDay(days.at(-1)!) : Date.now();
+  const label = (i: number) => dayMonth(days[i]!, latest);
+  if (fits(1)) return label;
+  if (fits(2)) return (i) => (back(i) % 2 === 0 ? label(i) : null);
+  if (unit === 'day' && fits(7)) return (i) => (dates[i]!.getUTCDay() === 1 ? label(i) : null);
+  if (unit === 'day' && fits(14)) {
+    const lastMonday = dates.findLastIndex((date) => date.getUTCDay() === 1);
+    return (i) => (dates[i]!.getUTCDay() === 1 && ((lastMonday - i) / 7) % 2 === 0 ? label(i) : null);
+  }
+  const perMonth = unit === 'day' ? 30.4 : 4.35;
+  const months = fits(perMonth, 8) ? 1 : fits(3 * perMonth, 8) ? 3 : 12;
+  // A day opens its month on the 1st; a week, when its Monday is among the month's first seven days.
+  const opens = (i: number) =>
+    (unit === 'day' ? dates[i]!.getUTCDate() === 1 : dates[i]!.getUTCDate() <= 7) &&
+    dates[i]!.getUTCMonth() % months === 0;
+  const first = days.findIndex((_, i) => opens(i));
+  return (i) => {
+    if (!opens(i)) return null;
+    const date = dates[i]!;
+    return date.getUTCMonth() === 0 || i === first
+      ? `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+      : MONTHS[date.getUTCMonth()]!;
+  };
+}
+
 /** Dice modes by the names players see in the lobby. */
 export const DICE_LABELS: Record<string, string> = {
   classic: 'Natural',

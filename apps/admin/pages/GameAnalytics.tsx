@@ -11,7 +11,7 @@ import { RESOURCE_NAMES, RESOURCES } from '../../../packages/rules/src/index.js'
 import { useApi } from '../api.js';
 import { accountLabel, count, diceLabel, duration, time } from '../format.js';
 import { Badge, Columns, Empty, Failure, LineChart, Loading, Section, Stat, Table, When } from '../ui.js';
-import { DiceTable, expectationName, fairness } from './Stats.js';
+import { DiceTable, expectationName, fairness, rollCount, totalLabel } from './Stats.js';
 
 type Slot = 1 | 2 | 3 | 4;
 /** Each player keeps one chart colour everywhere on the page, by their place in turn order. */
@@ -532,6 +532,8 @@ export function GameAnalyticsView({
               <Columns
                 label={`Rolls of each total in this game, against ${expectationName(game.dice).toLowerCase()}`}
                 categories={Array.from({ length: 11 }, (_, i) => String(i + 2))}
+                pointLabel={totalLabel}
+                format={rollCount}
                 series={[{ name: 'Rolled', slot: 1, values: game.dice.counts }]}
                 reference={{ name: expectationName(game.dice), values: game.dice.expected }}
               />

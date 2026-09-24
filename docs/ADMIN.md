@@ -31,6 +31,8 @@ Players ──HTTPS──▶ Caddy :443 ──▶ game:3000   public game; never
 - **Stats** has all-time and 30-day numbers, games per day and the dice across every game, judged separately for each dice mode. **Feedback** is the players' inbox, and **Audit** the log of every change and private view.
 - **System** has the detail Overview leaves out: the process, event-loop delay, connections, rooms, the database and its journal, disk space, the host reports in full, recent server errors and refused admin requests.
 
+Every chart says exactly what each bar or point is: its whole date ("Tue 16 Sep", "Week of 15 Sep") or name ("Total 7") and each series' value there, on hover, on a tap (until the next tap elsewhere), and from the keyboard (Tab to the chart, then the arrow keys, Home, End and Escape, which a screen reader announces too). Axes label only the dates that fit, such as Mondays or the first of each month. The numbers behind each chart are in its "Show the numbers" table or a table beside it.
+
 Who is online comes from the game server's presence (`GameRuntime.online()`), which reports every signed-in account with Catanova open, wherever they are in it. Where it is not provided, only people connected to a room are listed, and Overview says so.
 
 The pages read these endpoints, all behind the checks below: `GET /api/admin/overview?day=&week=` (the dashboard), `/metrics?range=1h|6h|24h` (performance history), `/system`, `/games`, `/games/<room>`, `/games/<room>/history`, `/games/<room>/analytics[?round=<archived round>]`, `/games/<room>/private` (audited), `/players?sort=lastSeen|games|wins|joined|name&dir=&page=&q=`, `/players/<id>`, `/stats`, `/reports/retention`, `/feedback` and `/audit`.

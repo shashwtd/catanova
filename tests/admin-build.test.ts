@@ -7,9 +7,22 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { build } from 'vite';
 import { loadAdminAssets } from '../apps/server/src/admin/assets.js';
-import { Columns, LineChart, PlayerColour } from '../apps/admin/ui.js';
+import { Columns, LineChart, PlayerColour, columnTip, tipText } from '../apps/admin/ui.js';
 import { parseRoute } from '../apps/admin/route.js';
-import { accountLabel, clock, diceLabel, localWindows, timeTicks } from '../apps/admin/format.js';
+import {
+  accountLabel,
+  clock,
+  count,
+  dateAxis,
+  dayLabel,
+  dayMonth,
+  diceLabel,
+  isoDay,
+  localWindows,
+  timeTicks,
+  utcDay,
+  weekLabel,
+} from '../apps/admin/format.js';
 import { fairness } from '../apps/admin/pages/Stats.js';
 import { detailPairs } from '../apps/admin/pages/Audit.js';
 import { diceSummary, FAIR_DICE } from '../apps/server/src/admin/analysis.js';
@@ -73,7 +86,11 @@ test('admin charts and routes are plain markup: no inline styles, and ids never 
   );
   assert.doesNotMatch(chart, /style=/);
   assert.match(chart, /role="img" aria-label="Rolls"/);
-  assert.equal((chart.match(/<title>/g) ?? []).length, 3, 'every column has a tooltip');
+  assert.match(chart, /tabindex="0"/, 'reachable by keyboard for its tooltip');
+  assert.equal((chart.match(/class="chart-column/g) ?? []).length, 3);
+  assert.match(chart, /class="chart-hit"/, 'one pointer layer reads whichever column is nearest');
+  assert.doesNotMatch(chart, /<title>/, 'no native tooltip doubling the drawn one');
+  assert.match(chart, /aria-live="polite"/, 'the keyboard reading is announced');
   assert.match(chart, /Finished<\/span>.*Abandoned<\/span>.*Expected<\/span>/s, 'a legend for two series');
   assert.deepEqual(parseRoute('#/games/AB2C?status=live'), {
     page: 'games',
@@ -82,6 +99,94 @@ test('admin charts and routes are plain markup: no inline styles, and ids never 
   });
   assert.equal(parseRoute('#/unknown').page, 'overview');
   assert.equal(parseRoute('#/games/%E0%A4%A').id, undefined, 'a malformed id is ignored');
+});
+
+test('every column says exactly what it is: its whole date and each value there, in its tooltip and its table', () => {
+  const now = Date.UTC(2026, 8, 24, 15);
+  const days = ['2026-09-20', '2026-09-21', '2026-09-22'];
+  const series = [
+    { name: 'Finished', slot: 3 as const, values: [2, 0, 5] },
+    { name: 'Abandoned', slot: 2 as const, values: [1, 1, 0] },
+  ];
+  const lines = [{ name: '7-day average', paint: 'ink' as const, values: [null, 1.5, 2.8] }];
+  // Read from the top of the stack down, then the lines over it.
+  const tip = columnTip(1, { title: dayLabel(days[1]!, now), series, lines, format: count });
+  assert.deepEqual(tip, {
+    title: 'Mon 21 Sep',
+    rows: [
+      { mark: 'bar', paint: 2, value: '1', name: 'Abandoned' },
+      { mark: 'bar', paint: 3, value: '0', name: 'Finished' },
+      { mark: 'line', paint: 'ink', value: '1.5', name: '7-day average' },
+    ],
+  });
+  assert.equal(tipText(tip), 'Mon 21 Sep: Abandoned 1, Finished 0, 7-day average 1.5');
+  assert.equal(
+    columnTip(0, { title: 'Sun 20 Sep', series: [], lines, format: count }).rows[0]!.value,
+    '—',
+    'a missing value reads as missing',
+  );
+  const chart = renderToStaticMarkup(
+    createElement(Columns, {
+      label: 'Games ended per day',
+      categories: days,
+      axis: (band: number) => dateAxis(days, band),
+      pointLabel: (i: number) => dayLabel(days[i]!, now),
+      series,
+      lines,
+      table: 'Day (UTC)',
+    }),
+  );
+  assert.doesNotMatch(chart, /style=/);
+  assert.match(chart, /<summary>Show the numbers<\/summary>/);
+  assert.match(
+    chart,
+    /<td class="nowrap">Mon 21 Sep<\/td><td class="num">0<\/td><td class="num">1<\/td><td class="num">1.5<\/td>/,
+  );
+  assert.match(chart, /<td class="nowrap">Sun 20 Sep<\/td>.*?<td class="num">—<\/td>/);
+  assert.match(
+    chart,
+    /class="chart-line line-ink" d="M[\d.]+,[\d.]+L[\d.]+,[\d.]+"/,
+    'the line starts at its first value',
+  );
+});
+
+test('date axes label what fits: every day, Mondays, months or quarters, and the year where it changes', () => {
+  const now = Date.UTC(2026, 8, 24, 12);
+  const run = (last: string, n: number, stepDays: number) =>
+    Array.from({ length: n }, (_, i) => isoDay(utcDay(last) - (n - 1 - i) * stepDays * 86_400_000));
+  const labels = (days: string[], band: number, unit: 'day' | 'week' = 'day') => {
+    const pick = dateAxis(days, band, unit);
+    return days.map((_, i) => pick(i)).filter((label): label is string => label !== null);
+  };
+  const month = run('2026-09-24', 30, 1);
+  assert.deepEqual(labels(month, 18), ['31 Aug', '7 Sep', '14 Sep', '21 Sep'], 'Mondays at 18px a day');
+  assert.equal(labels(month, 60).length, 30, 'every day when there is room');
+  assert.deepEqual(
+    labels(month, 30).slice(-2),
+    ['22 Sep', '24 Sep'],
+    'every other day, ending on the latest',
+  );
+  assert.deepEqual(
+    labels(run('2026-09-24', 90, 1), 5).slice(-3),
+    ['24 Aug', '7 Sep', '21 Sep'],
+    'every other Monday across a quarter, ending on the latest',
+  );
+  assert.deepEqual(
+    labels(run('2026-09-24', 180, 1), 2.5),
+    ['Apr 2026', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+    'months across half a year, the first with its year',
+  );
+  const year = run('2026-09-21', 53, 7);
+  assert.deepEqual(
+    labels(year, 10, 'week'),
+    ['Oct 2025', 'Jan 2026', 'Apr', 'Jul'],
+    'quarters over a year of weeks',
+  );
+  assert.deepEqual(labels(run('2026-09-21', 8, 7), 60, 'week').slice(0, 2), ['3 Aug', '10 Aug']);
+  assert.equal(dayLabel('2026-09-16', now), 'Wed 16 Sep');
+  assert.equal(dayLabel('2025-12-31', now), 'Wed 31 Dec 2025', 'another year says so');
+  assert.equal(weekLabel('2026-09-14', now), 'Week of 14 Sep');
+  assert.equal(dayMonth('2026-01-05', now), '5 Jan');
 });
 
 test('a seat colour is the game’s own swatch and name, with no inline style', () => {

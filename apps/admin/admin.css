@@ -663,11 +663,34 @@ details > summary {
   stroke: var(--axis);
   stroke-width: 1;
 }
-.chart-hit {
+.chart-hit,
+.chart-slot {
   fill: transparent;
 }
-.chart-column:hover .chart-hit {
-  fill: rgba(255, 255, 255, 0.04);
+/* The column being read lifts: a faint wash behind it. */
+.chart-column.is-active .chart-slot {
+  fill: rgba(255, 255, 255, 0.05);
+}
+/* Columns recede when lines drawn over them carry the story. */
+.chart-column.soft path {
+  opacity: 0.45;
+}
+.chart-column.soft.is-active path {
+  opacity: 0.7;
+}
+.columns-chart svg,
+.heatmap svg {
+  touch-action: pan-y;
+}
+.columns-chart svg:focus,
+.heatmap svg:focus {
+  outline: none;
+}
+.columns-chart svg:focus-visible,
+.heatmap svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
 }
 .chart-reference {
   stroke: var(--ink);
@@ -765,6 +788,16 @@ details > summary {
 .line-bg-4 {
   background: var(--series-4);
 }
+/* Ink: a trend or reference line drawn over the series, never a series itself. */
+.line-ink {
+  stroke: var(--ink-2);
+}
+.dot-ink {
+  fill: var(--ink-2);
+}
+.line-bg-ink {
+  background: var(--ink-2);
+}
 .swatch-line {
   width: 14px;
   height: 2px;
@@ -788,6 +821,28 @@ details > summary {
 }
 .chart-area {
   opacity: 0.1;
+}
+/* A range around a line, such as the middle half of game lengths. */
+.chart-band-area,
+.chart-tip-band {
+  opacity: 0.18;
+}
+.swatch-band {
+  width: 14px;
+  height: 8px;
+  opacity: 0.35;
+}
+.area-bg-1 {
+  background: var(--series-1);
+}
+.area-bg-2 {
+  background: var(--series-2);
+}
+.area-bg-3 {
+  background: var(--series-3);
+}
+.area-bg-4 {
+  background: var(--series-4);
 }
 .area-1 {
   fill: var(--series-1);

@@ -7,10 +7,15 @@ import type {
   RetentionReport,
 } from '../../server/src/admin/types.js';
 import { api, ApiError, useApi } from '../api.js';
-import { count, diceLabel, percent, time } from '../format.js';
+import { count, dateAxis, dayLabel, diceLabel, percent, time, weekLabel } from '../format.js';
 import { Columns, Empty, Failure, Loading, Section, Stat, Table, Tabs } from '../ui.js';
 
 const TOTALS = Array.from({ length: 11 }, (_, i) => String(i + 2));
+
+/** A dice chart's column by name: "Total 7". */
+export const totalLabel = (index: number) => `Total ${index + 2}`;
+/** Rolls are whole; an expectation reads to a tenth. */
+export const rollCount = (value: number) => (Number.isInteger(value) ? count(value) : value.toFixed(1));
 
 export function DiceTable({ dice }: { dice: DiceSummary }) {
   return (
@@ -173,6 +178,8 @@ export function Stats() {
     `/api/admin/stats${refresh ? `?refresh=1&n=${refresh}` : ''}`,
   );
   const stats = data?.value;
+  const days = stats?.days.map((day) => day.day) ?? [];
+  const weeks = stats?.weeks.map((week) => week.week) ?? [];
   return (
     <div className="stack">
       <div className="toolbar">
@@ -230,35 +237,41 @@ export function Stats() {
           <Section title="Games started per day" className="wide">
             <Columns
               label="Games started per day over the last 30 days"
-              categories={stats.days.map((day) => day.day.slice(5))}
+              categories={days}
+              axis={(band) => dateAxis(days, band)}
+              pointLabel={(i) => dayLabel(days[i]!)}
               series={[{ name: 'Started', slot: 1, values: stats.days.map((day) => day.started) }]}
-              every={5}
             />
           </Section>
           <Section title="Games ended per day" className="wide">
             <Columns
               label="Games finished and abandoned per day over the last 30 days"
-              categories={stats.days.map((day) => day.day.slice(5))}
+              categories={days}
+              axis={(band) => dateAxis(days, band)}
+              pointLabel={(i) => dayLabel(days[i]!)}
               series={[
                 { name: 'Finished', slot: 3, values: stats.days.map((day) => day.finished) },
                 { name: 'Abandoned', slot: 2, values: stats.days.map((day) => day.abandoned) },
               ]}
-              every={5}
             />
           </Section>
           <Section title="Players per day" className="wide">
             <Columns
               label="Distinct accounts that played each day"
-              categories={stats.days.map((day) => day.day.slice(5))}
+              categories={days}
+              axis={(band) => dateAxis(days, band)}
+              pointLabel={(i) => dayLabel(days[i]!)}
               series={[{ name: 'Players', slot: 1, values: stats.days.map((day) => day.players) }]}
-              every={5}
             />
           </Section>
           <Section title="Players per week" className="wide">
             <Columns
               label="Distinct accounts that played each week"
-              categories={stats.weeks.map((week) => week.week.slice(5))}
+              categories={weeks}
+              axis={(band) => dateAxis(weeks, band, 'week')}
+              pointLabel={(i) => weekLabel(weeks[i]!)}
               series={[{ name: 'Players', slot: 1, values: stats.weeks.map((week) => week.players) }]}
+              table="Week (UTC)"
             />
             <p className="footnote">
               Distinct accounts that started a match that day or week (UTC; weeks start on Monday). Local
@@ -280,7 +293,7 @@ export function Stats() {
               <tbody>
                 {[...stats.days].reverse().map((day) => (
                   <tr key={day.day}>
-                    <td>{day.day}</td>
+                    <td className="nowrap">{dayLabel(day.day)}</td>
                     <td className="num">{day.started}</td>
                     <td className="num">{day.finished}</td>
                     <td className="num">{day.abandoned}</td>
@@ -296,6 +309,8 @@ export function Stats() {
                 <Columns
                   label={`Rolls of each total across every game, against ${expectationName(stats.dice.overall).toLowerCase()}`}
                   categories={TOTALS}
+                  pointLabel={totalLabel}
+                  format={rollCount}
                   series={[{ name: 'Rolled', slot: 1, values: stats.dice.overall.counts }]}
                   reference={{
                     name: expectationName(stats.dice.overall),
