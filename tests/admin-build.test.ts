@@ -234,6 +234,15 @@ test('date axes label what fits: every day, Mondays, months or quarters, and the
     ['Oct 2025', 'Jan 2026', 'Apr', 'Jul'],
     'quarters over a year of weeks',
   );
+  // A year and a bit of weeks on a phone: years alone would leave "Jan 2026" by itself.
+  const longer = run('2026-09-21', 60, 7);
+  assert.deepEqual(
+    labels(longer, 4.5, 'week'),
+    ['Oct', 'Jan 2026', 'Apr', 'Jul'],
+    'quarters, the first without its year',
+  );
+  assert.deepEqual(labels(longer, 3, 'week'), ['Jan 2026', 'Jul'], 'half-years when quarters do not fit');
+  assert.deepEqual(labels(run('2026-09-21', 160, 7), 1.5, 'week'), ['Jan 2024', 'Jan 2025', 'Jan 2026']);
   assert.deepEqual(labels(run('2026-09-21', 8, 7), 60, 'week').slice(0, 2), ['3 Aug', '10 Aug']);
   assert.equal(dayLabel('2026-09-16', now), 'Wed 16 Sep');
   assert.equal(dayLabel('2025-12-31', now), 'Wed 31 Dec 2025', 'another year says so');

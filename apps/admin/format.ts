@@ -125,9 +125,11 @@ export const monthLabel = (iso: string) => {
  * chart's axis, given the width each one has: every one when there is room,
  * otherwise every other one, Mondays, every other Monday, or the first of each
  * month, quarter or year, whichever first keeps the labels clear of each
- * other. Alternate labels are counted back from the latest, so the latest is
- * labelled. Days read "16 Sep"; months by name, with the year on January and
- * on the first month labelled.
+ * other; where years would leave one label alone, quarters or half-years when
+ * they fit as written. Alternate labels are counted back from the latest, so
+ * the latest is labelled. Days read "16 Sep"; months by name, with the year on
+ * January and on the first month labelled (unless a January follows it among
+ * quarters or half-years that only fit that way).
  */
 export function dateAxis(
   days: string[],
@@ -161,17 +163,39 @@ export function dateAxis(
   const perMonth = unit === 'day' ? 30.4 : 4.35;
   const months = fits(perMonth, 8) ? 1 : fits(3 * perMonth, 8) ? 3 : 12;
   // A day opens its month on the 1st; a week, when its Monday is among the month's first seven days.
-  const opens = (i: number) =>
+  const opens = (i: number, every: number) =>
     (unit === 'day' ? dates[i]!.getUTCDate() === 1 : dates[i]!.getUTCDate() <= 7) &&
-    dates[i]!.getUTCMonth() % months === 0;
-  const first = days.findIndex((_, i) => opens(i));
-  return (i) => {
-    if (!opens(i)) return null;
-    const date = dates[i]!;
-    return date.getUTCMonth() === 0 || i === first
-      ? `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
-      : MONTHS[date.getUTCMonth()]!;
+    dates[i]!.getUTCMonth() % every === 0;
+  const monthly = (every: number, firstYear = true) => {
+    const first = days.findIndex((_, i) => opens(i, every));
+    return (i: number) => {
+      if (!opens(i, every)) return null;
+      const date = dates[i]!;
+      return date.getUTCMonth() === 0 || (firstYear && i === first)
+        ? `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+        : MONTHS[date.getUTCMonth()]!;
+    };
   };
+  const chosen = monthly(months);
+  const shown = (pick: (i: number) => string | null) =>
+    days.flatMap((_, i) => (pick(i) === null ? [] : [{ i, text: pick(i)! }]));
+  if (months < 12 || shown(chosen).length > 1) return chosen;
+  // Years alone can leave a single label, as for a year and a bit on a phone. Quarters or
+  // half-years read better when their labels, as written, clear each other; the first then goes
+  // without its year, since the January after it names the year.
+  for (const every of [3, 6]) {
+    const pick = monthly(every, false);
+    const labels = shown(pick);
+    const named = labels.some(({ i }) => dates[i]!.getUTCMonth() === 0);
+    const clear = labels.every(
+      (label, k) =>
+        k === 0 ||
+        (label.i - labels[k - 1]!.i) * band >=
+          ((label.text.length + labels[k - 1]!.text.length) / 2) * 6.2 + 14,
+    );
+    if (named && labels.length > 1 && clear) return pick;
+  }
+  return chosen;
 }
 
 /** A change against an earlier value, as a signed share: "+12%", "−8%", or null when there is nothing to compare. */
