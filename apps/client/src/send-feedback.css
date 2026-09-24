@@ -74,12 +74,6 @@
   .feedback-message textarea {
     font-size: 16px;
   }
-  /* Phone dialogs give every input a 44px touch height; the switch keeps its
-     own shape and gets its touch height from its label instead. */
-  .game-dialog .feedback-form .settings-switch input,
-  .playing .game-panel .feedback-form .settings-switch input {
-    min-height: 0;
-  }
 }
 .feedback-thanks {
   display: flex;
