@@ -5,6 +5,9 @@ those assumptions have to go, in what order, and what each step actually costs.
 Read the first two sections before the phases: almost every estimate later on
 follows from them.
 
+For every variation of the game, the order to build them in, and the knights
+expansion in detail, see [Game modes](GAME-MODES.md), which this plan sits under.
+
 Rules research is summarised at the end, with sources. Nothing here reproduces
 rulebook text; game mechanics are described in our own words so we can build
 them, which is the same basis the existing rulebook doc is written on.
