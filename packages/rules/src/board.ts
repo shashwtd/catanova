@@ -139,6 +139,25 @@ export function topology(shape: BoardShape = CLASSIC_SHAPE): Omit<Board, 'seed' 
   return { hexes, vertices, edges };
 }
 
+/**
+ * Whether a hex is land. Every hex is, for now: Open Sea makes the sea out of hexes of its own terrain
+ * (docs/BIGGER-MAPS-AND-MODES.md, Phase 2). Whatever looks for the coast asks this, rather than counting an
+ * edge's hexes, because once the sea is hexes too every inland-looking edge touches two of them.
+ */
+export const isLand = (hex: { terrain: string }) => hex.terrain !== 'sea';
+/**
+ * An edge is on the coast when exactly one of the hexes it touches is land. That is an edge between land and sea,
+ * or an edge of a land hex at the rim of the board, where nothing lies beyond. The rim of a sea hex is open water.
+ */
+export const isCoastalEdge = (board: Pick<Board, 'hexes'>, edge: Edge) =>
+  edge.hexes.filter((id) => isLand(board.hexes[id]!)).length === 1;
+/** The land side of a coastal edge: the hex its harbour serves and its ship moors off. */
+export function shoreHex(board: Pick<Board, 'hexes'>, edge: Edge): Hex {
+  const land = edge.hexes.map((id) => board.hexes[id]!).filter(isLand);
+  if (land.length !== 1) throw new Error('Only a coastal edge has a shore');
+  return land[0]!;
+}
+
 const red = (n: number) => n === 6 || n === 8;
 /**
  * Numbers that may not share a border, and the issue each pairing raises. Red numbers together stack the
@@ -232,12 +251,12 @@ function harbourLayouts(graph: Pick<Board, 'hexes' | 'vertices' | 'edges'>): Edg
     y: graph.vertices[e.a]!.y + graph.vertices[e.b]!.y,
   });
   const sea = (e: Edge) => ({
-    x: out(e).x - graph.hexes[e.hexes[0]!]!.x,
-    y: out(e).y - graph.hexes[e.hexes[0]!]!.y,
+    x: out(e).x - shoreHex(graph, e).x,
+    y: out(e).y - shoreHex(graph, e).y,
   });
   const apart = (e: Edge, f: Edge) => Math.hypot(sea(e).x - sea(f).x, sea(e).y - sea(f).y) > 2;
   const coast = graph.edges
-    .filter((e) => e.hexes.length === 1)
+    .filter((e) => isCoastalEdge(graph, e))
     .sort((a, b) => Math.atan2(out(a).y, out(a).x) - Math.atan2(out(b).y, out(b).x));
   return coast
     .map((_, offset) => HARBOUR_SLOTS.map((slot) => coast[(slot + offset) % coast.length]!))

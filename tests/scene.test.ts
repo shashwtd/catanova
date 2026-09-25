@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateBoard } from '../packages/rules/src/board.js';
+import { generateBoard, hexagon, hexDistance, isCoastalEdge } from '../packages/rules/src/board.js';
 import {
   coastline,
   HEX_SIZE,
@@ -17,6 +17,7 @@ import {
   SHIP_COAST_DISTANCE,
   WATER_FEATHER,
 } from '../apps/client/src/scene.js';
+import { bareBoard, flood } from './board-shapes.js';
 
 test('the calm continuous water band follows the coast and leaves room for its shadow within the scene', () => {
   const board = generateBoard(42),
@@ -141,6 +142,38 @@ test('coast-aligned ships and outer trade badges fit every coast, with separate 
       /coastal edge/,
     );
   }
+});
+
+test('a harbour on a coast of sea hexes is posed exactly as it is on the rim of the board', () => {
+  const classic = generateBoard(42),
+    ringed = flood(bareBoard(hexagon(3)), (h) => hexDistance(h, { q: 0, r: 0 }) <= 2);
+  const at = (x: number, y: number) => `${Math.round(x * 1000) || 0},${Math.round(y * 1000) || 0}`;
+  const expected = new Map(
+    classic.edges
+      .filter((e) => e.hexes.length === 1)
+      .map((e) => portPlacement(classic, e.id))
+      .map((pose) => [at(pose.x, pose.y), pose]),
+  );
+  const close = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-9, `${a} is not ${b}`);
+  const coast = ringed.edges.filter((e) => isCoastalEdge(ringed, e));
+  assert.equal(coast.length, 30);
+  for (const e of coast) {
+    const pose = portPlacement(ringed, e.id),
+      want = expected.get(at(pose.x, pose.y))!;
+    for (const key of ['nx', 'ny', 'boatX', 'boatY', 'markerX', 'markerY'] as const)
+      close(pose[key], want[key]);
+    close(((pose.angle - want.angle + 540) % 360) - 180, 0);
+    const piers = (p: typeof pose) =>
+      p.bridges
+        .map((b) => [b.from.x, b.from.y, b.to.x, b.to.y])
+        .sort((a, b) => Math.round(a[0]! - b[0]!) || a[1]! - b[1]!);
+    piers(pose).forEach((pier, i) => pier.forEach((n, k) => close(n, piers(want)[i]![k]!)));
+  }
+  for (const e of [
+    ringed.edges.find((e) => e.hexes.every((h) => hexDistance(ringed.hexes[h]!, { q: 0, r: 0 }) === 3))!,
+    ringed.edges.find((e) => e.hexes.length === 1)!,
+  ])
+    assert.throws(() => portPlacement(ringed, e.id), /coastal edge/, 'open water has no harbour');
 });
 
 test('the feather mask covers the entire coast and becomes transparent before the world boundary', () => {

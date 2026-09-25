@@ -5,12 +5,14 @@ import {
   generateBoard,
   hexagon,
   hexDistance,
+  isCoastalEdge,
+  shoreHex,
   topology,
 } from '../packages/rules/src/board.js';
 import { createGame } from '../packages/rules/src/game.js';
 import type { Board, BoardShape } from '../packages/rules/src/board.js';
 import { NUMBER_SPIRAL, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
-import { BIG_TABLE_SHAPE } from './board-shapes.js';
+import { BIG_TABLE_SHAPE, flood } from './board-shapes.js';
 
 test('island topology has shared corners and edges, without duplicate geometry', () => {
   const board = topology();
@@ -96,6 +98,47 @@ test('a board is built from any list of hexes, the Classic island from its own',
     /twice/,
   );
   assert.throws(() => topology([{ q: 0.5, r: 0 }]), /not a hex/);
+});
+
+test('the coast is where land meets sea, whether the sea is hexes or the world beyond the rim', () => {
+  const classic = topology();
+  assert.deepEqual(
+    classic.edges.filter((e) => isCoastalEdge(classic, e)),
+    classic.edges.filter((e) => e.hexes.length === 1),
+  );
+  // The Classic island in a ring of sea hexes: every edge now touches two hexes, and the coast is where it was.
+  const ringed = flood(topology(hexagon(3)), (h) => hexDistance(h, { q: 0, r: 0 }) <= 2);
+  const coast = ringed.edges.filter((e) => isCoastalEdge(ringed, e));
+  assert.equal(coast.length, 30);
+  assert.ok(coast.every((e) => e.hexes.length === 2));
+  const midpoint = (board: typeof classic, id: number) => {
+    const e = board.edges[id]!,
+      [a, b] = [board.vertices[e.a]!, board.vertices[e.b]!];
+    const round = (n: number) => Math.round(n * 1e6) / 1e6 || 0;
+    return `${round((a.x + b.x) / 2)},${round((a.y + b.y) / 2)}`;
+  };
+  assert.deepEqual(
+    coast.map((e) => midpoint(ringed, e.id)).sort(),
+    classic.edges
+      .filter((e) => isCoastalEdge(classic, e))
+      .map((e) => midpoint(classic, e.id))
+      .sort(),
+  );
+  // The sea ring's own rim is open water, and the shore is always the land side, whichever hex an edge lists first.
+  assert.equal(
+    ringed.edges.filter((e) => e.hexes.length === 1).filter((e) => isCoastalEdge(ringed, e)).length,
+    0,
+  );
+  assert.ok(coast.some((e) => ringed.hexes[e.hexes[0]!]!.terrain === ('sea' as string)));
+  for (const e of coast) assert.ok(hexDistance(shoreHex(ringed, e), { q: 0, r: 0 }) === 2);
+  assert.throws(
+    () =>
+      shoreHex(
+        ringed,
+        ringed.edges.find((e) => !isCoastalEdge(ringed, e))!,
+      ),
+    /coastal/,
+  );
 });
 /** Edge k of a hex joins its corners k and k + 1 and faces this axial direction: NE, E, SE, SW, W, NW. */
 const FACING = [

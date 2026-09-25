@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { format, resolveConfig } from 'prettier';
-import { generateBoard, seededRandom, topology } from '../packages/rules/src/board.js';
+import { generateBoard, isCoastalEdge, seededRandom, topology } from '../packages/rules/src/board.js';
 import type { Board as Island } from '../packages/rules/src/board.js';
 import { applyAction, createGame, gameView, roadSites, settlementSites } from '../packages/rules/src/game.js';
 import type { Game } from '../packages/rules/src/game.js';
@@ -242,7 +242,7 @@ export function sceneFixture() {
       ]),
     ),
     ports: board.edges
-      .filter((e) => e.hexes.length === 1)
+      .filter((e) => isCoastalEdge(board, e))
       .map((e) => ({ edge: e.id, ...portPlacement(board, e.id) })),
     camera: CAMERA_BOUNDS.map((bounds) => ({
       bounds,

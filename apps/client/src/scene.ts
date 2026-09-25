@@ -1,3 +1,4 @@
+import { isCoastalEdge, shoreHex } from '../../../packages/rules/src/board.js';
 import type { Board, Terrain } from '../../../packages/rules/src/board.js';
 
 export const HEX_SIZE = 64;
@@ -47,7 +48,7 @@ export function hexPoints(x: number, y: number, radius = HEX_SIZE) {
   }).join(' ');
 }
 export function coastline(board: Board): string {
-  const edges = board.edges.filter((e) => e.hexes.length === 1);
+  const edges = board.edges.filter((e) => isCoastalEdge(board, e));
   const first = edges[0]!;
   const points = [first.a];
   let current = first.b,
@@ -116,10 +117,10 @@ export function waterOutline(board: Board, inset = 0): ShorePoint[] {
 /** The normal is perpendicular to this exact coast edge, not a ray from the island center. */
 export function portPlacement(board: Board, edgeId: number) {
   const e = board.edges[edgeId]!;
-  if (e.hexes.length !== 1) throw new Error('Ports require a coastal edge');
+  if (!isCoastalEdge(board, e)) throw new Error('Ports require a coastal edge');
   const a = board.vertices[e.a]!,
     b = board.vertices[e.b]!,
-    h = board.hexes[e.hexes[0]!]!;
+    h = shoreHex(board, e);
   const x = ((a.x + b.x) * HEX_SIZE) / 2,
     y = ((a.y + b.y) * HEX_SIZE) / 2;
   const dx = x - h.x * HEX_SIZE,
