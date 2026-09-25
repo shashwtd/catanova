@@ -110,12 +110,16 @@ function log(g: Game, text: string) {
  * board.
  */
 export const BOARD_ID_LIMIT = 4096;
-/** Whether every corner, edge and hex an action names is on this board. */
+/**
+ * Whether every corner, edge and hex an action names is on this board. It reads the fields, not the kinds, so a
+ * new action that names a `vertex`, `edge` or `hex` is checked without being listed here.
+ */
 function onBoard(board: Board, a: GameAction) {
-  if (a.kind === 'settlement' || a.kind === 'city') return a.vertex < board.vertices.length;
-  if (a.kind === 'road') return a.edge < board.edges.length;
-  if (a.kind === 'robber') return a.hex < board.hexes.length;
-  return true;
+  return (
+    (!('vertex' in a) || a.vertex < board.vertices.length) &&
+    (!('edge' in a) || a.edge < board.edges.length) &&
+    (!('hex' in a) || a.hex < board.hexes.length)
+  );
 }
 
 /** Untrusted input becomes a small, canonical action before it reaches a transaction. */
