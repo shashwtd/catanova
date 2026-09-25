@@ -45,7 +45,8 @@ test('the board, the lounge table and the viewport render the same SVG markup', 
 });
 
 test('the WebGL terrain shader is the pinned source', () => {
-  // Node has no WebGL, so only screenshots can show what it paints. Phase 0 has to change it to take more than 19
-  // hexes: compare Classic screenshots from before and after, in both board themes, before pinning the new source.
+  // Node has no WebGL, so only screenshots can show what it paints. Phase 0 changed it to take more than 19 hexes,
+  // and pinned the new source once Classic screenshots in both board themes were identical before and after. Any
+  // further change needs the same comparison before its source is pinned.
   assert.equal(current.shader, pinned.shader);
 });

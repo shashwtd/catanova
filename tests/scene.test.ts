@@ -26,6 +26,7 @@ import {
 import { constrainCamera, fitBoard } from '../apps/client/src/camera.js';
 import { Board } from '../apps/client/src/Board.js';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
+import { fragmentSource, MAX_TERRAIN_HEXES, terrainUniforms } from '../apps/client/src/Terrain.js';
 import { BIG_TABLE_SHAPE, bareBoard, flood } from './board-shapes.js';
 
 test('the calm continuous water band follows the coast and leaves room for its shadow within the scene', () => {
@@ -188,6 +189,34 @@ test('the scene frames the board it is given: the Classic box for Classic, a big
   assert.equal((island.match(/class="terrain-hit/g) ?? []).length, 30);
   const viewport = renderToStaticMarkup(createElement(BoardViewport, { board: big, children: 'board' }));
   assert.match(viewport, /aspect-ratio:896\/928/);
+});
+
+test('the terrain shader takes every hex of a bigger board, and refuses a board past its limit', () => {
+  // Node has no WebGL: the screenshots show the Classic island painted as before, and this shows what the shader
+  // is given and that its source no longer stops at the 19th hex.
+  const classic = terrainUniforms(generateBoard(481));
+  assert.equal(classic.count, 19);
+  assert.equal(classic.land.length, 57);
+  assert.deepEqual(classic.world, WORLD);
+  const big = bareBoard(BIG_TABLE_SHAPE),
+    uniforms = terrainUniforms(big);
+  assert.equal(uniforms.count, 30);
+  assert.deepEqual(
+    [...uniforms.land],
+    [...new Float32Array(big.hexes.flatMap((h) => [h.x * HEX_SIZE, h.y * HEX_SIZE, 5]))],
+  );
+  assert.deepEqual(uniforms.world, worldBox(big));
+  assert.ok(
+    uniforms.count <= MAX_TERRAIN_HEXES && MAX_TERRAIN_HEXES + 3 <= 224,
+    'within WebGL 2 uniform space',
+  );
+  assert.match(
+    fragmentSource,
+    new RegExp(`uniform vec3 uLand\\[${MAX_TERRAIN_HEXES}\\];\\s*uniform int uCount;`),
+  );
+  assert.match(fragmentSource, /for\(int i=0;i<uCount;i\+\+\)\{float d=hex\(p-uLand\[i\]\.xy,64\.0\)/);
+  assert.doesNotMatch(fragmentSource, /\[19\]|<19;/);
+  assert.throws(() => terrainUniforms(bareBoard(hexagon(7))), /takes 128 hexes, not 169/);
 });
 
 test('every island has its own coast, whether the water between them is sea hexes or off the board', () => {

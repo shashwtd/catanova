@@ -12,6 +12,24 @@ import {
   worldBox,
 } from './scene.js';
 
+/**
+ * The most hexes the terrain shader takes: well past any board planned, the largest Open Sea frame included, and
+ * with room to spare in the 224 uniform vectors every WebGL 2 fragment shader is guaranteed.
+ */
+export const MAX_TERRAIN_HEXES = 128;
+/** What the terrain shader is given for a board: each hex's centre and atlas cell, how many there are, the box. */
+export function terrainUniforms(board: Board) {
+  if (board.hexes.length > MAX_TERRAIN_HEXES)
+    throw new Error(`The terrain shader takes ${MAX_TERRAIN_HEXES} hexes, not ${board.hexes.length}`);
+  return {
+    land: new Float32Array(
+      board.hexes.flatMap((h) => [h.x * HEX_SIZE, h.y * HEX_SIZE, TERRAIN_INDEX[h.terrain]]),
+    ),
+    count: board.hexes.length,
+    world: worldBox(board),
+  };
+}
+
 const vertexSource = `#version 300 es
 in vec2 aPosition;
 out vec2 vUv;
@@ -24,7 +42,8 @@ in vec2 vUv;
 out vec4 outColor;
 uniform sampler2D uTerrain;
 uniform sampler2D uEnvironment;
-uniform vec3 uLand[19];
+uniform vec3 uLand[${MAX_TERRAIN_HEXES}];
+uniform int uCount;
 uniform vec4 uWorld;
 uniform float uConcept;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -40,7 +59,7 @@ vec3 environment(vec2 uv,vec2 cell){
 void main(){
   vec2 p=uWorld.xy+vec2(vUv.x,1.0-vUv.y)*uWorld.zw;
   float land=10000.0;int nearest=0;
-  for(int i=0;i<19;i++){float d=hex(p-uLand[i].xy,64.0);if(d<land){land=d;nearest=i;}}
+  for(int i=0;i<uCount;i++){float d=hex(p-uLand[i].xy,64.0);if(d<land){land=d;nearest=i;}}
   float angle=atan(p.y,p.x);
   float waterWidth=${WATER_BAND.toFixed(1)}${WATER_EDGE_WAVES.map((wave) => `+sin(angle*${wave.frequency.toFixed(1)}+${wave.phase.toFixed(2)})*${wave.amplitude.toFixed(2)}`).join('')};
   float outer=land-waterWidth;
@@ -116,6 +135,8 @@ export function Terrain({
         powerPreference: 'low-power',
       });
       if (!gl) return;
+      // A board too big for the shader stops here, before any work, and the SVG ground stands in.
+      const uniforms = terrainUniforms(board);
       const images = await Promise.all([terrainArt, environmentArt].map(decodedGameImage));
       if (disposed || gl.isContextLost()) return;
       const vertex = compile(gl, gl.VERTEX_SHADER, vertexSource),
@@ -155,13 +176,9 @@ export function Terrain({
       gl.uniform1f(gl.getUniformLocation(program, 'uConcept'), concept ? 1 : 0);
       gl.uniform1i(gl.getUniformLocation(program, 'uTerrain'), 0);
       gl.uniform1i(gl.getUniformLocation(program, 'uEnvironment'), 1);
-      gl.uniform3fv(
-        gl.getUniformLocation(program, 'uLand[0]'),
-        new Float32Array(
-          board.hexes.flatMap((h) => [h.x * HEX_SIZE, h.y * HEX_SIZE, TERRAIN_INDEX[h.terrain]]),
-        ),
-      );
-      const world = worldBox(board);
+      gl.uniform3fv(gl.getUniformLocation(program, 'uLand[0]'), uniforms.land);
+      gl.uniform1i(gl.getUniformLocation(program, 'uCount'), uniforms.count);
+      const { world } = uniforms;
       gl.uniform4f(gl.getUniformLocation(program, 'uWorld'), world.x, world.y, world.width, world.height);
       const draw = () => {
         if (disposed || gl.isContextLost()) return;
