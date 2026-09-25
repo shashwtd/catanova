@@ -1,5 +1,5 @@
 == Starter text ==
-The original starter articles in this wiki were prepared for the [https://github.com/shashwtd/catanova Catanova repository] on 9 September 2026. They summarize that project's rulebook and implemented game behavior. They were not copied from CATAN rulebooks, Fandom articles, or another game's wiki.
+The original starter articles in this wiki were prepared for the [https://github.com/shashwtd/catanova Catanova repository] on 9 September 2026 and revised on 25 September 2026 to match the game at that date. They summarize that project's rulebook and implemented game behavior. The Game modes, Big Table and Open Sea articles, added on 26 September 2026, summarize rules planned for modes that are not yet built. They were not copied from CATAN rulebooks, Fandom articles, or another game's wiki.
 
 The repository's MIT license permits reuse and modification of this starter text when the copyright and permission notice are retained. This notice covers the imported starter material; a host's terms and the wiki's chosen contribution license govern subsequent contributions as applicable. Brand names do not imply endorsement. No official CATAN artwork is included in this pack.
 
