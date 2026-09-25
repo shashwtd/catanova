@@ -260,6 +260,7 @@ Neither mode rulebook, nor [map generation](MAP_GENERATION.md), reproduces an of
 | OS54 | Absent player: the game waits; after 2 minutes offline the clock acts for them, setup placements included | 15.5 | TURN_CLOCK.md | Catanova decision (M4, M7) |
 | OS55 | Resignation, pausing and abandonment as in Classic; ships stay on the board | 15.6 | TURN_CLOCK.md | Documented |
 | OS56 | Reserved later scenarios; outline of five and six players with paired turns and a Partner's ship move | 16 | S6-56 pp. 2–3 | Outline only; not in `open-sea-v1` |
+| OS57 | The room's board before the game: dealt when the room is created, as in Classic, and again on a change of mode, but not drawn in the lobby; it follows the seated count between the three- and four-player templates, and that re-deal does not reset readiness; Start refuses a board made for another count | 4.1, 15.1 | — | Catanova decision of 26 September 2026; replaces an earlier draft in which the lobby showed the board and a re-deal reset readiness |
 
 ### Edition and interpretation decisions: both modes
 

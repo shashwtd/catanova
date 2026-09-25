@@ -114,7 +114,7 @@ A ship is worth no points and counts toward Longest Route. When all 15 of your s
 
 Outer Isles is a Catanova map preset, not an official layout. Its templates and generator are specified in [map generation](MAP_GENERATION.md). Every Outer Isles board guarantees:
 
-1. A separate template for three players and for four. The game uses the template for the number of players seated when it starts. Section 15.1 covers the board shown in the lobby.
+1. A separate template for three players and for four. The game uses the template for the number of players seated when it starts. Section 15.1 covers the board a room holds before the game starts.
 2. One main island. Every starting settlement goes there.
 3. Several small islands, each separated from the main island and from each other by sea.
 4. Gold fields only on small islands. A gold field never carries a 6 or an 8.
@@ -478,7 +478,7 @@ Catanova decision: in the lobby, a change of mode is refused while the seated pl
 
 Catanova decision: changing the mode resets the points target to the new mode's default, even if the host had chosen another: 14 for Open Sea, 10 for Classic and Big Table.
 
-Catanova decision: the room deals its board when it is created and shows it in the lobby, before the player count is final. In an Open Sea lobby, the board uses the four-player template while four players are seated and the three-player template otherwise. Whenever the seated count moves between three and four, the board is dealt again from the same seed on the other template. Like any settings change, this resets the other players' readiness. Start refuses a board whose template was made for a different number of players than are seated. The board records its template's player count next to its preset, because both templates share the preset `outer-isles-v1` (section 4.1).
+Catanova decision: as in Classic, the room deals its board when it is created, and Start uses that board; a change of mode deals a new one. The lobby does not draw it; players first see the island when the game starts. In an Open Sea lobby, the board uses the four-player template while four players are seated and the three-player template otherwise. Whenever the seated count moves between three and four, the board is dealt again from the same seed on the other template. Nobody has seen the board yet, so this is not a settings change and does not reset anyone's readiness. Start refuses a board whose template was made for a different number of players than are seated. The board records its template's player count next to its preset, because both templates share the preset `outer-isles-v1` (section 4.1).
 
 ### 15.2 Room options
 
