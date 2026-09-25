@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { generateBoard, hexagon, hexDistance, isCoastalEdge } from '../packages/rules/src/board.js';
+import { generateBoard, hexagon, hexDistance, isCoastalEdge, isLand } from '../packages/rules/src/board.js';
+import type { Axial } from '../packages/rules/src/board.js';
 import {
   coastline,
   HEX_SIZE,
@@ -11,6 +12,7 @@ import {
   waterOutline,
   waterWidth,
   portPlacement,
+  shoreDistance,
   WORLD,
   MATERIAL_GUTTER,
   MATERIAL_QUADRANTS,
@@ -28,8 +30,10 @@ import { BIG_TABLE_SHAPE, bareBoard, flood } from './board-shapes.js';
 
 test('the calm continuous water band follows the coast and leaves room for its shadow within the scene', () => {
   const board = generateBoard(42),
-    coast = coastPoints(board),
+    coasts = coastPoints(board),
+    coast = coasts[0]!,
     outline = waterOutline(board);
+  assert.equal(coasts.length, 1, 'the Classic island has one coast');
   assert.equal(outline.length, 240);
   const widths = new Set<number>();
   for (let index = 0; index < outline.length; index++) {
@@ -60,9 +64,9 @@ test('the calm continuous water band follows the coast and leaves room for its s
 test('coast-aligned ships and outer trade badges fit every coast, with separate boarding points', () => {
   for (const seed of [1, 42, 2026, 98765]) {
     const board = generateBoard(seed);
-    const coast = coastline(board)
-      .split(' ')
-      .map((p) => p.split(',').map(Number));
+    const [shore, ...more] = coastline(board);
+    assert.equal(more.length, 0);
+    const coast = shore!.split(' ').map((p) => p.split(',').map(Number));
     assert.equal(coast.length, 30);
     for (let i = 0; i < coast.length; i++) {
       const a = coast[i]!,
@@ -186,6 +190,61 @@ test('the scene frames the board it is given: the Classic box for Classic, a big
   assert.match(viewport, /aspect-ratio:896\/928/);
 });
 
+test('every island has its own coast, whether the water between them is sea hexes or off the board', () => {
+  const inIslands = (h: Axial) => hexDistance(h, { q: -2, r: 0 }) <= 1 || hexDistance(h, { q: 2, r: 0 }) <= 1;
+  const apart = bareBoard(hexagon(3).filter(inIslands)),
+    framed = flood(bareBoard(hexagon(4)), inIslands);
+  const at = ({ x, y }: { x: number; y: number }) =>
+    `${Math.round(x * 1000) || 0},${Math.round(y * 1000) || 0}`;
+  const shores = [apart, framed].map((board) => {
+    const coasts = coastPoints(board);
+    assert.deepEqual(
+      coasts.map((coast) => coast.length),
+      [18, 18],
+    );
+    assert.deepEqual(
+      coastline(board),
+      coasts.map((coast) => coast.map(({ x, y }) => `${x},${y}`).join(' ')),
+    );
+    assert.equal(
+      board.edges.filter((e) => isCoastalEdge(board, e)).length,
+      36,
+      'every coastal edge is walked once',
+    );
+    for (const coast of coasts)
+      for (const [i, point] of coast.entries()) {
+        const next = coast[(i + 1) % coast.length]!;
+        assert.ok(Math.abs(Math.hypot(next.x - point.x, next.y - point.y) - HEX_SIZE) < 1e-9);
+      }
+    // Each coast holds one island's seven hexes and no sea; the sea between them is outside both.
+    for (const h of board.hexes) {
+      const within = coasts.filter((coast) => coastDistance(coast, h.x * HEX_SIZE, h.y * HEX_SIZE) < 0);
+      assert.equal(within.length, isLand(h) ? 1 : 0);
+      assert.equal(shoreDistance(coasts, h.x * HEX_SIZE, h.y * HEX_SIZE) < 0, isLand(h));
+    }
+    assert.ok(shoreDistance(coasts, 0, 0) > 0);
+    // The painted band is still one island's (see waterOutline), but a board of two does not break it.
+    const outline = waterOutline(board, WATER_FEATHER / 2);
+    assert.equal(outline.length, 240);
+    assert.ok(outline.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)));
+    return coasts.flat().map(at).sort();
+  });
+  assert.deepEqual(shores[0], shores[1], 'the coasts are in the same places either way');
+  // Board draws the shallows and the sand of both.
+  const island = renderToStaticMarkup(
+    createElement(Board, {
+      board: apart,
+      mode: null,
+      disabled: true,
+      onAction: () => {},
+      onRobber: () => {},
+    }),
+  );
+  assert.equal((island.match(/fill="#52bebf"/g) ?? []).length, 2);
+  assert.equal((island.match(/fill="url\(#sand-material\)"/g) ?? []).length, 2);
+  assert.ok(island.lastIndexOf('fill="#52bebf"') < island.indexOf('fill="url(#sand-material)"'));
+});
+
 test('a harbour on a coast of sea hexes is posed exactly as it is on the rim of the board', () => {
   const classic = generateBoard(42),
     ringed = flood(bareBoard(hexagon(3)), (h) => hexDistance(h, { q: 0, r: 0 }) <= 2);
@@ -220,7 +279,7 @@ test('a harbour on a coast of sea hexes is posed exactly as it is on the rim of 
 
 test('the feather mask covers the entire coast and becomes transparent before the world boundary', () => {
   const board = generateBoard(42),
-    coast = coastPoints(board),
+    coast = coastPoints(board)[0]!,
     halfOpacity = waterOutline(board, WATER_FEATHER / 2),
     opaqueCore = waterOutline(board, WATER_FEATHER);
   assert.ok(coast.every(({ x, y }) => coastDistance(opaqueCore, x, y) < 0));

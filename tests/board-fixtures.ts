@@ -229,10 +229,12 @@ const CAMERAS: Camera[] = [
 
 export function sceneFixture() {
   // Classic's coast, water and harbour poses depend on the island's shape alone, never on its seed.
-  const board = generateBoard(481);
+  const board = generateBoard(481),
+    [coast, ...more] = coastline(board);
+  if (more.length) throw new Error('The Classic island has one coast');
   return {
     world: worldBox(board),
-    coastline: coastline(board),
+    coastline: coast!,
     // As Board.tsx writes a polygon's points; inset WATER_FEATHER / 2 is the one it draws.
     water: Object.fromEntries(
       [0, WATER_FEATHER / 2, WATER_FEATHER].map((inset) => [

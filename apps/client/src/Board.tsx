@@ -143,7 +143,7 @@ const BoardScenery = memo(function BoardScenery({
 }: {
   board: Island;
   art?: TerrainArt;
-  coast: string;
+  coast: readonly string[];
   water: string;
   world: WorldBox;
 }) {
@@ -235,22 +235,29 @@ const BoardScenery = memo(function BoardScenery({
           fill="url(#ocean-material)"
           mask="url(#water-fade-mask)"
         />
-        <polygon
-          points={coast}
-          fill="#52bebf"
-          stroke="#73dcd2"
-          strokeWidth="27"
-          strokeLinejoin="round"
-          filter="url(#ground-edge)"
-        />
-        <polygon
-          points={coast}
-          fill="url(#sand-material)"
-          stroke="#a68d53"
-          strokeWidth="8"
-          strokeLinejoin="round"
-          filter="url(#ground-edge)"
-        />
+        {/* Every island's shallows go down before any island's sand, so no shallows lie over a beach. */}
+        {coast.map((points, i) => (
+          <polygon
+            key={i}
+            points={points}
+            fill="#52bebf"
+            stroke="#73dcd2"
+            strokeWidth="27"
+            strokeLinejoin="round"
+            filter="url(#ground-edge)"
+          />
+        ))}
+        {coast.map((points, i) => (
+          <polygon
+            key={i}
+            points={points}
+            fill="url(#sand-material)"
+            stroke="#a68d53"
+            strokeWidth="8"
+            strokeLinejoin="round"
+            filter="url(#ground-edge)"
+          />
+        ))}
         {board.hexes.map((h) => {
           const n = TERRAIN_INDEX[h.terrain];
           return (

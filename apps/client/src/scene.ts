@@ -67,33 +67,41 @@ export function hexPoints(x: number, y: number, radius = HEX_SIZE) {
     return `${x + Math.cos(angle) * radius},${y + Math.sin(angle) * radius}`;
   }).join(' ');
 }
-export function coastline(board: Board): string {
-  const edges = board.edges.filter((e) => isCoastalEdge(board, e));
-  const first = edges[0]!;
-  const points = [first.a];
-  let current = first.b,
-    previous = first.a;
-  while (current !== first.a) {
-    points.push(current);
-    const edge = edges.find(
-      (e) => (e.a === current && e.b !== previous) || (e.b === current && e.a !== previous),
-    )!;
-    const next = edge.a === current ? edge.b : edge.a;
-    previous = current;
-    current = next;
+/**
+ * Every coast on the board, one closed loop of corner ids for each island. A loop starts at the lowest-numbered
+ * coastal edge not yet walked and follows the coast until it is back. Every corner has none or two coastal edges,
+ * so the walk never has a choice to make and the loops never touch.
+ */
+function coastLoops(board: Board): number[][] {
+  const coast = board.edges.filter((e) => isCoastalEdge(board, e)),
+    walked = new Set<number>(),
+    loops: number[][] = [];
+  for (const first of coast) {
+    if (walked.has(first.id)) continue;
+    walked.add(first.id);
+    const loop = [first.a];
+    let current = first.b;
+    while (current !== first.a) {
+      loop.push(current);
+      const edge = coast.find((e) => !walked.has(e.id) && (e.a === current || e.b === current));
+      if (!edge) throw new Error('A coast does not close');
+      walked.add(edge.id);
+      current = edge.a === current ? edge.b : edge.a;
+    }
+    loops.push(loop);
   }
-  return points
-    .map((id) => `${board.vertices[id]!.x * HEX_SIZE},${board.vertices[id]!.y * HEX_SIZE}`)
-    .join(' ');
+  return loops;
 }
 export type ShorePoint = { x: number; y: number };
-export function coastPoints(board: Board): ShorePoint[] {
-  return coastline(board)
-    .split(' ')
-    .map((point) => {
-      const [x, y] = point.split(',').map(Number);
-      return { x: x!, y: y! };
-    });
+/** Every coast as scene points, one closed polygon per island. */
+export function coastPoints(board: Board): ShorePoint[][] {
+  return coastLoops(board).map((loop) =>
+    loop.map((id) => ({ x: board.vertices[id]!.x * HEX_SIZE, y: board.vertices[id]!.y * HEX_SIZE })),
+  );
+}
+/** Every coast as the points of an SVG polygon, one per island: the Classic island has one. */
+export function coastline(board: Board): string[] {
+  return coastPoints(board).map((loop) => loop.map(({ x, y }) => `${x},${y}`).join(' '));
 }
 /** Exact distance to the shared coastline; negative within land. */
 export function coastDistance(points: readonly ShorePoint[], x: number, y: number) {
@@ -110,6 +118,17 @@ export function coastDistance(points: readonly ShorePoint[], x: number, y: numbe
   }
   return inside ? -nearest : nearest;
 }
+/** Exact distance to the nearest of several coasts that neither overlap nor hold lakes; negative on land. */
+export function shoreDistance(coasts: readonly (readonly ShorePoint[])[], x: number, y: number) {
+  let nearest = Infinity;
+  for (const coast of coasts) {
+    const distance = coastDistance(coast, x, y);
+    // Inside one island is outside every other, so that island's coast is the nearest.
+    if (distance < 0) return distance;
+    nearest = Math.min(nearest, distance);
+  }
+  return nearest;
+}
 /** Broad, low-amplitude curves keep the existing coast-following band calm. */
 export function waterWidth(angle: number) {
   return WATER_EDGE_WAVES.reduce(
@@ -117,9 +136,15 @@ export function waterWidth(angle: number) {
     WATER_BAND,
   );
 }
-/** One continuous offset coast, not an extra ring of board-game hexagons. */
+/**
+ * One continuous offset coast, not an extra ring of board-game hexagons. It is found by marching out from the
+ * origin at 240 angles to at most 440 units, so it can describe only one island, round the origin and within
+ * that reach. On a board of several islands it still returns 240 finite points, but they follow only the coast
+ * each ray meets, and between islands they can fall back to the origin; the band for Open Sea is Phase 2's
+ * (docs/BIGGER-MAPS-AND-MODES.md).
+ */
 export function waterOutline(board: Board, inset = 0): ShorePoint[] {
-  const coast = coastPoints(board);
+  const coasts = coastPoints(board);
   return Array.from({ length: 240 }, (_, index) => {
     const angle = (index * Math.PI * 2) / 240,
       nx = Math.cos(angle),
@@ -128,7 +153,7 @@ export function waterOutline(board: Board, inset = 0): ShorePoint[] {
       high = 440;
     for (let step = 0; step < 22; step++) {
       const radius = (low + high) / 2;
-      if (coastDistance(coast, radius * nx, radius * ny) < waterWidth(angle) - inset) low = radius;
+      if (shoreDistance(coasts, radius * nx, radius * ny) < waterWidth(angle) - inset) low = radius;
       else high = radius;
     }
     return { x: ((low + high) / 2) * nx, y: ((low + high) / 2) * ny };

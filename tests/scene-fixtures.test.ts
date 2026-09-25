@@ -20,7 +20,7 @@ test('the Classic coastline, water outlines and harbour poses are unchanged to t
   // They follow from the island's shape, so every Classic seed shares them.
   for (const seed of [0, 42, 2026, 98765]) {
     const board = generateBoard(seed);
-    assert.equal(coastline(board), pinned.coastline, `seed ${seed}`);
+    assert.deepEqual(coastline(board), [pinned.coastline], `seed ${seed}`);
     for (const port of board.ports)
       assert.deepEqual(
         { edge: port.edge, ...portPlacement(board, port.edge) },
