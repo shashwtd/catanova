@@ -1,25 +1,39 @@
 /**
- * The Classic island as it is dealt and played today, pinned so that making the board data
+ * The Classic island as it is dealt, drawn and played today, pinned so that making the board data
  * (docs/BIGGER-MAPS-AND-MODES.md, Phase 0) can prove it changed nothing a player could see.
  *
- *   npx tsx tests/board-fixtures.ts    rewrite tests/fixtures/classic-board.json from this checkout
+ *   npx tsx tests/board-fixtures.ts                  rewrite tests/fixtures/classic-*.json from this checkout
+ *   npx tsx tests/board-fixtures.ts markup <name>    print one pinned SVG render, to diff two checkouts
  *
- * The committed files are the reference, and board-fixtures.test.ts compares this checkout against them.
- * Rewrite them only for a deliberate change, such as a new preset.
+ * The committed files are the reference, and board-fixtures.test.ts and scene-fixtures.test.ts compare
+ * this checkout against them. Rewrite them only for a deliberate change, such as a new preset, or a React
+ * upgrade that serialises the same SVG differently, and only once screenshots of the board taken before and
+ * after the change agree.
  */
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { format, resolveConfig } from 'prettier';
 import { generateBoard, seededRandom, topology } from '../packages/rules/src/board.js';
 import type { Board as Island } from '../packages/rules/src/board.js';
-import { applyAction, createGame, gameView } from '../packages/rules/src/game.js';
+import { applyAction, createGame, gameView, roadSites, settlementSites } from '../packages/rules/src/game.js';
+import type { Game } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 import { decide, initialPlan } from '../packages/bot/src/index.js';
 import type { BotPlan } from '../packages/bot/src/index.js';
+import { Board } from '../apps/client/src/Board.js';
+import { BoardViewport } from '../apps/client/src/BoardViewport.js';
+import { BOARD_THEMES } from '../apps/client/src/board-theme.js';
+import { constrainCamera, fitBoard, maxZoom } from '../apps/client/src/camera.js';
+import type { Bounds, Camera } from '../apps/client/src/camera.js';
+import { coastline, portPlacement, waterOutline, WATER_FEATHER, WORLD } from '../apps/client/src/scene.js';
+import { fragmentSource } from '../apps/client/src/Terrain.js';
 
 export const BOARD_FIXTURE = new URL('./fixtures/classic-board.json', import.meta.url);
+export const SCENE_FIXTURE = new URL('./fixtures/classic-scene.json', import.meta.url);
 
 export const sha256 = (text: string) => createHash('sha256').update(text).digest('hex');
 /** Byte for byte, key order included: the JSON a saved game or a lobby stores. */
@@ -121,6 +135,126 @@ export async function boardFixture() {
   };
 }
 
+/**
+ * The table the design preview at /dev/lounge opens on (dev/LoungePreview.tsx), rebuilt here: seed 481, four
+ * seats, the first legal setup moves, a roll and a road long enough to show every kind of build site.
+ */
+export function loungeGame(): Game {
+  const seats = ['FernCaptain', 'Mossling', 'CopperFox', 'Juniper'].map((name, i) => ({
+    id: `sample-${i}`,
+    name,
+  }));
+  const me = seats[0]!.id;
+  let game = createGame(seats, 481, () => 0.37);
+  for (let i = 0; i < 16; i++) {
+    const player = game.players[game.active]!;
+    const view = gameView(game, player.id);
+    const action =
+      game.phase === 'setupSettlement'
+        ? { kind: 'settlement' as const, vertex: view.legal.settlements[0]! }
+        : { kind: 'road' as const, edge: view.legal.roads[0]! };
+    game = applyAction(game, player.id, action, () => 0.37);
+  }
+  game = applyAction(game, me, { kind: 'roll' }, () => 0.34);
+  extend: for (const edge of roadSites(game, me)) {
+    const candidate = structuredClone(game);
+    candidate.roads[edge] = me;
+    for (const next of roadSites(candidate, me)) {
+      const extended = structuredClone(candidate);
+      extended.roads[next] = me;
+      if (settlementSites(extended, me).length) {
+        game = extended;
+        break extend;
+      }
+    }
+  }
+  game.players[0]!.hand = { wood: 3, brick: 2, sheep: 2, wheat: 7, ore: 4 };
+  game.turn = 8;
+  return game;
+}
+
+const island = (seed: number) => () =>
+  renderToStaticMarkup(
+    createElement(Board, {
+      board: generateBoard(seed),
+      mode: null,
+      disabled: true,
+      onAction: () => {},
+      onRobber: () => {},
+    }),
+  );
+/** Each pinned render, by name. Rendered markup is the SVG a browser paints, less the WebGL layer. */
+export const MARKUP: Record<string, () => string> = {
+  ...Object.fromEntries([0, 42, 281, 481, 2026, 98765].map((seed) => [`island-${seed}`, island(seed)])),
+  'lounge-481': () => {
+    const game = loungeGame(),
+      view = gameView(game, game.players[0]!.id);
+    return renderToStaticMarkup(
+      createElement(Board, {
+        board: view.board,
+        game: view,
+        me: view.players[0]!.id,
+        mode: null,
+        disabled: false,
+        art: BOARD_THEMES.storybook,
+        onAction: () => {},
+        onRobber: () => {},
+      }),
+    );
+  },
+  viewport: () => renderToStaticMarkup(createElement(BoardViewport, { seed: 481, children: 'board' })),
+};
+
+/** The test viewports in board-camera.test.ts, then phone, landscape phone, tablet and desktop board areas. */
+const CAMERA_BOUNDS: Bounds[] = [
+  { width: 180, height: 520 },
+  { width: 940, height: 240 },
+  { width: 620, height: 560 },
+  { width: 280, height: 190 },
+  { width: 360, height: 440 },
+  { width: 800, height: 700 },
+  { width: 375, height: 520 },
+  { width: 812, height: 300 },
+  { width: 768, height: 760 },
+  { width: 1440, height: 820 },
+];
+const CAMERAS: Camera[] = [
+  { scale: 1, x: 0, y: 0 },
+  { scale: 0.5, x: -40, y: 30 },
+  { scale: 2.2, x: -120, y: 260 },
+  { scale: 3, x: 500, y: -500 },
+  { scale: 5, x: -2000, y: 2000 },
+];
+
+export function sceneFixture() {
+  // Classic's coast, water and harbour poses depend on the island's shape alone, never on its seed.
+  const board = generateBoard(481);
+  return {
+    world: { ...WORLD },
+    coastline: coastline(board),
+    // As Board.tsx writes a polygon's points; inset WATER_FEATHER / 2 is the one it draws.
+    water: Object.fromEntries(
+      [0, WATER_FEATHER / 2, WATER_FEATHER].map((inset) => [
+        inset,
+        waterOutline(board, inset)
+          .map((p) => `${p.x},${p.y}`)
+          .join(' '),
+      ]),
+    ),
+    ports: board.edges
+      .filter((e) => e.hexes.length === 1)
+      .map((e) => ({ edge: e.id, ...portPlacement(board, e.id) })),
+    camera: CAMERA_BOUNDS.map((bounds) => ({
+      bounds,
+      fit: fitBoard(bounds),
+      maxZoom: maxZoom(bounds),
+      constrained: CAMERAS.map((camera) => constrainCamera(camera, bounds)),
+    })),
+    markup: Object.fromEntries(Object.entries(MARKUP).map(([name, render]) => [name, sha256(render())])),
+    shader: sha256(fragmentSource),
+  };
+}
+
 async function write(file: URL, value: unknown) {
   const path = fileURLToPath(file);
   const options = { ...(await resolveConfig(path)), filepath: path };
@@ -128,5 +262,13 @@ async function write(file: URL, value: unknown) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await write(BOARD_FIXTURE, await boardFixture());
+  const [command, name] = process.argv.slice(2);
+  if (command === 'markup') {
+    const render = MARKUP[name ?? ''];
+    if (!render) throw new Error(`Name one of: ${Object.keys(MARKUP).join(', ')}`);
+    process.stdout.write(render().replaceAll('><', '>\n<') + '\n');
+  } else {
+    await write(BOARD_FIXTURE, await boardFixture());
+    await write(SCENE_FIXTURE, sceneFixture());
+  }
 }
