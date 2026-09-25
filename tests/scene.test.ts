@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { generateBoard, hexagon, hexDistance, isCoastalEdge, isLand } from '../packages/rules/src/board.js';
 import type { Axial } from '../packages/rules/src/board.js';
 import {
+  boardKey,
   coastline,
   HEX_SIZE,
   coastDistance,
@@ -189,6 +190,15 @@ test('the scene frames the board it is given: the Classic box for Classic, a big
   assert.equal((island.match(/class="terrain-hit/g) ?? []).length, 30);
   const viewport = renderToStaticMarkup(createElement(BoardViewport, { board: big, children: 'board' }));
   assert.match(viewport, /aspect-ratio:896\/928/);
+});
+
+test('the scene is keyed on the board’s preset as well as its seed, and not on the object that carries them', () => {
+  // A seed deals a different island under each preset, so the memoised layers and the camera must tell them apart.
+  assert.notEqual(boardKey({ seed: 7, preset: 'balanced-v1' }), boardKey({ seed: 7, preset: 'balanced-v2' }));
+  const board = generateBoard(7);
+  assert.notEqual(boardKey(board), boardKey(generateBoard(8)));
+  // Every snapshot from the server is fresh JSON: the same island must keep its key, or every layer would redraw.
+  assert.equal(boardKey(structuredClone(board)), boardKey(board));
 });
 
 test('the terrain shader takes every hex of a bigger board, and refuses a board past its limit', () => {
