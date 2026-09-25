@@ -8,6 +8,7 @@ import { Connection, newSession } from '../apps/client/src/connection.js';
 import { snapshotProblem } from '../apps/client/src/state.js';
 import { createGame, gameView, emptyHand, robberVictims } from '../packages/rules/src/game.js';
 import type { GameAction, Game } from '../packages/rules/src/game.js';
+import type { Board } from '../packages/rules/src/board.js';
 import type { RoomState, HistoryEntry } from '../packages/protocol/src/index.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { readyLobby } from './helpers.js';
@@ -145,6 +146,16 @@ test('client retains permanent pieces and refuses rollback snapshots while allow
   assert.equal(snapshotProblem(current, changed), null);
   assert.match(snapshotProblem(changed, current)!, /stale/);
   assert.equal(snapshotProblem(current, { ...current, players: [] }), null);
+  // Mid-match, the island may not change: not its seed, and not the preset that dealt it from that seed.
+  for (const change of [
+    (board: Board) => (board.seed += 1),
+    (board: Board) => (board.preset = 'balanced-v1'),
+  ]) {
+    const moved = structuredClone(current);
+    moved.revision = 9;
+    change(moved.game!.board);
+    assert.equal(snapshotProblem(current, moved), 'The saved island changed');
+  }
 });
 
 test('a move waits for its committed snapshot; out-of-order or missing-piece frames cannot erase a road', async (t) => {
