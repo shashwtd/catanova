@@ -54,60 +54,86 @@ export function shuffle<T>(input: readonly T[], random: () => number): T[] {
   }
   return a;
 }
-export const hexDistance = (a: Hex, b: Hex) =>
+export const hexDistance = (a: Pick<Hex, 'q' | 'r'>, b: Pick<Hex, 'q' | 'r'>) =>
   Math.max(Math.abs(a.q - b.q), Math.abs(a.r - b.r), Math.abs(a.q + a.r - b.q - b.r));
 
-export function topology(): Omit<Board, 'seed' | 'preset' | 'ports'> {
+/** A hex's place on the board in axial coordinates: `r` counts rows down, `q` steps right along a row. */
+export type Axial = { q: number; r: number };
+/** Every hex on a board, in id order. */
+export type BoardShape = readonly Axial[];
+/** The hexes within `radius` steps of the origin, row by row from the top and left to right along each row. */
+export function hexagon(radius: number): Axial[] {
+  const shape: Axial[] = [];
+  for (let r = -radius; r <= radius; r++)
+    for (let q = Math.max(-radius, -r - radius); q <= Math.min(radius, -r + radius); q++)
+      shape.push({ q, r });
+  return shape;
+}
+/** The Classic island: 19 hexes, radius 2. */
+export const CLASSIC_SHAPE: BoardShape = hexagon(2);
+
+/**
+ * The hexes, corners and edges of a board, numbered in the order the shape lists its hexes. Positions are in
+ * hex radii, and the middle of the board's extent sits on the origin, where the renderer centres its scene; a
+ * shape centred on a hex, like the Classic island, is not moved at all.
+ */
+export function topology(shape: BoardShape = CLASSIC_SHAPE): Omit<Board, 'seed' | 'preset' | 'ports'> {
   const hexes: Hex[] = [],
     vertices: Vertex[] = [],
     edges: Edge[] = [];
   const pointIds = new Map<string, number>(),
     edgeIds = new Map<string, number>();
-  for (let r = -2; r <= 2; r++)
-    for (let q = Math.max(-2, -r - 2); q <= Math.min(2, -r + 2); q++) {
-      const h: Hex = {
-        id: hexes.length,
-        q,
-        r,
-        x: Math.sqrt(3) * (q + r / 2),
-        y: 1.5 * r,
-        terrain: 'desert',
-        number: 0,
-        vertices: [],
-        neighbors: [],
-      };
-      for (let k = 0; k < 6; k++) {
-        const angle = (Math.PI / 180) * (60 * k - 90);
-        const x = h.x + Math.cos(angle),
-          y = h.y + Math.sin(angle);
-        const key = `${Math.round(x * 10000)},${Math.round(y * 10000)}`;
-        let id = pointIds.get(key);
-        if (id === undefined) {
-          id = vertices.length;
-          pointIds.set(key, id);
-          vertices.push({ id, x, y, hexes: [], neighbors: [], edges: [] });
-        }
-        vertices[id]!.hexes.push(h.id);
-        h.vertices.push(id);
+  const centre = (values: number[]) => (Math.min(...values) + Math.max(...values)) / 2;
+  const cx = centre(shape.map(({ q, r }) => Math.sqrt(3) * (q + r / 2))),
+    cy = centre(shape.map(({ r }) => 1.5 * r));
+  const seen = new Set<string>();
+  for (const { q, r } of shape) {
+    if (!Number.isInteger(q) || !Number.isInteger(r) || seen.has(`${q},${r}`))
+      throw new Error(`The board shape lists ${q},${r} twice, or it is not a hex`);
+    seen.add(`${q},${r}`);
+    const h: Hex = {
+      id: hexes.length,
+      q,
+      r,
+      x: Math.sqrt(3) * (q + r / 2) - cx,
+      y: 1.5 * r - cy,
+      terrain: 'desert',
+      number: 0,
+      vertices: [],
+      neighbors: [],
+    };
+    for (let k = 0; k < 6; k++) {
+      const angle = (Math.PI / 180) * (60 * k - 90);
+      const x = h.x + Math.cos(angle),
+        y = h.y + Math.sin(angle);
+      const key = `${Math.round(x * 10000)},${Math.round(y * 10000)}`;
+      let id = pointIds.get(key);
+      if (id === undefined) {
+        id = vertices.length;
+        pointIds.set(key, id);
+        vertices.push({ id, x, y, hexes: [], neighbors: [], edges: [] });
       }
-      for (let k = 0; k < 6; k++) {
-        const a = h.vertices[k]!,
-          b = h.vertices[(k + 1) % 6]!;
-        const key = [a, b].sort((a, b) => a - b).join(',');
-        let id = edgeIds.get(key);
-        if (id === undefined) {
-          id = edges.length;
-          edgeIds.set(key, id);
-          edges.push({ id, a, b, hexes: [] });
-          vertices[a]!.neighbors.push(b);
-          vertices[b]!.neighbors.push(a);
-          vertices[a]!.edges.push(id);
-          vertices[b]!.edges.push(id);
-        }
-        edges[id]!.hexes.push(h.id);
-      }
-      hexes.push(h);
+      vertices[id]!.hexes.push(h.id);
+      h.vertices.push(id);
     }
+    for (let k = 0; k < 6; k++) {
+      const a = h.vertices[k]!,
+        b = h.vertices[(k + 1) % 6]!;
+      const key = [a, b].sort((a, b) => a - b).join(',');
+      let id = edgeIds.get(key);
+      if (id === undefined) {
+        id = edges.length;
+        edgeIds.set(key, id);
+        edges.push({ id, a, b, hexes: [] });
+        vertices[a]!.neighbors.push(b);
+        vertices[b]!.neighbors.push(a);
+        vertices[a]!.edges.push(id);
+        vertices[b]!.edges.push(id);
+      }
+      edges[id]!.hexes.push(h.id);
+    }
+    hexes.push(h);
+  }
   for (const h of hexes)
     h.neighbors = hexes.filter((other) => hexDistance(h, other) === 1).map((other) => other.id);
   return { hexes, vertices, edges };

@@ -1,9 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fairnessIssues, generateBoard, topology } from '../packages/rules/src/board.js';
+import {
+  fairnessIssues,
+  generateBoard,
+  hexagon,
+  hexDistance,
+  topology,
+} from '../packages/rules/src/board.js';
 import { createGame } from '../packages/rules/src/game.js';
-import type { Board } from '../packages/rules/src/board.js';
+import type { Board, BoardShape } from '../packages/rules/src/board.js';
 import { NUMBER_SPIRAL, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
+import { BIG_TABLE_SHAPE } from './board-shapes.js';
 
 test('island topology has shared corners and edges, without duplicate geometry', () => {
   const board = topology();
@@ -15,6 +22,80 @@ test('island topology has shared corners and edges, without duplicate geometry',
     assert.ok(v.hexes.length <= 3);
     for (const n of v.neighbors) assert.ok(board.vertices[n]!.neighbors.includes(v.id));
   }
+});
+
+/** Every cross-reference in a board's graph agrees with every other, for a shape with no lakes in it. */
+function assertConsistent(shape: BoardShape) {
+  const { hexes, vertices, edges } = topology(shape);
+  assert.deepEqual(
+    hexes.map(({ id, q, r }) => ({ id, q, r })),
+    shape.map(({ q, r }, id) => ({ id, q, r })),
+    'hexes are numbered in the order the shape lists them',
+  );
+  const touching = (a: number, b: number) =>
+    edges.find((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+  for (const h of hexes) {
+    assert.equal(new Set(h.vertices).size, 6);
+    for (const [k, v] of h.vertices.entries()) {
+      assert.ok(vertices[v]!.hexes.includes(h.id));
+      assert.ok(touching(v, h.vertices[(k + 1) % 6]!)!.hexes.includes(h.id));
+    }
+    assert.deepEqual(
+      h.neighbors,
+      hexes.filter((o) => hexDistance(h, o) === 1).map((o) => o.id),
+    );
+    for (const n of h.neighbors)
+      assert.equal(
+        h.vertices.filter((v) => hexes[n]!.vertices.includes(v)).length,
+        2,
+        'neighbours share an edge',
+      );
+  }
+  for (const v of vertices) {
+    assert.ok(v.hexes.length >= 1 && v.hexes.length <= 3);
+    assert.ok(v.neighbors.length >= 2 && v.neighbors.length <= 3);
+    assert.equal(v.edges.length, v.neighbors.length);
+    for (const n of v.neighbors) {
+      assert.ok(vertices[n]!.neighbors.includes(v.id));
+      assert.ok(v.edges.includes(touching(v.id, n)!.id));
+      assert.ok(Math.abs(Math.hypot(vertices[n]!.x - v.x, vertices[n]!.y - v.y) - 1) < 1e-9);
+    }
+  }
+  for (const e of edges) {
+    assert.ok(e.a !== e.b && e.hexes.length >= 1 && e.hexes.length <= 2);
+    for (const h of e.hexes) assert.ok(hexes[h]!.vertices.includes(e.a) && hexes[h]!.vertices.includes(e.b));
+  }
+  // Euler's formula for one piece of plane with no holes: corners - edges + hexes = 1.
+  assert.equal(vertices.length - edges.length + hexes.length, 1);
+  // The scene is centred on the origin, so the middle of the board must be there.
+  const xs = vertices.map((v) => v.x),
+    ys = vertices.map((v) => v.y);
+  assert.ok(Math.abs(Math.min(...xs) + Math.max(...xs)) < 1e-9);
+  assert.ok(Math.abs(Math.min(...ys) + Math.max(...ys)) < 1e-9);
+  return { hexes, vertices, edges, coast: edges.filter((e) => e.hexes.length === 1) };
+}
+
+test('a board is built from any list of hexes, the Classic island from its own', () => {
+  const classic = assertConsistent(hexagon(2));
+  assert.deepEqual(topology(hexagon(2)), topology());
+  assert.equal(classic.coast.length, 30);
+  // A 30-hex island has an even middle row, so no hex sits at its centre; it is moved to the origin all the same.
+  const big = assertConsistent(BIG_TABLE_SHAPE);
+  assert.deepEqual(
+    [big.hexes.length, big.vertices.length, big.edges.length, big.coast.length],
+    [30, 80, 109, 38],
+  );
+  // Every edge that is not on the coast joins two neighbouring hexes.
+  assert.equal(big.hexes.reduce((sum, h) => sum + h.neighbors.length, 0) / 2, 109 - 38);
+  assert.throws(
+    () =>
+      topology([
+        { q: 0, r: 0 },
+        { q: 0, r: 0 },
+      ]),
+    /twice/,
+  );
+  assert.throws(() => topology([{ q: 0.5, r: 0 }]), /not a hex/);
 });
 /** Edge k of a hex joins its corners k and k + 1 and faces this axial direction: NE, E, SE, SW, W, NW. */
 const FACING = [
