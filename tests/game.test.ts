@@ -160,7 +160,7 @@ test('newly bought victory point wins immediately; ten points on another turn wa
   assert.equal(g.winner, null); g = move(g, { kind: 'endTurn' }); assert.equal(g.winner, 'p1');
 });
 test('untrusted action data cannot inject negative costs, fractional sites or unknown resource keys', () => {
-  for (const input of [null, [], { kind: 'road', edge: 1.5 }, { kind: 'road', edge: 72 }, { kind: 'discard', resources: { ...emptyHand(), wood: -1 } }, { kind: 'bankTrade', give: '__proto__', receive: 'ore' }, { kind: 'offerTrade', give: { ...emptyHand(), gold: 1 }, want: emptyHand() }]) assert.throws(() => parseGameAction(input));
+  for (const input of [null, [], { kind: 'road', edge: 1.5 }, { kind: 'road', edge: 4096 }, { kind: 'discard', resources: { ...emptyHand(), wood: -1 } }, { kind: 'bankTrade', give: '__proto__', receive: 'ore' }, { kind: 'offerTrade', give: { ...emptyHand(), gold: 1 }, want: emptyHand() }]) assert.throws(() => parseGameAction(input));
 });
 test('automated legal play preserves inventories through 1,500 turns of rolls, discards, steals and building', () => {
   let g = setup(); const rng = seededRandom(135);

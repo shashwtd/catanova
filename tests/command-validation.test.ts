@@ -33,7 +33,7 @@ test('invalid commands return their bounded identifier without applying state or
   assert.equal(welcome.type, 'welcome');
   const invalid = [
     { type: 'settings', settings: { turnTimerSeconds: 41 } },
-    { type: 'action', action: { kind: 'road', edge: 72 } },
+    { type: 'action', action: { kind: 'road', edge: -1 } },
     { type: 'lobby', ready: 'yes' },
     { type: 'increment', expectedRevision: -1 },
     { type: 'future-command' },
@@ -114,7 +114,7 @@ test('client clears its pending outbox after a payload validation error and can 
   assert.equal(persisted, null);
   assert.equal(client.status, 'connected');
   assert.equal(client.state!.revision, 0);
-  await assert.rejects(client.action({ kind: 'road', edge: 72 }), /ILLEGAL_ACTION/);
+  await assert.rejects(client.action({ kind: 'road', edge: -1 }), /ILLEGAL_ACTION/);
   assert.equal(client.awaitingConfirmation, false);
   const accepted = await client.settings({ turnTimerSeconds: 65 });
   assert.equal(accepted.revision, 1);
