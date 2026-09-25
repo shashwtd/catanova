@@ -88,8 +88,9 @@ export function topology(shape: BoardShape = CLASSIC_SHAPE): Omit<Board, 'seed' 
     cy = centre(shape.map(({ r }) => 1.5 * r));
   const seen = new Set<string>();
   for (const { q, r } of shape) {
-    if (!Number.isInteger(q) || !Number.isInteger(r) || seen.has(`${q},${r}`))
-      throw new Error(`The board shape lists ${q},${r} twice, or it is not a hex`);
+    if (!Number.isInteger(q) || !Number.isInteger(r))
+      throw new Error(`The board shape has ${q},${r}, which is not a hex`);
+    if (seen.has(`${q},${r}`)) throw new Error(`The board shape lists ${q},${r} twice`);
     seen.add(`${q},${r}`);
     const h: Hex = {
       id: hexes.length,
@@ -345,8 +346,11 @@ export function generateBoard(seed: number, preset: BoardPreset = BOARD_PRESETS[
     throw new Error(
       `${preset.id} has ${preset.numbers.length} numbers for ${land.length - preset.terrain.desert} hexes`,
     );
-  if (preset.harbours.trades.length !== preset.harbours.slots.length || !harbours.length)
-    throw new Error(`${preset.id} has no way to lay out its harbours`);
+  if (preset.harbours.trades.length !== preset.harbours.slots.length)
+    throw new Error(
+      `${preset.id} has ${preset.harbours.trades.length} trades for ${preset.harbours.slots.length} harbours`,
+    );
+  if (!harbours.length) throw new Error(`${preset.id} has no way to lay out its harbours`);
   // Hard limits make an impossible future constraint fail visibly rather than hang or silently relax.
   for (let layout = 0; layout < 10000; layout++) {
     const shuffled = shuffle(terrain, random);

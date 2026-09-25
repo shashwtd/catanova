@@ -265,8 +265,17 @@ test('a board is dealt from its preset, and a preset that cannot be dealt says w
     /past the end of the coast/,
   );
   assert.throws(
-    () => generateBoard(1, variant({ harbours: { ...BALANCED_V2.harbours, slots: [0, 1] } })),
-    /harbours/,
+    () =>
+      generateBoard(
+        1,
+        variant({ harbours: { ...BALANCED_V2.harbours, trades: BALANCED_V2.harbours.trades.slice(1) } }),
+      ),
+    /8 trades for 9 harbours/,
+  );
+  // Two harbours side by side have no rotation that keeps them off neighbouring sea spaces.
+  assert.throws(
+    () => generateBoard(1, variant({ harbours: { slots: [0, 1], trades: ['any', 'any'] } })),
+    /no way to lay out its harbours/,
   );
 });
 test('new islands are balanced-v2, and boards saved as balanced-v1 remain valid', () => {
