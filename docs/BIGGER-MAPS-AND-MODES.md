@@ -79,9 +79,9 @@ edge and walks neighbours until it returns to the start. With two islands it
 walks one of them and never sees the other. `waterOutline()` is worse: it
 marches a ray outward from the origin at 240 angles and binary-searches for the
 shore, which only describes a single roughly star-shaped island. Its search
-stops at radius 440, and on a 30-hex island 70 of the 240 rays hit that cap even
-after recentring, so Big Table needs this fixed too. The painted water band,
-the coast feathering and the island drop shadow are all built on it.
+stops at radius 440, so it clips the band on any board whose outline reaches
+further (see Phases 1 and 2). The painted water band, the coast feathering and
+the island drop shadow are all built on it.
 
 **5. The world box is a constant.** `WORLD` in `scene.ts` is
 `{ x: -392, y: -368, width: 784, height: 736 }`, sized by hand for a radius-2
@@ -104,8 +104,9 @@ Smaller things that will need touching, none of them hard:
   Sea, gold and fog are three more, and need new art.
 - The board's static layers and the camera are memoised on `board.seed` alone.
   The key should be the preset and the seed, or a board hash.
-- The colour palette already holds eight, so six players need no new colours,
-  though only four seats have default colours.
+- The colour palette already holds eight, so six players need no new colours.
+  But `seatColors` gives six seats without a chosen colour coral and sky twice
+  (see Phase 1).
 - `Board.preset` is `'balanced-v1' | 'balanced-v2'` (new boards are v2) and
   `Game.schema` is `1`. `Game.ruleset` is saved on every game but never read.
   It is what tells a Classic game from a new one, so no schema bump is needed;
@@ -164,6 +165,19 @@ review found:
 No player sees anything change. This is the phase that decides whether the rest
 is pleasant or miserable, so it is worth doing properly and worth its own PR.
 
+**Status on 26 September 2026.** Built on `feature/board-data/2026-09-25`, not
+yet merged. It does everything below except the water band, and it also moves
+the board bounds from the protocol into the rules and lets the terrain shader
+take up to 128 hexes. How it ships is in
+[Game modes](GAME-MODES.md#how-the-modes-ship). When it merges, its pull
+request (after merging main) marks as done the passages that still describe
+the code before it: assumptions 1 to 5 above, apart from the 440-unit reach in
+4 (`uLand[19]`, the parser's bounds, the fixed bags, the coastal test, the
+single coastline, the constant `WORLD`), the board layers memoised on the seed,
+and "Protocol bounds" and the 19-hex shader under
+[Beyond the board](#beyond-the-board); in Game modes, the "Board bounds" item
+and step 2.
+
 **Board recipes.** Replace the hardcoded bag with a `BoardPreset` record: the
 coordinate shape, terrain counts, number tokens, harbour count and the fairness
 rules to apply. `generateBoard(seed, preset)` reads one. `'balanced-v2'` becomes
@@ -221,6 +235,20 @@ new preset and nothing else, if Phase 0 landed.
 **Seats and bounds.** Lift the cap in all seven places to the ruleset's range,
 five to six for Big Table, and move the board bounds into the rules.
 
+**Seat colours.** `seatColors` in `packages/protocol/src/colors.ts` fills seats
+without a chosen colour from a spare list, the four defaults followed by the
+whole palette, and never removes the repeats. Six such seats get coral, sky,
+violet, amber, coral and sky. Remove the repeats before Big Table ships, so
+seats 5 and 6 get jade and rose. Classic cannot change: with four seats or
+fewer, the first four entries always cover every seat.
+
+**Water band.** `waterOutline` still searches only 440 units out. The SVG
+fallback asks it for an outline 24 units inside the band (half the feather),
+and on Big Table that outline peaks at about 436 units, so nothing is cut
+today. The full band would reach about 460 units and meet the cap on 70 of the
+240 rays, so raise the reach, or work it out from the board, before anything
+widens the band or narrows the feather.
+
 **Supply.** 24 of each resource (120), 34 development cards (20 Knights, 3 Road
 Building, 3 Year of Plenty, 3 Monopoly, 5 Victory Point), and the usual 15
 roads, 5 settlements and 4 cities per player. Raise the caps of 19.
@@ -276,8 +304,10 @@ That touches more than it looks like:
 - Analytics key turn times by the active player, so the Partner's time would be
   counted to the Lead.
 
-**Phones.** With the larger world the hexes shrink by about a quarter (from
-about 29 to 21 pixels of hex radius on a 390 × 844 phone). Today six players
+**Phones.** Measured in the real renderer on the Phase 0 branch, Big Table's
+hexes are 87% of Classic's size on a 390 × 844 phone and 79% on a 1440 × 900
+desktop, and the tokens stay readable
+([Game modes](GAME-MODES.md#matching-the-existing-look)). Today six players
 would make three rows of the rail on a portrait phone. On a landscape phone
 the rail is one column that does not scroll, and six of today's cards run on
 to 425 pixels, past the dock at 303 and off an 812 × 375 screen. The owner has
@@ -346,6 +376,31 @@ sea board the ring is already water, so a narrower margin would help: at 48
 units the hexes on a 390-pixel phone would be 0.75 and 0.71 of Classic's size
 instead of 0.67 and 0.64. Decide it when the renderer is built, with
 before-and-after screenshots at phone and desktop sizes.
+
+**What the renderer must add.** On 26 September 2026 the Phase 0 branch drew
+Outer Isles boards in a throwaway preview. Its data is right, but the client
+has no idea of sea: sea hexes draw as land tiles (in WebGL from an undefined
+atlas cell, in the fallback as forest), and their labels read "undefined".
+With the sea hexes left out, each island already gets its own beach and
+shallows. The outer islets reach about 442 units from the centre with three
+players and 462 with four, past `waterOutline`'s 440, so the fallback's band
+is visibly cut there. Phase 2 adds:
+
+- sea as a client terrain: `TERRAIN_INDEX`, `TERRAIN_BASE` and the label
+  "Sea". The fallback's tile loop skips sea hexes, and sea hexes get hit
+  targets for the pirate and accessible names;
+- in the shader, only land hexes in `uLand`, for beach, foam and shallows, and
+  a separate mask of the whole sea frame so water fills it. The fade keys on
+  distance outside the frame's rim rather than 90 units from land, and the
+  waves on the frame rather than the angle about the origin. Deep-water seams
+  in narrow channels need tuning;
+- in the SVG fallback, the frame's outline, feathered as today, in place of
+  the ray-march from the origin and its 440-unit cap. The per-island shallows
+  and sand stay;
+- gold as a new terrain, added without disturbing the 3 × 2 terrain atlases or
+  Classic's pixels: as a second texture, or in a new atlas that keeps the old
+  cells pixel for pixel and is saved losslessly
+  ([Game modes](GAME-MODES.md#matching-the-existing-look)).
 
 ### Ships
 
@@ -428,15 +483,19 @@ gold field.
 Each player owed gold has one 20-second clock for all their picks, in every
 room. If it runs out, the clock takes, for each card still owed, the resource
 the player holds fewest of among those available, breaking ties in the order
-Timber, Clay, Sheep, Hay, Rock. Picks are public once made. The picker already
-exists (`ResourcePicker`, used for Year of Plenty), and the `pending` list in
-[Game modes](GAME-MODES.md#features-not-forks) gives the order. This replaces
-the earlier idea of simultaneous picks shaped like discards.
+Timber, Clay, Sheep, Hay, Rock. Picks are public once made. The closest picker
+already exists: Year of Plenty's "Choose 2 from the bank" in
+`DevelopmentCards`, which already disables the types the bank cannot pay.
+`ResourcePicker` is a different component, used only in `TradePanel`. The
+`pending` list in [Game modes](GAME-MODES.md#features-not-forks) gives the
+order. This replaces the earlier idea of simultaneous picks shaped like
+discards.
 
 The gold field's art is chosen from drafts: a painted Storybook-style tile with
 one large rock and a wide, glowing seam of gold above a pool with nuggets, which
 read best at board size. The final tile is made with the high-quality image
-model when Open Sea is built, as a seventh cell of the terrain atlas.
+model when Open Sea is built, as a new terrain in both board themes (see the
+sea renderer list above).
 
 ### The pirate
 

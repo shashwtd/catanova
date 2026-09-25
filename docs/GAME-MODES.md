@@ -209,8 +209,9 @@ decisions, not rules, and the build follows them.
 - **Gold field art.** A painted tile in the Storybook style: one large rock and
   a wide, glowing seam of gold above a pool with nuggets. It was chosen from
   drafts because it read best at board size. The final tile is to be made with
-  the high-quality image model when Open Sea is built, as a seventh cell of the
-  terrain atlas.
+  the high-quality image model when Open Sea is built, as a new terrain in both
+  board themes. How it joins the art is under
+  [Matching the existing look](#matching-the-existing-look).
 
 ## The variations
 
@@ -463,8 +464,11 @@ Four things every mode touches, so they get one home early:
   are upright boats in the player's colour, the pirate a black-sailed ship, and
   Open Sea's harbour markers lose their boat. The renderer changes are in the
   maps plan.
-- **Hand dock and build shelf.** A ship to build and a ship to move, and a way
+- **Hand dock and placement.** A ship to build and a ship to move, and a way
   to choose road or ship on an edge that takes both, laid out for phones first.
+  The live game has no build shelf: players tap a legal site and confirm it, so
+  the road-or-ship choice belongs in the placement confirmation, and Move ship
+  in the dock's utility actions.
 - **Rail.** Today, on a portrait phone the rail is a two-column grid, so six
   players would make three rows, and on landscape phones the rail is one
   column that six cards overflow. With six players, a portrait phone
@@ -610,6 +614,327 @@ own are ready.
 
 See [Knights, in detail](#knights-in-detail). Combinations with knights are
 parked with it.
+
+## How the modes ship
+
+Checked on 26 September 2026 against the code, the runbook and the Phase 0
+branch (`feature/board-data/2026-09-25`, step 2 above, which was built first).
+This section says how each step reaches players, and which steps need the
+owner.
+
+### Merging, the gate and the VM
+
+- **Merging never deploys.** There is no deploy job, and the VM never pulls on
+  its own. A change reaches catanova.io only when the owner deploys a reviewed
+  commit over SSH.
+- **The gate is local.** GitHub Actions has not run since 20 September 2026, so
+  the check is `npm run ci` on the owner's computer, on the exact commit, with
+  no uncommitted changes. Deploy only a run that ends in `RESULT: PASS`.
+  Without Docker it reports 9 passed and 1 skipped (the Compose check). Run it
+  from a normal checkout: the main checkout detached at the commit after
+  `npm ci`, or a fresh clone. Never run it from `.claude/worktrees`. The
+  Phase 0 worktree's `node_modules` is a link to the main checkout's, so the
+  gate's installed-tree check flags every `@catanova/*` package there.
+  `npm run ci -- --docker` proves that the image builds and serves on Node 24,
+  but it uses the development Compose file. The production container settings
+  are first exercised on the VM.
+- **The VM update** follows
+  [Deploy a reviewed update](../deploy/single-vm/OPERATIONS.md#deploy-a-reviewed-update):
+  finish active games where possible, confirm a backup that reports success,
+  run the deploy subshell with the full hash, then check the logs and HTTPS
+  health and reconnect a test room. On top of the runbook, deploy at a quiet
+  hour after a fresh backup, and check afterwards that the admin System page
+  shows the new Revision. Keep the old image until the new release is proven.
+  Every swap disconnects all players for a few seconds, and the runbook says
+  what that does to tables in progress.
+- **Which release is live** is known only on the VM. The repository records
+  only the first release, `8741e44`. Before the first deploy below, the owner
+  reads the running container's image label, as the runbook shows. If it is
+  older than `6af5762`, deploy `6af5762` on its own first and let it run a day,
+  so Phase 0 is not bundled with other unreleased work. If it is older than
+  `7e86098`, the admin console comes first: its Cloudflare and Access setup
+  and status directory in [Admin console](ADMIN.md#cloudflare-setup), and its
+  five values (`TUNNEL_TOKEN` and the four `ADMIN_*` settings) in
+  `production.env`. Without them the deploy stops at `compose config`, after
+  the checkout and `CATANOVA_REVISION` have already moved. If it is older than
+  `88cad52`, run the game-avatar cleanup in
+  [Accounts](AUTH.md#username-and-portrait-ownership) after that deploy.
+- **The docs merge** publishes on public GitHub but changes nothing on the
+  site. The image copies no docs, and the public pages are built from React
+  components, not from `docs/`. Once merged, the rulebooks, the plans and the
+  wiki pack are public, and the live `llms.txt` link to `docs/RULEBOOK.md` on
+  main shows the planned modes, marked as not yet playable. No VM deploy is
+  needed; the next code deploy carries the docs. Merge it before Phase 0.
+- **Phase 0 can deploy on its own**, with no visible change. What was checked:
+  - Saved games and lobby boards are stored as full JSON and never re-dealt
+    from their seed, and every board ever saved has a preset field
+    (`balanced-v1` since 9 September 2026, `balanced-v2` since 23 September
+    2026). `topology()` gives byte-identical JSON before and after.
+  - The restore verifier passes across versions both ways: Phase 0 verified 5
+    of 5 played games written by main, and main verified 5 of 5 written by
+    Phase 0. Rolling back is safe.
+  - `PROTOCOL_VERSION` stays 1 and message shapes are unchanged. Real moves
+    give the same payload hashes, so retries sent across the swap are still
+    recognised. An off-board id is still refused with `ILLEGAL_ACTION`.
+  - Old tabs keep working on Classic boards until they are reloaded.
+  - Classic is pixel-identical in 18 screenshots, and a fixture pins 607 seeds
+    byte for byte, plus whole bot games.
+  - The terrain shader takes up to 128 hexes, within what WebGL 2 guarantees,
+    and falls back to the SVG ground if it fails to compile.
+
+  After the deploy, open a game in progress and start a new one, on a phone
+  and on desktop, including an older Android phone and an iPhone. The board
+  should show painted terrain, not the flat fallback, with no "Terrain
+  renderer unavailable" warning in the console.
+
+### The staged rollout
+
+Each mode reaches players in several releases, each gated and deployed as
+above. The reader ships before the writer, so a rollback never meets a game it
+cannot read.
+
+1. **Release A: reader and switch** (step 1). No player can start a game in
+   another mode yet. It contains:
+   - the mode field in room settings. The server keeps the stored mode when an
+     older tab leaves the field out, and re-deals the board on any mode
+     change;
+   - unknown rulesets refused on every path that reads a saved game: `loadGame`
+     (with `VERSION_MISMATCH`, beside its schema check), `initializePresence`
+     at start-up, the journal compactor, the restore verifier and the admin
+     reads. Start-up and the compactor leave such a game untouched;
+   - stand-in bots that depend on the ruleset: none in a mode without bots;
+   - a check at Start that the board's preset matches the ruleset;
+   - a restore verifier that reads seats and supply from the ruleset;
+   - a capability flag in the join message, like `preloadGame`. The server
+     refuses to start, join or watch a non-Classic room from a tab without it,
+     with the existing `CLIENT_UPDATE_REQUIRED`, and the tab shows the reason:
+     "Refresh to play Big Table". `PROTOCOL_VERSION` stays 1, because bumping
+     it would cut off every open tab;
+   - two environment switches, read at start-up. `CATANOVA_MODES` lists the
+     modes any host may pick; unset means Classic only.
+     `CATANOVA_MODE_TESTERS` lists account ids whose rooms may pick any mode
+     the build contains. An unknown mode id is logged and treated as
+     unavailable. It never stops the server: otherwise a rollback to A with
+     `big-table-v1` still in `production.env` would crash-loop. The server
+     enforces both switches when settings change (`MODE_UNAVAILABLE`) and
+     again at Start. Room setup shows the Game mode section only when the host
+     may pick more than Classic, so everyone else sees today's screens;
+   - both variables added to `deploy/single-vm/compose.yaml` and
+     `deploy/single-vm/.env.example`, to `SCRUBBED_VARIABLES` in
+     `scripts/ci.ts` and to the `env -u` list of the runbook's
+     `catanova_compose` helper.
+
+   The watchdog, the backup pings and the weekly drill are not installed on
+   the VM yet. Switch them on
+   ([Alerts](../deploy/single-vm/OPERATIONS.md#alerts)), deploy A, and let one
+   restore drill pass before any mode opens, so tester games are checked.
+   Release A is where every later rollback lands. Once any mode game exists,
+   never roll back past it.
+
+2. **Release B: the Big Table board, seats and supply**, hidden: not in
+   `CATANOVA_MODES`, and `CATANOVA_MODE_TESTERS` still empty, since a tester
+   may pick any mode the build contains. The server deals a room's board on
+   its main thread when the room is created or returns to the lobby, and will
+   on every mode change, on a two-vCPU burstable VM. So the preset ships only
+   if every deal stays under 100 ms on that VM size, or dealing moves to a
+   worker.
+3. **Release C: paired turns**, testers first. After the deploy, the owner adds
+   their own account id and a few friends' to `CATANOVA_MODE_TESTERS` (the id
+   is in the admin console's player address) and recreates the container. The
+   host must be a tester; the others join by code with up-to-date tabs. Test:
+   - several full five- and six-player games on portrait and landscape phones
+     and on desktop, including 1366 × 768;
+   - a player who drops out and comes back (the 2-minute absence rule), and a
+     Partner's clock that runs out;
+   - rematch and invitations;
+   - the admin Games and Stats pages;
+   - a manual restore drill (`systemctl start catanova-drill.service`) that
+     verifies the Big Table games;
+   - locally, Release A on a copy of a database with Big Table games: it must
+     refuse those games, not misplay them.
+4. **Opening to everyone.** Add `big-table-v1` to `CATANOVA_MODES` and recreate
+   the container. In the same window, ship the release that changes the copy
+   saying "two to four" or "2–4". The public pages are prerendered when the
+   image is built, so this is a code release, not an environment edit. Setting
+   `CATANOVA_MODES` in `production.env` before running the deploy subshell
+   makes both one container swap. Today the copy is in:
+   - `apps/client/src/PublicPages.tsx`: the home page's description, the FAQ
+     answers to "What is Catanova?" and "How many players do you need?"
+     ("Two to four."), the structured data's `numberOfPlayers`
+     (`maxValue: 4`), and the player guide's subtitle, "Players 2–4" row and
+     opening paragraph;
+   - `apps/client/src/EntryScreen.tsx` ("A Catan alternative for 2–4
+     friends.") and `apps/client/src/LandingFeatures.tsx` ("gather 2–4
+     friends");
+   - `scripts/render-public-pages.ts`: `llms.txt`, twice;
+   - `apps/client/public/site.webmanifest`, `README.md` (twice) and the
+     `package.json` description;
+   - the rules error "Start with two to four players" in
+     `packages/rules/src/game.ts`, which should read the ruleset anyway; tests
+     in two files match its wording.
+
+   Search again on the day with `git grep -n -i -E "two to four|2–4"`. The
+   same release changes every line in `docs/` that says the mode is not
+   playable yet or still being built (the rulebook, the turn clock, map
+   generation and the wiki pages), with the wiki pack rebuilt. The Between-turns build option follows later as
+   its own release, through the same steps.
+
+5. **The kill switch.** Take the mode out of `CATANOVA_MODES`, clear
+   `CATANOVA_MODE_TESTERS`, and recreate the container. Taking it out of
+   `CATANOVA_MODES` alone leaves it open to testers. Started games keep their
+   frozen ruleset and play on; no new game can start in the mode.
+6. **Open Sea follows the same path.** Its core ships hidden, one part at a
+   time. Outer Isles then goes to testers, then to everyone, with its own
+   capability value ("Refresh to play Open Sea") and its own copy changes.
+
+### What needs the owner
+
+- Every push and pull request, because the repository is public.
+- Every merge into main.
+- Every deploy, over SSH.
+- Every change to `production.env`: adding testers, opening a mode, the kill
+  switch.
+- Switching on the watchdog, the backup pings and the restore drill.
+- Generating more than about five images for the new art.
+
+Writing the code, running the gate and taking screenshots need no approval.
+
+## Matching the existing look
+
+Checked on 26 September 2026 against the stylesheets, the art and the real
+renderer. Every mode screen and piece follows the rules below. The table after
+them says where each planned element stands and how it is to be built.
+
+### What the real renderer shows
+
+Big Table was drawn by the real renderer on the Phase 0 branch, from a
+throwaway preset. It matches Classic in WebGL and in the SVG fallback, on a
+phone and on desktop: the same tiles and sand paths, the same number tokens,
+the same harbours with piers and badges, and the same water band fading into
+the table. Its hexes are 87% of Classic's size on a 390-pixel phone (43.3
+against 49.5 pixels across; tokens 15.6 against 17.9 pixels) and 79% on a
+1440 × 900 desktop (87.2 against 109.9 pixels; tokens 31.5 against 39.7).
+Tokens stay readable.
+
+Outer Isles cannot be drawn yet. The renderer has no idea of sea, so sea hexes
+come out as land tiles. With the sea hexes left out, each island already gets
+its own beach, foam and shallows, and that land-only picture is where the sea
+starts from. On a phone its hexes are about 32 pixels across and its tokens
+about 11 pixels. The renderer work is in the
+[maps plan](BIGGER-MAPS-AND-MODES.md#sea-hexes-and-the-ring-of-sea).
+
+### Rules
+
+1. **One owner per component.** Each new component gets one stylesheet of its
+   own, as `room-seats.css` owns the seat card, imported last in
+   `apps/client/src/main.tsx`, after `table-light.css`. Never add to
+   `style.css`, `polish.css` or the other layered sheets. Many rules win by
+   source order: 21 sheets load after `mobile-layout.css`.
+2. **Same specificity.** Reuse the classes of the rule you mirror, or match its
+   selector shape. No extra `:not()`, no IDs, no `!important`. Layouts for five
+   and six seats hang off a data attribute set only then, so four-player
+   screens stay pixel-identical.
+3. **The right scope.** In a game, `.game-world.playing` with the ink-green
+   `--game-*` values of `lounge.css`. Before a game, `.game-world.player-home`
+   and `.lobby` with the walnut `--game-*` values of `lounge-tabletop.css`. In
+   every dialog and popover, the parchment `--dialog-*` values of
+   `game-dialogs.css`. Read colours from these. A colour that is truly new
+   becomes a scoped custom property, not a loose hex value.
+4. **Type.** Cinzel 600 for titles only. Barlow 400, 500 or 600 for everything
+   else, board numbers included. Barlow loads only those three weights (Cinzel
+   loads 600 and 700) and font synthesis is off, so Barlow at 700 or 800 looks
+   like 600. No new family or weight without its `@fontsource` import.
+5. **Buttons.** Copy the neighbouring button: hub gold, walnut or slate before
+   a game, the olive `.gold-button` in parchment, the teal `.icon-button` in
+   the game. Every one has a light inset top line and most a dark inset bottom
+   lip. Of the pre-game and parchment buttons, only the lobby's Start and
+   Leave and the olive button have a hard ledge; the hub gold, walnut, slate
+   and teal buttons have a soft shadow. Warm means you can act. Disabled
+   buttons fade to 0.4 (`button:disabled` in `style.css`); a disabled card or
+   seat control fades to 0.45, like `.seat-fill`.
+6. **Icons.** `GameIcon` only: an existing painted name (boat, road,
+   settlement, dice, trophy and others) or a 24 × 24 `CONTROL_PATHS` line icon
+   with stroke 1.8, round caps and `currentColor`. A new painted symbol follows
+   `docs/art/painted-ui-icons.md` and goes into the icon atlas, never a loose
+   file or an emoji.
+7. **Pieces.** Flat SVG in world units with the house contour: a seat-colour
+   fill, a `#31453e` stroke at 1.7 (roads `#33463f` at 1.1), a soft ground
+   shadow with no stroke, and a sheen or roof line. Colours come from
+   `seatColorMap` by player id. Previews and guides reuse
+   `.build-site-preview`, `.build-ghost` and `.site-guide`.
+8. **No hard lines on water.** No rims, hex outlines or dark borders on the
+   sea. Water is the painted environment art with the existing blend by
+   distance from the coast, the foam line and the sand bank. New constants go
+   through `scene.ts`, so WebGL and the SVG fallback stay in step.
+9. **Both board themes.** Storybook and Classic (`board-theme.ts`). New
+   terrain, pieces and icons are made and checked in both.
+10. **Motion.** Finite effects only, on `--ease-smooth-out` and the existing
+    `.t-dropdown`, `.t-panel-slide`, `.t-digit` and `.t-acc`. Every animation
+    has both opt-outs, `@media (prefers-reduced-motion: reduce)` and
+    `[data-motion='reduced']`. The server never waits for an animation.
+11. **Art.** New bitmaps follow the Storybook prompt in
+    `docs/art/terrain-concept.md` or the icon prompt: calm, light edges and
+    square cells. The prompt, references and SHA-256 go in `docs/art`. Drafts
+    on gpt-image-2.5-flare, finals on sunburst, and the owner is asked before
+    more than about five images.
+12. **Don't.** No emoji, no rope or wood-frame art stretched onto buttons, no
+    glow that never stops, no competing banners, no new backdrop. Before a
+    game the screen stays on the walnut backdrop; the game stays on the lit
+    walnut table.
+
+### Every planned element
+
+| Element                                     | Status           | Approach                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Game mode section in Room setup             | Blends           | Built in `RoomConfiguration` with the same fieldset and `label.settings-dice-option` cards, so today's selected and hover rules apply. The legend gets its own painted icon. Shown only when the host may pick more than Classic.                                                                                             |
+| Big Table turn style                        | Needs work       | Two cards inside the Game mode fieldset, after Big Table, indented to its text, under a `.settings-caption` line and opened with `.t-acc`. Fix the copy: the Partner gets a full action phase, with no roll and no player trades.                                                                                             |
+| A blocked mode, and the points range        | Not designed yet | A `data-disabled` state on the same card selector: opacity 0.45, `--dialog-muted` text, the reason in `<small>` ("Bots play Classic only"). The existing range takes its limits and Standard label from the ruleset.                                                                                                          |
+| Mode chip in the lobby                      | Not designed yet | A `button.lobby-mode` first in `.lobby-room-options`, shaped like the goal, timer and dice chips: an 18-pixel icon, Barlow 500 at 14 px, opening Room setup. The strip already wraps; check the wrap and its dividers at 375 × 812.                                                                                           |
+| Six-seat lobby                              | Not designed yet | `room-seats.css` handles five and six places: three columns on phones with smaller portraits, checked at 812 × 375 and 1366 × 768. "Add a bot" uses the disabled `.seat-fill` with its reason; "Big Table needs five players" goes in the launch hint.                                                                        |
+| Mode in history, invitations and results    | Not designed yet | No new badge. The mode goes in the small line of `.match-row`, in the invitation text and as a Mode row in `.game-over-facts`. Match records need a ruleset column first.                                                                                                                                                     |
+| An out-of-date tab                          | Not designed yet | `CLIENT_UPDATE_REQUIRED` with a reason the player sees, "Refresh to play Big Table" or "Refresh to play Open Sea", through the existing error path.                                                                                                                                                                           |
+| Six-player rail, portrait phone             | Needs work       | One six-seat stylesheet on `.playing .player-rail` with the seat attribute. Names at least 12 px; the rank hidden while the turn chip shows; award counts moved into `.profile-stats`; medals about 22 px. The friend button keeps its reveal and only moves when shown.                                                      |
+| Six-player rail, landscape phone            | Needs work       | The same stylesheet, inside the in-game query `(max-width: 1000px) and (max-height: 600px) and (orientation: landscape)`. Re-measure at 812 × 375 and 844 × 390 with a Partner chip, live timers and an absence label; keep 8 px above the dock.                                                                              |
+| Six-player rail, desktop                    | Needs work       | Fits at 1440 × 900. At 1366 × 768 the last card runs under the dice of the last roll: add a smaller portrait in the six-seat stylesheet (the old 70-pixel step never applies) or lift the dice. Check 1280 × 720 too.                                                                                                         |
+| Seat colours 5 and 6                        | Needs work       | Fix `seatColors` first: today it gives coral and sky twice. Then check jade and rose roads, houses and ships on forest, pasture and water, and rose beside coral, on both themes. If two still confuse, change the fallback order, not the palette.                                                                           |
+| Lead and Partner markers                    | Not designed yet | Add the Partner's phase and build windows to `playerTurnActivity`, so both marker holders get the existing `.profile-turn` chip. Both get `.active`, and the timer shows only on the one acting; today both follow `game.active`. Label them with the existing, unused `.profile-turn-label`.                                 |
+| Partner's phase prompt and trade lock       | Not designed yet | `.action-prompt`: "Your Partner's phase: build, buy, trade with the bank, play one card". The attention cue for the Partner only. The trade panel greys its player offers with a muted line. The end button reads "End phase".                                                                                                |
+| Between-turns build windows                 | Not designed yet | For the player in the window: `.action-prompt` "Build window: build or buy, no trading", the timer in their chip, and the end button labelled "Done". Everyone else sees only the chip move along the rail, with no sound and no prompt.                                                                                      |
+| Turn clock in the new phases                | Not designed yet | The same `.turn-timer`, reading its deadline from whoever is owed a move. Change both its title and its visible label, which today says "Discards": "Gold picks", "Partner".                                                                                                                                                  |
+| Absent player with no stand-in              | Not designed yet | Reuse `.offline-mark` and `.profile-absence`. Change the visible "Away" and the tooltip, which says a bot takes the seat: "Auto moves in 1:32", then "Clock plays forced moves". On the smallest cards, the mark only.                                                                                                        |
+| Big Table island                            | Blends           | Measured above. The fallback's water outline peaks about 436 units out, just inside `waterOutline`'s 440-unit reach, so nothing is cut; a wider band would need the reach raised. Screenshot the 11 harbours on both themes, in WebGL and the fallback.                                                                       |
+| Tokens and harbour badges on smaller hexes  | Needs work       | Big Table's tokens are readable. On Outer Isles phones they are about 11 px, so the owner picks the framing: a narrower margin or rim, a camera that opens on the main island, or a larger token. Decide from 375 × 812 and 390 × 844 screenshots.                                                                            |
+| Sea                                         | Not designed yet | Painted water, never a hex grid. Start from the land-only preview: deep and shallow water, foam and sand from every coast, filling the whole sea. Sea edges are marked only where a ship can go at that moment, like today's road sites, with the dashed `.site-guide` lines.                                                 |
+| The board's outer edge                      | Not designed yet | The outer ring of sea stays opaque deep water. The fade into the table starts outside the rim, on a rounded, wobbling line, so there is no frame and no stepped edge. The stage shadow must fall under the islands, not along the sea.                                                                                        |
+| Ships                                       | Needs work       | A `ShipShape` beside `RoadShape` and `BuildingShape`: an upright hull in the seat colour with the house contour, a sheen line, cream `#fff0cc` sails and a plinth-like shadow. No coloured stripe. Re-mock with real colours on real sea edges.                                                                               |
+| Pirate                                      | Needs work       | A ship in the robber's colours: near-black `#172231` hull and sails, a `#c3b488` contour, one `#e7d8af` pennant stroke and the piece shadow, about 1.1 times a ship. No skull, no pure black and no darkened hex on water.                                                                                                    |
+| Harbours in Open Sea                        | Blends           | Keep the piers and the resource badge; drop the boat sprite when the board has sea. Mock one whose sea hex also holds two ships and the pirate. If they collide, pull the badge towards the shore and draw ships above it.                                                                                                    |
+| Gold field, Storybook theme                 | Needs work       | Redo it with the Storybook prompt, keeping the chosen rock, seam, pool and nuggets but moved up clear of the number token. A muted warm stone ground, not pasture green; a seam no brighter than the hay tile; calm edges. Test at board size beside real tiles.                                                              |
+| Gold field, Classic theme and fallback      | Not designed yet | A Classic tile in the denser style of `terrain-fantasy`, and a warm stone fallback colour such as `#8f7f5a`, labelled Gold. Add gold as a second texture, or build a new atlas that keeps tiles 0–5 pixel for pixel and is saved losslessly (re-saving the lossy atlas changes every tile), so Classic stays pixel-identical. |
+| New icons                                   | Not designed yet | Game mode, pirate, gold and island bonus, painted with the icon prompt. Repack the atlas to 8 × 7 with a clean gutter of at least 4 px, a new hash and new sizes. Ships use the existing boat; Move ship a line icon.                                                                                                         |
+| Road or ship on a coastal edge              | Not designed yet | The live game has no build shelf: players tap a site and confirm it. Where an edge takes either, `PlacementConfirmation` offers Road or Ship: in play, in setup and for Road Building.                                                                                                                                        |
+| Moving a ship                               | Not designed yet | "Move ship" in the dock's `.utility-actions`, styled like Trade; tapping your own ship also starts a move. Movable ships get the dashed orbit, destinations the site guide, and `PlacementConfirmation` confirms. A tooltip says why a ship cannot move.                                                                      |
+| Gold pick                                   | Not designed yet | Built from Year of Plenty's picker in `DevelopmentCards` ("Gold field: choose N", buttons limited by the bank) in a `.robber-flow`-style panel, with the discard waiting list for the order of picks and `TurnTimer` for the 20 seconds.                                                                                      |
+| Robber or pirate                            | Not designed yet | A first step with two `.robber-victim`-style buttons, robber and pirate, each with a title and one line. Then the existing target selection, on sea hexes for the pirate. Robber and pirate hexes are never targetable at once.                                                                                               |
+| Island bonus                                | Not designed yet | One celebration through `.award-celebration-layer`, +2 in the score tooltip and the log, and "Island bonus × n" with its icon in the results. No permanent board marker, unless a small pennant reads on a phone.                                                                                                             |
+| Results screen                              | Not designed yet | Points named by score term; "Longest Route" in Open Sea in the facts, the standings and the medal's label; a Mode fact. Screenshot six players at 375 × 812.                                                                                                                                                                  |
+| Trade and robber panels with five opponents | Not designed yet | `.trade-partners` is one row. Five partners in a 351-pixel phone panel, and the Partner as a trade partner during the Lead's part, need a layout. So do the discard and victim lists.                                                                                                                                         |
+| Copy, history and labels                    | Not designed yet | Per-mode quick rules, card text ("robber or pirate", "roads or ships"), costs with the ship, a guide section per mode, log lines and icons for every new action, a notice when Big Table drops below five players, and accessible names for sea, gold, ships, the pirate and the Partner.                                     |
+
+### Checking a change
+
+Every change to a screen or the board is checked before it merges:
+
+- Screenshots before and after at 375 × 812, 812 × 375, 1366 × 768 and
+  1440 × 900.
+- The other controls on the screen measured with `getComputedStyle` and their
+  boxes, and shown not to have moved. Four-player screens must not change at
+  all.
+- Both board themes.
+- WebGL and the SVG fallback. To force the fallback, make
+  `getContext('webgl2')` return null, the app's own path without WebGL 2.
+- A change to the terrain art or the shader also re-runs the 18-screenshot
+  Classic comparison.
 
 ## Knights, in detail
 
@@ -763,6 +1088,10 @@ What remains:
 1. **The knights mode's name**, when it is unparked.
 2. **Open Sea balance**, to playtest after release: the target of 14 and the
    2-point island bonus on Outer Isles. It is not a rules question.
+3. **Outer Isles on phones.** Its number tokens draw at about 11 pixels on a
+   390-pixel phone, too small to read without zooming. The owner picks the
+   framing when the sea renderer is built; the options are under
+   [Matching the existing look](#matching-the-existing-look).
 
 ## Sources
 
