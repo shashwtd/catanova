@@ -1,4 +1,3 @@
-import { WORLD } from './scene.js';
 export type Camera = { scale: number; x: number; y: number };
 export type Bounds = { width: number; height: number };
 export type Point = { x: number; y: number };
@@ -6,17 +5,17 @@ export const MIN_ZOOM = 0.85,
   MAX_ZOOM = 2.2;
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 /**
- * The camera functions take the board's world box (scene.ts worldBox), of which only the shape matters here. It
- * defaults to the Classic island's.
+ * The camera functions take the board's world box (scene.ts worldBox), of which only the shape matters here.
+ * It has no default, so no caller can quietly frame a bigger board with the Classic island's box.
  */
-export function fitBoard(bounds: Bounds, world: Bounds = WORLD): Bounds {
+export function fitBoard(bounds: Bounds, world: Bounds): Bounds {
   const width = Math.min(
     Math.max(1, bounds.width - 24),
     (Math.max(1, bounds.height - 24) * world.width) / world.height,
   );
   return { width, height: (width * world.height) / world.width };
 }
-export function constrainCamera(camera: Camera, bounds: Bounds, world: Bounds = WORLD): Camera {
+export function constrainCamera(camera: Camera, bounds: Bounds, world: Bounds): Camera {
   const scale = clamp(camera.scale, MIN_ZOOM, maxZoom(bounds, world));
   const board = fitBoard(bounds, world);
   const maxX = Math.max(0, (board.width * scale - bounds.width) / 2) + Math.min(90, bounds.width * 0.18);
@@ -24,14 +23,14 @@ export function constrainCamera(camera: Camera, bounds: Bounds, world: Bounds = 
   return { scale, x: clamp(camera.x, -maxX, maxX) || 0, y: clamp(camera.y, -maxY, maxY) || 0 };
 }
 /** A small fitted board needs more magnification to make its roads selectable. */
-export const maxZoom = (bounds: Bounds, world: Bounds = WORLD) =>
+export const maxZoom = (bounds: Bounds, world: Bounds) =>
   Math.max(MAX_ZOOM, Math.min(4, 960 / fitBoard(bounds, world).width));
 export function zoomAt(
   camera: Camera,
   scale: number,
   focal: { x: number; y: number },
   bounds: Bounds,
-  world: Bounds = WORLD,
+  world: Bounds,
 ): Camera {
   const next = clamp(scale, MIN_ZOOM, maxZoom(bounds, world)),
     ratio = next / camera.scale;
@@ -80,7 +79,7 @@ export class BoardGesture {
         : null;
     for (const contact of this.contacts.values()) contact.start = { x: contact.x, y: contact.y };
   }
-  update(id: number, point: Point, camera: Camera, bounds: Bounds, world: Bounds = WORLD): Camera | null {
+  update(id: number, point: Point, camera: Camera, bounds: Bounds, world: Bounds): Camera | null {
     const previous = this.contacts.get(id);
     if (!previous) return null;
     this.contacts.set(id, { ...point, start: previous.start });
