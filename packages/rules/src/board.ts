@@ -164,6 +164,7 @@ const red = (n: number) => n === 6 || n === 8;
  * Numbers that may not share a border, and the issue each pairing raises. Red numbers together stack the
  * likeliest rolls in one place, equal numbers pay out twice to every corner they share, and a 2 beside the 12
  * leaves a patch of island that almost never produces. The official A–R number spiral never does any of these.
+ * balanced-v2 added the equal-number and 2/12 rules, which a balanced-v1 board in a saved game may break.
  */
 const BORDER_RULES: [issue: string, clash: (a: number, b: number) => boolean][] = [
   ['Adjacent red numbers', (a, b) => red(a) && red(b)],
@@ -175,7 +176,7 @@ const CLASHES = Array.from({ length: 13 }, (_, a) =>
   Array.from({ length: 13 }, (_, b) => BORDER_RULES.some(([, clash]) => clash(a, b))),
 );
 
-/** The limits a balanced deal must keep within, besides BORDER_RULES, which every balanced deal keeps. */
+/** The limits a balanced deal must keep within, besides BORDER_RULES, which fairnessIssues always checks. */
 export type FairnessRules = {
   /** The most hexes of one resource that may touch one another as a group. */
   largestCluster: number;
@@ -186,7 +187,7 @@ export type FairnessRules = {
   /** The most pips one corner may touch. */
   cornerPips: number;
 };
-/** The balanced-v2 limits; balanced-v1 boards in saved games predate the equal-number and 2/12 rules. */
+/** The limits balanced-v1 and balanced-v2 both deal within. */
 export const BALANCED_FAIRNESS: FairnessRules = {
   largestCluster: 2,
   spread: 3,
