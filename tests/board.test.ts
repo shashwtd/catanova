@@ -1,16 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  BALANCED_FAIRNESS,
+  BALANCED_V2,
+  BOARD_PRESETS,
   fairnessIssues,
   generateBoard,
   hexagon,
   hexDistance,
   isCoastalEdge,
+  pips,
   shoreHex,
   topology,
 } from '../packages/rules/src/board.js';
 import { createGame } from '../packages/rules/src/game.js';
-import type { Board, BoardShape } from '../packages/rules/src/board.js';
+import type { Board, BoardPreset, BoardShape } from '../packages/rules/src/board.js';
 import { NUMBER_SPIRAL, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
 import { BIG_TABLE_SHAPE, flood } from './board-shapes.js';
 
@@ -237,6 +241,33 @@ test('equal numbers, two red numbers, or the 2 and the 12 may not share a border
   assert.deepEqual(borderIssues(12, 2), ['Adjacent 2 and 12']);
   assert.deepEqual(borderIssues(5, 9), []);
   assert.deepEqual(borderIssues(2, 11), []);
+});
+test('a board is dealt from its preset, and a preset that cannot be dealt says why before searching', () => {
+  assert.equal(BOARD_PRESETS[0], BALANCED_V2);
+  assert.deepEqual(generateBoard(481, BALANCED_V2), generateBoard(481));
+  const variant = (change: Partial<BoardPreset>) => ({ ...BALANCED_V2, ...change });
+  // The fairness limits and the harbour trades are the preset's, not the generator's.
+  const tighter = { ...BALANCED_FAIRNESS, cornerPips: 10 };
+  for (let seed = 0; seed < 5; seed++) {
+    const board = generateBoard(seed, variant({ fairness: tighter }));
+    assert.deepEqual(fairnessIssues(board, tighter), []);
+    assert.ok(
+      board.vertices.every((v) => v.hexes.reduce((sum, h) => sum + pips(board.hexes[h]!.number), 0) <= 10),
+    );
+  }
+  const general = variant({ harbours: { ...BALANCED_V2.harbours, trades: Array(9).fill('any') } });
+  assert.ok(generateBoard(7, general).ports.every((p) => p.resource === 'any'));
+  // A 30-hex shape with the 19-hex bags used to crash on the 20th tile; now it is refused up front.
+  assert.throws(() => generateBoard(1, variant({ shape: BIG_TABLE_SHAPE })), /19 tiles onto 30 hexes/);
+  assert.throws(() => generateBoard(1, variant({ numbers: NUMBER_SPIRAL.slice(1) })), /17 numbers for 18/);
+  assert.throws(
+    () => generateBoard(1, variant({ harbours: { ...BALANCED_V2.harbours, slots: [0, 3, 30] } })),
+    /past the end of the coast/,
+  );
+  assert.throws(
+    () => generateBoard(1, variant({ harbours: { ...BALANCED_V2.harbours, slots: [0, 1] } })),
+    /harbours/,
+  );
 });
 test('new islands are balanced-v2, and boards saved as balanced-v1 remain valid', () => {
   for (let seed = 0; seed < 20; seed++) assert.equal(generateBoard(seed).preset, 'balanced-v2');

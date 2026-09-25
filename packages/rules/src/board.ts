@@ -26,7 +26,7 @@ export type Port = { edge: number; resource: Resource | 'any' };
 export type Board = {
   seed: number;
   /**
-   * The generator that dealt this board: a seed reproduces a board only under its own preset. New boards
+   * The BoardPreset that dealt this board: a seed reproduces a board only under its own preset. New boards
    * are balanced-v2; saved games keep the board JSON they were dealt, so balanced-v1 boards stay valid.
    */
   preset: 'balanced-v1' | 'balanced-v2';
@@ -174,11 +174,30 @@ const CLASHES = Array.from({ length: 13 }, (_, a) =>
   Array.from({ length: 13 }, (_, b) => BORDER_RULES.some(([, clash]) => clash(a, b))),
 );
 
-/**
- * Inspectable constraints: fairness means bounded extremes, not identical starting spots. These are the
- * balanced-v2 rules; balanced-v1 boards in saved games predate the equal-number and 2/12 rules.
- */
-export function fairnessIssues(board: Pick<Board, 'hexes' | 'vertices'>): string[] {
+/** The limits a balanced deal must keep within, besides BORDER_RULES, which every balanced deal keeps. */
+export type FairnessRules = {
+  /** The most hexes of one resource that may touch one another as a group. */
+  largestCluster: number;
+  /** Some two hexes of each resource must be at least this many steps apart. */
+  spread: number;
+  /** A resource's pips, per hex of it: its total must be within this range, the lower end rounded up. */
+  pipsPerHex: readonly [low: number, high: number];
+  /** The most pips one corner may touch. */
+  cornerPips: number;
+};
+/** The balanced-v2 limits; balanced-v1 boards in saved games predate the equal-number and 2/12 rules. */
+export const BALANCED_FAIRNESS: FairnessRules = {
+  largestCluster: 2,
+  spread: 3,
+  pipsPerHex: [2.5, 4],
+  cornerPips: 11,
+};
+
+/** Inspectable constraints: fairness means bounded extremes, not identical starting spots. */
+export function fairnessIssues(
+  board: Pick<Board, 'hexes' | 'vertices'>,
+  rules: FairnessRules = BALANCED_FAIRNESS,
+): string[] {
   const issues: string[] = [];
   for (const resource of RESOURCES) {
     const tiles = board.hexes.filter((h) => h.terrain === resource);
@@ -198,52 +217,59 @@ export function fairnessIssues(board: Pick<Board, 'hexes' | 'vertices'>): string
           ),
         );
       }
-      if (size > 2) issues.push(`${resource}: cluster larger than two`);
+      if (size > rules.largestCluster)
+        issues.push(`${resource}: cluster larger than ${rules.largestCluster}`);
     }
-    if (!tiles.some((a) => tiles.some((b) => hexDistance(a, b) >= 3)))
+    if (!tiles.some((a) => tiles.some((b) => hexDistance(a, b) >= rules.spread)))
       issues.push(`${resource}: insufficient spread`);
     const production = tiles.reduce((sum, h) => sum + pips(h.number), 0);
-    if (production < Math.ceil(tiles.length * 2.5) || production > tiles.length * 4)
+    const [low, high] = rules.pipsPerHex;
+    if (production < Math.ceil(tiles.length * low) || production > tiles.length * high)
       issues.push(`${resource}: production outside range`);
   }
   for (const [issue, clash] of BORDER_RULES)
     for (const h of board.hexes)
       if (h.neighbors.some((n) => clash(h.number, board.hexes[n]!.number))) issues.push(issue);
   for (const v of board.vertices)
-    if (v.hexes.reduce((sum, h) => sum + pips(board.hexes[h]!.number), 0) > 11)
-      issues.push('Intersection above 11 pips');
+    if (v.hexes.reduce((sum, h) => sum + pips(board.hexes[h]!.number), 0) > rules.cornerPips)
+      issues.push(`Intersection above ${rules.cornerPips} pips`);
   return issues;
 }
 
 /**
- * Deals the number tokens onto `land` in a uniformly random order, giving up as soon as a token lands beside one
- * it may not touch. Every deal abandoned here would fail fairnessIssues anyway, so accepted numberings stay
+ * Deals the number tokens onto `numbered` in a uniformly random order, giving up as soon as a token lands beside
+ * one it may not touch. Every deal abandoned here would fail fairnessIssues anyway, so accepted numberings stay
  * uniformly random among the valid ones, exactly as with whole shuffles; most failures just cost a few draws
  * instead of a full check. Returns whether the deal completed.
  */
-function dealNumbers(hexes: readonly Hex[], land: readonly Hex[], random: () => number): boolean {
-  const tokens: number[] = [...NUMBER_SPIRAL];
-  for (const h of land) h.number = 0;
-  for (let i = 0; i < land.length; i++) {
+function dealNumbers(
+  hexes: readonly Hex[],
+  numbered: readonly Hex[],
+  numbers: readonly number[],
+  random: () => number,
+): boolean {
+  const tokens: number[] = [...numbers];
+  for (const h of numbered) h.number = 0;
+  for (let i = 0; i < numbered.length; i++) {
     const j = i + Math.floor(random() * (tokens.length - i));
     [tokens[i], tokens[j]] = [tokens[j]!, tokens[i]!];
     const token = tokens[i]!;
-    if (land[i]!.neighbors.some((n) => CLASHES[token]![hexes[n]!.number])) return false;
-    land[i]!.number = token;
+    if (numbered[i]!.neighbors.some((n) => CLASHES[token]![hexes[n]!.number])) return false;
+    numbered[i]!.number = token;
   }
   return true;
 }
 
-/** Nine harbours around the 30 coastal edges, spaced 3, 3 and 4 edges apart. */
-const HARBOUR_SLOTS = [0, 3, 6, 10, 13, 16, 20, 23, 26];
-
 /**
- * The harbour edges of each rotation of HARBOUR_SLOTS that keeps harbours off the same and neighbouring sea
- * spaces. With nine harbours on the eighteen sea spaces round the island, that makes harbour and open sea
+ * The harbour edges of each rotation of the slots that keeps harbours off the same and neighbouring sea
+ * spaces. With the Classic island's nine harbours on its eighteen sea spaces, that makes harbour and open sea
  * alternate all the way round, as on the fixed frame in docs/SETUP.md, with harbours off three of the six tips.
  * The other four of every ten rotations put three pairs of harbours side by side and leave every tip bare.
  */
-function harbourLayouts(graph: Pick<Board, 'hexes' | 'vertices' | 'edges'>): Edge[][] {
+function harbourLayouts(
+  graph: Pick<Board, 'hexes' | 'vertices' | 'edges'>,
+  slots: readonly number[],
+): Edge[][] {
   // Twice the edge's midpoint. Its angle orders the coast, and subtracting the land hex's centre gives the centre
   // of the sea space across the edge: neighbouring sea spaces are √3 apart, any other two at least 3.
   const out = (e: Edge) => ({
@@ -258,37 +284,93 @@ function harbourLayouts(graph: Pick<Board, 'hexes' | 'vertices' | 'edges'>): Edg
   const coast = graph.edges
     .filter((e) => isCoastalEdge(graph, e))
     .sort((a, b) => Math.atan2(out(a).y, out(a).x) - Math.atan2(out(b).y, out(b).x));
+  if (coast.length <= Math.max(...slots))
+    throw new Error('The harbour slots go round past the end of the coast');
   return coast
-    .map((_, offset) => HARBOUR_SLOTS.map((slot) => coast[(slot + offset) % coast.length]!))
+    .map((_, offset) => slots.map((slot) => coast[(slot + offset) % coast.length]!))
     .filter((edges) => edges.every((e, i) => edges.slice(i + 1).every((f) => apart(e, f))));
 }
 
-export function generateBoard(seed: number): Board {
+/** The order a preset's terrain counts are laid out in before they are shuffled. */
+const TERRAINS: readonly Terrain[] = ['desert', ...RESOURCES];
+/**
+ * One way to deal a board: its shape, the tiles, numbers and harbours dealt onto it, and the rules a deal must
+ * pass. Every board records the id of the preset that dealt it, since a seed reproduces a board only under the
+ * same preset.
+ */
+export type BoardPreset = {
+  id: Board['preset'];
+  shape: BoardShape;
+  /** How many land hexes of each terrain; together, every land hex in the shape. */
+  terrain: Readonly<Record<Terrain, number>>;
+  /** The number tokens, one for each land hex that is not desert. */
+  numbers: readonly number[];
+  harbours: {
+    /** Where the harbours go, as coastal edges counted round from wherever the dealer starts. */
+    slots: readonly number[];
+    /** What each harbour trades, shuffled onto the slots: 'any' at 3:1, or one resource at 2:1. */
+    trades: readonly (Resource | 'any')[];
+  };
+  /** 'balanced' searches for a deal of tiles and numbers with no fairnessIssues under `fairness`. */
+  generator: 'balanced';
+  fairness: FairnessRules;
+};
+/** The Classic island as Catanova deals it by default: see docs/MAP_GENERATION.md. */
+export const BALANCED_V2: BoardPreset = {
+  id: 'balanced-v2',
+  shape: CLASSIC_SHAPE,
+  terrain: { desert: 1, wood: 4, brick: 3, sheep: 4, wheat: 4, ore: 3 },
+  numbers: NUMBER_SPIRAL,
+  // Nine harbours round the 30 coastal edges, spaced 3, 3 and 4 edges apart.
+  harbours: { slots: [0, 3, 6, 10, 13, 16, 20, 23, 26], trades: ['any', 'any', 'any', 'any', ...RESOURCES] },
+  generator: 'balanced',
+  fairness: BALANCED_FAIRNESS,
+};
+/**
+ * The presets that deal new boards, the default first. balanced-v1 deals no more boards; the ones it dealt
+ * live on in saved games, which keep the board JSON they were dealt.
+ */
+export const BOARD_PRESETS: readonly [BoardPreset, ...BoardPreset[]] = [BALANCED_V2];
+
+export function generateBoard(seed: number, preset: BoardPreset = BOARD_PRESETS[0]): Board {
   const random = seededRandom(seed),
-    graph = topology(),
-    harbours = harbourLayouts(graph);
-  const terrain: Terrain[] = [
-    'desert',
-    ...RESOURCES.flatMap((r) => Array<Terrain>(r === 'brick' || r === 'ore' ? 3 : 4).fill(r)),
-  ];
+    graph = topology(preset.shape),
+    land = graph.hexes.filter(isLand),
+    harbours = harbourLayouts(graph, preset.harbours.slots);
+  const terrain = TERRAINS.flatMap((t) => Array<Terrain>(preset.terrain[t]).fill(t));
+  // A preset that cannot be dealt says so before any search, rather than failing somewhere inside one.
+  if (terrain.length !== land.length)
+    throw new Error(`${preset.id} deals ${terrain.length} tiles onto ${land.length} hexes`);
+  if (preset.numbers.length !== land.length - preset.terrain.desert)
+    throw new Error(
+      `${preset.id} has ${preset.numbers.length} numbers for ${land.length - preset.terrain.desert} hexes`,
+    );
+  if (preset.harbours.trades.length !== preset.harbours.slots.length || !harbours.length)
+    throw new Error(`${preset.id} has no way to lay out its harbours`);
   // Hard limits make an impossible future constraint fail visibly rather than hang or silently relax.
   for (let layout = 0; layout < 10000; layout++) {
     const shuffled = shuffle(terrain, random);
-    for (const h of graph.hexes) {
-      h.terrain = shuffled[h.id]!;
-      h.number = 0;
-    }
-    if (fairnessIssues(graph).some((issue) => issue.includes('cluster') || issue.includes('spread')))
+    for (const [i, h] of land.entries()) h.terrain = shuffled[i]!;
+    for (const h of graph.hexes) h.number = 0;
+    if (
+      fairnessIssues(graph, preset.fairness).some(
+        (issue) => issue.includes('cluster') || issue.includes('spread'),
+      )
+    )
       continue;
-    const land = graph.hexes.filter((h) => h.terrain !== 'desert');
+    const numbered = land.filter((h) => h.terrain !== 'desert');
     for (let attempt = 0; attempt < 20000; attempt++) {
-      if (!dealNumbers(graph.hexes, land, random) || fairnessIssues(graph).length) continue;
-      const resources = shuffle<Resource | 'any'>(['any', 'any', 'any', 'any', ...RESOURCES], random);
+      if (
+        !dealNumbers(graph.hexes, numbered, preset.numbers, random) ||
+        fairnessIssues(graph, preset.fairness).length
+      )
+        continue;
+      const trades = shuffle(preset.harbours.trades, random);
       const ports = harbours[Math.floor(random() * harbours.length)]!.map((edge, n) => ({
         edge: edge.id,
-        resource: resources[n]!,
+        resource: trades[n]!,
       }));
-      return { seed: seed >>> 0, preset: 'balanced-v2', ...graph, ports };
+      return { seed: seed >>> 0, preset: preset.id, ...graph, ports };
     }
   }
   throw new Error('Could not generate a balanced island within the search limit');
