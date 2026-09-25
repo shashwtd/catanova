@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
+import { generateBoard } from '../packages/rules/src/board.js';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
 import { CORD_HEIGHT, StringLights, cordY } from '../apps/client/src/StringLights.js';
 import {
@@ -189,14 +190,16 @@ test('camera limits remain bounded, allow useful phone magnification and reverse
 });
 
 test('camera presents a straight-down island and a matching wooden world with gestures and no buttons', () => {
-  const html = renderToStaticMarkup(createElement(BoardViewport, { seed: 42, children: 'board' }));
+  const html = renderToStaticMarkup(
+    createElement(BoardViewport, { board: generateBoard(42), children: 'board' }),
+  );
   assert.equal([...html.matchAll(/<button/g)].length, 0);
   assert.match(html, /Scroll or pinch to zoom/);
   assert.ok(!html.includes('rotateX') && !html.includes('rotateY') && !html.includes('zoom-controls'));
   assert.match(html, /class="board-world-surface"/);
   assert.match(html, /patternTransform="translate\(0 0\) scale\(1\)"/);
   const reduced = renderToStaticMarkup(
-    createElement(BoardViewport, { seed: 42, reducedMotion: true, children: 'board' }),
+    createElement(BoardViewport, { board: generateBoard(42), reducedMotion: true, children: 'board' }),
   );
   assert.ok(!reduced.includes('gently tilt'));
 });
@@ -227,7 +230,7 @@ test('new-match curtain has two opposing cloud shapes and a bounded reduced-moti
 
 test('the table is lit, the board is not, and none of the lighting can be clicked', () => {
   const html = renderToStaticMarkup(
-    createElement(BoardViewport, { seed: 7, children: createElement('div', null, 'island') }),
+    createElement(BoardViewport, { board: generateBoard(7), children: createElement('div', null, 'island') }),
   );
   const css = readFileSync('apps/client/src/table-light.css', 'utf8');
   // The lighting is scenery: it must never take a click meant for a corner.

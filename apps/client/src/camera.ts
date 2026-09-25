@@ -5,33 +5,40 @@ export type Point = { x: number; y: number };
 export const MIN_ZOOM = 0.85,
   MAX_ZOOM = 2.2;
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
-export function fitBoard(bounds: Bounds): Bounds {
+/**
+ * The camera functions take the board's world box (scene.ts worldBox), of which only the shape matters here. It
+ * defaults to the Classic island's.
+ */
+export function fitBoard(bounds: Bounds, world: Bounds = WORLD): Bounds {
   const width = Math.min(
     Math.max(1, bounds.width - 24),
-    (Math.max(1, bounds.height - 24) * WORLD.width) / WORLD.height,
+    (Math.max(1, bounds.height - 24) * world.width) / world.height,
   );
-  return { width, height: (width * WORLD.height) / WORLD.width };
+  return { width, height: (width * world.height) / world.width };
 }
-export function constrainCamera(camera: Camera, bounds: Bounds): Camera {
-  const scale = clamp(camera.scale, MIN_ZOOM, maxZoom(bounds));
-  const board = fitBoard(bounds);
+export function constrainCamera(camera: Camera, bounds: Bounds, world: Bounds = WORLD): Camera {
+  const scale = clamp(camera.scale, MIN_ZOOM, maxZoom(bounds, world));
+  const board = fitBoard(bounds, world);
   const maxX = Math.max(0, (board.width * scale - bounds.width) / 2) + Math.min(90, bounds.width * 0.18);
   const maxY = Math.max(0, (board.height * scale - bounds.height) / 2) + Math.min(80, bounds.height * 0.18);
   return { scale, x: clamp(camera.x, -maxX, maxX) || 0, y: clamp(camera.y, -maxY, maxY) || 0 };
 }
 /** A small fitted board needs more magnification to make its roads selectable. */
-export const maxZoom = (bounds: Bounds) => Math.max(MAX_ZOOM, Math.min(4, 960 / fitBoard(bounds).width));
+export const maxZoom = (bounds: Bounds, world: Bounds = WORLD) =>
+  Math.max(MAX_ZOOM, Math.min(4, 960 / fitBoard(bounds, world).width));
 export function zoomAt(
   camera: Camera,
   scale: number,
   focal: { x: number; y: number },
   bounds: Bounds,
+  world: Bounds = WORLD,
 ): Camera {
-  const next = clamp(scale, MIN_ZOOM, maxZoom(bounds)),
+  const next = clamp(scale, MIN_ZOOM, maxZoom(bounds, world)),
     ratio = next / camera.scale;
   return constrainCamera(
     { scale: next, x: focal.x - (focal.x - camera.x) * ratio, y: focal.y - (focal.y - camera.y) * ratio },
     bounds,
+    world,
   );
 }
 export const wheelScale = (scale: number, delta: number) => scale * Math.exp(-clamp(delta, -24, 24) * 0.0009);
@@ -73,7 +80,7 @@ export class BoardGesture {
         : null;
     for (const contact of this.contacts.values()) contact.start = { x: contact.x, y: contact.y };
   }
-  update(id: number, point: Point, camera: Camera, bounds: Bounds): Camera | null {
+  update(id: number, point: Point, camera: Camera, bounds: Bounds, world: Bounds = WORLD): Camera | null {
     const previous = this.contacts.get(id);
     if (!previous) return null;
     this.contacts.set(id, { ...point, start: previous.start });
@@ -90,14 +97,14 @@ export class BoardGesture {
         return null;
       }
       const requested = pinchScale(base.camera.scale, separation, base.distance);
-      const scale = clamp(requested, MIN_ZOOM, maxZoom(bounds)),
+      const scale = clamp(requested, MIN_ZOOM, maxZoom(bounds, world)),
         ratio = scale / base.camera.scale;
       const desired = {
         scale,
         x: middle.x - (base.middle.x - base.camera.x) * ratio,
         y: middle.y - (base.middle.y - base.camera.y) * ratio,
       };
-      const next = constrainCamera(desired, bounds);
+      const next = constrainCamera(desired, bounds, world);
       // At a limit, rebase so reversing the fingers responds immediately instead of unwinding overshoot.
       if (scale !== requested || next.x !== desired.x || next.y !== desired.y) this.rebase(next);
       return next;
@@ -108,6 +115,7 @@ export class BoardGesture {
     return constrainCamera(
       { ...camera, x: camera.x + point.x - from.x, y: camera.y + point.y - from.y },
       bounds,
+      world,
     );
   }
   end(id: number, camera: Camera) {

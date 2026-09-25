@@ -29,7 +29,7 @@ import { BoardViewport } from '../apps/client/src/BoardViewport.js';
 import { BOARD_THEMES } from '../apps/client/src/board-theme.js';
 import { constrainCamera, fitBoard, maxZoom } from '../apps/client/src/camera.js';
 import type { Bounds, Camera } from '../apps/client/src/camera.js';
-import { coastline, portPlacement, waterOutline, WATER_FEATHER, WORLD } from '../apps/client/src/scene.js';
+import { coastline, portPlacement, waterOutline, WATER_FEATHER, worldBox } from '../apps/client/src/scene.js';
 import { fragmentSource } from '../apps/client/src/Terrain.js';
 
 export const BOARD_FIXTURE = new URL('./fixtures/classic-board.json', import.meta.url);
@@ -202,7 +202,8 @@ export const MARKUP: Record<string, () => string> = {
       }),
     );
   },
-  viewport: () => renderToStaticMarkup(createElement(BoardViewport, { seed: 481, children: 'board' })),
+  viewport: () =>
+    renderToStaticMarkup(createElement(BoardViewport, { board: generateBoard(481), children: 'board' })),
 };
 
 /** The test viewports in board-camera.test.ts, then phone, landscape phone, tablet and desktop board areas. */
@@ -230,7 +231,7 @@ export function sceneFixture() {
   // Classic's coast, water and harbour poses depend on the island's shape alone, never on its seed.
   const board = generateBoard(481);
   return {
-    world: { ...WORLD },
+    world: worldBox(board),
     coastline: coastline(board),
     // As Board.tsx writes a polygon's points; inset WATER_FEATHER / 2 is the one it draws.
     water: Object.fromEntries(
@@ -246,9 +247,9 @@ export function sceneFixture() {
       .map((e) => ({ edge: e.id, ...portPlacement(board, e.id) })),
     camera: CAMERA_BOUNDS.map((bounds) => ({
       bounds,
-      fit: fitBoard(bounds),
-      maxZoom: maxZoom(bounds),
-      constrained: CAMERAS.map((camera) => constrainCamera(camera, bounds)),
+      fit: fitBoard(bounds, worldBox(board)),
+      maxZoom: maxZoom(bounds, worldBox(board)),
+      constrained: CAMERAS.map((camera) => constrainCamera(camera, bounds, worldBox(board))),
     })),
     markup: Object.fromEntries(Object.entries(MARKUP).map(([name, render]) => [name, sha256(render())])),
     shader: sha256(fragmentSource),

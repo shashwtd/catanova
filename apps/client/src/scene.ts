@@ -1,10 +1,30 @@
-import { isCoastalEdge, shoreHex } from '../../../packages/rules/src/board.js';
+import { isCoastalEdge, shoreHex, topology } from '../../../packages/rules/src/board.js';
 import type { Board, Terrain } from '../../../packages/rules/src/board.js';
 
 export const HEX_SIZE = 64;
-export const WORLD = { x: -392, y: -368, width: 784, height: 736 };
 export const WATER_BAND = 90;
 export const WATER_FEATHER = 48;
+/** Room round the island for the water band, WATER_BAND and its waves, and some 20 units of table past its fade. */
+export const WORLD_MARGIN = 112;
+export type WorldBox = { x: number; y: number; width: number; height: number };
+/**
+ * The part of the world a board's scene covers: the board's extent and WORLD_MARGIN round it, rounded out to
+ * whole steps of 8 units. The SVG's viewBox, the terrain shader and the camera all frame this box.
+ */
+export function worldBox(board: Pick<Board, 'vertices'>): WorldBox {
+  const xs = board.vertices.map((v) => v.x * HEX_SIZE),
+    ys = board.vertices.map((v) => v.y * HEX_SIZE);
+  // The tolerance keeps floating-point dust on a side that lands on a step from pushing it out a whole step.
+  const down = (n: number) => Math.floor((n - WORLD_MARGIN) / 8 + 1e-9) * 8,
+    up = (n: number) => Math.ceil((n + WORLD_MARGIN) / 8 - 1e-9) * 8;
+  const x = down(Math.min(...xs)),
+    y = down(Math.min(...ys));
+  return { x, y, width: up(Math.max(...xs)) - x, height: up(Math.max(...ys)) - y };
+}
+/** The Classic island's box, x -392, y -368, 784 by 736, which every Classic board has. */
+export const WORLD = worldBox(topology());
+/** What memoised layers are keyed on: a board never changes in a game, and a seed deals one board per preset. */
+export const boardKey = (board: Pick<Board, 'seed' | 'preset'>) => `${board.preset}/${board.seed}`;
 /** The square sprite rotates so its long axis follows its coastal edge. */
 export const SHIP_SIZE = 60;
 export const SHIP_COAST_DISTANCE = 36;

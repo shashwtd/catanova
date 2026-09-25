@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { generateBoard, hexagon, hexDistance, isCoastalEdge } from '../packages/rules/src/board.js';
 import {
   coastline,
@@ -16,8 +18,13 @@ import {
   PORT_BADGE_BOUNDS,
   SHIP_COAST_DISTANCE,
   WATER_FEATHER,
+  WORLD_MARGIN,
+  worldBox,
 } from '../apps/client/src/scene.js';
-import { bareBoard, flood } from './board-shapes.js';
+import { constrainCamera, fitBoard } from '../apps/client/src/camera.js';
+import { Board } from '../apps/client/src/Board.js';
+import { BoardViewport } from '../apps/client/src/BoardViewport.js';
+import { BIG_TABLE_SHAPE, bareBoard, flood } from './board-shapes.js';
 
 test('the calm continuous water band follows the coast and leaves room for its shadow within the scene', () => {
   const board = generateBoard(42),
@@ -142,6 +149,41 @@ test('coast-aligned ships and outer trade badges fit every coast, with separate 
       /coastal edge/,
     );
   }
+});
+
+test('the scene frames the board it is given: the Classic box for Classic, a bigger one for a bigger island', () => {
+  for (const seed of [0, 42, 481, 2026]) assert.deepEqual(worldBox(generateBoard(seed)), WORLD);
+  assert.deepEqual(WORLD, { x: -392, y: -368, width: 784, height: 736 });
+  const big = bareBoard(BIG_TABLE_SHAPE),
+    world = worldBox(big);
+  assert.deepEqual(world, { x: -448, y: -464, width: 896, height: 928 });
+  for (const v of big.vertices) {
+    assert.ok(
+      v.x * HEX_SIZE - world.x >= WORLD_MARGIN && world.x + world.width - v.x * HEX_SIZE >= WORLD_MARGIN,
+    );
+    assert.ok(
+      v.y * HEX_SIZE - world.y >= WORLD_MARGIN && world.y + world.height - v.y * HEX_SIZE >= WORLD_MARGIN,
+    );
+  }
+  // The camera fits that box's shape, not the Classic one, and still lets the whole of it be panned into view.
+  const bounds = { width: 375, height: 520 },
+    fitted = fitBoard(bounds, world);
+  assert.ok(Math.abs(fitted.width / fitted.height - 896 / 928) < 1e-9);
+  assert.ok(fitted.width <= bounds.width - 24 && fitted.height <= bounds.height - 24 + 1e-9);
+  const far = constrainCamera({ scale: 2.2, x: 5000, y: -5000 }, bounds, world);
+  assert.ok(
+    far.x >= (fitted.width * 2.2 - bounds.width) / 2 && -far.y >= (fitted.height * 2.2 - bounds.height) / 2,
+  );
+  // And the SVG, the stage and the viewport take it too.
+  const island = renderToStaticMarkup(
+    createElement(Board, { board: big, mode: null, disabled: true, onAction: () => {}, onRobber: () => {} }),
+  );
+  assert.match(island, /viewBox="-448 -464 896 928"/);
+  assert.match(island, /aspect-ratio:896\/928/);
+  assert.match(island, /<rect class="water-band" x="-448" y="-464" width="896" height="928"/);
+  assert.equal((island.match(/class="terrain-hit/g) ?? []).length, 30);
+  const viewport = renderToStaticMarkup(createElement(BoardViewport, { board: big, children: 'board' }));
+  assert.match(viewport, /aspect-ratio:896\/928/);
 });
 
 test('a harbour on a coast of sea hexes is posed exactly as it is on the rim of the board', () => {

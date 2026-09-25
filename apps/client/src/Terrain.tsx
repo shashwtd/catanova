@@ -8,7 +8,8 @@ import {
   WATER_FEATHER,
   WATER_EDGE_WAVES,
   TERRAIN_INDEX,
-  WORLD,
+  boardKey,
+  worldBox,
 } from './scene.js';
 
 const vertexSource = `#version 300 es
@@ -160,7 +161,8 @@ export function Terrain({
           board.hexes.flatMap((h) => [h.x * HEX_SIZE, h.y * HEX_SIZE, TERRAIN_INDEX[h.terrain]]),
         ),
       );
-      gl.uniform4f(gl.getUniformLocation(program, 'uWorld'), WORLD.x, WORLD.y, WORLD.width, WORLD.height);
+      const world = worldBox(board);
+      gl.uniform4f(gl.getUniformLocation(program, 'uWorld'), world.x, world.y, world.width, world.height);
       const draw = () => {
         if (disposed || gl.isContextLost()) return;
         const ratio = Math.min(devicePixelRatio || 1, 2),
@@ -193,7 +195,7 @@ export function Terrain({
       canvas.removeEventListener('webglcontextlost', lost);
       canvas.removeEventListener('webglcontextrestored', restored);
     };
-    // Board terrain is immutable for a seed. Game actions must not re-upload textures.
-  }, [board.seed, generation, onReady, terrainArt, environmentArt, concept]);
+    // A board never changes once dealt, so this runs once per boardKey. Game actions must not re-upload textures.
+  }, [boardKey(board), generation, onReady, terrainArt, environmentArt, concept]);
   return <canvas ref={ref} className="terrain-canvas" aria-hidden="true" />;
 }

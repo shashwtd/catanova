@@ -55,6 +55,7 @@ import {
 import { PlayerRail } from './PlayerRail.js';
 import { friendStatus } from './social-presence.js';
 import { BoardViewport } from './BoardViewport.js';
+import { boardKey } from './scene.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
 import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
@@ -419,10 +420,10 @@ function App() {
   /**
    * The board is dealt once and never changes, but every state message arrives
    * as fresh JSON, so `g.board` was a new object each time and the scenery was
-   * rebuilt with it. Pinning it to the seed lets the static half of the board
-   * render once for the whole game.
+   * rebuilt with it. Pinning it to its seed and preset lets the static half of
+   * the board render once for the whole game.
    */
-  const stableBoard = useMemo(() => g?.board, [g?.board.seed]);
+  const stableBoard = useMemo(() => g?.board, [g && boardKey(g.board)]);
   /** Seat colours change only when somebody picks one, so they are derived from
    *  the seats' own colours rather than rebuilt on every render — `Board` is
    *  memoised and a fresh array each time would defeat it. */
@@ -1011,7 +1012,7 @@ function App() {
       {!g && (room || playerHome) && <LoungeBackdrop />}
       {g && (
         <div className="board-anchor">
-          <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
+          <BoardViewport board={stableBoard ?? g.board} reducedMotion={reducedMotion}>
             <Board
               art={BOARD_THEMES[preferences.boardTheme]}
               board={stableBoard ?? g.board}
