@@ -38,9 +38,9 @@ The test suite checks 500 seeds against every rule above, including harbour alte
 
 Each board records the preset that generated it, and a seed produces a different island under each version. Saved games keep the board they were dealt, so games already started on a `balanced-v1` island keep that island.
 
-A preset is data: `BALANCED_V2` in `packages/rules/src/board.ts` lists the hexes of the island, how many tiles of each terrain it deals, the number tokens, the harbour slots and trades, and the fairness limits above. `generateBoard(seed, preset)` deals from it, and a preset that cannot be dealt, such as one with more hexes than tiles, is refused before any search. `tests/fixtures/classic-board.json` pins the boards `balanced-v2` deals, seed by seed, so a change to the code that deals them cannot move a tile unnoticed.
-
 - **`balanced-v2`** (current) added the rules against equal numbers and against the 2 beside the 12, and made harbours alternate with open sea. In 5,000 version-1 islands, 81% had equal numbers on neighbouring tiles, 24% had the 2 beside the 12, and 41% had three pairs of harbours on neighbouring sea spaces.
 - **`balanced-v1`** had the same terrain, production and 6/8 rules and the same harbour spacing, but let the spacing take any of its ten rotations.
+
+A preset is data: `BALANCED_V2` in `packages/rules/src/board.ts` lists the hexes of the island, how many tiles of each terrain it deals, the number tokens, the harbour slots and trades, and the fairness limits above. `generateBoard(seed, preset)` deals from it, and a preset that cannot be dealt, such as one with more hexes than tiles, is refused before any search. `tests/fixtures/classic-board.json` pins the boards `balanced-v2` deals, seed by seed, so a change to the code that deals them cannot move a tile unnoticed.
 
 Next balance evidence should come from playtests: compare first/last setup seats, resource scarcity, win rate by seat, and player feedback before tightening these bounds. An official-style board preset can be added separately.
