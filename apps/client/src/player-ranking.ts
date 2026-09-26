@@ -57,10 +57,11 @@ const TERM_LABELS: Record<ScoreTermId, (count: number) => string> = {
   cities: (n) => plural(n, 'city', 'cities'),
   longestRoad: () => 'Longest Road',
   largestArmy: () => 'Largest Army',
+  islandBonus: (n) => (n === 1 ? 'Island bonus' : `Island bonus × ${n}`),
   cards: (n) => plural(n, 'victory point card', 'victory point cards'),
 };
 /** Terms whose count is worth reading beside the label: the awards are one each, and say so by name. */
-const COUNTED = new Set<string>(['settlements', 'cities', 'cards']);
+const COUNTED = new Set<string>(['settlements', 'cities', 'islandBonus', 'cards']);
 export function pointBreakdown(game: ResultGame, player: ResultPlayer): PointPart[] {
   if (player.terms)
     return player.terms.map(({ id, points, count }) => ({

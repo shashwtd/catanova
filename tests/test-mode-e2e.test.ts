@@ -17,7 +17,7 @@ import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { seededRandom } from '../packages/rules/src/board.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
-import { CLASSIC } from '../packages/rules/src/rulesets.js';
+import { CLASSIC, OPEN_SEA } from '../packages/rules/src/rulesets.js';
 import { TEST_DECK_SIZE, TEST_TABLE, useTestTable } from './test-ruleset.js';
 
 useTestTable();
@@ -79,7 +79,7 @@ test('the test mode is picked, started, played through a seven, replayed, verifi
     ];
     for (const seat of seats) store.setConnected(seat, true);
     const revision = () => store.snapshot(roomId).revision;
-    assert.deepEqual(store.snapshot(roomId, host.id).modes, [CLASSIC.id, TEST_TABLE.id]);
+    assert.deepEqual(store.snapshot(roomId, host.id).modes, [CLASSIC.id, OPEN_SEA.id, TEST_TABLE.id]);
     store.configureSettings(host, 'pick-test-mode', revision(), {
       turnTimerSeconds: null,
       diceMode: 'classic',

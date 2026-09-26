@@ -66,12 +66,12 @@ test('a saved id finds its ruleset; no id is Classic, and an id this build does 
   assert.equal(findRuleset('base-3-4-v1'), CLASSIC);
   assert.equal(findRuleset('big-table-v1'), undefined);
   assert.equal(rulesetOf({}), CLASSIC);
-  assert.throws(() => rulesetOf({ ruleset: 'open-sea-v1' }), /open-sea-v1, which this version cannot play/);
-  // Only Classic ships in this release: nothing else is registered until a test registers it, so the
-  // largest count of one resource any action may name is still Classic's 19.
+  assert.throws(() => rulesetOf({ ruleset: 'big-table-v1' }), /big-table-v1, which this version cannot play/);
+  // Classic and Open Sea ship in this release: nothing else is registered until a test registers it, so the
+  // largest count of one resource any action may name is still the 19 both modes' banks hold.
   assert.deepEqual(
     rulesets().map((ruleset) => ruleset.id),
-    ['base-3-4-v1'],
+    ['base-3-4-v1', 'open-sea-v1'],
   );
   assert.equal(handLimit(), 19);
   assert.throws(

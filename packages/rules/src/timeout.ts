@@ -1,8 +1,11 @@
 import { RESOURCES } from './index.js';
-import { pips } from './board.js';
+import { isLand, pips } from './board.js';
 import { emptyHand, roadSites, robberVictims, settlementSites } from './game.js';
 import type { Game, GameAction, Phase } from './game.js';
 import { owedBy } from './owed.js';
+import { rulesetOf } from './rulesets.js';
+import { roadSitesOpenSea, settlementSitesOpenSea, shipSites } from './sea.js';
+import { defaultGoldPicks } from './gold.js';
 
 /**
  * Resolve only mandatory choices. Never spend resources or play an unchosen card.
@@ -14,6 +17,14 @@ export function timeoutAction(game: Game, playerId: string, random: () => number
   const pick = <T>(choices: T[]) => choices[Math.floor(random() * choices.length)];
   const owed = owedBy(game, playerId);
   if (!owed) return undefined;
+  // Open Sea's defaults, docs/RULEBOOK-OPEN-SEA.md section 15.3: a road where one can go, else a ship.
+  const sea = !!rulesetOf(game).sea;
+  const roadOrShip = (roads: number[], ships: () => number[]): GameAction | undefined => {
+    const road = pick(roads);
+    if (road !== undefined) return { kind: 'road', edge: road };
+    const ship = sea ? pick(ships()) : undefined;
+    return ship === undefined ? undefined : { kind: 'ship', edge: ship };
+  };
   switch (owed.kind) {
     case 'discard': {
       const count = game.discards[playerId];
@@ -35,29 +46,43 @@ export function timeoutAction(game: Game, playerId: string, random: () => number
       return { kind: 'roll' };
     case 'actions':
       return { kind: 'endTurn' };
+    // In Open Sea the clock always moves the robber, never the pirate, and only on land (section 15.3).
     case 'robber': {
-      const hex = pick(game.board.hexes.filter((h) => h.id !== game.robber))!;
+      const hex = pick(game.board.hexes.filter((h) => h.id !== game.robber && isLand(h)))!;
       const victim = pick(robberVictims(game, playerId, hex.id));
       return { kind: 'robber', hex: hex.id, ...(victim ? { victim } : {}) };
     }
-    case 'freeRoads': {
-      const edge = pick(roadSites(game, playerId));
-      return edge === undefined ? undefined : { kind: 'road', edge };
+    case 'freeRoads':
+      return sea
+        ? roadOrShip(roadSitesOpenSea(game, playerId), () => shipSites(game, playerId, 'roadBuilding'))
+        : roadOrShip(roadSites(game, playerId), () => []);
+    // The resource the player holds fewest of among those the bank still has, card by card (section 9.5).
+    case 'goldPick': {
+      const player = game.players.find((p) => p.id === playerId)!;
+      return {
+        kind: 'goldPick',
+        resources: defaultGoldPicks(player.hand, game.bank, game.goldOwed![0]!.picks),
+      };
     }
     // Setup is untimed. Only the absence rule of modes without bots places for a player, when they have been
     // gone too long: the corner with the most production pips, ties at random, then a road beside it.
+    // In Open Sea, on the main island, and then a ship only if no road can go by it (section 15.5).
     case 'setupSettlement': {
       const production = (vertex: number) =>
         game.board.vertices[vertex]!.hexes.reduce((sum, hex) => sum + pips(game.board.hexes[hex]!.number), 0);
-      const sites = settlementSites(game, playerId, true);
+      const sites = sea
+        ? settlementSitesOpenSea(game, playerId, true)
+        : settlementSites(game, playerId, true);
       const most = Math.max(...sites.map(production));
       const vertex = pick(sites.filter((site) => production(site) === most));
       return vertex === undefined ? undefined : { kind: 'settlement', vertex };
     }
-    case 'setupRoad': {
-      const edge = pick(roadSites(game, playerId, game.setupVertex));
-      return edge === undefined ? undefined : { kind: 'road', edge };
-    }
+    case 'setupRoad':
+      return sea
+        ? roadOrShip(roadSitesOpenSea(game, playerId, game.setupVertex), () =>
+            shipSites(game, playerId, { setup: game.setupVertex! }),
+          )
+        : roadOrShip(roadSites(game, playerId, game.setupVertex), () => []);
   }
 }
 
@@ -76,6 +101,12 @@ export function timeoutDescription(action: GameAction, phase?: Phase): string {
       return phase === 'setupRoad'
         ? 'starting road placed automatically'
         : 'remaining free road placed automatically';
+    case 'ship':
+      return phase === 'setupRoad'
+        ? 'starting ship placed automatically'
+        : 'remaining free ship placed automatically';
+    case 'goldPick':
+      return 'gold picks made automatically';
     case 'endTurn':
       return 'turn ended automatically';
     default:
