@@ -32,6 +32,7 @@ export {
 } from './colors.js';
 export type { PlayerColor } from './colors.js';
 import { parseGameAction } from '../../rules/src/game.js';
+import { isRulesetId } from '../../rules/src/rulesets.js';
 import type { GameAction, GameView } from '../../rules/src/game.js';
 import type { Board } from '../../rules/src/board.js';
 export const PROTOCOL_VERSION = 1;
@@ -120,6 +121,12 @@ export type ClientMessage =
       roomId?: string;
       accessToken?: string;
       preloadGame?: boolean;
+      /**
+       * The rulesets this tab can draw, by id, like `preloadGame` a capability rather than a new protocol
+       * version. A tab from before modes sends none and can draw Classic only; the server keeps it out of any
+       * other mode's room (CLIENT_UPDATE_REQUIRED).
+       */
+      rulesets?: string[];
       profile?: Profile;
     }
   | { type: 'increment'; commandId: string; expectedRevision: number }
@@ -186,6 +193,11 @@ export function parseClientMessage(input: string): ClientMessage {
       throw new Error('Invalid room code');
     if (v.accessToken !== undefined && (typeof v.accessToken !== 'string' || v.accessToken.length > 16000))
       throw new Error('Invalid authentication');
+    if (
+      v.rulesets !== undefined &&
+      (!Array.isArray(v.rulesets) || v.rulesets.length > 32 || !v.rulesets.every(isRulesetId))
+    )
+      throw new Error('Invalid rulesets');
     return {
       type: v.type,
       version: v.version,
@@ -195,6 +207,7 @@ export function parseClientMessage(input: string): ClientMessage {
       ...(typeof v.accessToken === 'string' ? { accessToken: v.accessToken } : {}),
       ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
       ...(v.preloadGame === true ? { preloadGame: true } : {}),
+      ...(Array.isArray(v.rulesets) ? { rulesets: [...new Set(v.rulesets as string[])] } : {}),
     };
   }
   if (

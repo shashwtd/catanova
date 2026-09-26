@@ -87,6 +87,7 @@ import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
 import { emptyHand } from '../../../packages/rules/src/game.js';
+import { rulesets } from '../../../packages/rules/src/rulesets.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
@@ -523,6 +524,8 @@ function App() {
       {
         pending,
         preloadGame: true,
+        // Every mode this build contains can be drawn by it.
+        rulesets: rulesets().map((ruleset) => ruleset.id),
         accessToken: auth.accessToken,
         onMetrics: (value) => {
           if (connection.current === c) metricsFeed.publish(value);

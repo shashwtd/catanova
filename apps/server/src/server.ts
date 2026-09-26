@@ -443,6 +443,17 @@ export async function startServer(
   const activeSeats = new Map<string, WebSocket>();
   const alive = new Set<WebSocket>();
   const preloadClients = new WeakSet<WebSocket>();
+  /** The rulesets each tab said it can draw. A tab from before modes said nothing, and draws Classic alone. */
+  const drawable = new WeakMap<WebSocket, ReadonlySet<string>>();
+  const canDraw = (ws: WebSocket, mode: string) => mode === CLASSIC.id || !!drawable.get(ws)?.has(mode);
+  /** Keep a tab out of a room in a mode it cannot draw, and tell its player how to fix that. */
+  const requireDrawable = (rulesets: readonly string[] | undefined, mode: string) => {
+    if (mode !== CLASSIC.id && !rulesets?.includes(mode))
+      throw new ProtocolError(
+        'CLIENT_UPDATE_REQUIRED',
+        `Refresh to play ${findRuleset(mode)?.name ?? 'this game'}`,
+      );
+  };
   function send(ws: WebSocket, message: ServerMessage) {
     if (ws.readyState !== WebSocket.OPEN) return;
     if (ws.bufferedAmount > 128 * 1024) {
@@ -740,6 +751,7 @@ export async function startServer(
             );
           if (message.type === 'spectate') {
             const roomId = store.resolveRoom(message.roomId!);
+            requireDrawable(message.rulesets, store.roomMode(roomId));
             if (!store.loadGame(roomId))
               throw new ProtocolError('NOT_STARTED', 'This match has not started. Join the lobby instead.');
             if ([...spectators.values()].filter((id) => id === roomId).length >= 24)
@@ -750,6 +762,7 @@ export async function startServer(
               setAuthDeadline();
             }
             spectators.set(ws, roomId);
+            drawable.set(ws, new Set(message.rulesets));
             joined();
             if (identity) void presence.add(ws, 'game', identity, message.accessToken);
             clearTimeout(handshakeTimeout);
@@ -761,6 +774,9 @@ export async function startServer(
             });
             return;
           }
+          // Checked before a seat exists, so a refused tab never leaves one behind. Start checks every tab again.
+          if (message.type !== 'create')
+            requireDrawable(message.rulesets, store.roomMode(store.resolveRoom(message.roomId!)));
           const seat = store.enter(
             message.type,
             message.token,
@@ -785,6 +801,7 @@ export async function startServer(
           sessions.set(ws, seat);
           joined();
           if (message.preloadGame) preloadClients.add(ws);
+          drawable.set(ws, new Set(message.rulesets));
           activeSeats.set(seat.id, ws);
           if (identity) void presence.add(ws, 'game', identity, message.accessToken);
           clearTimeout(handshakeTimeout);
@@ -1042,6 +1059,23 @@ export async function startServer(
               .players.every((p) => p.bot || activeSeats.get(p.id)?.readyState === WebSocket.OPEN)
           )
             throw new ProtocolError('NOT_CONNECTED', 'Wait for every player to reconnect');
+          // A game in another mode starts only when every tab at the table can draw it.
+          if (message.type === 'action' && message.action.kind === 'start' && !store.loadGame(seat.room_id)) {
+            const mode = store.roomMode(seat.room_id),
+              name = findRuleset(mode)?.name ?? 'this game';
+            if (!canDraw(ws, mode))
+              throw new ProtocolError('CLIENT_UPDATE_REQUIRED', `Refresh to play ${name}`);
+            if (
+              store.snapshot(seat.room_id).players.some((p) => {
+                const client = activeSeats.get(p.id);
+                return !p.bot && (!client || !canDraw(client, mode));
+              })
+            )
+              throw new ProtocolError(
+                'CLIENT_UPDATE_REQUIRED',
+                `Ask every player to refresh Catanova to play ${name}`,
+              );
+          }
           if (
             message.type === 'action' &&
             message.action.kind === 'start' &&
