@@ -85,7 +85,6 @@ test('a tab that cannot draw the room’s mode is kept out of it, and told to re
   assert.deepEqual(old.errors, ['CLIENT_UPDATE_REQUIRED: Refresh to play Test Table']);
   assert.equal(old.client.status, 'closed');
   assert.equal(server.store.snapshot(roomId).players.length, 2);
-  // The older tab already seated stops the start until it refreshes.
   // A current tab joins; ids it lists that are not ruleset ids are simply dropped.
   const current = open('Current', roomId, {
     ...modern,
@@ -95,6 +94,7 @@ test('a tab that cannot draw the room’s mode is kept out of it, and told to re
   // Ready is refused against settings a tab has not seen yet, so both see the new mode first.
   await until(() => [early.client, current.client].every((client) => client.state?.settings?.mode === TEST));
   for (const client of [early.client, current.client]) await client.lobby(true);
+  // The older tab already seated stops the start until it refreshes.
   await assert.rejects(
     host.client.action({ kind: 'start' }),
     /Ask every player to refresh Catanova to play Test Table/,

@@ -16,7 +16,9 @@ import { computeStats } from '../apps/server/src/admin/analysis.js';
 import { openGame } from '../apps/server/src/admin/rooms.js';
 import { readMatches } from '../scripts/reporting/retention.js';
 import { formatReport, gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
-import { newSession } from '../apps/client/src/connection.js';
+import { Connection, newSession } from '../apps/client/src/connection.js';
+import type { Session } from '../packages/protocol/src/index.js';
+import { startServer } from '../apps/server/src/server.js';
 import { activePlayer } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
@@ -312,4 +314,42 @@ test('the restore verifier and the admin reads name a newer mode’s game instea
   } finally {
     store.close();
   }
+});
+
+test('over the wire, a game in an unknown mode is a version mismatch, which refreshing would not fix', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'catanova-unknown-ruleset-wire-'));
+  const path = join(directory, 'game.sqlite');
+  const seeded = new Store(path, { trackPresence: true });
+  const newer = played(seeded, 2);
+  fromNewerRelease(seeded, newer.roomId);
+  seeded.close();
+  const server = await startServer({ port: 0, databasePath: path, auth: null });
+  const clients: Connection[] = [];
+  t.after(async () => {
+    clients.forEach((client) => client.stop());
+    await server.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  /** A current tab, one that can draw every mode this build contains, asks to come in; its first error. */
+  const attempt = async (session: Session) => {
+    const client = new Connection(server.url, session, {
+      minRetryMs: 30,
+      maxRetryMs: 100,
+      rulesets: ['base-3-4-v1'],
+    });
+    clients.push(client);
+    const error = new Promise<string>((resolve) =>
+      client.subscribe((message) => {
+        if (message.type === 'error') resolve(`${message.code}: ${message.message}`);
+      }),
+    );
+    client.start();
+    return error;
+  };
+  const mismatch = 'VERSION_MISMATCH: This saved game needs a compatible server version';
+  // Not CLIENT_UPDATE_REQUIRED: that asks the player to refresh, which cannot help with a mode the server
+  // itself does not know.
+  assert.equal(await attempt(newSession('Newcomer', newer.roomId)), mismatch);
+  assert.equal(await attempt({ ...newer.sessions[0]!, roomId: newer.roomId, joined: true }), mismatch);
+  assert.equal(await attempt({ ...newSession('Watcher', newer.roomId), spectating: true }), mismatch);
 });

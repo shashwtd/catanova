@@ -205,6 +205,37 @@ test('in play the clock makes only forced moves for the absent player, until the
   }
 });
 
+test('an absent player the game is not waiting on does not wake the room on every tick', () => {
+  const t = table();
+  try {
+    while (game(t).turn === 0) play(t);
+    // Two seats on: nobody waits for them this turn, nor for the next one's.
+    const absent = seatOf(t, game(t).players[(game(t).active + 2) % 3]!.id);
+    t.store.setConnected(absent, false);
+    t.clock.now += ABSENCE_AFTER_MS + 5_000;
+    const next = () =>
+      (
+        t.store.db.prepare('SELECT next_deadline FROM room_presence WHERE room_id = ?').get(t.roomId) as {
+          next_deadline: number | null;
+        }
+      ).next_deadline;
+    // Past the 2 minutes, but the game waits on someone who is here: no deadline, so no wake-ups.
+    assert.equal(next(), null);
+    for (let tick = 0; tick < 20; tick++) {
+      assert.ok(!t.store.dueRooms().includes(t.roomId), `tick ${tick}`);
+      t.store.expireRoom(t.roomId);
+      t.clock.now += 500;
+    }
+    assert.deepEqual(awayLines(game(t)), []);
+    // Once the game does wait on them, the room is due at once.
+    playUntil(t, absent, (g) => owedMoves(g).some((move) => move.player === absent.id));
+    assert.ok(next()! <= t.clock.now);
+    assert.ok(t.store.dueRooms().includes(t.roomId));
+  } finally {
+    t.store.close();
+  }
+});
+
 test('an absent player owed a discard has it made for them, and the others still choose their own', () => {
   const t = table();
   try {
