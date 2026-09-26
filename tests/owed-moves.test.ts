@@ -6,6 +6,7 @@ import { owedBy, owedMoves } from '../packages/rules/src/owed.js';
 import { timeoutAction, timeoutDescription } from '../packages/rules/src/timeout.js';
 import { pips, seededRandom } from '../packages/rules/src/board.js';
 import { requiredAction } from '../apps/client/src/game-attention.js';
+import { BIG_TABLE } from '../packages/rules/src/rulesets.js';
 
 const seats = ['Alice', 'Bob', 'Cara'].map((name, i) => ({ id: `p${i}`, name }));
 const production = (game: Game, vertex: number) =>
@@ -131,4 +132,51 @@ test('a resigned player owes nothing, and the next player owes the robber they l
     undefined,
   );
   assert.equal(timeoutAction(resigned, 'p1', () => 0.5)?.kind, 'robber');
+});
+
+test('Big Table: the Partner and each build window are owed by the player acting, and the clock can finish both', () => {
+  for (const turns of ['paired', 'betweenTurnsBuild'] as const)
+    for (const n of [5, 6]) {
+      const random = seededRandom(n * 13 + turns.length);
+      const players = ['Ann', 'Ben', 'Cat', 'Dan', 'Eve', 'Fay']
+        .slice(0, n)
+        .map((name, i) => ({ id: `p${i}`, name }));
+      let game = createGame(players, 2026 + n, random, { ruleset: BIG_TABLE.id, turns, victoryPoints: 8 });
+      const kinds = new Set<string>();
+      for (let step = 0; step < 8000 && game.phase !== 'finished'; step++) {
+        const owed = owedMoves(game);
+        assert.ok(owed.length, `the game waits on nobody during ${game.phase}`);
+        for (const move of owed) {
+          kinds.add(move.kind);
+          // Only the player acting is owed: the Lead during the Partner's phase, and every player not in the
+          // window, wait.
+          if (move.kind === 'partner' || move.kind === 'buildWindow')
+            assert.deepEqual(owed, [{ player: game.players[game.active]!.id, kind: move.kind }]);
+          const action = timeoutAction(game, move.player, random);
+          assert.ok(action, `no timeout move for ${move.kind}`);
+          assert.doesNotThrow(
+            () => applyAction(game, move.player, action, random),
+            `${move.kind}: ${action.kind}`,
+          );
+        }
+        const [first] = owed;
+        const legal = gameView(game, first!.player).legal;
+        const building = ['actions', 'partner', 'buildWindow'].includes(first!.kind);
+        const action =
+          building && legal.settlements.length
+            ? { kind: 'settlement' as const, vertex: legal.settlements[0]! }
+            : building && legal.cities.length
+              ? { kind: 'city' as const, vertex: legal.cities[0]! }
+              : building && legal.canBuyCard
+                ? { kind: 'buyCard' as const }
+                : building && legal.roads.length && step % 3 === 0
+                  ? { kind: 'road' as const, edge: legal.roads[0]! }
+                  : timeoutAction(game, first!.player, random)!;
+        game = applyAction(game, first!.player, action, random);
+      }
+      assert.equal(game.phase, 'finished', `${turns}, ${n} players`);
+      const own = turns === 'paired' ? 'partner' : 'buildWindow';
+      for (const kind of ['setupSettlement', 'setupRoad', 'roll', 'actions', 'robber', own])
+        assert.ok(kinds.has(kind), `${turns}, ${n} players: the game never owed ${kind}`);
+    }
 });

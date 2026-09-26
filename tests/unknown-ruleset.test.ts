@@ -21,7 +21,7 @@ import { activePlayer } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 
-const NEWER = 'big-table-v1';
+const NEWER = 'big-table-v2';
 let commands = 0;
 /** A two-player Classic game played through setup and a few turns, every move through Store.action. */
 function played(store: Store, turns: number) {
@@ -209,17 +209,17 @@ test('the restore verifier and the admin reads name a newer mode’s game instea
     const classic = played(store, 3);
     const game = fromNewerRelease(store, newer.roomId);
     assert.deepEqual(gameInvariantProblems(game), [
-      'the game plays ruleset big-table-v1, which this release does not know, so it was not checked; verify it with the release that wrote it',
+      'the game plays ruleset big-table-v2, which this release does not know, so it was not checked; verify it with the release that wrote it',
     ]);
     const report = verifyStore(store);
     const room = report.details.find((detail) => detail.roomId === newer.roomId)!;
     assert.equal(room.status, 'failed');
     assert.equal(room.ruleset, NEWER);
-    assert.match(room.problems[0]!, /ruleset big-table-v1, which this release does not know/);
+    assert.match(room.problems[0]!, /ruleset big-table-v2, which this release does not know/);
     assert.equal(report.details.find((detail) => detail.roomId === classic.roomId)!.status, 'verified');
     assert.match(
       formatReport('restored.sqlite', 1, report),
-      /FAIL \S+ {2}a big-table-v1 game this release cannot load/,
+      /FAIL \S+ {2}a big-table-v2 game this release cannot load/,
     );
     // Game analytics refuses it; the dice statistics leave its rolls out; retention reads no ending from it.
     const head = (roomId: string) =>
@@ -237,7 +237,7 @@ test('the restore verifier and the admin reads name a newer mode’s game instea
           archiveId: null,
           toRevision: head(newer.roomId),
         }),
-      /big-table-v1, a mode this version cannot read/,
+      /big-table-v2, a mode this version cannot read/,
     );
     assert.ok(
       computeGameAnalytics(store.db, {

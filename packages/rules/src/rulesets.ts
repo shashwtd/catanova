@@ -9,6 +9,26 @@ type CardKind = keyof typeof DEVELOPMENT_DECK;
 export type Purchase = keyof typeof COSTS;
 
 /**
+ * How a mode's turns run, where its host may choose (docs/RULEBOOK-BIG-TABLE.md, section 5). 'paired': after the
+ * Lead's turn, the Partner three seats on has an action phase of their own. 'betweenTurnsBuild': after each
+ * turn, every other player in order has a short window to build.
+ */
+export type TurnStructure = 'paired' | 'betweenTurnsBuild';
+/** Every turn structure there is, with the names players see. */
+export const TURN_STRUCTURES: Readonly<Record<TurnStructure, { name: string; summary: string }>> = {
+  paired: {
+    name: 'Paired turns',
+    summary: 'After each turn, the Partner gets a full action phase, with no roll and no player trades.',
+  },
+  betweenTurnsBuild: {
+    name: 'Between-turns build',
+    summary: 'The older rule: after each turn, everyone else in turn may build and buy, with no trading.',
+  },
+};
+export const isTurnStructure = (value: unknown): value is TurnStructure =>
+  typeof value === 'string' && Object.hasOwn(TURN_STRUCTURES, value);
+
+/**
  * One mode's rules, as data: everything Classic, Big Table and Open Sea set differently that can be written
  * down as numbers. A game keeps only the id (`Game.ruleset`), frozen when it starts, and this is what the id
  * means. An id is never reused for different rules: changed rules get a new id, so a saved game always plays
@@ -49,6 +69,11 @@ export type Ruleset = {
    * makes an absent player's forced moves after two minutes (docs/TURN_CLOCK.md, "Modes without bots").
    */
   standIns: boolean;
+  /**
+   * The turn structures the host may choose between, the default first. Absent: one player at a time, as in
+   * Classic. The one chosen is frozen into the game when it starts.
+   */
+  turns?: readonly TurnStructure[];
 };
 
 /** The base game, as Catanova has always played it. Its numbers are the constants in index.ts. */
@@ -70,8 +95,33 @@ export const CLASSIC: Ruleset = {
   standIns: true,
 };
 
+/**
+ * Big Table, for five and six players: Classic's rules on the 30-hex island, with a larger bank and deck, and
+ * a second player acting in every turn. docs/RULEBOOK-BIG-TABLE.md is its rulebook.
+ */
+export const BIG_TABLE: Ruleset = {
+  id: 'big-table-v1',
+  name: 'Big Table',
+  summary: 'For five and six players.',
+  board: 'big-table-balanced-v1',
+  seats: { min: 5, max: 6 },
+  victoryPoints: { default: DEFAULT_VICTORY_POINTS, min: MIN_VICTORY_POINTS, max: MAX_VICTORY_POINTS },
+  supply: {
+    bank: 24,
+    deck: { knight: 20, roadBuilding: 3, yearOfPlenty: 3, monopoly: 3, victoryPoint: 5 },
+    pieces: { roads: SUPPLY.roads, settlements: SUPPLY.settlements, cities: SUPPLY.cities },
+  },
+  costs: COSTS,
+  bots: false,
+  standIns: false,
+  turns: ['paired', 'betweenTurnsBuild'],
+};
+
 /** The rulesets this build can play, by id. Classic is always one of them, and always first. */
-const registry = new Map<string, Ruleset>([[CLASSIC.id, CLASSIC]]);
+const registry = new Map<string, Ruleset>([
+  [CLASSIC.id, CLASSIC],
+  [BIG_TABLE.id, BIG_TABLE],
+]);
 
 /** Every ruleset this build plays, Classic first. A client lists these as the rulesets it can draw. */
 export const rulesets = (): Ruleset[] => [...registry.values()];
@@ -103,11 +153,11 @@ export const playsBoard = (ruleset: Ruleset, board: Pick<Board, 'preset'>) =>
 const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 /** A small number as players read it in a sentence: "four". */
 export const numberWord = (n: number) => WORDS[n] ?? String(n);
-/** How many a ruleset seats, in words: "two to four", or "four" when there is only one count. */
+/** How many a ruleset seats, in words: "two to four", "five or six", or "four" when there is only one count. */
 export const seatRange = (ruleset: Ruleset) =>
   ruleset.seats.min === ruleset.seats.max
     ? numberWord(ruleset.seats.min)
-    : `${numberWord(ruleset.seats.min)} to ${numberWord(ruleset.seats.max)}`;
+    : `${numberWord(ruleset.seats.min)} ${ruleset.seats.max === ruleset.seats.min + 1 ? 'or' : 'to'} ${numberWord(ruleset.seats.max)}`;
 
 /** Which modes seat bots, as the host is told when a mode has none: "Bots play Classic only". */
 export const botsPlayIn = () =>
@@ -184,6 +234,13 @@ export function rulesetProblems(ruleset: Ruleset): string[] {
   if (!BOARD_PRESETS.some((preset) => preset.id === ruleset.board))
     problems.push(`no preset deals ${ruleset.board} boards`);
   if (ruleset.standIns && !ruleset.bots) problems.push('stand-ins are bots, so they need bots');
+  if (
+    ruleset.turns &&
+    (!ruleset.turns.length ||
+      !ruleset.turns.every(isTurnStructure) ||
+      new Set(ruleset.turns).size !== ruleset.turns.length)
+  )
+    problems.push('the turn structures must be known ones, each listed once');
   return problems;
 }
 

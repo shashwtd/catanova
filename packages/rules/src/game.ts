@@ -2,6 +2,7 @@ import { DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES } from './index.js';
 import type { Resource } from './index.js';
 import { generateBoard, shuffle } from './board.js';
 import {
+  TURN_STRUCTURES,
   boardPresetOf,
   findRuleset,
   fullBank,
@@ -12,6 +13,7 @@ import {
   targetRangeText,
   validTarget,
 } from './rulesets.js';
+import type { TurnStructure } from './rulesets.js';
 import type { Board } from './board.js';
 import { rollDice } from './dice.js';
 import type { DiceMode, BalancedDiceState } from './dice.js';
@@ -28,8 +30,22 @@ export type Player = {
   resigned?: boolean;
 };
 export type Building = { player: string; kind: 'settlement' | 'city' };
+/**
+ * What the game waits for. Big Table adds two: 'partner', the Partner's phase of a paired turn, and
+ * 'buildWindow', one player's window to build between turns. In both, `active` is the player acting, as it is
+ * in every other phase; `pair` and `windows` say whose turn it is.
+ */
 export type Phase =
-  'setupSettlement' | 'setupRoad' | 'roll' | 'actions' | 'discard' | 'robber' | 'freeRoads' | 'finished';
+  | 'setupSettlement'
+  | 'setupRoad'
+  | 'roll'
+  | 'actions'
+  | 'discard'
+  | 'robber'
+  | 'freeRoads'
+  | 'partner'
+  | 'buildWindow'
+  | 'finished';
 export type TradeProposal = { player: string; give: Hand };
 export type Trade = {
   id: number;
@@ -57,8 +73,10 @@ export type Game = {
   dice: [number, number] | null;
   deck: CardKind[];
   nextCard: number;
+  /** Whether a development card was played in the part under way: a turn, a Lead's part or a Partner's phase. */
   playedCard: boolean;
-  returnPhase: 'roll' | 'actions';
+  /** Where a Knight's robber or Road Building's roads return to. */
+  returnPhase: 'roll' | 'actions' | 'partner';
   freeRoads: number;
   discards: Record<string, number>;
   trade: Trade | null;
@@ -73,12 +91,29 @@ export type Game = {
   tradeOffersThisTurn?: number;
   log: { id: number; text: string }[];
   nextLog: number;
+  /** The turn structure the host chose, frozen at the start. Only a mode that offers a choice has one. */
+  turns?: TurnStructure;
+  /**
+   * Paired turns: the seats of the paired turn's Lead and Partner, from the moment the markers reach them until
+   * the Partner's phase ends. Both are on turn for the whole paired turn, whoever is acting. Absent once fewer
+   * than five players remain, when turns go one player at a time (docs/RULEBOOK-BIG-TABLE.md, 6.8).
+   */
+  pair?: { lead: number; partner: number };
+  /**
+   * Between-turns build: the build windows running after the turn of seat `after`. `robber` is a robber move a
+   * resigned player left owing, which the next player makes before rolling, once the windows are over.
+   */
+  windows?: { after: number; robber?: true };
 };
 export type GameAction =
   | { kind: 'start' | 'returnToLobby' }
   | { kind: 'settlement' | 'city'; vertex: number }
   | { kind: 'road'; edge: number }
   | { kind: 'roll' | 'endTurn' | 'buyCard' | 'cancelTrade' }
+  /** The Partner ends their phase. `expired`: the clock ended it, leaving free roads still owed unplaced. */
+  | { kind: 'endPhase'; expired?: true }
+  /** The player in a build window closes it. */
+  | { kind: 'endWindow' }
   | { kind: 'discard'; resources: Hand }
   | { kind: 'robber'; hex: number; victim?: string }
   | { kind: 'bankTrade'; give: Resource; receive: Resource }
@@ -185,7 +220,11 @@ export function parseGameAction(input: unknown): GameAction {
     case 'endTurn':
     case 'buyCard':
     case 'cancelTrade':
+    case 'endWindow':
       return { kind: a.kind };
+    case 'endPhase':
+      requireRule(a.expired === undefined || a.expired === true, 'Invalid action');
+      return a.expired ? { kind: a.kind, expired: true } : { kind: a.kind };
     case 'settlement':
     case 'city':
       return { kind: a.kind, vertex: index(a.vertex, BOARD_ID_LIMIT) };
@@ -237,13 +276,24 @@ export function createGame(
   // `board`: the island a lobby was already showing, played exactly as dealt. A seed
   // only reproduces a board under the generator that dealt it, and generators change.
   // `ruleset`: the mode the room chose, frozen into the game here. Classic when absent.
-  options: { diceMode?: DiceMode; victoryPoints?: number; board?: Board; ruleset?: string } = {},
+  // `turns`: the turn structure the host chose, where the mode offers one; its first when absent.
+  options: {
+    diceMode?: DiceMode;
+    victoryPoints?: number;
+    board?: Board;
+    ruleset?: string;
+    turns?: TurnStructure;
+  } = {},
 ): Game {
   const rules = findRuleset(options.ruleset);
   requireRule(rules, 'This game mode is not available');
   requireRule(
     options.victoryPoints === undefined || validTarget(rules, options.victoryPoints),
     targetRangeText(rules),
+  );
+  requireRule(
+    options.turns === undefined || !!rules.turns?.includes(options.turns),
+    `${rules.name} has no turn structure called ${options.turns}`,
   );
   requireRule(
     seats.length >= rules.seats.min && seats.length <= rules.seats.max,
@@ -261,7 +311,8 @@ export function createGame(
     bank: fullBank(rules),
     buildings: {},
     roads: {},
-    robber: board.hexes.find((h) => h.terrain === 'desert')!.id,
+    // A board with two deserts says which one the robber starts on; Classic's has only the one.
+    robber: board.robberStart ?? board.hexes.find((h) => h.terrain === 'desert')!.id,
     phase: 'setupSettlement',
     active: 0,
     setupIndex: 0,
@@ -286,11 +337,27 @@ export function createGame(
     nextLog: 0,
     diceMode: options.diceMode ?? 'classic',
     victoryPoints: options.victoryPoints ?? rules.victoryPoints.default,
+    ...(rules.turns ? { turns: options.turns ?? rules.turns[0]! } : {}),
   };
   log(g, 'The island is ready. Place two settlements and roads in snake order.');
+  if (g.turns) log(g, `This game plays ${TURN_STRUCTURES[g.turns].name}.`);
   return g;
 }
 export const activePlayer = (g: Pick<Game, 'players' | 'active'>) => g.players[g.active]!;
+/** How many players are still in the game. */
+const stillPlaying = (g: Pick<Game, 'players'>) => g.players.filter((p) => !p.resigned).length;
+/** Whether the player acting is the Partner, in their phase of a paired turn (or a card played in it). */
+export const partnerActing = (g: Pick<Game, 'pair' | 'active'>) => !!g.pair && g.active === g.pair.partner;
+/**
+ * The Partner of a paired turn led from `lead`: the third player to the Lead's left, counting only players
+ * still in the game (docs/RULEBOOK-BIG-TABLE.md, 6.1). Only asked while five or more remain.
+ */
+function partnerSeat(g: Pick<Game, 'players'>, lead: number): number {
+  let seat = lead;
+  for (let counted = 0; counted < 3;)
+    if (!g.players[(seat = (seat + 1) % g.players.length)]!.resigned) counted++;
+  return seat;
+}
 /** Catanova's anti-spam house rule; responses and bank/port trades do not consume this allowance. */
 type BoardState = Pick<Game, 'board' | 'buildings' | 'roads'>;
 export function settlementSites(g: BoardState, player: string, setup = false): number[] {
@@ -402,17 +469,28 @@ function updateAwards(g: Game) {
       );
   }
 }
-function checkWin(g: Game) {
-  if (
-    g.turn &&
-    !activePlayer(g).resigned &&
-    score(g, activePlayer(g)) >= (g.victoryPoints ?? rulesetOf(g).victoryPoints.default)
-  ) {
-    g.winner = activePlayer(g).id;
-    g.phase = 'finished';
-    g.trade = null;
-    log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`);
-  }
+/**
+ * Who may win now: the player on turn. In a paired turn that is both marker holders, the Lead first, whoever
+ * is acting; in a build window it is nobody (docs/RULEBOOK-BIG-TABLE.md, 6.7 and 7.5).
+ */
+function onTurn(g: Game): Player[] {
+  if (g.pair) return [g.players[g.pair.lead]!, g.players[g.pair.partner]!];
+  return g.phase === 'buildWindow' ? [] : [activePlayer(g)];
+}
+/**
+ * Whether anyone on turn has reached the target, checked after every action and as each turn begins. When
+ * both marker holders have, the Lead wins. `eligible` leaves out a winner the caller may not declare yet.
+ */
+function checkWin(g: Game, eligible: (id: string) => boolean = () => true) {
+  if (!g.turn) return;
+  const target = g.victoryPoints ?? rulesetOf(g).victoryPoints.default;
+  const winner = onTurn(g).find((p) => !p.resigned && score(g, p) >= target);
+  if (!winner || !eligible(winner.id)) return;
+  g.winner = winner.id;
+  g.phase = 'finished';
+  g.trade = null;
+  const partner = g.pair?.partner === g.players.indexOf(winner);
+  log(g, `${winner.name} wins${partner ? ' as Partner' : ''} with ${score(g, winner)} points!`);
 }
 export function robberVictims(
   g: BoardState & { players?: { id: string; resigned?: boolean }[] },
@@ -469,7 +547,21 @@ function produce(g: Game, number: number) {
   if (!received.some((hand) => total(hand))) log(g, 'No resources produced.');
 }
 
+/** How a turn is announced: in a paired turn, with its Partner. */
+const turnLine = (g: Game) =>
+  g.pair
+    ? `${g.players[g.pair.lead]!.name}'s turn, with ${g.players[g.pair.partner]!.name} as Partner.`
+    : `${activePlayer(g).name}'s turn.`;
+
 function advanceTurn(g: Game, pendingRobber = false) {
+  // A paired turn passes on from its Lead, whoever acted last, and the turn after build windows from the player
+  // whose turn they followed.
+  if (g.pair) g.active = g.pair.lead;
+  if (g.windows) {
+    g.active = g.windows.after;
+    pendingRobber ||= !!g.windows.robber;
+    delete g.windows;
+  }
   do {
     g.active = (g.active + 1) % g.players.length;
   } while (activePlayer(g).resigned);
@@ -480,7 +572,73 @@ function advanceTurn(g: Game, pendingRobber = false) {
   g.playedCard = false;
   g.freeRoads = 0;
   g.trade = null;
-  log(g, `${activePlayer(g).name}'s turn.${pendingRobber ? ' Move the robber, then roll.' : ''}`);
+  pairUp(g);
+  log(g, `${turnLine(g)}${pendingRobber ? ' Move the robber, then roll.' : ''}`);
+}
+
+/**
+ * Hand out the markers as a paired turn begins: the Lead is the player on turn and the Partner is recounted
+ * from them. With fewer than five players left, turns go one player at a time for the rest of the game.
+ */
+function pairUp(g: Game) {
+  if (g.turns !== 'paired') return;
+  if (stillPlaying(g) >= 5) {
+    g.pair = { lead: g.active, partner: partnerSeat(g, g.active) };
+    return;
+  }
+  if (g.pair || g.turn === 1)
+    log(g, 'Fewer than five players remain, so turns go one player at a time from now on, with no Partner.');
+  delete g.pair;
+}
+
+/** Whether a Partner's phase follows the Lead's part now ending: only while five or more remain. */
+const partnerFollows = (g: Game) =>
+  !!g.pair && !partnerActing(g) && !g.players[g.pair.partner]!.resigned && stillPlaying(g) >= 5;
+
+/** The Lead's part is over: the Partner takes their phase, first moving a robber the Lead left owing. */
+function beginPartnerPhase(g: Game, pendingRobber = false) {
+  g.active = g.pair!.partner;
+  g.phase = pendingRobber ? 'robber' : 'partner';
+  g.returnPhase = 'partner';
+  g.playedCard = false;
+  g.freeRoads = 0;
+  g.trade = null;
+  log(
+    g,
+    `${activePlayer(g).name} begins the Partner's phase.${pendingRobber ? ' Move the robber first.' : ''}`,
+  );
+}
+
+/** A turn under Between-turns build is over: every other player, from the next, gets a window to build. */
+function openWindows(g: Game, pendingRobber = false) {
+  g.windows = { after: g.active, ...(pendingRobber ? { robber: true as const } : {}) };
+  g.freeRoads = 0;
+  g.trade = null;
+  nextWindow(g);
+}
+
+/** The next build window, clockwise, until it comes back round to the player whose turn it followed. */
+function nextWindow(g: Game) {
+  const after = g.windows!.after;
+  for (let seat = (g.active + 1) % g.players.length; seat !== after; seat = (seat + 1) % g.players.length)
+    if (!g.players[seat]!.resigned) {
+      g.active = seat;
+      g.phase = 'buildWindow';
+      log(g, `${activePlayer(g).name}'s build window.`);
+      return;
+    }
+  advanceTurn(g);
+}
+
+/**
+ * Whatever part of the turn is under way ends: a turn, a Lead's part, a Partner's phase or a build window. A
+ * robber move still owed passes to whoever acts next and may move it (docs/RULEBOOK-BIG-TABLE.md, 9.6).
+ */
+function endPart(g: Game, pendingRobber = false) {
+  if (g.phase === 'buildWindow') nextWindow(g);
+  else if (partnerFollows(g)) beginPartnerPhase(g, pendingRobber);
+  else if (g.turns === 'betweenTurnsBuild') openWindows(g, pendingRobber);
+  else advanceTurn(g, pendingRobber);
 }
 
 function advanceSetup(g: Game) {
@@ -497,6 +655,9 @@ function advanceSetup(g: Game) {
   g.turn = 1;
   g.phase = 'roll';
   log(g, 'Setup complete. Roll the dice to begin.');
+  // The first paired turn begins after setup, with the starting player as Lead.
+  pairUp(g);
+  if (g.pair) log(g, turnLine(g));
 }
 
 /**
@@ -588,6 +749,9 @@ export function resignPlayers(
       g.discards = {};
       g.freeRoads = 0;
       g.setupVertex = null;
+      // One player cannot pair up or have a window: they only wait here to come back and win.
+      delete g.pair;
+      delete g.windows;
       return g;
     }
     g.winner = remaining[0]!.id;
@@ -604,10 +768,13 @@ export function resignPlayers(
       g.setupIndex++;
       advanceSetup(g);
     } else if (g.phase !== 'discard' || !Object.keys(g.discards).length)
-      advanceTurn(g, g.phase === 'robber' || g.phase === 'discard');
+      // Their part of the turn ends there: a Lead's part is still followed by the Partner's phase, and a build
+      // window by the next one (docs/RULEBOOK-BIG-TABLE.md, 9.6).
+      endPart(g, g.phase === 'robber' || g.phase === 'discard');
     // Other players finish required discards before the next player moves the robber.
   } else if (g.phase === 'discard' && !Object.keys(g.discards).length) g.phase = 'robber';
-  if (eligible(activePlayer(g).id)) checkWin(g);
+  // A resignation that hands an award on counts as an action: whoever is on turn may win by it.
+  checkWin(g, eligible);
   return g;
 }
 
@@ -634,7 +801,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     log(g, `${p.name} discarded ${resourceText(a.resources)}.`);
     if (!Object.keys(g.discards).length) {
       if (activePlayer(g).resigned) {
-        advanceTurn(g, true);
+        endPart(g, true);
         checkWin(g);
       } else g.phase = 'robber';
     }
@@ -838,8 +1005,23 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     log(g, `${p.name} built a free road on edge ${a.edge + 1}.`);
     return g;
   }
+  if (a.kind === 'endPhase') {
+    // Only the clock ends the phase with free roads still owed, and leaves them unplaced (rulebook 9.3).
+    requireRule(
+      partnerActing(g) && (g.phase === 'partner' || (!!a.expired && g.phase === 'freeRoads')),
+      g.phase === 'freeRoads' ? 'Place your free roads first' : 'Finish the current action first',
+    );
+    advanceTurn(g);
+    updateAwards(g);
+    checkWin(g);
+    return g;
+  }
   if (a.kind === 'playCard') {
-    requireRule(g.phase === 'roll' || g.phase === 'actions', 'Finish the current action first');
+    requireRule(g.phase !== 'buildWindow', 'No development card is played in a build window');
+    requireRule(
+      g.phase === 'roll' || g.phase === 'actions' || g.phase === 'partner',
+      'Finish the current action first',
+    );
     requireRule(!g.playedCard, 'Only one development card can be played per turn');
     const card = p.cards.find((c) => c.id === a.cardId);
     requireRule(
@@ -903,7 +1085,19 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     }
     return g;
   }
-  requireRule(g.phase === 'actions', 'Finish the current action first');
+  requireRule(
+    g.phase === 'actions' || g.phase === 'partner' || g.phase === 'buildWindow',
+    'Finish the current action first',
+  );
+  // The Partner trades only with the bank, and a build window allows no trade at all.
+  if (a.kind === 'offerTrade' || a.kind === 'openTrade' || a.kind === 'cancelTrade')
+    requireRule(
+      g.phase === 'actions',
+      g.phase === 'partner'
+        ? 'No trades with players in the Partner’s phase'
+        : 'No trading in a build window',
+    );
+  requireRule(a.kind !== 'bankTrade' || g.phase !== 'buildWindow', 'No trading in a build window');
   // Keep one live offer; cancelling it deliberately permits another with no per-turn cap.
   if (a.kind === 'offerTrade' || a.kind === 'openTrade')
     requireRule(!g.trade, 'Cancel your current offer before creating another');
@@ -986,7 +1180,16 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       log(g, `${p.name} withdrew the trade offer.`);
       break;
     case 'endTurn':
-      advanceTurn(g);
+      requireRule(
+        g.phase === 'actions',
+        g.phase === 'partner' ? 'End your Partner’s phase instead' : 'Close your build window instead',
+      );
+      // Under Big Table's turn structures, the Partner's phase or the build windows come next.
+      endPart(g);
+      break;
+    case 'endWindow':
+      requireRule(g.phase === 'buildWindow', 'That action is unavailable');
+      nextWindow(g);
       break;
     default:
       throw new RuleError('That action is unavailable');
@@ -1047,7 +1250,8 @@ export function gameView(g: Game, viewer: string): GameView {
   const active = !!me && !me.resigned && activePlayer(g).id === viewer;
   const owned = pieces(g, viewer);
   const { costs, supply } = rulesetOf(g);
-  const build = active && g.phase === 'actions',
+  // Building and buying happen in a turn's actions, and in Big Table's Partner's phase and build windows.
+  const build = active && (g.phase === 'actions' || g.phase === 'partner' || g.phase === 'buildWindow'),
     setup = active && g.phase === 'setupSettlement';
   return {
     ...structuredClone(publicState),
@@ -1086,7 +1290,7 @@ export function gameView(g: Game, viewer: string): GameView {
               .map(([id]) => Number(id))
           : [],
       playableCards:
-        active && ['roll', 'actions'].includes(g.phase) && !g.playedCard
+        active && ['roll', 'actions', 'partner'].includes(g.phase) && !g.playedCard
           ? me.cards.filter((c) => c.kind !== 'victoryPoint' && c.boughtTurn < g.turn).map((c) => c.id)
           : [],
       canBuyCard: build && deck.length > 0 && canPay(me.hand, costs.developmentCard),

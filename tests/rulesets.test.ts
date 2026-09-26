@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COSTS, DEVELOPMENT_DECK, RESOURCES, RULESET, SUPPLY } from '../packages/rules/src/index.js';
 import {
+  BIG_TABLE,
   CLASSIC,
   findRuleset,
   handLimit,
@@ -64,18 +65,24 @@ test('Classic is described in full by its ruleset, from the constants it has alw
 test('a saved id finds its ruleset; no id is Classic, and an id this build does not know is refused', () => {
   assert.equal(findRuleset(undefined), CLASSIC);
   assert.equal(findRuleset('base-3-4-v1'), CLASSIC);
-  assert.equal(findRuleset('big-table-v1'), undefined);
+  assert.equal(findRuleset('big-table-v1'), BIG_TABLE);
   assert.equal(rulesetOf({}), CLASSIC);
-  assert.throws(() => rulesetOf({ ruleset: 'open-sea-v1' }), /open-sea-v1, which this version cannot play/);
-  // Only Classic ships in this release: nothing else is registered until a test registers it, so the
-  // largest count of one resource any action may name is still Classic's 19.
+  assert.throws(() => rulesetOf({ ruleset: 'big-table-v2' }), /big-table-v2, which this version cannot play/);
+  // Classic and Big Table ship in this release; nothing else is registered until a test registers it. The
+  // largest count of one resource any action may name is Big Table's 24, and a Classic game holds to its 19.
   assert.deepEqual(
     rulesets().map((ruleset) => ruleset.id),
-    ['base-3-4-v1'],
+    ['base-3-4-v1', 'big-table-v1'],
   );
-  assert.equal(handLimit(), 19);
+  assert.equal(handLimit(), 24);
   assert.throws(
-    () => parseGameAction({ kind: 'discard', resources: { ...emptyHand(), wood: 20 } }),
+    () => parseGameAction({ kind: 'discard', resources: { ...emptyHand(), wood: 25 } }),
+    /from 0 to 24/,
+  );
+  const classic = createGame(seats(3), 481, () => 0.34);
+  assert.throws(
+    () =>
+      applyAction(classic, 'p0', { kind: 'discard', resources: { ...emptyHand(), wood: 20 } }, Math.random),
     /from 0 to 19/,
   );
 });
@@ -125,7 +132,7 @@ test('a game frozen in the test mode seats, supplies and targets from its rulese
     createGame(seats(3), 1, random, { ruleset: TEST_TABLE.id, victoryPoints: 13 }).victoryPoints,
     13,
   );
-  assert.throws(() => createGame(seats(3), 1, random, { ruleset: 'big-table-v1' }), /not available/);
+  assert.throws(() => createGame(seats(3), 1, random, { ruleset: 'big-table-v2' }), /not available/);
   // Classic keeps its exact wording and its numbers.
   assert.throws(() => createGame(seats(1), 1, random), /^Error: Start with two to four players$|two to four/);
   assert.throws(() => createGame(seats(5), 1, random), /Start with two to four players/);

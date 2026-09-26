@@ -1,6 +1,6 @@
 import { RESOURCES } from './index.js';
 import { pips } from './board.js';
-import { emptyHand, roadSites, robberVictims, settlementSites } from './game.js';
+import { emptyHand, partnerActing, roadSites, robberVictims, settlementSites } from './game.js';
 import type { Game, GameAction, Phase } from './game.js';
 import { owedBy } from './owed.js';
 
@@ -35,12 +35,19 @@ export function timeoutAction(game: Game, playerId: string, random: () => number
       return { kind: 'roll' };
     case 'actions':
       return { kind: 'endTurn' };
+    // Big Table: a Partner's phase or a build window that runs out simply ends, with nothing bought or built.
+    case 'partner':
+      return { kind: 'endPhase' };
+    case 'buildWindow':
+      return { kind: 'endWindow' };
     case 'robber': {
       const hex = pick(game.board.hexes.filter((h) => h.id !== game.robber))!;
       const victim = pick(robberVictims(game, playerId, hex.id));
       return { kind: 'robber', hex: hex.id, ...(victim ? { victim } : {}) };
     }
     case 'freeRoads': {
+      // Free roads still owed when a Partner's phase runs out stay unplaced (docs/RULEBOOK-BIG-TABLE.md, 9.3).
+      if (partnerActing(game)) return { kind: 'endPhase', expired: true };
       const edge = pick(roadSites(game, playerId));
       return edge === undefined ? undefined : { kind: 'road', edge };
     }
@@ -78,6 +85,12 @@ export function timeoutDescription(action: GameAction, phase?: Phase): string {
         : 'remaining free road placed automatically';
     case 'endTurn':
       return 'turn ended automatically';
+    case 'endPhase':
+      return action.expired
+        ? "Partner's phase ended automatically, with its free roads unplaced"
+        : "Partner's phase ended automatically";
+    case 'endWindow':
+      return 'build window closed automatically';
     default:
       return 'required choice resolved automatically';
   }

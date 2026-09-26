@@ -15,7 +15,7 @@ import type { RoomState } from '../packages/protocol/src/index.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import type { Account } from '../packages/protocol/src/profile.js';
 import { parseRoomSettings } from '../packages/protocol/src/settings.js';
-import { CLASSIC } from '../packages/rules/src/rulesets.js';
+import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import { generateBoard } from '../packages/rules/src/board.js';
 import { TEST_TABLE, useTestTable } from './test-ruleset.js';
 
@@ -63,7 +63,7 @@ test('the switches: Classic always, open modes for every host, every mode for te
   assert.deepEqual(readModeSwitches({}, log), { open: [CLASSIC.id], testers: new Set() });
   const switches = readModeSwitches(
     {
-      CATANOVA_MODES: ' test-table-v1, big-table-v1,test-table-v1 ,',
+      CATANOVA_MODES: ' test-table-v1, big-table-v2,test-table-v1 ,',
       CATANOVA_MODE_TESTERS: 'acct-1, acct-2',
     },
     log,
@@ -71,9 +71,10 @@ test('the switches: Classic always, open modes for every host, every mode for te
   assert.deepEqual(switches.open, [CLASSIC.id, TEST]);
   assert.deepEqual([...switches.testers], ['acct-1', 'acct-2']);
   // A mode this build does not contain is left out and logged; the server still starts.
-  assert.deepEqual(logged, [{ event: 'mode_unavailable', variable: 'CATANOVA_MODES', mode: 'big-table-v1' }]);
+  assert.deepEqual(logged, [{ event: 'mode_unavailable', variable: 'CATANOVA_MODES', mode: 'big-table-v2' }]);
   const testers = readModeSwitches({ CATANOVA_MODE_TESTERS: 'acct-1' }, log);
-  assert.deepEqual(modesFor(testers, 'acct-1'), [CLASSIC.id, TEST]);
+  // Testers may pick every mode the build contains: Big Table ships in it, and this file registers the test mode.
+  assert.deepEqual(modesFor(testers, 'acct-1'), [CLASSIC.id, BIG_TABLE.id, TEST]);
   assert.deepEqual(modesFor(testers, 'acct-9'), [CLASSIC.id]);
   // Local playtest mode has no accounts, so CATANOVA_MODES alone decides.
   assert.deepEqual(modesFor(testers, undefined), [CLASSIC.id]);
@@ -177,14 +178,14 @@ test('a mode change is refused while the mode is closed to the host, the table i
     assert.equal(store.snapshot(plain.roomId, plain.host.id).modes, undefined, 'Classic alone goes unsaid');
     // A tester's room may pick every mode the build contains, and only its host is told.
     const tester = lobby(store, 2, 'tester');
-    assert.deepEqual(store.snapshot(tester.roomId, tester.host.id).modes, [CLASSIC.id, TEST]);
+    assert.deepEqual(store.snapshot(tester.roomId, tester.host.id).modes, [CLASSIC.id, BIG_TABLE.id, TEST]);
     assert.equal(store.snapshot(tester.roomId, tester.seats[1]!.id).modes, undefined);
     assert.equal(store.snapshot(tester.roomId).modes, undefined);
     assert.throws(
       () =>
         store.configureSettings(tester.host, 'unknown', tester.revision(), {
           turnTimerSeconds: 90,
-          mode: 'big-table-v1',
+          mode: 'big-table-v2',
         }),
       code('MODE_UNAVAILABLE'),
     );
