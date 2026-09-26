@@ -486,6 +486,8 @@ export type GameAnalytics = {
   unreadable: number;
   status: 'setup' | 'playing' | 'finished';
   diceMode: string;
+  /** The game's mode, when it is not Classic: the page names some things by it, such as Longest Route. */
+  ruleset?: string;
   victoryPoints: number;
   startedAt: number | null;
   endedAt: number | null;

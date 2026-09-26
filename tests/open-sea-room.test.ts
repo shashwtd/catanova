@@ -531,6 +531,7 @@ test('a whole game with an absent player replays from its journal, passes the ve
       toRevision: rows.at(-1)!.revision,
     });
     assert.equal(analytics.victoryPoints, 14);
+    assert.equal(analytics.ruleset, OPEN_SEA.id, 'the page names the award Longest Route by it');
     for (const stats of analytics.players) {
       const player = final.players.find((p) => p.id === stats.id)!;
       if (player.resigned) continue;

@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react';
 import type { AnalyticsPlayer, Cached, GameAnalytics, GameEndReason } from '../../server/src/admin/types.js';
 import { RESOURCE_NAMES, RESOURCES } from '../../../packages/rules/src/index.js';
+import { findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 import { useApi } from '../api.js';
 import { accountLabel, count, diceLabel, duration, time } from '../format.js';
 import { Badge, Columns, Empty, Failure, LineChart, Loading, Section, Stat, Table, When } from '../ui.js';
@@ -175,7 +176,7 @@ function Standings({ game }: { game: GameAnalytics }) {
             <td className="num hide-phone">{player.pieces.roads}</td>
             <td className="num hide-phone">{player.knights}</td>
             <td>
-              {player.longestRoad && <Badge tone="accent">Longest Road</Badge>}
+              {player.longestRoad && <Badge tone="accent">{routeAwardName(findRuleset(game.ruleset))}</Badge>}
               {player.largestArmy && <Badge tone="accent">Largest Army</Badge>}
             </td>
             <td className="num nowrap">
@@ -445,13 +446,14 @@ function Interactions({ game }: { game: GameAnalytics }) {
 
 function Awards({ game }: { game: GameAnalytics }) {
   const name = (id: string | null) => game.players.find((player) => player.id === id)?.name ?? 'nobody';
-  if (!game.awards.length) return <Empty>Nobody held Longest Road or Largest Army.</Empty>;
+  const route = routeAwardName(findRuleset(game.ruleset));
+  if (!game.awards.length) return <Empty>Nobody held {route} or Largest Army.</Empty>;
   return (
     <ul className="plain">
       {game.awards.map((award, index) => (
         <li key={index}>
           <span className="muted">Turn {award.turn}</span> ·{' '}
-          {award.award === 'longestRoad' ? 'Longest Road' : 'Largest Army'}:{' '}
+          {award.award === 'longestRoad' ? route : 'Largest Army'}:{' '}
           {award.playerId ? (
             <>
               {name(award.playerId)} took it{award.fromId ? ` from ${name(award.fromId)}` : ''}
@@ -572,7 +574,7 @@ export function GameAnalyticsView({
         )}
       </Section>
       <div className="grid">
-        <Section title="Longest Road and Largest Army">
+        <Section title={`${routeAwardName(findRuleset(game.ruleset))} and Largest Army`}>
           <Awards game={game} />
         </Section>
         <Section title="Bots, stand-ins and the turn timer">
