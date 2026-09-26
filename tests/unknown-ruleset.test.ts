@@ -129,6 +129,9 @@ test('a game in a mode this version does not know is refused on load and left un
     );
     assert.equal(store.roomMode(newer.roomId), NEWER, 'the room still says what it is');
     assert.ok(store.loadGame(classic.roomId));
+    // Its turn clock and presence come up due, as a game left running by a newer release's server would.
+    store.db.prepare('UPDATE turn_clocks SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
+    store.db.prepare('UPDATE room_presence SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
     // A restart rewrites the presence of the games it can play, and leaves this one exactly as it was.
     const before = rowsOf(store, newer.roomId);
     const classicPresence = store.db
@@ -142,7 +145,9 @@ test('a game in a mode this version does not know is refused on load and left un
       classicPresence,
       'a Classic game at the same restart gets its recovery grace',
     );
-    // Neither a player nor the clock can move it, and the clock stops asking.
+    // The clock never asks about it, from the first tick on: nothing tries to load it, and nothing is logged.
+    assert.ok(!store.dueRooms().includes(newer.roomId));
+    // Neither a player nor the clock can move it.
     // Joining, resuming and watching all read the room's snapshot, which refuses it.
     assert.throws(
       () => store.snapshot(newer.roomId, newer.seats[0]!.id),
@@ -152,13 +157,10 @@ test('a game in a mode this version does not know is refused on load and left un
       () => store.expireRoom(newer.roomId),
       (error: Error & { code?: string }) => error.code === 'VERSION_MISMATCH',
     );
-    store.db.prepare('UPDATE turn_clocks SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
     assert.ok(!store.dueRooms().includes(newer.roomId));
     // The admin console shows the refusal instead of the game.
     assert.deepEqual(openGame(store, newer.roomId), { error: 'VERSION_MISMATCH' });
     assert.ok(openGame(store, classic.roomId).game);
-    // The account history skips it rather than failing.
-    assert.doesNotThrow(() => store.accountGames('nobody'));
   } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });

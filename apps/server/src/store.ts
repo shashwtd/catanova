@@ -1303,7 +1303,8 @@ export class Store {
          )`,
       )
       .all()
-      .map((row) => row.room_id as string);
+      .map((row) => row.room_id as string)
+      .filter((roomId) => !this.unplayable.has(roomId));
   }
   /**
    * Every seat a bot plays in one room.
@@ -1506,7 +1507,11 @@ export class Store {
         const roomId = row.room_id as string;
         const game = JSON.parse(row.state as string) as Game;
         // Left exactly as it is: this version cannot play it, and the release that can will want it whole.
-        if (!findRuleset(game.ruleset)) continue;
+        // Its clock and presence may still come up due, so the scheduler is told to pass it by from the start.
+        if (!findRuleset(game.ruleset)) {
+          this.unplayable.add(roomId);
+          continue;
+        }
         if (game.phase === 'finished') {
           this.db.prepare('DELETE FROM room_presence WHERE room_id=?').run(roomId);
           this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
