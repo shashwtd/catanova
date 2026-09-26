@@ -97,7 +97,7 @@ test('§9.1 a gold field pays each settlement 1 pick and each city 2, unless the
   assert.ok(!(RESOURCES as readonly string[]).includes('gold'));
 });
 
-test('§9.2 players pick one at a time in turn order from the player on turn, from the bank as it stands', () => {
+test('§9.2 players pick in turn order from the player on turn, each all at once, from the bank as it stands', () => {
   const { board, gold } = goldBoard();
   const buildings: Record<number, Building> = {
     [corner(board, gold, 'n')]: { player: 'blue', kind: 'city' },
@@ -121,11 +121,10 @@ test('§9.2 players pick one at a time in turn order from the player on turn, fr
   assert.match(goldPickIssue(g, 'red', hand({ ore: 1 }))!, /bank does not have/);
   assert.match(goldPickIssue(g, 'red', hand({ wood: 2 }))!, /Choose 1 resource/);
   g = applyGoldPick(g, 'red', hand({ wood: 1 }));
-  // Blue's city is owed 2 and may take them one at a time.
+  // Blue's city is owed 2, and takes both in one action, as with Year of Plenty: not one now and one later.
   assert.deepEqual(g.goldOwed, [{ player: 'blue', picks: 2 }]);
-  g = applyGoldPick(g, 'blue', hand({ wood: 1 }));
-  assert.deepEqual(g.goldOwed, [{ player: 'blue', picks: 1 }]);
-  g = applyGoldPick(g, 'blue', hand({ wood: 1 }));
+  assert.match(goldPickIssue(g, 'blue', hand({ wood: 1 }))!, /Choose 2 resources/);
+  g = applyGoldPick(g, 'blue', hand({ wood: 2 }));
   assert.deepEqual(g.goldOwed, []);
   assert.deepEqual(
     g.players.map((p) => p.hand),
@@ -166,7 +165,10 @@ test('§9.2 picks from an empty bank lapse and are not owed later, and picks can
       { player: 'blue', picks: 1 },
     ],
   };
-  assert.match(goldPickIssue(g, 'red', emptyHand())!, /Choose from 1 to 3/);
+  // Red is owed 3 and the bank holds 2 cards: red takes both, and may neither decline nor take fewer.
+  assert.match(goldPickIssue(g, 'red', emptyHand())!, /Choose 2 resources/);
+  assert.match(goldPickIssue(g, 'red', hand({ wood: 1 }))!, /Choose 2 resources/);
+  assert.match(goldPickIssue(g, 'red', hand({ wood: 3 }))!, /Choose 2 resources/);
   assert.match(goldPickIssue(g, 'red', hand({ wood: 2 }))!, /bank does not have/);
   g = applyGoldPick(g, 'red', hand({ wood: 1, brick: 1 }));
   assert.deepEqual(g.goldOwed, [], 'red’s third pick and blue’s pick lapse with the bank empty');
@@ -281,17 +283,20 @@ test('§9 gold picks, made or defaulted in random games, conserve every card and
         g.goldOwed = remainingGoldOwed(g.goldOwed, g.bank, g.players);
         continue;
       }
+      // All of the player's picks in one action: the clock's default, or as many cards chosen at random.
+      const due = Math.min(owed, total(g.bank));
       const me = g.players.find((p) => p.id === player)!;
-      let choice = defaultGoldPicks(me.hand, g.bank, 1 + draw(owed));
+      let choice = defaultGoldPicks(me.hand, g.bank, owed);
       if (random() < 0.5) {
         choice = emptyHand();
-        for (let n = 1 + draw(owed); n > 0; n--) {
+        for (let n = due; n > 0; n--) {
           const types = RESOURCES.filter((r) => g.bank[r] > choice[r]);
-          if (!types.length) break;
           choice[types[draw(types.length)]!]++;
         }
       }
+      assert.equal(total(choice), due);
       assert.equal(goldPickIssue(g, player, choice), null);
+      assert.match(goldPickIssue(g, player, { ...choice, wood: choice.wood + 1 })!, /Choose/);
       const before = g.bank;
       g = applyGoldPick(g, player, choice);
       picks++;

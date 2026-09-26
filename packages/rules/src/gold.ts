@@ -14,7 +14,7 @@ import type { SeaBoard } from './sea.js';
 
 /** Seconds each player owed gold has for all of their picks, in every room, timer or not (section 9.5). */
 export const GOLD_PICK_SECONDS = 20;
-/** A player owed gold and the picks they still have to make. */
+/** A player owed gold and how many picks they are owed. */
 export type GoldOwed = { player: string; picks: number };
 type Seat = { id: string; resigned?: boolean };
 
@@ -71,8 +71,8 @@ export function goldOwedForRoll(
 /** The types a pick may take: those the bank still holds, which is all the picker offers (sections 9.2 and 14). */
 export const goldPickTypes = (bank: Hand): Resource[] => RESOURCES.filter((r) => bank[r] > 0);
 /**
- * The picks still to make, in order (section 9.2): none for a player who has made all theirs or has resigned, and
- * none at all once the bank holds no cards, when every remaining pick lapses. A lapsed pick is not owed later.
+ * The picks still to make, in order (section 9.2): none for a player who is owed none or has resigned, and none at
+ * all once the bank holds no cards, when every remaining pick lapses. A lapsed pick is not owed later.
  */
 export function remainingGoldOwed(
   goldOwed: readonly GoldOwed[],
@@ -83,9 +83,9 @@ export function remainingGoldOwed(
   return goldOwed.filter((o) => o.picks > 0 && !players.find((p) => p.id === o.player)?.resigned);
 }
 /**
- * Why these picks are not allowed, or null (section 9.2). Only the first player owed gold picks, from 1 card up to
- * as many as they are owed, each of a type the bank holds, after the cards taken before it. Picks cannot be
- * declined, so they cannot be empty.
+ * Why these picks are not allowed, or null (section 9.2). Only the first player owed gold picks, and they make all
+ * their picks in one action, as with Year of Plenty: exactly as many cards as they are owed, or every card the bank
+ * holds if that is fewer, each of a type the bank has. Picks cannot be declined or saved for later.
  */
 export function goldPickIssue(
   g: { bank: Hand; goldOwed?: readonly GoldOwed[] },
@@ -96,14 +96,14 @@ export function goldPickIssue(
   if (next?.player !== player) return 'It is not your turn to pick from a gold field';
   if (RESOURCES.some((r) => !Number.isInteger(picks[r]) || picks[r] < 0))
     return 'Choose whole resource counts';
-  if (cards(picks) < 1 || cards(picks) > next.picks)
-    return next.picks === 1 ? 'Choose 1 resource' : `Choose from 1 to ${next.picks} resources`;
+  const due = Math.min(next.picks, cards(g.bank));
+  if (cards(picks) !== due) return due === 1 ? 'Choose 1 resource' : `Choose ${due} resources`;
   if (RESOURCES.some((r) => picks[r] > g.bank[r])) return 'The bank does not have those resources';
   return null;
 }
 /**
- * Makes some or all of a player's gold picks, returning the bank, the players and the picks still owed. A player
- * whose picks are all made, or who took the bank's last card, hands on to the next (section 9.2).
+ * Makes all of a player's gold picks, returning the bank, the players and the picks still owed. The next player
+ * owed gold picks next, from the bank as it now stands, unless it is empty, when the remaining picks lapse (9.2).
  */
 export function applyGoldPick<P extends Seat & { hand: Hand }>(
   g: { bank: Hand; goldOwed?: readonly GoldOwed[]; players: readonly P[] },
@@ -122,12 +122,7 @@ export function applyGoldPick<P extends Seat & { hand: Hand }>(
     }
     return { ...p, hand };
   });
-  const [first, ...rest] = g.goldOwed!;
-  return {
-    bank,
-    players,
-    goldOwed: remainingGoldOwed([{ player, picks: first!.picks - cards(picks) }, ...rest], bank, players),
-  };
+  return { bank, players, goldOwed: remainingGoldOwed(g.goldOwed!.slice(1), bank, players) };
 }
 /**
  * The pick the clock makes for a player whose 20 seconds ran out (section 9.5): the resource they hold fewest of
