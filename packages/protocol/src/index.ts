@@ -92,6 +92,11 @@ export type RoomState = {
   historyRevision?: number;
   round?: number;
   settings?: RoomSettings;
+  /**
+   * The modes the host may pick, as ruleset ids, Classic first. Sent to the host alone, and only when there is
+   * more than Classic to pick: absent, the host may pick Classic only.
+   */
+  modes?: string[];
   turnClock?: TurnClock;
   serverNow?: number;
   paused?: boolean;

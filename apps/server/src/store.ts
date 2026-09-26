@@ -38,6 +38,19 @@ import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
 import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
+import {
+  CLASSIC,
+  boardPresetOf,
+  findRuleset,
+  numberWord,
+  playsBoard,
+  switchBlock,
+  targetRangeText,
+  validTarget,
+} from '../../../packages/rules/src/rulesets.js';
+import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
+import { CLASSIC_ONLY, modesFor } from './modes.js';
+import type { ModeSwitches } from './modes.js';
 import { PlayerRecords, parseGamesCursor } from './player-records.js';
 import { decodeState, encodeState } from './journal.js';
 import { setImmediate } from 'node:timers/promises';
@@ -109,6 +122,8 @@ export class Store {
   private readonly random: () => number;
   private readonly codeRandom: (max: number) => number;
   private readonly trackPresence: boolean;
+  /** Which modes a host may pick (modes.ts). Read once when the server starts. */
+  private readonly modes: ModeSwitches;
   private readonly records: PlayerRecords;
   private connectedSeats = new Set<string>();
   /** Which bot turns up when a seat is filled. Drawn from the store's own
@@ -133,9 +148,11 @@ export class Store {
       random?: () => number;
       codeRandom?: (max: number) => number;
       trackPresence?: boolean;
+      modes?: ModeSwitches;
     } = {},
   ) {
     this.now = options.now ?? Date.now;
+    this.modes = options.modes ?? CLASSIC_ONLY;
     this.random = options.random ?? privateRandom;
     this.codeRandom = options.codeRandom ?? ((max) => randomInt(max));
     this.trackPresence = options.trackPresence ?? false;
@@ -484,11 +501,12 @@ export class Store {
       } else if (!this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId!)) {
         throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
       }
+      const seats = this.seatLimit(roomId!);
       if (
         (this.db.prepare('SELECT COUNT(*) AS n FROM seats WHERE room_id = ? AND departed = 0').get(roomId!)!
-          .n as number) >= 4
+          .n as number) >= seats
       )
-        throw new ProtocolError('ROOM_FULL', 'Room already has four seats');
+        throw new ProtocolError('ROOM_FULL', `Room already has ${numberWord(seats)} seats`);
       if (this.loadGame(roomId!))
         throw new ProtocolError('GAME_STARTED', 'This game has already started; existing players can resume');
       const profile = identity
@@ -536,6 +554,11 @@ export class Store {
     const standingIn = new Set(this.standInIds(roomId));
     const roomCode = this.roomCode(roomId);
     const previousResults = !game && viewer ? this.records.previousResults(roomId, viewer) : null;
+    // Only the host picks the mode, and only in the lobby. More than Classic, or nothing to say.
+    const modes =
+      !game && viewer && viewer === roomHostId(players.map((p) => ({ id: p.id, bot: !!p.bot })))
+        ? this.modesFor(roomId)
+        : [];
     return {
       ...(previousResults ? { previousResults } : {}),
       roomId,
@@ -557,6 +580,7 @@ export class Store {
       round: this.round(roomId),
       historyRevision: this.eventHead(roomId)?.revision ?? 0,
       settings: this.settings(roomId),
+      ...(modes.length > 1 ? { modes } : {}),
       serverNow: this.now(),
       ...(this.clock(roomId) ? { turnClock: this.clock(roomId)! } : {}),
       board: this.board(roomId),
@@ -571,7 +595,8 @@ export class Store {
     if (saved) return JSON.parse(saved.board) as Board;
     if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
       throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
-    const board = generateBoard(randomInt(0, 2 ** 32));
+    // Dealt for the room's mode: a mode change deletes the board, and this deals the new mode's.
+    const board = generateBoard(randomInt(0, 2 ** 32), boardPresetOf(this.lobbyRules(roomId) ?? CLASSIC));
     this.db
       .prepare('INSERT INTO room_boards(room_id, board) VALUES (?, ?)')
       .run(roomId, JSON.stringify(board));
@@ -588,6 +613,32 @@ export class Store {
       settings: state.settings,
       started: !!this.loadGame(roomId),
     };
+  }
+  /** The ruleset a lobby is set to play, or undefined for one this version does not know. */
+  private lobbyRules(roomId: string): Ruleset | undefined {
+    return findRuleset(this.settings(roomId).mode);
+  }
+  /**
+   * The ruleset a room plays, by id: its game's, once started, else the mode its lobby is set to. Read without
+   * loading the game, so that a room this version cannot load still says what it is.
+   */
+  roomMode(roomId: string): string {
+    const started = this.db
+      .prepare("SELECT coalesce(json_extract(state, '$.ruleset'), ?) AS ruleset FROM games WHERE room_id = ?")
+      .get(CLASSIC.id, roomId) as { ruleset: string } | undefined;
+    return started?.ruleset ?? this.settings(roomId).mode ?? CLASSIC.id;
+  }
+  /** How many seats a lobby has: its mode's, or Classic's four while its mode is one this version cannot run. */
+  seatLimit(roomId: string): number {
+    return (this.lobbyRules(roomId) ?? CLASSIC).seats.max;
+  }
+  /** The modes the room's host may pick, Classic first: decided by the host's account (modes.ts). */
+  modesFor(roomId: string): string[] {
+    const seats = this.db
+      .prepare('SELECT id, user_id, bot FROM seats WHERE room_id = ? AND departed = 0 ORDER BY rowid')
+      .all(roomId) as { id: string; user_id: string | null; bot: number }[];
+    const host = roomHostId(seats.map((seat) => ({ id: seat.id, bot: !!seat.bot })));
+    return modesFor(this.modes, seats.find((seat) => seat.id === host)?.user_id);
   }
   hasAccountSeat(roomId: string, userId: string) {
     return !!this.db
@@ -1103,8 +1154,13 @@ export class Store {
           throw new ProtocolError('NOT_HOST', 'Only the host can add a bot');
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
-        if (room.players.length >= 4)
-          throw new ProtocolError('INVALID_PLAYER', 'The room already has four seats');
+        const rules = this.lobbyRules(seat.room_id) ?? CLASSIC;
+        if (room.players.length >= rules.seats.max)
+          throw new ProtocolError(
+            'INVALID_PLAYER',
+            `The room already has ${numberWord(rules.seats.max)} seats`,
+          );
+        if (!rules.bots) throw new ProtocolError('MODE_BOTS', switchBlock(rules, [{ bot: true }])!.reason);
         // Drawn here, not asked for: the host fills a seat and finds out who
         // sat down by playing them.
         const level = this.botLevel();
@@ -1303,12 +1359,47 @@ export class Store {
         throw new ProtocolError('NOT_HOST', 'Only the host can change game settings');
       if (room.revision !== expectedRevision)
         throw new ProtocolError('STALE_STATE', 'The lobby changed; review the latest settings');
+      const previous = room.settings.mode ?? CLASSIC.id;
+      // A tab from before modes leaves the field out, which keeps the room's mode rather than resetting it.
+      const mode = settings.mode ?? previous,
+        rules = findRuleset(mode),
+        changing = mode !== previous;
+      if (!rules || (changing && !this.modesFor(seat.room_id).includes(mode)))
+        throw new ProtocolError(
+          'MODE_UNAVAILABLE',
+          rules
+            ? `${rules.name} is not open to this room`
+            : 'This room’s game mode is not available. Choose Classic.',
+        );
+      const blocked = changing ? switchBlock(rules, room.players) : undefined;
+      if (blocked)
+        throw new ProtocolError(
+          blocked.code,
+          blocked.code === 'MODE_SEATS'
+            ? `${rules.name} seats up to ${numberWord(rules.seats.max)} players. Someone must leave first.`
+            : `${blocked.reason}. Remove the bots to play ${rules.name}.`,
+        );
+      // A new mode starts from its own default target; the host sets another once the mode is in place.
+      const victoryPoints = changing ? undefined : settings.victoryPoints;
+      if (victoryPoints !== undefined && !validTarget(rules, victoryPoints))
+        throw new ProtocolError('INVALID_SETTINGS', targetRangeText(rules));
+      const saved: RoomSettings = {
+        ...(victoryPoints === undefined ? {} : { victoryPoints }),
+        turnTimerSeconds: settings.turnTimerSeconds,
+        ...(settings.diceMode === undefined ? {} : { diceMode: settings.diceMode }),
+        ...(mode === CLASSIC.id ? {} : { mode }),
+      };
       const revision = room.revision + 1;
       this.db
         .prepare(
           'INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET settings = excluded.settings, revision = excluded.revision',
         )
-        .run(seat.room_id, JSON.stringify(settings), revision);
+        .run(seat.room_id, JSON.stringify(saved), revision);
+      // Each mode deals its own island, so a new mode is a new board.
+      if (changing) {
+        this.db.prepare('DELETE FROM room_boards WHERE room_id = ?').run(seat.room_id);
+        this.board(seat.room_id);
+      }
       // People confirm the new settings; bots have nothing to confirm and would
       // otherwise keep Start disabled until they were removed and added again.
       this.db
@@ -1910,6 +2001,22 @@ export class Store {
           .prepare('SELECT user_id,name FROM seats WHERE room_id=? AND departed=0 AND user_id IS NOT NULL')
           .all(seat.room_id) as { user_id: string; name: string }[])
           this.assertAccountAvailable(member.user_id, seat.room_id, member.name);
+        // The mode is checked again here, not only when it was chosen: a switch may have closed it since.
+        const settings = this.settings(seat.room_id),
+          mode = settings.mode ?? CLASSIC.id,
+          rules = findRuleset(mode);
+        if (!rules || !this.modesFor(seat.room_id).includes(mode))
+          throw new ProtocolError(
+            'MODE_UNAVAILABLE',
+            `${rules?.name ?? 'This game mode'} is not open to this room. Choose another mode.`,
+          );
+        if (!rules.bots && room.players.some((p) => p.bot))
+          throw new ProtocolError('MODE_BOTS', `${switchBlock(rules, [{ bot: true }])!.reason}.`);
+        if (!playsBoard(rules, room.board))
+          throw new ProtocolError(
+            'BOARD_MISMATCH',
+            'This island was dealt for another game mode. Change the mode to deal a new one.',
+          );
         next = createGame(
           shuffle(
             room.players.map((p) => ({ id: p.id, name: p.name })),
@@ -1917,8 +2024,8 @@ export class Store {
           ),
           room.board.seed,
           this.random,
-          // The island the lobby has been showing, exactly as dealt.
-          { ...this.settings(seat.room_id), board: room.board },
+          // The island the lobby has been showing, exactly as dealt, and the mode frozen into the game.
+          { ...settings, board: room.board, ruleset: rules.id },
         );
       } else {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');

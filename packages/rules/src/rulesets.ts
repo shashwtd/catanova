@@ -109,6 +109,29 @@ export const seatRange = (ruleset: Ruleset) =>
     ? numberWord(ruleset.seats.min)
     : `${numberWord(ruleset.seats.min)} to ${numberWord(ruleset.seats.max)}`;
 
+/** Which modes seat bots, as the host is told when a mode has none: "Bots play Classic only". */
+export const botsPlayIn = () =>
+  `Bots play ${rulesets()
+    .filter((ruleset) => ruleset.bots)
+    .map((ruleset) => ruleset.name)
+    .join(' and ')} only`;
+
+/**
+ * Why a lobby cannot switch to a mode now, or undefined when it can: more players seated than the mode seats,
+ * or a bot seated in a mode without bots. Too few players never blocks a switch: the lobby waits for more.
+ * The server refuses the change for the same reason that marks the mode's card in Room setup.
+ */
+export function switchBlock(
+  ruleset: Ruleset,
+  seated: readonly { bot?: boolean }[],
+): { code: 'MODE_SEATS' | 'MODE_BOTS'; reason: string } | undefined {
+  if (seated.length > ruleset.seats.max)
+    return { code: 'MODE_SEATS', reason: `For up to ${numberWord(ruleset.seats.max)} players` };
+  if (!ruleset.bots && seated.some((player) => player.bot))
+    return { code: 'MODE_BOTS', reason: botsPlayIn() };
+  return undefined;
+}
+
 /** Whether a points target is one the host may set in this ruleset. */
 export const validTarget = (ruleset: Ruleset, value: unknown): value is number =>
   typeof value === 'number' &&

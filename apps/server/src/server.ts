@@ -16,6 +16,9 @@ import type { RoomState, ServerMessage } from '../../../packages/protocol/src/in
 import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
 import { RuleError } from '../../../packages/rules/src/game.js';
+import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
+import { readModeSwitches } from './modes.js';
+import type { ModeSwitches } from './modes.js';
 import { serveClient } from './static.js';
 import { GameLaunch } from './game-launch.js';
 import { RoomInviteService } from './room-invites.js';
@@ -68,6 +71,8 @@ export async function startServer(
     captcha?: { siteKey: string } | null;
     now?: () => number;
     trustedProxyCidrs?: string[];
+    /** Which modes hosts may pick. Read from CATANOVA_MODES and CATANOVA_MODE_TESTERS when absent. */
+    modes?: ModeSwitches;
   } = {},
 ) {
   const auth = options.auth === null ? undefined : (options.auth ?? readAuthConfig());
@@ -136,7 +141,11 @@ export async function startServer(
       ? undefined
       : (options.captcha?.siteKey ?? process.env.TURNSTILE_SITE_KEY)?.trim();
   const captcha = siteKey ? { siteKey } : undefined;
-  const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now, trackPresence: true });
+  // Read once, here: changing a switch means recreating the container (docs/GAME-MODES.md).
+  const modes = options.modes ?? readModeSwitches(process.env);
+  if (modes.open.length > 1 || modes.testers.size)
+    console.log(JSON.stringify({ event: 'modes', open: modes.open, testers: modes.testers.size }));
+  const store = new Store(options.databasePath ?? 'data/probe.sqlite', { now, trackPresence: true, modes });
   const roomInvites = accounts ? new RoomInviteService(store, accounts, now) : undefined;
   const feedback = new PlayerFeedback({
     store,
