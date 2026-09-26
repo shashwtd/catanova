@@ -246,6 +246,30 @@ test('§3 a ship costs 1 Timber and 1 Sheep, each player has 15, and Classic’s
       'build',
     ),
   );
+  // Five settlements on the board: no sixth, even beside your ship, until a city hands a settlement back.
+  const spread: number[] = [];
+  for (const v of settlementSitesOpenSea(state(sk), 'blue', true))
+    if (
+      spread.length < 5 &&
+      spread.every((f) =>
+        board.vertices[f]!.neighbors.every((n) => n !== v && !board.vertices[n]!.neighbors.includes(v)),
+      )
+    )
+      spread.push(v);
+  const five = state(sk, { settlements: { blue: spread } });
+  const site = settlementSitesOpenSea(five, 'red', true).find((v) => isCoastalIntersection(board, v))!;
+  const sailed = {
+    ...five,
+    ships: { [at(board, site).find((e) => takesShip(edgeKind(board, e)))!]: 'blue' },
+  };
+  assert.equal(spread.length, 5);
+  assert.deepEqual(settlementSitesOpenSea(sailed, 'blue'), []);
+  assert.throws(() => placeSettlement(sailed, 'blue', site));
+  const city = {
+    ...sailed,
+    buildings: { ...sailed.buildings, [spread[0]!]: { player: 'blue', kind: 'city' as const } },
+  };
+  assert.deepEqual(settlementSitesOpenSea(city, 'blue'), [site]);
   const roads = board.edges.filter((e) => takesRoad(edgeKind(board, e.id))).map((e) => e.id);
   assert.deepEqual(
     roadSitesOpenSea(

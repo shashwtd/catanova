@@ -89,6 +89,15 @@ test('§9.1 a gold field pays each settlement 1 pick and each city 2, unless the
     ],
     'a resigned player’s buildings stop producing',
   );
+  // One player's buildings on a field are paid together: a settlement and a city owe 3 picks.
+  const both = {
+    ...g,
+    buildings: {
+      [corner(board, gold, 'n')]: { player: 'blue', kind: 'settlement' as const },
+      [corner(board, gold, 's')]: { player: 'blue', kind: 'city' as const },
+    },
+  };
+  assert.deepEqual(goldOwedForRoll(both, 10), [{ player: 'blue', picks: 3 }]);
   // Red's settlement also touches the second gold field; its number pays red alone.
   assert.ok(board.hexes[gold2]!.vertices.includes(corner(board, gold, 'se')));
   assert.deepEqual(goldOwedForRoll(g, 4), [{ player: 'red', picks: 1 }]);
@@ -222,6 +231,12 @@ test('§9.3 and §5.5 a second starting settlement takes a card per producing he
     board.vertices[v]!.hexes.some((h) => board.hexes[h]!.terrain === 'desert'),
   )!;
   assert.deepEqual(startingResources(board, shared), { resources: hand({ ore: 1 }), goldPicks: 0 });
+  // Each producing hex pays its own card: between two forests, 2 Timber.
+  const woods = sketch(' . . . .', '. T T .', ' . . . .').board;
+  const between2 = woods.vertices.find(
+    (v) => v.hexes.filter((h) => woods.hexes[h]!.terrain === 'wood').length === 2,
+  )!;
+  assert.deepEqual(startingResources(woods, between2.id), { resources: hand({ wood: 2 }), goldPicks: 0 });
 });
 
 test('§9.4 the robber stops a gold field like any land, and the pirate never stands on one', () => {
