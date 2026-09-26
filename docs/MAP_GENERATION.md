@@ -117,6 +117,17 @@ On this laptop the 100 ms rule is met: the slowest board, seed 13898 with the mo
 
 Release checklist: before Big Table is enabled, run `node dist/scripts/measure-boards.js --preset big-table-balanced-v1` in the production container on the VM, and record its figures here. If its slowest board takes over 100 ms, Big Table boards are dealt in a worker off the server's main thread, the second route below, with a longer limit chosen from that run and written down here before release.
 
+Measured on the production VM on 27 September 2026, in the container of release `66a048e` (AMD EPYC 7763, 2 cores, Node 24.21.0), seeds 0 to 19,999 of every preset:
+
+| Preset                    | Median  | p99     | Slowest              | At 100 ms or more |
+| ------------------------- | ------- | ------- | -------------------- | ----------------- |
+| balanced-v2               | 1.33 ms | 7.34 ms | 14.0 ms (seed 4527)  | 0 of 20,000       |
+| big-table-balanced-v1     | 3.45 ms | 19.4 ms | 56.0 ms (seed 13898) | 0 of 20,000       |
+| outer-isles-v1, 3 players | 1.19 ms | 2.08 ms | 2.79 ms (seed 8638)  | 0 of 20,000       |
+| outer-isles-v1, 4 players | 1.70 ms | 3.87 ms | 7.35 ms (seed 4888)  | 0 of 20,000       |
+
+Every preset meets the 100 ms limit on the VM, so boards are dealt on the main thread and no worker is needed. Big Table's slowest seed is the same one as on the development laptop.
+
 Catanova decision, made on 26 September 2026 under the owner's delegation: the 11-pip cap stays, and it is not raised to 12. The preset ships only when one of these holds:
 
 1. A tuned search keeps every board under the 100 ms limit over 20,000 seeds.
