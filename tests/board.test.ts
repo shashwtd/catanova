@@ -1,9 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fairnessIssues, generateBoard, topology } from '../packages/rules/src/board.js';
+import {
+  BALANCED_FAIRNESS,
+  BALANCED_V2,
+  BOARD_PRESETS,
+  fairnessIssues,
+  generateBoard,
+  hexagon,
+  hexDistance,
+  isCoastalEdge,
+  pips,
+  shoreHex,
+  topology,
+} from '../packages/rules/src/board.js';
 import { createGame } from '../packages/rules/src/game.js';
-import type { Board } from '../packages/rules/src/board.js';
+import type { Board, BoardPreset, BoardShape } from '../packages/rules/src/board.js';
 import { NUMBER_SPIRAL, RESOURCES, RESOURCE_NAMES } from '../packages/rules/src/index.js';
+import { BIG_TABLE_SHAPE, flood } from './board-shapes.js';
 
 test('island topology has shared corners and edges, without duplicate geometry', () => {
   const board = topology();
@@ -15,6 +28,121 @@ test('island topology has shared corners and edges, without duplicate geometry',
     assert.ok(v.hexes.length <= 3);
     for (const n of v.neighbors) assert.ok(board.vertices[n]!.neighbors.includes(v.id));
   }
+});
+
+/** Every cross-reference in a board's graph agrees with every other, for a shape with no lakes in it. */
+function assertConsistent(shape: BoardShape) {
+  const { hexes, vertices, edges } = topology(shape);
+  assert.deepEqual(
+    hexes.map(({ id, q, r }) => ({ id, q, r })),
+    shape.map(({ q, r }, id) => ({ id, q, r })),
+    'hexes are numbered in the order the shape lists them',
+  );
+  const touching = (a: number, b: number) =>
+    edges.find((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+  for (const h of hexes) {
+    assert.equal(new Set(h.vertices).size, 6);
+    for (const [k, v] of h.vertices.entries()) {
+      assert.ok(vertices[v]!.hexes.includes(h.id));
+      assert.ok(touching(v, h.vertices[(k + 1) % 6]!)!.hexes.includes(h.id));
+    }
+    assert.deepEqual(
+      h.neighbors,
+      hexes.filter((o) => hexDistance(h, o) === 1).map((o) => o.id),
+    );
+    for (const n of h.neighbors)
+      assert.equal(
+        h.vertices.filter((v) => hexes[n]!.vertices.includes(v)).length,
+        2,
+        'neighbours share an edge',
+      );
+  }
+  for (const v of vertices) {
+    assert.ok(v.hexes.length >= 1 && v.hexes.length <= 3);
+    assert.ok(v.neighbors.length >= 2 && v.neighbors.length <= 3);
+    assert.equal(v.edges.length, v.neighbors.length);
+    for (const n of v.neighbors) {
+      assert.ok(vertices[n]!.neighbors.includes(v.id));
+      assert.ok(v.edges.includes(touching(v.id, n)!.id));
+      assert.ok(Math.abs(Math.hypot(vertices[n]!.x - v.x, vertices[n]!.y - v.y) - 1) < 1e-9);
+    }
+  }
+  for (const e of edges) {
+    assert.ok(e.a !== e.b && e.hexes.length >= 1 && e.hexes.length <= 2);
+    for (const h of e.hexes) assert.ok(hexes[h]!.vertices.includes(e.a) && hexes[h]!.vertices.includes(e.b));
+  }
+  // Euler's formula for one piece of plane with no holes: corners - edges + hexes = 1.
+  assert.equal(vertices.length - edges.length + hexes.length, 1);
+  // The scene is centred on the origin, so the middle of the board must be there.
+  const xs = vertices.map((v) => v.x),
+    ys = vertices.map((v) => v.y);
+  assert.ok(Math.abs(Math.min(...xs) + Math.max(...xs)) < 1e-9);
+  assert.ok(Math.abs(Math.min(...ys) + Math.max(...ys)) < 1e-9);
+  return { hexes, vertices, edges, coast: edges.filter((e) => e.hexes.length === 1) };
+}
+
+test('a board is built from any list of hexes, the Classic island from its own', () => {
+  const classic = assertConsistent(hexagon(2));
+  assert.deepEqual(topology(hexagon(2)), topology());
+  assert.equal(classic.coast.length, 30);
+  // A 30-hex island has an even middle row, so no hex sits at its centre; it is moved to the origin all the same.
+  const big = assertConsistent(BIG_TABLE_SHAPE);
+  assert.deepEqual(
+    [big.hexes.length, big.vertices.length, big.edges.length, big.coast.length],
+    [30, 80, 109, 38],
+  );
+  // Every edge that is not on the coast joins two neighbouring hexes.
+  assert.equal(big.hexes.reduce((sum, h) => sum + h.neighbors.length, 0) / 2, 109 - 38);
+  assert.throws(
+    () =>
+      topology([
+        { q: 0, r: 0 },
+        { q: 0, r: 0 },
+      ]),
+    /twice/,
+  );
+  assert.throws(() => topology([{ q: 0.5, r: 0 }]), /not a hex/);
+});
+
+test('the coast is where land meets sea, whether the sea is hexes or the world beyond the rim', () => {
+  const classic = topology();
+  assert.deepEqual(
+    classic.edges.filter((e) => isCoastalEdge(classic, e)),
+    classic.edges.filter((e) => e.hexes.length === 1),
+  );
+  // The Classic island in a ring of sea hexes: every edge now touches two hexes, and the coast is where it was.
+  const ringed = flood(topology(hexagon(3)), (h) => hexDistance(h, { q: 0, r: 0 }) <= 2);
+  const coast = ringed.edges.filter((e) => isCoastalEdge(ringed, e));
+  assert.equal(coast.length, 30);
+  assert.ok(coast.every((e) => e.hexes.length === 2));
+  const midpoint = (board: typeof classic, id: number) => {
+    const e = board.edges[id]!,
+      [a, b] = [board.vertices[e.a]!, board.vertices[e.b]!];
+    const round = (n: number) => Math.round(n * 1e6) / 1e6 || 0;
+    return `${round((a.x + b.x) / 2)},${round((a.y + b.y) / 2)}`;
+  };
+  assert.deepEqual(
+    coast.map((e) => midpoint(ringed, e.id)).sort(),
+    classic.edges
+      .filter((e) => isCoastalEdge(classic, e))
+      .map((e) => midpoint(classic, e.id))
+      .sort(),
+  );
+  // The sea ring's own rim is open water, and the shore is always the land side, whichever hex an edge lists first.
+  assert.equal(
+    ringed.edges.filter((e) => e.hexes.length === 1).filter((e) => isCoastalEdge(ringed, e)).length,
+    0,
+  );
+  assert.ok(coast.some((e) => ringed.hexes[e.hexes[0]!]!.terrain === ('sea' as string)));
+  for (const e of coast) assert.ok(hexDistance(shoreHex(ringed, e), { q: 0, r: 0 }) === 2);
+  assert.throws(
+    () =>
+      shoreHex(
+        ringed,
+        ringed.edges.find((e) => !isCoastalEdge(ringed, e))!,
+      ),
+    /coastal/,
+  );
 });
 /** Edge k of a hex joins its corners k and k + 1 and faces this axial direction: NE, E, SE, SW, W, NW. */
 const FACING = [
@@ -113,6 +241,42 @@ test('equal numbers, two red numbers, or the 2 and the 12 may not share a border
   assert.deepEqual(borderIssues(12, 2), ['Adjacent 2 and 12']);
   assert.deepEqual(borderIssues(5, 9), []);
   assert.deepEqual(borderIssues(2, 11), []);
+});
+test('a board is dealt from its preset, and a preset that cannot be dealt says why before searching', () => {
+  assert.equal(BOARD_PRESETS[0], BALANCED_V2);
+  assert.deepEqual(generateBoard(481, BALANCED_V2), generateBoard(481));
+  const variant = (change: Partial<BoardPreset>) => ({ ...BALANCED_V2, ...change });
+  // The fairness limits and the harbour trades are the preset's, not the generator's.
+  const tighter = { ...BALANCED_FAIRNESS, cornerPips: 10 };
+  for (let seed = 0; seed < 5; seed++) {
+    const board = generateBoard(seed, variant({ fairness: tighter }));
+    assert.deepEqual(fairnessIssues(board, tighter), []);
+    assert.ok(
+      board.vertices.every((v) => v.hexes.reduce((sum, h) => sum + pips(board.hexes[h]!.number), 0) <= 10),
+    );
+  }
+  const general = variant({ harbours: { ...BALANCED_V2.harbours, trades: Array(9).fill('any') } });
+  assert.ok(generateBoard(7, general).ports.every((p) => p.resource === 'any'));
+  // A 30-hex shape with the 19-hex bags used to crash on the 20th tile; now it is refused up front.
+  assert.throws(() => generateBoard(1, variant({ shape: BIG_TABLE_SHAPE })), /19 tiles onto 30 hexes/);
+  assert.throws(() => generateBoard(1, variant({ numbers: NUMBER_SPIRAL.slice(1) })), /17 numbers for 18/);
+  assert.throws(
+    () => generateBoard(1, variant({ harbours: { ...BALANCED_V2.harbours, slots: [0, 3, 30] } })),
+    /past the end of the coast/,
+  );
+  assert.throws(
+    () =>
+      generateBoard(
+        1,
+        variant({ harbours: { ...BALANCED_V2.harbours, trades: BALANCED_V2.harbours.trades.slice(1) } }),
+      ),
+    /8 trades for 9 harbours/,
+  );
+  // Two harbours side by side have no rotation that keeps them off neighbouring sea spaces.
+  assert.throws(
+    () => generateBoard(1, variant({ harbours: { slots: [0, 1], trades: ['any', 'any'] } })),
+    /no way to lay out its harbours/,
+  );
 });
 test('new islands are balanced-v2, and boards saved as balanced-v1 remain valid', () => {
   for (let seed = 0; seed < 20; seed++) assert.equal(generateBoard(seed).preset, 'balanced-v2');

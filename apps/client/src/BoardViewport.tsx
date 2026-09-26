@@ -1,34 +1,41 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, PointerEvent } from 'react';
+import type { Board } from '../../../packages/rules/src/board.js';
 import { useGameInteractionGuards } from './useGameInteractionGuards.js';
 import { BoardGesture, constrainCamera, fitBoard, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
-import { MATERIAL_GUTTER, MATERIAL_QUADRANTS, WORLD } from './scene.js';
+import { boardKey, MATERIAL_GUTTER, MATERIAL_QUADRANTS, worldBox } from './scene.js';
 
 export function BoardViewport({
-  seed,
+  board,
   children,
   reducedMotion = false,
 }: {
-  seed: number;
+  /** The board being framed: the camera fits its world box, and starts over when a new board is dealt. */
+  board: Board;
   children: ReactNode;
   reducedMotion?: boolean;
 }) {
   useGameInteractionGuards();
+  const key = boardKey(board),
+    box = useMemo(() => worldBox(board), [key]);
   const viewport = useRef<HTMLDivElement>(null),
     current = useRef<Camera>({ scale: 1, x: 0, y: 0 }),
     target = useRef(current.current),
     bounds = useRef<Bounds>({ width: 1, height: 1 }),
     origin = useRef({ x: 0, y: 0 }),
     frame = useRef<number | null>(null),
-    quiet = useRef(reducedMotion);
+    quiet = useRef(reducedMotion),
+    // A ref, like `quiet`, because the wheel handler outlives the render that registered it.
+    world = useRef(box);
   quiet.current = reducedMotion;
+  world.current = box;
   const patternId = `table-${useId().replaceAll(':', '')}`;
   const [camera, setCamera] = useState(current.current),
     [dragging, setDragging] = useState(false);
   const gesture = useRef(new BoardGesture());
   function move(next: Camera) {
-    current.current = constrainCamera(next, bounds.current);
+    current.current = constrainCamera(next, bounds.current, world.current);
     setCamera(current.current);
   }
   function stopGlide() {
@@ -45,7 +52,7 @@ export function BoardViewport({
     }
   }
   function glide(next: Camera) {
-    target.current = constrainCamera(next, bounds.current);
+    target.current = constrainCamera(next, bounds.current, world.current);
     if (quiet.current) {
       move(target.current);
       return;
@@ -80,7 +87,7 @@ export function BoardViewport({
     stopGlide();
     move({ scale: 1, x: 0, y: 0 });
     target.current = current.current;
-  }, [seed]);
+  }, [key]);
   useEffect(() => {
     if (reducedMotion) {
       const next = target.current;
@@ -116,6 +123,7 @@ export function BoardViewport({
           wheelScale(target.current.scale, delta),
           { x: event.clientX - rect.left - rect.width / 2, y: event.clientY - rect.top - rect.height / 2 },
           bounds.current,
+          world.current,
         ),
       );
     };
@@ -172,7 +180,13 @@ export function BoardViewport({
   }
   function pointerMove(event: PointerEvent<HTMLDivElement>) {
     if (!gesture.current.has(event.pointerId)) return;
-    const next = gesture.current.update(event.pointerId, point(event), current.current, bounds.current);
+    const next = gesture.current.update(
+      event.pointerId,
+      point(event),
+      current.current,
+      bounds.current,
+      world.current,
+    );
     if (next) move(next);
     target.current = current.current;
     captureGesture(event);
@@ -183,7 +197,7 @@ export function BoardViewport({
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   }
-  const fitted = fitBoard(bounds.current);
+  const fitted = fitBoard(bounds.current, world.current);
   return (
     <div
       ref={viewport}
@@ -224,6 +238,7 @@ export function BoardViewport({
               target.current.scale + (event.key === '-' ? -0.07 : 0.07),
               { x: 0, y: 0 },
               bounds.current,
+              world.current,
             ),
           );
       }}
@@ -266,7 +281,7 @@ export function BoardViewport({
         style={{
           width: fitted.width,
           height: fitted.height,
-          aspectRatio: `${WORLD.width}/${WORLD.height}`,
+          aspectRatio: `${world.current.width}/${world.current.height}`,
           transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`,
         }}
       >

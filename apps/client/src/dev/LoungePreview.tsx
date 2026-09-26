@@ -413,7 +413,7 @@ export function LoungePreview() {
       {screen === 'game' && (
         <>
           <div className="board-anchor">
-            <BoardViewport seed={game.board.seed} reducedMotion={reducedMotion}>
+            <BoardViewport board={game.board} reducedMotion={reducedMotion}>
               <Board
                 board={game.board}
                 art={BOARD_THEMES[preferences.boardTheme]}

@@ -104,6 +104,24 @@ function log(g: Game, text: string) {
   if (g.log.length > 80) g.log.shift();
 }
 
+/**
+ * The ceiling on a corner, edge or hex id, whatever the board. Classic has 72 edges, Big Table 109 and a large
+ * Open Sea frame a few hundred. Whether an id is on this game's board is for applyAction to say: only it has the
+ * board.
+ */
+export const BOARD_ID_LIMIT = 4096;
+/**
+ * Whether every corner, edge and hex an action names is on this board. It reads the fields, not the kinds, so a
+ * new action that names a `vertex`, `edge` or `hex` is checked without being listed here.
+ */
+function onBoard(board: Board, a: GameAction) {
+  return (
+    (!('vertex' in a) || a.vertex < board.vertices.length) &&
+    (!('edge' in a) || a.edge < board.edges.length) &&
+    (!('hex' in a) || a.hex < board.hexes.length)
+  );
+}
+
 /** Untrusted input becomes a small, canonical action before it reaches a transaction. */
 export function parseGameAction(input: unknown): GameAction {
   requireRule(input && typeof input === 'object' && !Array.isArray(input), 'Invalid action');
@@ -147,13 +165,13 @@ export function parseGameAction(input: unknown): GameAction {
       return { kind: a.kind };
     case 'settlement':
     case 'city':
-      return { kind: a.kind, vertex: index(a.vertex, 54) };
+      return { kind: a.kind, vertex: index(a.vertex, BOARD_ID_LIMIT) };
     case 'road':
-      return { kind: a.kind, edge: index(a.edge, 72) };
+      return { kind: a.kind, edge: index(a.edge, BOARD_ID_LIMIT) };
     case 'robber':
       return {
         kind: a.kind,
-        hex: index(a.hex, 19),
+        hex: index(a.hex, BOARD_ID_LIMIT),
         ...(a.victim === undefined ? {} : { victim: id(a.victim) }),
       };
     case 'discard':
@@ -547,8 +565,9 @@ export function resignPlayers(
 
 /** Pure transition: caller supplies private randomness, and commits the result before broadcasting. */
 export function applyAction(state: Game, playerId: string, raw: GameAction, random: () => number): Game {
-  const a = parseGameAction(raw),
-    g = structuredClone(state);
+  const a = parseGameAction(raw);
+  requireRule(onBoard(state.board, a), 'Invalid board location');
+  const g = structuredClone(state);
   const p = g.players.find((p) => p.id === playerId);
   requireRule(p, 'Not a player in this game');
   requireRule(!p.resigned, 'You resigned from this game; you can still watch');

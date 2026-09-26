@@ -12,6 +12,7 @@ const EMPTY_COLORS: Record<string, string> = {};
 import { DICE_READABLE_MS } from './DiceThrow.js';
 import type { BuildAction } from './placement.js';
 import {
+  boardKey,
   coastline,
   HEX_SIZE as SIZE,
   MATERIAL_GUTTER,
@@ -24,8 +25,9 @@ import {
   PORT_BADGE_BOUNDS,
   TERRAIN_INDEX,
   WATER_FEATHER,
-  WORLD,
+  worldBox,
 } from './scene.js';
+import type { WorldBox } from './scene.js';
 
 /** The seat colours a board falls back to when nothing tells it otherwise —
  *  a preview, or the first frame before the room arrives. A real table passes
@@ -137,11 +139,13 @@ const BoardScenery = memo(function BoardScenery({
   art,
   coast,
   water,
+  world,
 }: {
   board: Island;
   art?: TerrainArt;
-  coast: string;
+  coast: readonly string[];
   water: string;
+  world: WorldBox;
 }) {
   return (
     <>
@@ -149,10 +153,10 @@ const BoardScenery = memo(function BoardScenery({
         <filter
           id="water-feather"
           filterUnits="userSpaceOnUse"
-          x={WORLD.x}
-          y={WORLD.y}
-          width={WORLD.width}
-          height={WORLD.height}
+          x={world.x}
+          y={world.y}
+          width={world.width}
+          height={world.height}
           colorInterpolationFilters="sRGB"
         >
           <feGaussianBlur stdDeviation={WATER_FEATHER / 6} />
@@ -163,10 +167,10 @@ const BoardScenery = memo(function BoardScenery({
         <mask
           id="water-fade-mask"
           maskUnits="userSpaceOnUse"
-          x={WORLD.x}
-          y={WORLD.y}
-          width={WORLD.width}
-          height={WORLD.height}
+          x={world.x}
+          y={world.y}
+          width={world.width}
+          height={world.height}
           style={{ maskType: 'alpha' }}
         >
           <polygon points={water} fill="white" filter="url(#water-feather)" />
@@ -224,29 +228,36 @@ const BoardScenery = memo(function BoardScenery({
       <g className="terrain-fallback" aria-hidden="true">
         <rect
           className="water-band"
-          x={WORLD.x}
-          y={WORLD.y}
-          width={WORLD.width}
-          height={WORLD.height}
+          x={world.x}
+          y={world.y}
+          width={world.width}
+          height={world.height}
           fill="url(#ocean-material)"
           mask="url(#water-fade-mask)"
         />
-        <polygon
-          points={coast}
-          fill="#52bebf"
-          stroke="#73dcd2"
-          strokeWidth="27"
-          strokeLinejoin="round"
-          filter="url(#ground-edge)"
-        />
-        <polygon
-          points={coast}
-          fill="url(#sand-material)"
-          stroke="#a68d53"
-          strokeWidth="8"
-          strokeLinejoin="round"
-          filter="url(#ground-edge)"
-        />
+        {/* Every island's shallows go down before any island's sand, so no shallows lie over a beach. */}
+        {coast.map((points, i) => (
+          <polygon
+            key={i}
+            points={points}
+            fill="#52bebf"
+            stroke="#73dcd2"
+            strokeWidth="27"
+            strokeLinejoin="round"
+            filter="url(#ground-edge)"
+          />
+        ))}
+        {coast.map((points, i) => (
+          <polygon
+            key={i}
+            points={points}
+            fill="url(#sand-material)"
+            stroke="#a68d53"
+            strokeWidth="8"
+            strokeLinejoin="round"
+            filter="url(#ground-edge)"
+          />
+        ))}
         {board.hexes.map((h) => {
           const n = TERRAIN_INDEX[h.terrain];
           return (
@@ -415,13 +426,15 @@ export const Board = memo(function Board({
   art?: TerrainArt;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
-  const coast = useMemo(() => coastline(board), [board.seed]);
+  const key = boardKey(board);
+  const world = useMemo(() => worldBox(board), [key]);
+  const coast = useMemo(() => coastline(board), [key]);
   const water = useMemo(
     () =>
       waterOutline(board, WATER_FEATHER / 2)
         .map((p) => `${p.x},${p.y}`)
         .join(' '),
-    [board.seed],
+    [key],
   );
   // A board with no room to ask — a preview, a test — falls back to the four
   // the game has always started with, in whatever order it has.
@@ -467,16 +480,16 @@ export const Board = memo(function Board({
   return (
     <div
       className={`island-stage ${gpuReady ? 'gpu-ready' : ''}`}
-      style={{ aspectRatio: `${WORLD.width}/${WORLD.height}` }}
+      style={{ aspectRatio: `${world.width}/${world.height}` }}
     >
       <Terrain board={board} onReady={setGpuReady} art={art} />
       <svg
         className="island"
-        viewBox={`${WORLD.x} ${WORLD.y} ${WORLD.width} ${WORLD.height}`}
+        viewBox={`${world.x} ${world.y} ${world.width} ${world.height}`}
         role="group"
         aria-label="Island board"
       >
-        <BoardScenery board={board} art={art} coast={coast} water={water} />
+        <BoardScenery board={board} art={art} coast={coast} water={water} world={world} />
         {board.hexes.map((h) => {
           const x = h.x * SIZE,
             y = h.y * SIZE;
