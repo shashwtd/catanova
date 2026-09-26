@@ -25,6 +25,7 @@ import {
   MATERIAL_GUTTER,
   MATERIAL_QUADRANTS,
   hexPoints,
+  piratePlacement,
   seaBadge,
   seaOutline,
   waterOutline,
@@ -641,6 +642,8 @@ export const Board = memo(function Board({
     seaBoard = board as Island & OpenSeaBoard;
   const shipsShown = ships ?? openSea?.ships ?? {};
   const pirateHex = pirate ?? (game ? openSea?.pirate : seaBoard.pirateStart);
+  const pirateAt =
+    pirateHex !== undefined && board.hexes[pirateHex] ? piratePlacement(board, pirateHex) : null;
   // A board with no room to ask — a preview, a test — falls back to the four
   // the game has always started with, in whatever order it has.
   const color = (id: string) =>
@@ -811,10 +814,10 @@ export const Board = memo(function Board({
           );
         })}
         <BoardHarbors board={board} sea={sea} />
-        {pirateHex !== undefined && board.hexes[pirateHex] && (
+        {pirateAt && (
           <g
             className="pirate-piece"
-            transform={`translate(${board.hexes[pirateHex].x * SIZE},${board.hexes[pirateHex].y * SIZE + 6})`}
+            transform={`translate(${pirateAt.x},${pirateAt.y})`}
             filter="url(#piece-shadow)"
             role="img"
             aria-label="Pirate"

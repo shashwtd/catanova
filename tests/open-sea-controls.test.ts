@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { dealBoard, isLand } from '../packages/rules/src/board.js';
 import { applyAction, createGame, gameView } from '../packages/rules/src/game.js';
 import type { Game, GameAction, GameView } from '../packages/rules/src/game.js';
 import { CLASSIC, OPEN_SEA } from '../packages/rules/src/rulesets.js';
@@ -33,6 +34,13 @@ import { QuickRules } from '../apps/client/src/QuickRules.js';
 import { CARD_LORE, cardEffect, cardLockReason } from '../apps/client/src/cards.js';
 import { gameStatus } from '../apps/client/src/game-attention.js';
 import { MoveHistory, historyTokens } from '../apps/client/src/MoveHistory.js';
+import {
+  PIRATE_BOUNDS,
+  PORT_BADGE_BOUNDS,
+  piratePlacement,
+  portPlacement,
+  seaBadge,
+} from '../apps/client/src/scene.js';
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
@@ -612,6 +620,32 @@ test('Open Sea’s words: the guide’s section and costs, the cards, the prompt
   assert.equal(actions.length, 4);
   for (const [i, icon] of (['boat', 'boat', SEA_ICONS.pirate, SEA_ICONS.gold] as const).entries())
     assert.ok(actions[i]!.includes(painted(icon)), icon);
+});
+
+test('the pirate stands clear of every harbour badge on its hex, and in the middle of any other', () => {
+  for (const players of [3, 4])
+    for (const seed of [1, 2, 3, 7, 11, 42, 481, 2026]) {
+      const b = dealBoard(seed, 'outer-isles-v1', players);
+      const harboured = new Set(b.ports.flatMap((port) => b.edges[port.edge]!.hexes));
+      for (const hex of b.hexes.filter((h) => !isLand(h))) {
+        const at = piratePlacement(b, hex.id);
+        if (!harboured.has(hex.id)) {
+          assert.deepEqual(at, { x: hex.x * 64, y: hex.y * 64 + 6 });
+          continue;
+        }
+        for (const port of b.ports) {
+          const { markerX, markerY } = seaBadge(portPlacement(b, port.edge));
+          const clear =
+            at.x + PIRATE_BOUNDS.left >= markerX + PORT_BADGE_BOUNDS.x + PORT_BADGE_BOUNDS.width ||
+            at.x + PIRATE_BOUNDS.right <= markerX + PORT_BADGE_BOUNDS.x ||
+            at.y + PIRATE_BOUNDS.top >= markerY + PORT_BADGE_BOUNDS.y + PORT_BADGE_BOUNDS.height ||
+            at.y + PIRATE_BOUNDS.bottom <= markerY + PORT_BADGE_BOUNDS.y;
+          assert.ok(clear, `seed ${seed}, ${players} players: the pirate on hex ${hex.id} covers a badge`);
+        }
+        // It keeps to its own hex: less than half a hex from the middle.
+        assert.ok(Math.hypot(at.x - hex.x * 64, at.y - hex.y * 64) < 32, `hex ${hex.id}`);
+      }
+    }
 });
 
 test('each new component has one stylesheet, loaded last, in the house’s selector shapes', () => {

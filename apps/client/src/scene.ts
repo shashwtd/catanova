@@ -449,3 +449,36 @@ export const SEA_BADGE_DISTANCE = 30;
 export function seaBadge(pose: Pick<ReturnType<typeof portPlacement>, 'x' | 'y' | 'nx' | 'ny'>) {
   return { markerX: pose.x + pose.nx * SEA_BADGE_DISTANCE, markerY: pose.y + pose.ny * SEA_BADGE_DISTANCE };
 }
+/**
+ * The pirate's outline where Board.tsx draws it, a tenth larger than a ship, around the point it stands on: from
+ * its pennant to its hull, with the strokes.
+ */
+export const PIRATE_BOUNDS = { left: -21, top: -26.5, right: 21, bottom: 12 };
+/** How far the pirate keeps from a harbour badge it would otherwise cover. */
+const PIRATE_BADGE_GAP = 2;
+/**
+ * Where the pirate stands on its sea hex: the middle, a little low as the robber stands, unless a harbour's badge
+ * sits there. Off an east- or west-facing harbour the badge reaches into the hex, and the pirate would cover its
+ * rate, so it steps out along that harbour's normal, away from the coast, until it clears the badge, as the robber
+ * stands aside for its hex's number. Only an Open Sea board has a pirate, so Classic never comes here.
+ */
+export function piratePlacement(board: Board, hex: number): ShorePoint {
+  const h = board.hexes[hex]!;
+  let x = h.x * HEX_SIZE,
+    y = h.y * HEX_SIZE + 6;
+  for (const port of board.ports) {
+    if (!board.edges[port.edge]!.hexes.includes(hex)) continue;
+    const pose = portPlacement(board, port.edge),
+      { markerX, markerY } = seaBadge(pose);
+    const covers = () =>
+      x + PIRATE_BOUNDS.left - PIRATE_BADGE_GAP < markerX + PORT_BADGE_BOUNDS.x + PORT_BADGE_BOUNDS.width &&
+      x + PIRATE_BOUNDS.right + PIRATE_BADGE_GAP > markerX + PORT_BADGE_BOUNDS.x &&
+      y + PIRATE_BOUNDS.top - PIRATE_BADGE_GAP < markerY + PORT_BADGE_BOUNDS.y + PORT_BADGE_BOUNDS.height &&
+      y + PIRATE_BOUNDS.bottom + PIRATE_BADGE_GAP > markerY + PORT_BADGE_BOUNDS.y;
+    for (let step = 0; step < HEX_SIZE / 2 && covers(); step++) {
+      x += pose.nx;
+      y += pose.ny;
+    }
+  }
+  return { x, y };
+}
