@@ -1,4 +1,10 @@
-import { CLASSIC, botsPlayIn, findRuleset, numberWord } from '../../../packages/rules/src/rulesets.js';
+import {
+  CLASSIC,
+  TURN_STRUCTURES,
+  botsPlayIn,
+  findRuleset,
+  numberWord,
+} from '../../../packages/rules/src/rulesets.js';
 import {
   Bot,
   BotMark,
@@ -374,6 +380,8 @@ export function Lobby({
     room.players.length < seats ? [...room.players, null] : [...room.players];
   // Only when there is a mode to speak of: a room not in Classic, or a host who could pick another.
   const showMode = rules.id !== CLASSIC.id || (room.modes?.length ?? 0) > 1;
+  // How its turns run, in a mode that lets the host choose: Big Table's Paired turns unless another was picked.
+  const turns = rules.turns ? (room.settings?.turns ?? rules.turns[0]) : undefined;
   // Resolved the same way the board resolves them, so the swatch on a card and
   // the roads on the island are never two different answers.
   const colors = seatHexColors(room.players);
@@ -423,10 +431,18 @@ export function Lobby({
                 type="button"
                 className="lobby-mode"
                 onClick={onConfigure}
-                aria-label={`Game mode: ${rules.name}. Room setup`}
+                aria-label={`Game mode: ${rules.name}${turns ? `, ${TURN_STRUCTURES[turns].name}` : ''}. Room setup`}
               >
                 <GameMode size={18} />
-                <span>{rules.name}</span>
+                <span>
+                  {rules.name}
+                  {turns && (
+                    <>
+                      {' '}
+                      <b>{TURN_STRUCTURES[turns].short}</b>
+                    </>
+                  )}
+                </span>
               </button>
             )}
             <button className="lobby-goal" onClick={onConfigure} aria-label="Points to win. Room setup">

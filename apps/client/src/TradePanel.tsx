@@ -114,12 +114,13 @@ export function BankTrade({ game, me, disabled, onAction }: Props) {
   const [bankReceive, setBankReceive] = useState<Resource | null>(null);
   const player = game.players.find((p) => p.id === me),
     hand = player?.hand ?? emptyHand();
+  // Big Table's Partner trades with the bank and at harbours in their phase, as in a turn's actions.
   const locked =
     disabled ||
     command.pending ||
     !!player?.resigned ||
     game.players[game.active]?.id !== me ||
-    game.phase !== 'actions';
+    (game.phase !== 'actions' && game.phase !== 'partner');
   const give = bankGive ? { ...emptyHand(), [bankGive]: game.legal.rates[bankGive] } : emptyHand(),
     get = bankReceive ? { ...emptyHand(), [bankReceive]: 1 } : emptyHand();
   const [reviewed, setReviewed] = useState('');
@@ -224,7 +225,9 @@ export function TradePanel({
     return () => window.removeEventListener('keydown', escape);
   }, []);
   const command = useTradeAction(disabled, onAction);
-  const [tab, setTab] = useState<'players' | 'bank'>('players');
+  // The Partner may trade only with the bank, so their panel opens there.
+  const partnerPhase = game.phase === 'partner' && game.players[game.active]?.id === me;
+  const [tab, setTab] = useState<'players' | 'bank'>(partnerPhase ? 'bank' : 'players');
   const [give, setGive] = useState<Hand>(emptyHand),
     [want, setWant] = useState<Hand>(emptyHand);
   const [open, setOpen] = useState(false),
@@ -275,6 +278,9 @@ export function TradePanel({
           <BankTrade game={game} me={me} disabled={disabled || command.pending} onAction={onAction} />
         ) : (
           <div role="tabpanel" aria-label="Player trade">
+            {partnerPhase && (
+              <p className="quiet-note trade-lock">No trades with players in the Partner’s phase</p>
+            )}
             {trade ? (
               <section className="live-offer" aria-label="Your current offer">
                 <TradeExchange give={trade.give} get={trade.open ? (chosen?.give ?? null) : trade.want} />

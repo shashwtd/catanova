@@ -4,6 +4,28 @@ export function reconnectSeconds(deadline: number, serverNow: number) {
   return Math.max(0, Math.ceil((deadline - serverNow) / 1000));
 }
 
+const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+/**
+ * What an empty seat's line says, in a mode without stand-ins, in words a tooltip can carry: a card too small
+ * for the line puts it on the disconnected mark instead.
+ */
+export function absenceText({
+  deadline,
+  now,
+  paused,
+  forcedMovesAt,
+}: {
+  deadline?: number;
+  now: number;
+  paused?: boolean;
+  forcedMovesAt: number;
+}): string | undefined {
+  if (paused)
+    return deadline === undefined ? undefined : `Abandoned in ${clock(reconnectSeconds(deadline, now))}`;
+  const until = reconnectSeconds(forcedMovesAt, now);
+  return until > 0 ? `Auto moves in ${clock(until)}` : 'Clock plays forced moves';
+}
+
 /**
  * What an empty chair says.
  *
@@ -42,7 +64,6 @@ export function DisconnectStatus({
       </span>
     );
   if (deadline === undefined) return null;
-  const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const remaining = reconnectSeconds(deadline, now);
   const time = clock(remaining);
   if (!paused && forcedMovesAt === undefined)

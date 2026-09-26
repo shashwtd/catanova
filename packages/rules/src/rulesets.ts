@@ -14,14 +14,18 @@ export type Purchase = keyof typeof COSTS;
  * turn, every other player in order has a short window to build.
  */
 export type TurnStructure = 'paired' | 'betweenTurnsBuild';
-/** Every turn structure there is, with the names players see. */
-export const TURN_STRUCTURES: Readonly<Record<TurnStructure, { name: string; summary: string }>> = {
+/** Every turn structure there is, with the names players see: `short` where space is tight, as on a chip. */
+export const TURN_STRUCTURES: Readonly<
+  Record<TurnStructure, { name: string; short: string; summary: string }>
+> = {
   paired: {
     name: 'Paired turns',
+    short: 'Paired',
     summary: 'After each turn, the Partner gets a full action phase, with no roll and no player trades.',
   },
   betweenTurnsBuild: {
     name: 'Between-turns build',
+    short: 'Build windows',
     summary: 'The older rule: after each turn, everyone else in turn may build and buy, with no trading.',
   },
 };

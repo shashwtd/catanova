@@ -48,8 +48,18 @@ export function cardLockReason(card: Card, game: GameView, me: string): string |
     return null;
   }
   if (card.boughtTurn === game.turn) return 'You can play this on your next turn.';
-  if (game.players[game.active]?.id !== me) return 'You can play this on your turn.';
-  if (game.playedCard) return 'You have already played a development card this turn.';
+  if (game.players[game.active]?.id !== me) {
+    // Big Table: a Partner plays theirs in their own phase, after the Lead's part.
+    const seat = game.players.findIndex((p) => p.id === me);
+    return game.pair?.partner === seat && game.pair.lead === game.active
+      ? 'You can play this in your Partner’s phase.'
+      : 'You can play this on your turn.';
+  }
+  if (game.phase === 'buildWindow') return 'No development card is played in a build window.';
+  if (game.playedCard)
+    return game.phase === 'partner' || game.returnPhase === 'partner'
+      ? 'You have already played a development card this phase.'
+      : 'You have already played a development card this turn.';
   return 'Finish the current action first.';
 }
 export const RESOURCE_DESCRIPTION = {

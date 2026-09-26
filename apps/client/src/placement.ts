@@ -31,9 +31,11 @@ export function placementValid(
   )
     return false;
   const a = draft.action;
-  if (a.kind === 'road' && !['actions', 'setupRoad', 'freeRoads'].includes(game.phase)) return false;
-  if (a.kind === 'settlement' && !['actions', 'setupSettlement'].includes(game.phase)) return false;
-  if (a.kind === 'city' && game.phase !== 'actions') return false;
+  // Building goes on in a turn's actions, and in Big Table's Partner's phase and build windows.
+  const building = ['actions', 'partner', 'buildWindow'].includes(game.phase);
+  if (a.kind === 'road' && !building && !['setupRoad', 'freeRoads'].includes(game.phase)) return false;
+  if (a.kind === 'settlement' && !building && game.phase !== 'setupSettlement') return false;
+  if (a.kind === 'city' && !building) return false;
   return a.kind === 'road'
     ? game.legal.roads.includes(a.edge)
     : a.kind === 'city'

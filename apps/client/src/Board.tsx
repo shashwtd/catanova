@@ -444,7 +444,8 @@ export const Board = memo(function Board({
   const interactive = ownTurn && !disabled;
   const setupSettlement = game?.phase === 'setupSettlement',
     setupRoad = game?.phase === 'setupRoad',
-    actions = game?.phase === 'actions';
+    // Big Table's Partner's phase and build windows build as a turn's actions do.
+    actions = game?.phase === 'actions' || game?.phase === 'partner' || game?.phase === 'buildWindow';
   const robberMode = interactive && game?.phase === 'robber';
   // The server's legal lists already include affordability, supply, and connection rules.
   // A toolbar choice filters the sites; no choice still permits direct placement.

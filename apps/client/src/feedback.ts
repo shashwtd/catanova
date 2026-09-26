@@ -150,9 +150,10 @@ export function publicProduction(
 }
 /** Trade sounds use canonical public evidence, including equal-count trades invisible to observers' hands. */
 function traded(before: GameView, next: GameView, lines: string[]): boolean {
+  // A turn's actions, or Big Table's Partner's phase, where the Partner trades with the bank.
   if (
-    before.phase !== 'actions' ||
-    next.phase !== 'actions' ||
+    (before.phase !== 'actions' && before.phase !== 'partner') ||
+    next.phase !== before.phase ||
     before.turn !== next.turn ||
     before.active !== next.active ||
     before.robber !== next.robber ||
@@ -350,7 +351,11 @@ export function deriveFeedback(
     event.sounds.push('development');
   if (!dice && !event.sites.length && traded(before, g, lines)) event.sounds.push('trade');
   if (resignation && !g.winner) event.sounds.push('warning');
-  if (!resignation && !g.winner && g.turn > before.turn && before.players[before.active]?.id === me)
+  // Passing on: a turn ends, or in Big Table a Lead's part, a Partner's phase or a build window.
+  const passed =
+    g.turn > before.turn ||
+    (g.active !== before.active && ['actions', 'partner', 'buildWindow'].includes(before.phase));
+  if (!resignation && !g.winner && passed && before.players[before.active]?.id === me)
     event.sounds.push('pass');
   if (g.winner && !before.winner) event.sounds.push('win');
   for (const line of lines)

@@ -13,6 +13,7 @@ import { AccountSetup } from './AccountSetup.js';
 import { InviteRoster } from './Lobby.js';
 import type { useAuth } from './auth.js';
 import { roomPath, visibleRoomCode } from './navigation.js';
+import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
 
 type Auth = ReturnType<typeof useAuth>;
 export function EntryScreen({
@@ -84,10 +85,12 @@ export function EntryScreen({
     void auth.signIn(returnPath);
   };
   const returnPath = invite ? roomPath(invite) : '/';
+  // Full at its mode's number of seats: four in Classic, six at Big Table.
+  const seats = (findRuleset(previewRoom?.settings?.mode) ?? CLASSIC).seats.max;
   const blockedInvite =
     entry === 'invite' &&
     !resumableInvite &&
-    (previewRoom?.started || (previewRoom?.players.length ?? 0) >= 4);
+    (previewRoom?.started || (previewRoom?.players.length ?? 0) >= seats);
   return (
     <>
       <div

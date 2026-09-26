@@ -11,9 +11,9 @@
  * panel, which made the host's choices look like personal preferences and made
  * a guest's preferences look like they were changing the game for everyone.
  */
-import { CLASSIC, findRuleset, switchBlock } from '../../../packages/rules/src/rulesets.js';
-import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
-import { useEffect, useId, useState } from 'react';
+import { CLASSIC, TURN_STRUCTURES, findRuleset, switchBlock } from '../../../packages/rules/src/rulesets.js';
+import type { Ruleset, TurnStructure } from '../../../packages/rules/src/rulesets.js';
+import { Fragment, useEffect, useId, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Check, Clock3, Dices, GameMode, Trophy, Volume2, Music, Eye } from './GameIcons.js';
 import type { Preferences } from './preferences.js';
@@ -260,6 +260,54 @@ export function PlayerSettings({
   );
 }
 
+/** The turn structure a mode's settings choose: its first, the default, unless the host picked another. */
+const turnsOf = (settings: RoomSettings, ruleset: Ruleset) =>
+  ruleset.turns ? (settings.turns ?? ruleset.turns[0]) : undefined;
+
+/**
+ * Big Table's turn style: two more option cards under its own, open while it is the mode picked, indented to its
+ * text so they read as belonging to it (docs/GAME-MODES.md, "Matching the existing look").
+ */
+function TurnStyle({
+  options,
+  value,
+  open,
+  onChange,
+}: {
+  options: readonly TurnStructure[];
+  value: TurnStructure | undefined;
+  open: boolean;
+  onChange: (turns: TurnStructure) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="settings-turns t-acc" data-open={open}>
+      <div className="t-acc-panel" inert={!open} aria-hidden={!open}>
+        <div className="t-acc-panel-inner" role="radiogroup" aria-labelledby={id}>
+          <p className="settings-caption" id={id}>
+            Turn style
+          </p>
+          {options.map((structure) => (
+            <label key={structure} className="settings-dice-option" data-selected={value === structure}>
+              <input
+                type="radio"
+                name="turn-style"
+                value={structure}
+                checked={value === structure}
+                onChange={() => onChange(structure)}
+              />
+              <span>
+                <strong>{TURN_STRUCTURES[structure].name}</strong>
+                <small>{TURN_STRUCTURES[structure].summary}</small>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The table's own rules. The host moves them; everyone else reads them, which
  * is why this panel opens for everyone but only fills in its controls for one
@@ -287,7 +335,10 @@ export function RoomConfiguration({
     savedTarget = saved.victoryPoints ?? (findRuleset(roomMode) ?? CLASSIC).victoryPoints.default,
     // A new mode starts from its own default target, which the host can move once the mode is applied.
     switching = mode !== roomMode,
-    target = switching ? rules.victoryPoints.default : (draft.victoryPoints ?? rules.victoryPoints.default);
+    target = switching ? rules.victoryPoints.default : (draft.victoryPoints ?? rules.victoryPoints.default),
+    // How turns run, where the mode lets the host choose: Big Table's Paired turns unless another is picked.
+    turns = turnsOf(draft, rules),
+    savedTurns = turnsOf(saved, findRuleset(roomMode) ?? CLASSIC);
   // The server lists what this host may pick only when that is more than Classic.
   const offered = room?.modes ?? [CLASSIC.id],
     modes = [...new Set([...offered, roomMode])].flatMap((id) => findRuleset(id) ?? []);
@@ -300,7 +351,8 @@ export function RoomConfiguration({
       draft.turnTimerSeconds !== saved.turnTimerSeconds ||
       (draft.diceMode ?? 'classic') !== (saved.diceMode ?? 'classic') ||
       switching ||
-      target !== savedTarget;
+      target !== savedTarget ||
+      turns !== savedTurns;
   useEffect(
     () => setDraft(room?.settings ?? DEFAULT_ROOM_SETTINGS),
     [
@@ -309,6 +361,7 @@ export function RoomConfiguration({
       room?.settings?.diceMode,
       room?.settings?.victoryPoints,
       room?.settings?.mode,
+      room?.settings?.turns,
     ],
   );
   /**
@@ -339,35 +392,46 @@ export function RoomConfiguration({
             {modes.map((option) => {
               const reason = blocked(option);
               return (
-                <label
-                  key={option.id}
-                  className="settings-dice-option"
-                  data-selected={mode === option.id}
-                  {...(reason ? { 'data-disabled': true } : {})}
-                >
-                  <input
-                    type="radio"
-                    name="game-mode"
-                    value={option.id}
-                    checked={mode === option.id}
-                    disabled={!!reason}
-                    onChange={() =>
-                      setDraft({
-                        ...draft,
-                        mode: option.id,
-                        // Back to the room's own mode, its own target; any other mode starts from its default.
-                        victoryPoints: option.id === roomMode ? saved.victoryPoints : undefined,
-                      })
-                    }
-                  />
-                  <span>
-                    <strong>{option.name}</strong>
-                    <small>
-                      {reason ??
-                        (closed && option.id === roomMode ? 'No longer open to this room' : option.summary)}
-                    </small>
-                  </span>
-                </label>
+                <Fragment key={option.id}>
+                  <label
+                    className="settings-dice-option"
+                    data-selected={mode === option.id}
+                    {...(reason ? { 'data-disabled': true } : {})}
+                  >
+                    <input
+                      type="radio"
+                      name="game-mode"
+                      value={option.id}
+                      checked={mode === option.id}
+                      disabled={!!reason}
+                      onChange={() =>
+                        setDraft({
+                          ...draft,
+                          mode: option.id,
+                          // Back to the room's own mode, its own target and turns; any other mode starts from
+                          // its defaults.
+                          victoryPoints: option.id === roomMode ? saved.victoryPoints : undefined,
+                          turns: option.id === roomMode ? saved.turns : undefined,
+                        })
+                      }
+                    />
+                    <span>
+                      <strong>{option.name}</strong>
+                      <small>
+                        {reason ??
+                          (closed && option.id === roomMode ? 'No longer open to this room' : option.summary)}
+                      </small>
+                    </span>
+                  </label>
+                  {option.turns && (
+                    <TurnStyle
+                      options={option.turns}
+                      value={mode === option.id ? turns : undefined}
+                      open={mode === option.id}
+                      onChange={(next) => setDraft({ ...draft, turns: next })}
+                    />
+                  )}
+                </Fragment>
               );
             })}
           </fieldset>
@@ -508,7 +572,10 @@ export function RoomConfiguration({
               setSaving(true);
               setError('');
               try {
-                await save(draft);
+                // The turn structure goes only with a mode that has one, and always then, so that picking the
+                // default again is a change the server sees.
+                const { turns: _turns, ...settings } = draft;
+                await save({ ...settings, ...(turns ? { turns } : {}) });
               } catch (e) {
                 setError(e instanceof Error ? e.message : 'Could not save');
               } finally {

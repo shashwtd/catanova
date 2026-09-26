@@ -141,6 +141,7 @@ import './game-mode.css';
 import './six-seat-rail.css';
 import './six-seat-trade.css';
 import './six-seat-robber.css';
+import './big-table.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];
@@ -387,6 +388,10 @@ function App() {
     feedback.sound.setScene(g ? 'game' : 'menu');
   }, [!!g, feedback.sound]);
   const actionPhase = myTurn && g?.phase === 'actions';
+  // Big Table: the Partner's phase, and a build window between turns, are this player's to act in too.
+  const partnerPhase = myTurn && g?.phase === 'partner',
+    windowPhase = myTurn && g?.phase === 'buildWindow',
+    buildPhase = actionPhase || partnerPhase || windowPhase;
   const networkBusy = status === 'connecting' || status === 'reconnecting';
   const invitationNotice = (
     <RoomInviteNotice
@@ -785,7 +790,7 @@ function App() {
   useEffect(() => {
     setMode(null);
     setRobberHex(null);
-  }, [g?.phase, g?.turn]);
+  }, [g?.phase, g?.turn, g?.active]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), 2200);
@@ -996,17 +1001,28 @@ function App() {
     setName(canonical.name);
     setPanel(null);
   }
+  const endLabel = partnerPhase
+    ? 'End your Partner’s phase'
+    : windowPhase
+      ? 'Close your build window'
+      : actionPhase
+        ? 'Next turn'
+        : 'Roll dice';
   const phaseText = !g
     ? ''
     : room?.spectating || player?.resigned || room?.paused
       ? (gameNotice?.prompt ?? '')
       : ['discard', 'robber'].includes(g.phase)
         ? ''
-        : mode && myTurn && g.phase === 'actions'
+        : mode && buildPhase
           ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
           : g.phase === 'actions'
             ? ''
-            : (gameNotice?.prompt ?? '');
+            : // The Partner and the player in a build window are told what they may do; the rest of the table
+              // only sees their chip on the rail.
+              (g.phase === 'partner' || g.phase === 'buildWindow') && !myTurn
+              ? ''
+              : (gameNotice?.prompt ?? '');
   return (
     <main
       className={`game-world ${g ? 'playing' : room ? 'lobby' : playerHome ? 'player-home' : 'entry-world'}`}
@@ -1319,7 +1335,8 @@ function App() {
                       className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
                       aria-label="Trade"
                       title="Trade"
-                      disabled={disabled || !actionPhase}
+                      // The Partner trades with the bank and at harbours; a build window allows no trade.
+                      disabled={disabled || !(actionPhase || partnerPhase)}
                       onClick={() => {
                         setPanel(panel === 'trade' ? null : 'trade');
                         setMode(null);
@@ -1330,15 +1347,27 @@ function App() {
                     </button>
                   </div>
                   <button
-                    className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
-                    aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
-                    title={actionPhase ? 'Next turn' : 'Roll dice'}
-                    disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
-                    onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
+                    className={`turn-action ${buildPhase ? 'end-turn' : 'roll-turn'}`}
+                    aria-label={endLabel}
+                    title={endLabel}
+                    disabled={
+                      disabled || !myTurn || !['roll', 'actions', 'partner', 'buildWindow'].includes(g.phase)
+                    }
+                    onClick={() =>
+                      void act({
+                        kind: partnerPhase
+                          ? 'endPhase'
+                          : windowPhase
+                            ? 'endWindow'
+                            : actionPhase
+                              ? 'endTurn'
+                              : 'roll',
+                      })
+                    }
                   >
                     <TurnButtonAttention />
-                    {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
-                    {actionPhase && <span>Next</span>}
+                    {buildPhase ? <NextTurn size={36} /> : <Dices size={38} />}
+                    {buildPhase && <span>{partnerPhase ? 'End phase' : windowPhase ? 'Done' : 'Next'}</span>}
                   </button>
                 </>
               }
@@ -1583,6 +1612,7 @@ function App() {
           <QuickRules
             ruleset={findRuleset(g?.ruleset ?? room?.settings?.mode) ?? CLASSIC}
             victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints}
+            turns={g ? g.turns : room?.settings?.turns}
           />
         </Dialog>
       )}

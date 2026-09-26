@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Clock3, Pause } from './GameIcons.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
+import { partnerActing } from '../../../packages/rules/src/game.js';
 export function TurnTimer({
   room,
   me,
@@ -46,6 +47,14 @@ export function TurnTimer({
     }
   }, [remaining, mine, paused, connected, room.roomId, clock?.turn, deadline]);
   if (!clock || !deadline || !room.game || room.game.winner || room.paused) return null;
+  // Big Table's own clocks, for whoever the game is waiting on: the Partner's phase and a build window.
+  const stint = discard
+    ? null
+    : partnerActing(room.game)
+      ? { label: 'Partner', title: mine ? 'Your Partner’s phase: time left' : 'Partner’s phase: time left' }
+      : room.game.phase === 'buildWindow'
+        ? { label: 'Build window', title: mine ? 'Your build window: time left' : 'Build window: time left' }
+        : null;
   return (
     <span
       className={`turn-timer ${remaining <= 10 && !paused ? 'running-low' : ''} ${paused ? 'paused' : ''}`}
@@ -54,14 +63,16 @@ export function TurnTimer({
           ? 'Reconnecting; the server clock continues'
           : paused
             ? 'Turn clock paused while players discard'
-            : mine
-              ? 'Your remaining time'
-              : 'Active player’s remaining time'
+            : stint
+              ? stint.title
+              : mine
+                ? 'Your remaining time'
+                : 'Active player’s remaining time'
       }
     >
       {paused ? <Pause size={13} /> : <Clock3 size={13} />}
       <b>{remaining}s</b>
-      {paused && <small>Discards</small>}
+      {paused ? <small>Discards</small> : stint && <small>{stint.label}</small>}
     </span>
   );
 }

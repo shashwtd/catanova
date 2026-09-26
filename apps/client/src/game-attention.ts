@@ -68,6 +68,17 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
         icon = 'robber';
         favicon = mine ? 'robber' : null;
         break;
+      // Big Table. The rest of the table sees these only in the title: on the board, the chip on the rail.
+      case 'partner':
+        prompt = mine
+          ? 'Your Partner’s phase: build, buy, trade with the bank, play one card'
+          : `${name} is taking the Partner’s phase`;
+        icon = 'trade';
+        break;
+      case 'buildWindow':
+        prompt = mine ? 'Build window: build or buy, no trading' : `${name} has a build window`;
+        icon = 'settlement';
+        break;
     }
   if (
     !game.winner &&
@@ -89,12 +100,15 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
   return { prompt, icon, favicon, title: `${prompt} — Catanova` };
 }
 
-/** The move the game is waiting on this player for, other than the open-ended actions of their turn. */
+/**
+ * The move the game is waiting on this player for, other than the open-ended actions of their turn. A build
+ * window comes after every turn and asks nothing, so it gets no cue; the Partner's phase is a turn of its own.
+ */
 export function requiredAction(game: GameView, me?: string) {
   if (!me || game.winner || game.phase === 'finished' || game.players.find((p) => p.id === me)?.resigned)
     return null;
   const owed = owedBy(game, me)?.kind;
-  return owed && owed !== 'actions' ? owed : null;
+  return owed && owed !== 'actions' && owed !== 'buildWindow' ? owed : null;
 }
 
 /** Do not repeat a cue for presence updates, re-syncs, or a reconnect to the same obligation. */
@@ -127,6 +141,8 @@ export class AttentionTracker {
     this.action = action;
     // The house's construction sound already leads straight into its adjacent road.
     if (action === 'setupRoad' && previousAction === 'setupSettlement') return null;
-    return action === 'roll' || action === 'setupSettlement' || action === 'setupRoad' ? 'turn' : 'warning';
+    return action === 'roll' || action === 'partner' || action === 'setupSettlement' || action === 'setupRoad'
+      ? 'turn'
+      : 'warning';
   }
 }

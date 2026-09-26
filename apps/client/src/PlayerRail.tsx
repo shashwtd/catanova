@@ -9,7 +9,7 @@ import { findRuleset } from '../../../packages/rules/src/rulesets.js';
 import { Avatar } from './Profile.js';
 import { seatColorMap } from './player-colors.js';
 import { playerTurnActivity } from './turn-activity.js';
-import { DisconnectStatus } from './DisconnectStatus.js';
+import { DisconnectStatus, absenceText } from './DisconnectStatus.js';
 import { playerStandings } from './player-ranking.js';
 import { CardTooltip } from './CardTooltip.js';
 import type { FriendStatus } from './social-presence.js';
@@ -219,15 +219,27 @@ export function PlayerRail({
     <aside className="player-rail" aria-label="Players" ref={rail} data-seats={seats}>
       {ranked.map(({ player: p, seatIndex: i, points, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
-          active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
+          acting = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
           activity = playerTurnActivity(game, p.id),
+          // In a paired turn both marker holders are on turn; only the one acting has the clock.
+          active = acting || !!activity?.marker,
           road = game.longestRoad === p.id,
           army = game.largestArmy === p.id;
+        // Where no stand-in covers a seat, its small card has no room for the absence line: the mark says it.
+        const absence =
+          !standIns && !seat?.connected && seat?.disconnectedAt !== undefined && game.phase !== 'finished'
+            ? absenceText({
+                deadline: seat.resignAt,
+                now: serverNow,
+                paused: room.paused,
+                forcedMovesAt: seat.disconnectedAt + ABSENCE_AFTER_MS,
+              })
+            : undefined;
         return (
           <article
             key={p.id}
             data-player-profile={p.id}
-            aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${active ? ', current turn' : ''}`}
+            aria-label={`${p.name}${p.id === me ? ', your profile' : ''}${acting ? ', current turn' : ''}${activity?.marker ? `, ${activity.marker}` : ''}`}
             className={`player-profile ${active ? 'active' : ''} ${p.id === me ? 'self' : ''} ${!seat?.connected ? 'offline' : ''} ${p.resigned ? 'has-resigned' : ''}`}
             style={{ '--player-color': colors[p.id] } as CSSProperties}
             data-friend-reveal={revealed === p.id || undefined}
@@ -245,7 +257,12 @@ export function PlayerRail({
                 </span>
               )}
               {!seat?.connected && (
-                <span className="offline-mark" role="img" title="Disconnected" aria-label="Disconnected">
+                <span
+                  className="offline-mark"
+                  role="img"
+                  title={absence ? `Disconnected · ${absence}` : 'Disconnected'}
+                  aria-label="Disconnected"
+                >
                   <WifiOff size={38} />
                 </span>
               )}
@@ -254,10 +271,11 @@ export function PlayerRail({
                   className="profile-turn"
                   data-turn-activity={activity.icon}
                   title={activity.label}
-                  aria-label={`${active ? 'Current turn: ' : ''}${activity.label}`}
+                  aria-label={`${acting ? 'Current turn: ' : ''}${activity.label}`}
                 >
                   <GameIcon name={activity.icon} size={20} />
-                  {active && timer}
+                  {activity.marker && <span className="profile-turn-label">{activity.marker}</span>}
+                  {acting && timer}
                 </span>
               )}
               <DisconnectStatus
