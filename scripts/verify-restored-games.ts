@@ -41,7 +41,14 @@ import { RESOURCES } from '../packages/rules/src/index.js';
 import { isLand } from '../packages/rules/src/board.js';
 import { CLASSIC, findRuleset } from '../packages/rules/src/rulesets.js';
 import type { Ruleset } from '../packages/rules/src/rulesets.js';
-import { edgeKind, takesRoad, takesShip, vertexIsland } from '../packages/rules/src/sea.js';
+import {
+  MAIN_ISLAND,
+  edgeKind,
+  isLandIntersection,
+  takesRoad,
+  takesShip,
+  vertexIsland,
+} from '../packages/rules/src/sea.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 
@@ -300,9 +307,10 @@ function turnStructureProblems(game: Game, offered: readonly string[] | undefine
 
 /**
  * Open Sea's own invariants (docs/RULEBOOK-OPEN-SEA.md): every ship a seated player's, on an edge that takes a ship
- * and holds no road, no more than the supply; the pirate on a sea hex and the robber on land; gold picks owed
- * exactly while the game waits for them, one entry per playing seat; and an island bonus only where its player has
- * built.
+ * and holds no road, no more than the supply, and the ship records of section 8.7 only for ships on the board; the
+ * pirate on a sea hex and the robber on land; buildings on land, only on the main island during setup, and on a
+ * small island only with its bonus earned; gold picks owed exactly while the game waits for them, in turn order
+ * from the player on turn, one entry per playing seat, and never from an empty bank.
  */
 function seaProblems(game: Game, rules: Ruleset, ids: Set<string>): string[] {
   const problems: string[] = [];
@@ -324,6 +332,27 @@ function seaProblems(game: Game, rules: Ruleset, ids: Set<string>): string[] {
   for (const count of fleet.values())
     if (count > rules.supply.pieces.ships!)
       problems.push(`a player has ${count} ships; the supply is ${rules.supply.pieces.ships}`);
+  // A locked ship never moves, and a closed end is dropped with its ship's move, so each record has its ship.
+  for (const edge of game.lockedShips ?? [])
+    if (!ships[edge]) problems.push(`a ship is locked on edge ${edge}, which holds no ship`);
+  for (const [key, ends] of Object.entries(game.closedShipEnds ?? {})) {
+    const edge = board.edges[Number(key)],
+      owner = ships[Number(key)];
+    if (!edge || !owner) {
+      problems.push(`a closed ship end is recorded on edge ${key}, which holds no ship`);
+      continue;
+    }
+    for (const v of ends)
+      if ((v !== edge.a && v !== edge.b) || !game.buildings[v] || game.buildings[v]!.player === owner)
+        problems.push(
+          `the ship on edge ${key} has an end recorded as closed at corner ${v}, where nobody else built`,
+        );
+  }
+  // Only the player on turn builds, so every ship built this turn is theirs; the next turn starts the list afresh.
+  const onTurn = game.players[game.active]?.id;
+  for (const edge of game.shipsBuiltThisTurn ?? [])
+    if (!ships[edge] || ships[edge] !== onTurn)
+      problems.push(`the ship built this turn on edge ${edge} is not a ship of the player on turn`);
   for (const key of Object.keys(game.roads))
     if (board.edges[Number(key)] && !takesRoad(edgeKind(board, Number(key))))
       problems.push(`the road on edge ${key} is on an edge no road takes`);
@@ -332,6 +361,32 @@ function seaProblems(game: Game, rules: Ruleset, ids: Set<string>): string[] {
     problems.push(`the pirate is not on a sea hex (${String(pirate)})`);
   if (board.hexes[game.robber] && !isLand(board.hexes[game.robber]!))
     problems.push(`the robber stands on the sea (tile ${game.robber})`);
+  // Buildings: on land, only on the main island in setup, and never on a small island without its bonus, which a
+  // player's first settlement there always earns.
+  for (const [key, building] of Object.entries(game.buildings)) {
+    const vertex = Number(key);
+    if (!board.vertices[vertex]) continue;
+    const island = vertexIsland(board, vertex);
+    if (!isLandIntersection(board, vertex)) problems.push(`the building at corner ${key} stands at sea`);
+    else if (game.turn === 0 && island !== MAIN_ISLAND)
+      problems.push(`the starting settlement at corner ${key} is off the main island`);
+    else if (island && island !== MAIN_ISLAND && !game.islandBonuses?.[building.player]?.includes(island))
+      problems.push(
+        `the building at corner ${key} is on island ${island}, whose bonus its player never earned`,
+      );
+  }
+  for (const [player, islands] of Object.entries(game.islandBonuses ?? {})) {
+    if (new Set(islands).size !== islands.length) problems.push('an island bonus is recorded twice');
+    for (const island of islands)
+      if (
+        island === MAIN_ISLAND ||
+        !Object.entries(game.buildings).some(
+          ([vertex, building]) =>
+            building.player === player && vertexIsland(board, Number(vertex)) === island,
+        )
+      )
+        problems.push(`an island bonus for ${island} has no building of its player there`);
+  }
   const owed = game.goldOwed ?? [];
   if ((game.phase === 'goldPick') !== owed.length > 0)
     problems.push(`gold picks are ${owed.length ? '' : 'not '}owed during ${game.phase}`);
@@ -343,16 +398,16 @@ function seaProblems(game: Game, rules: Ruleset, ids: Set<string>): string[] {
   }
   if (new Set(owed.map((entry) => entry.player)).size !== owed.length)
     problems.push('a player is owed gold picks twice');
-  for (const [player, islands] of Object.entries(game.islandBonuses ?? {}))
-    for (const island of islands)
-      if (
-        island === 'main' ||
-        !Object.entries(game.buildings).some(
-          ([vertex, building]) =>
-            building.player === player && vertexIsland(board, Number(vertex)) === island,
-        )
-      )
-        problems.push(`an island bonus for ${island} has no building of its player there`);
+  // In turn order, starting with the player on turn: each seat further round the table than the one before.
+  const seats = game.players.length;
+  const round = owed.map(
+    (entry) => (game.players.findIndex((p) => p.id === entry.player) - game.active + seats) % seats,
+  );
+  if (round.some((place, i) => i > 0 && place <= round[i - 1]!))
+    problems.push('gold picks are owed out of turn order');
+  // The picks lapse once the bank is empty, so none is ever owed from an empty bank.
+  if (owed.length && RESOURCES.every((r) => !game.bank[r]))
+    problems.push('gold picks are owed from an empty bank');
   return problems;
 }
 

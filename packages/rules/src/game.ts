@@ -592,6 +592,9 @@ function checkWin(g: Game, eligible: (id: string) => boolean = () => true) {
   g.winner = winner.id;
   g.phase = 'finished';
   g.trade = null;
+  // Open Sea: a win can come while gold is being picked, when a resignation hands over an award; a finished
+  // game owes nobody a pick.
+  if (g.goldOwed) g.goldOwed = [];
   const partner = g.pair?.partner === g.players.indexOf(winner);
   log(g, `${winner.name} wins${partner ? ' as Partner' : ''} with ${score(g, winner)} points!`);
 }
@@ -882,10 +885,13 @@ export function resignPlayers(
       g.discards = {};
       g.freeRoads = 0;
       g.setupVertex = null;
-      // One player cannot pair up or have a window: they only wait here to come back and win.
+      // One player cannot pair up or have a window: they only wait here to come back and win. In Open Sea they
+      // start afresh, and no ship built or moved in the last turn is theirs.
       delete g.pair;
       delete g.windows;
       if (g.goldOwed) g.goldOwed = [];
+      if (g.shipsBuiltThisTurn) g.shipsBuiltThisTurn = [];
+      if (g.shipMovedThisTurn) g.shipMovedThisTurn = false;
       return g;
     }
     g.winner = remaining[0]!.id;
@@ -1170,11 +1176,11 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     // Open Sea's Road Building places ships too (section 13.2), and a free ship counts as built this turn.
     requireRule(sea && canPlaceShip(g, p.id, a.edge, 'roadBuilding'), 'Choose a legal edge for the ship');
     Object.assign(g, placeShip(g, p.id, a.edge, 'roadBuilding'));
+    log(g, SEA_LOG.freeShip(p.name, a.edge));
     g.freeRoads--;
     finishFreeRoads(g);
     updateAwards(g);
     checkWin(g);
-    log(g, SEA_LOG.freeShip(p.name, a.edge));
     return g;
   }
   if (a.kind === 'road' && g.phase === 'freeRoads') {
@@ -1185,11 +1191,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       'Choose a legal road site',
     );
     g.roads[a.edge] = p.id;
+    // The piece is logged before any award or win it brings, as a bought one is.
+    log(g, `${p.name} built a free road on edge ${a.edge + 1}.`);
     g.freeRoads--;
     finishFreeRoads(g);
     updateAwards(g);
     checkWin(g);
-    log(g, `${p.name} built a free road on edge ${a.edge + 1}.`);
     return g;
   }
   if (a.kind === 'endPhase') {
@@ -1637,6 +1644,8 @@ function pickGold(g: Game, player: string, picks: Hand) {
   requireRule(g.phase === 'goldPick', 'Nobody is picking from a gold field now');
   const issue = goldPickIssue(g, player, picks);
   requireRule(!issue, issue ?? '');
+  // A pick is at least one card: the queue lapses once the bank is empty (9.2), so nobody is ever owed none.
+  requireRule(total(picks) > 0, 'Choose at least one resource');
   const name = g.players.find((other) => other.id === player)!.name,
     waiting = g.goldOwed!.length - 1;
   Object.assign(g, applyGoldPick(g, player, picks));

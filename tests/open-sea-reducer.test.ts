@@ -46,7 +46,19 @@ import { timeoutAction, timeoutDescription } from '../packages/rules/src/timeout
 import { requiredAction } from '../apps/client/src/game-attention.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
 import { outerIslesThree, sketch } from './sea-boards.js';
-import { SEATS, accountedFor, dice, giveCards, hand, newLines, seaGame } from './open-sea-game.js';
+import {
+  SEATS,
+  accountedFor,
+  afterSetup,
+  dealCards,
+  dice,
+  giveCards,
+  hand,
+  newLines,
+  rigGold,
+  seaGame,
+} from './open-sea-game.js';
+import { gameInvariantProblems } from '../scripts/verify-restored-games.js';
 
 const rule = (message: RegExp | string) => (error: unknown) =>
   error instanceof RuleError &&
@@ -1121,4 +1133,176 @@ test('the new moves are parsed like the others, and a Classic game refuses each 
     rule('Nobody is picking from a gold field now'),
   );
   assert.deepEqual(owedMoves(classic), [{ player: 'blue', kind: 'actions' }]);
+});
+
+// Guards the first review found no test for, each by its section, and what a resignation or a win must end.
+
+test('§9.2 and §12.3 a resignation during gold picks that hands the player on turn the win ends the picks too', () => {
+  // Blue, on turn, has two cities and four hidden Victory Point cards: 8 of a target of 10. Blue and Orange have
+  // played three Knights each, and Orange holds Largest Army on the tie. Red is owed a pick from a gold field.
+  const g = afterSetup(4, 11, { victoryPoints: 10 });
+  for (const [v, building] of Object.entries(g.buildings))
+    if (building.player === 'blue') g.buildings[Number(v)] = { player: 'blue', kind: 'city' };
+  dealCards(g, 'blue', 'victoryPoint', 4);
+  dealCards(g, 'blue', 'knight', 3, true);
+  dealCards(g, 'orange', 'knight', 3, true);
+  g.largestArmy = 'orange';
+  const { random } = rigGold(g, ['red']);
+  assert.deepEqual(gameInvariantProblems(g), []);
+  assert.equal(score(g, g.players[0]!), 8);
+  const rolled = applyAction(g, 'blue', { kind: 'roll' }, random);
+  assert.deepEqual([rolled.phase, rolled.goldOwed], ['goldPick', [{ player: 'red', picks: 1 }]]);
+  // Orange leaves while Red picks: Largest Army passes to Blue, who has 10 on their own turn and wins at once.
+  const left = resignPlayers(rolled, ['orange'], { reason: 'leave' });
+  assert.deepEqual([left.phase, left.winner, left.largestArmy], ['finished', 'blue', 'blue']);
+  assert.deepEqual(newLines(rolled, left).slice(-2), [
+    'Blue claimed Largest Army (+2 points).',
+    'Blue wins with 10 points!',
+  ]);
+  // Nobody picks in a finished game, and the restore verifier finds nothing wrong with it.
+  assert.deepEqual(left.goldOwed, []);
+  assert.deepEqual(owedMoves(left), []);
+  assert.deepEqual(gameInvariantProblems(left), []);
+  assert.throws(
+    () => applyAction(left, 'red', { kind: 'goldPick', resources: hand({ ore: 1 }) }, () => 0.5),
+    rule('The game has ended'),
+  );
+});
+
+test('§9.2 the last player owed gold resigning ends the picks, and the turn goes on or passes', () => {
+  const layout = { players: 4, numbers: { [GOLD_NORTH]: 5 }, phase: 'roll' as const };
+  // Red, not on turn, is the only one owed: once Red leaves, Blue's action phase begins.
+  const red = applyAction(
+    seaGame(sea, { ...layout, settlements: { red: [GOLD_N!] } }),
+    'blue',
+    { kind: 'roll' },
+    dice(2, 3),
+  );
+  assert.deepEqual(red.goldOwed, [{ player: 'red', picks: 1 }]);
+  const redLeft = resignPlayers(red, ['red'], { reason: 'leave' });
+  assert.deepEqual([redLeft.phase, redLeft.goldOwed], ['actions', []]);
+  assert.deepEqual(owedMoves(redLeft), [{ player: 'blue', kind: 'actions' }]);
+  // Blue, on turn, is the only one owed: once Blue leaves, the turn passes to Red.
+  const blue = applyAction(
+    seaGame(sea, { ...layout, settlements: { blue: [GOLD_N!] } }),
+    'blue',
+    { kind: 'roll' },
+    dice(2, 3),
+  );
+  assert.deepEqual(blue.goldOwed, [{ player: 'blue', picks: 1 }]);
+  const blueLeft = resignPlayers(blue, ['blue'], { reason: 'leave' });
+  assert.deepEqual([blueLeft.phase, blueLeft.active, blueLeft.turn, blueLeft.goldOwed], ['roll', 1, 2, []]);
+  assert.deepEqual(owedMoves(blueLeft), [{ player: 'red', kind: 'roll' }]);
+});
+
+test('§9.2 a pick is never empty, even in a state that owes one from an empty bank', () => {
+  const g = afterSetup(3, 41);
+  Object.assign(g, { phase: 'goldPick', goldOwed: [{ player: 'blue', picks: 1 }] });
+  for (const r of RESOURCES) {
+    g.players[1]!.hand[r] += g.bank[r];
+    g.bank[r] = 0;
+  }
+  assert.throws(
+    () => applyAction(g, 'blue', { kind: 'goldPick', resources: hand() }, () => 0.5),
+    rule('Choose at least one resource'),
+  );
+});
+
+test('§10.2, §10.3 and §10.5 the pirate moves only after a seven or a Knight', () => {
+  for (const phase of ['actions', 'roll'] as const) {
+    const g = seaGame(sea, { phase, ships: { red: [STRAIT] }, hands: { red: { wood: 1 } } });
+    assert.throws(
+      () => applyAction(g, 'blue', { kind: 'pirate', hex: STRAIT_HEX, victim: 'red' }, () => 0.5),
+      rule('Move the pirate only after a seven or a Knight'),
+      phase,
+    );
+  }
+});
+
+test('§5.4 a second starting ship must touch the new settlement, not the first one', () => {
+  // Blue's first settlement is on the north coast, the second at the west end of the island.
+  const west = 52;
+  const g = seaGame(sea, { phase: 'setupRoad', settlements: { blue: [NORTH_COAST, west] } });
+  Object.assign(g, { turn: 0, setupIndex: 5, setupVertex: west, active: 0 });
+  const legal = gameView(g, 'blue').legal;
+  assert.ok(!legal.ships!.includes(STRAIT), 'the strait is by the first settlement');
+  assert.ok(legal.ships!.every((e) => [board.edges[e]!.a, board.edges[e]!.b].includes(west)));
+  assert.throws(
+    () => applyAction(g, 'blue', { kind: 'ship', edge: STRAIT }, () => 0.5),
+    rule('Place a ship touching your new settlement'),
+  );
+  const placed = applyAction(g, 'blue', { kind: 'ship', edge: legal.ships![0]! }, () => 0.5);
+  assert.equal(placed.ships![legal.ships![0]!], 'blue');
+});
+
+test('§13.2 a free ship that makes the longest route claims it at once, and a win with it; the log says so in order', () => {
+  // Blue's cities on the north coast and at the west end, and four ships from the first, across the strait and
+  // round the north isle's west end.
+  const [west] = south(LANDING, 40);
+  const out = board.vertices[40]!.edges.find((e) => edgeKind(board, e) === 'sea')!;
+  const tip = other(out, 40);
+  const onward = board.vertices[tip]!.edges.find((e) => e !== out && takesShip(edgeKind(board, e)))!;
+  const layout = { cities: { blue: [NORTH_COAST, 52] }, ships: { blue: [STRAIT, west!, out, onward] } };
+  const table = (target: number, cards: number) => {
+    const g = seaGame(sea, layout);
+    g.victoryPoints = target;
+    dealCards(g, 'blue', 'roadBuilding', 1);
+    dealCards(g, 'blue', 'victoryPoint', cards);
+    return applyAction(g, 'blue', { kind: 'playCard', cardId: g.players[0]!.cards[0]!.id }, () => 0.5);
+  };
+  const end = other(onward, tip);
+  // With 4 points and a long way to go: the first free ship claims Longest Route before the second is placed.
+  const played = table(14, 0);
+  assert.equal(longestRoute(played, 'blue').length, 4);
+  const ship = gameView(played, 'blue').legal.ships!.find((e) =>
+    [board.edges[e]!.a, board.edges[e]!.b].includes(end),
+  )!;
+  const claimed = applyAction(played, 'blue', { kind: 'ship', edge: ship }, () => 0.5);
+  assert.deepEqual([claimed.phase, claimed.freeRoads, claimed.longestRoad], ['freeRoads', 1, 'blue']);
+  // With 8 of 10, the same ship wins before the second piece; the ship is logged first, as a bought one is.
+  const winning = table(10, 4);
+  const won = applyAction(winning, 'blue', { kind: 'ship', edge: ship }, () => 0.5);
+  assert.deepEqual([won.phase, won.winner], ['finished', 'blue']);
+  assert.deepEqual(newLines(winning, won), [
+    `Blue built a free ship on edge ${ship + 1}.`,
+    'Blue claimed Longest Route (+2 points).',
+    'Blue wins with 10 points!',
+  ]);
+});
+
+test('§13.2 Road Building ends as soon as no road or ship can go anywhere', () => {
+  // Red's roads hold Blue's coastal edges and Red's ships the north isle's coast beyond the strait, so Blue has
+  // one place for a piece: a ship across the strait. After it, the card ends with one piece unplaced.
+  const coastal = board.vertices[NORTH_COAST]!.edges.filter((e) => edgeKind(board, e) === 'coastal');
+  const beyond = board.vertices[LANDING]!.edges.filter((e) => e !== STRAIT);
+  const g = seaGame(sea, {
+    settlements: { blue: [NORTH_COAST] },
+    roads: { red: coastal },
+    ships: { red: beyond },
+  });
+  dealCards(g, 'blue', 'roadBuilding', 1);
+  const played = applyAction(g, 'blue', { kind: 'playCard', cardId: g.players[0]!.cards[0]!.id }, () => 0.5);
+  assert.deepEqual(gameView(played, 'blue').legal.roads, []);
+  assert.deepEqual(gameView(played, 'blue').legal.ships, [STRAIT]);
+  assert.equal(played.freeRoads, 2);
+  const placed = applyAction(played, 'blue', { kind: 'ship', edge: STRAIT }, () => 0.5);
+  assert.deepEqual([placed.phase, placed.freeRoads], ['actions', 0]);
+  assert.deepEqual(owedMoves(placed), [{ player: 'blue', kind: 'actions' }]);
+});
+
+test('§15.6 the last player left, offline, starts a turn with no ship built or moved in it', () => {
+  const g = afterSetup(3, 1);
+  Object.assign(g, { phase: 'actions', dice: [2, 3] });
+  giveCards(g, 'blue', { wood: 1, sheep: 1 });
+  const edge = gameView(g, 'blue').legal.ships![0]!;
+  const built = applyAction(g, 'blue', { kind: 'ship', edge }, () => 0.5);
+  assert.deepEqual(built.shipsBuiltThisTurn, [edge]);
+  // Blue and Green leave while Red, the only one left, is offline: the game waits for Red's return.
+  const alone = resignPlayers(built, ['blue', 'green'], { reason: 'leave', winnerEligibleIds: [] });
+  assert.deepEqual(
+    [alone.phase, alone.players[alone.active]!.id, alone.shipsBuiltThisTurn, alone.shipMovedThisTurn],
+    ['roll', 'red', [], false],
+  );
+  assert.equal(alone.ships![edge], 'blue', 'the ship stays on the board');
+  assert.deepEqual(gameInvariantProblems(alone), []);
 });
