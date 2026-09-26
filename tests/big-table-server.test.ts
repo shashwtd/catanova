@@ -253,6 +253,38 @@ test('§9.4: without a turn timer the Partner gets a 45-second clock only once a
   }
 });
 
+test('§9.4 and §9.5: after a pause an absent Partner’s clock starts again in full, whoever is first back', () => {
+  for (const partnerFirst of [true, false]) {
+    const room = bigTableRoom({ timer: null });
+    try {
+      throughSetup(room);
+      leadEnds(room);
+      const partner = room.seatOf(activePlayer(room.game()).id);
+      room.store.setConnected(partner, false);
+      assert.equal(room.store.clock(room.roomId)!.deadlineAt, room.clock.now + 45_000);
+      // Ten seconds in, the rest of the table goes too: the room pauses with the clock under way.
+      room.clock.now += 10_000;
+      for (const seat of room.seats) if (seat.id !== partner.id) room.store.setConnected(seat, false);
+      room.clock.now += 20_000;
+      const back = partnerFirst ? partner : room.seats.find((seat) => seat.id !== partner.id)!;
+      room.store.setConnected(back, true);
+      const clock = room.store.clock(room.roomId);
+      assert.equal(
+        clock?.playerId,
+        partner.id,
+        partnerFirst ? 'the Partner is back first' : 'another is back',
+      );
+      assert.equal(clock.startedAt, room.clock.now);
+      assert.equal(clock.deadlineAt, room.clock.now + 45_000, 'with its full time');
+      room.clock.now += 45_000;
+      room.store.expireRoom(room.roomId);
+      assert.equal(room.game().turn, 2, 'and it ends the phase');
+    } finally {
+      room.store.close();
+    }
+  }
+});
+
 test('§9.2 and §9.3: every build window has 20 seconds, with or without a turn timer, and one that runs out ends', () => {
   for (const timer of [null, 140] as const) {
     const room = bigTableRoom({ turns: 'betweenTurnsBuild', timer });

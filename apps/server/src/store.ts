@@ -1629,9 +1629,17 @@ export class Store {
       }
     this.writePresence(roomId, holdFromPause(state), game);
     if (resumed) {
-      // Nobody owes an immediate automatic move for time when nobody could see the game.
+      // Nobody owes an immediate automatic move for time when nobody could see the game, so the clock under way
+      // starts again with its full time. An absent Partner's clock is one of them even when the Partner is the
+      // one back: once started it runs to the end of the phase (docs/RULEBOOK-BIG-TABLE.md, 9.4 and 9.5).
+      const saved = this.clock(roomId);
+      const partnerClock =
+        !!saved &&
+        partnerActing(game) &&
+        saved.turn === game.turn &&
+        saved.playerId === activePlayer(game).id;
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
-      this.updateClock(roomId, game, connected);
+      this.updateClock(roomId, game, connected, partnerClock);
     } else if (!paused && partnerActing(game) && !connected.has(activePlayer(game).id) && !this.clock(roomId))
       // A room without a turn timer gives the Partner's phase a clock only once the Partner is away, and it then
       // runs to the end of the phase even if they come back.
@@ -1858,7 +1866,8 @@ export class Store {
       { state: string } | undefined;
     return row ? (JSON.parse(row.state) as TurnClock) : undefined;
   }
-  private updateClock(roomId: string, next: Game, connected = this.connectedSeats) {
+  /** `partnerClock`: a Partner's clock was already running in this phase, so it runs on whoever is here. */
+  private updateClock(roomId: string, next: Game, connected = this.connectedSeats, partnerClock = false) {
     if (next.turn === 0 || next.phase === 'finished') {
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
       return;
@@ -1867,7 +1876,11 @@ export class Store {
     const playerId = next.players[next.active]!.id;
     // A turn or a Lead's part runs on the room's timer; Big Table's Partner's phase and build windows have
     // clocks of their own, which may run in a room without one (docs/TURN_CLOCK.md, "New clocks").
-    const seconds = clockSeconds(next, this.settings(roomId).turnTimerSeconds, !connected.has(playerId));
+    const seconds = clockSeconds(
+      next,
+      this.settings(roomId).turnTimerSeconds,
+      partnerClock || !connected.has(playerId),
+    );
     let clock = this.clock(roomId);
     if (!clock || clock.turn !== next.turn || clock.playerId !== playerId) {
       if (seconds === null) {
