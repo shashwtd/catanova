@@ -62,8 +62,9 @@
     height: 20px;
   }
   /* An absent player's portrait carries the mark alone, whose tooltip names
-     it, rather than a label with no room under it. */
-  :where(.playing .player-rail[data-seats] .profile-portrait:has(> .offline-mark)) > .profile-absence {
+     it, rather than a label with no room under it. "Resigned" stays. */
+  :where(.playing .player-rail[data-seats] .profile-portrait:has(> .offline-mark))
+    > .profile-absence:where(:not(.resigned-label)) {
     display: none;
   }
   /* Shown only while the card is hovered, focused or tapped, as before, and
@@ -134,17 +135,22 @@
 
 /* --- a phone on its side: one tight column ------------------------------- */
 
-/* Six cards end at least 8px above the hand dock, whose top is its measured
+/* The cards end at least 8px above the hand dock, whose top is its measured
    height and its 14px margin up from the bottom. The rail starts 5px down and
-   pads 6px, and a card is its portrait and 6px of padding. The portrait is
-   38px wherever that fits, as on an 812 × 375 phone. */
+   pads 6px, the gaps are 3px, and a card is its portrait and 6px of padding.
+   The portrait is 38px where that fits and a little less on a shorter phone:
+   37.8px for six on an 812 × 375 one. */
 @media (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
   .playing .player-rail:where([data-seats]) {
     gap: 3px;
   }
   .playing :where(.player-rail[data-seats]) .player-profile,
   .playing :where(.player-rail[data-seats]) .player-profile.active {
-    --portrait-size: 38px;
+    --rail-room: calc(
+      100dvh - max(14px, env(safe-area-inset-bottom)) - var(--dock-height, 64px) - 8px -
+        var(--mobile-safe-top, 0px) - 11px
+    );
+    --portrait-size: min(38px, calc((var(--rail-room) - 4 * 3px) / 5 - 6px));
   }
   .playing :where(.player-rail[data-seats]) .player-profile .profile-portrait .offline-mark .game-icon {
     width: 24px;
@@ -152,15 +158,6 @@
   }
   .playing :where(.player-rail[data-seats='6']) .player-profile,
   .playing :where(.player-rail[data-seats='6']) .player-profile.active {
-    --portrait-size: min(
-      38px,
-      calc(
-        (
-            100dvh - max(14px, env(safe-area-inset-bottom)) - var(--dock-height, 64px) - 8px -
-              var(--mobile-safe-top, 0px) - 11px - 5 * 3px
-          ) /
-          6 - 6px
-      )
-    );
+    --portrait-size: min(38px, calc((var(--rail-room) - 5 * 3px) / 6 - 6px));
   }
 }
