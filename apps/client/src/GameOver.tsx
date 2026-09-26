@@ -8,6 +8,7 @@ import { GameIcon } from './GameIcons.js';
 import { finalStandings, pointBreakdown } from './player-ranking.js';
 import { playerHexColor } from './player-colors.js';
 import type { CSSProperties } from 'react';
+import { CLASSIC, TURN_STRUCTURES, findRuleset } from '../../../packages/rules/src/rulesets.js';
 
 /**
  * Who took an award, and on what.
@@ -22,6 +23,14 @@ function award(game: ResultGame, kind: 'longestRoad' | 'largestArmy') {
   return kind === 'longestRoad'
     ? `${holder.name} · ${holder.roadLength} roads`
     : `${holder.name} · ${holder.knights} knights`;
+}
+
+/** The mode a game played, when it was not Classic: "Big Table · Paired turns". */
+function modeFact(game: ResultGame) {
+  const rules = findRuleset(game.ruleset);
+  if (!game.ruleset || game.ruleset === CLASSIC.id) return null;
+  const name = rules?.name ?? game.ruleset;
+  return game.turns ? `${name} · ${TURN_STRUCTURES[game.turns].name}` : name;
 }
 
 /** Results use the final viewer-safe snapshot; scores are revealed by the server at victory. */
@@ -209,6 +218,12 @@ export function GameOver({
             })}
           </div>
           <dl className="game-over-facts" aria-label="This match">
+            {modeFact(game) && (
+              <div>
+                <dt>Mode</dt>
+                <dd>{modeFact(game)}</dd>
+              </div>
+            )}
             <div>
               <dt>Turns</dt>
               <dd>{game.turn}</dd>

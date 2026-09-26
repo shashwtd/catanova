@@ -1,4 +1,5 @@
 import type { GameView, ScoreTerm } from '../../rules/src/game.js';
+import { CLASSIC } from '../../rules/src/rulesets.js';
 import type { RoomState } from './index.js';
 import { parseProfile } from './profile.js';
 import type { Profile } from './profile.js';
@@ -16,6 +17,9 @@ export type ResultGame = Pick<
   'winner' | 'finishReason' | 'turn' | 'longestRoad' | 'largestArmy'
 > & {
   players: ResultPlayer[];
+  /** The mode played, when it was not Classic, and its turn structure where it had a choice. */
+  ruleset?: string;
+  turns?: GameView['turns'];
 };
 /** Public final results only. Never a saved Game or a private GameView. */
 export type MatchResults = {
@@ -35,6 +39,8 @@ export function resultsFromRoom(room: RoomState, id = `${room.roomId}:${room.rou
     game: {
       winner: game.winner,
       ...(game.finishReason ? { finishReason: game.finishReason } : {}),
+      ...(game.ruleset !== CLASSIC.id ? { ruleset: game.ruleset } : {}),
+      ...(game.turns ? { turns: game.turns } : {}),
       turn: game.turn,
       longestRoad: game.longestRoad,
       largestArmy: game.largestArmy,

@@ -1,8 +1,20 @@
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CLASSIC } from '../../../packages/rules/src/rulesets.js';
-import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
-import { Castle, Dices, House, Route, ScrollText, Shield, Trophy, Robber, NextTurn } from './GameIcons.js';
+import { CLASSIC, seatRange } from '../../../packages/rules/src/rulesets.js';
+import type { Ruleset, TurnStructure } from '../../../packages/rules/src/rulesets.js';
+import { BUILD_WINDOW_SECONDS } from '../../../packages/protocol/src/settings.js';
+import {
+  Castle,
+  Dices,
+  GameMode,
+  House,
+  Route,
+  ScrollText,
+  Shield,
+  Trophy,
+  Robber,
+  NextTurn,
+} from './GameIcons.js';
 import { ResourceSummary } from './ResourcePicker.js';
 
 function GuideSection({
@@ -39,13 +51,47 @@ function GuideSection({
   );
 }
 
+/** How a mode that lets the host choose runs its turns: Big Table's two structures, in a few lines each. */
+function TurnsGuide({ ruleset, turns }: { ruleset: Ruleset; turns: TurnStructure }) {
+  const seats = seatRange(ruleset),
+    players = seats[0]!.toUpperCase() + seats.slice(1);
+  return turns === 'paired' ? (
+    <>
+      <p>
+        {players} play. Each turn has a <b>Lead</b>, the player on turn, and a <b>Partner</b>, the third
+        player to their left.
+      </p>
+      <p>
+        The Lead plays a full turn. Then the Partner has a phase of their own: build, buy, trade with the bank
+        or a harbour and play one card. The Partner never rolls and never trades with players.
+      </p>
+      <p>
+        Both hold the turn until the Partner’s phase ends, so either can win in it; if both reach the goal at
+        once, the Lead wins. With fewer than five players left, turns go one player at a time.
+      </p>
+    </>
+  ) : (
+    <>
+      <p>{players} play, one turn at a time.</p>
+      <p>
+        After each turn, everyone else in order gets {BUILD_WINDOW_SECONDS} seconds to build and buy with the
+        cards in hand. No trading, and no cards played.
+      </p>
+      <p>You win only on your own turn: points from a build window count when your turn begins.</p>
+    </>
+  );
+}
+
 export function QuickRules({
   ruleset = CLASSIC,
   victoryPoints = ruleset.victoryPoints.default,
+  turns = ruleset.turns?.[0],
 }: {
   /** The mode being played, for its costs and its default target. */
   ruleset?: Ruleset;
   victoryPoints?: number;
+  /** How its turns run, in a mode that lets the host choose. */
+  turns?: TurnStructure;
 }) {
   const [section, setSection] = useState<string | null>('build');
   const disclosure = (key: string) => ({
@@ -61,6 +107,11 @@ export function QuickRules({
           <span>Reach the goal on your own turn to win.</span>
         </div>
       </div>
+      {turns && (
+        <GuideSection title={ruleset.name} icon={<GameMode />} {...disclosure('mode')}>
+          <TurnsGuide ruleset={ruleset} turns={turns} />
+        </GuideSection>
+      )}
       <GuideSection title="Your turn" icon={<Dices />} {...disclosure('turn')}>
         <ol className="guide-turn-steps">
           <li>

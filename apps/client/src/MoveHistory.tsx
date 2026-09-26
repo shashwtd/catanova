@@ -24,7 +24,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   const actor = people.find(
     (name) =>
       line.startsWith(name) &&
-      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|took|claimed|wins)\b|'s (?:turn|timer)\b)/.test(
+      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|took|claimed|wins|begins)\b|'s (?:turn|timer|build window)\b)/.test(
         line.slice(name.length),
       ),
   );
@@ -47,6 +47,8 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
         at = actor.length + ' is willing to trade with '.length;
       else if (body === ` moved the robber. ${name} had no resource cards.`)
         at = actor.length + ' moved the robber. '.length;
+      else if (body.startsWith(`'s turn, with ${name} as Partner.`))
+        at = actor.length + "'s turn, with ".length;
       if (at >= 0) {
         spans.push({ at, name });
         break;
@@ -127,7 +129,7 @@ function Move({ entry, names }: { entry: HistoryEntry; names: string[] }) {
             ? Dices
             : entry.kind === 'buyCard' || entry.kind === 'playCard'
               ? ScrollText
-              : entry.kind === 'endTurn'
+              : entry.kind === 'endTurn' || entry.kind === 'endPhase' || entry.kind === 'endWindow'
                 ? ArrowRight
                 : /trade|proposal/i.test(entry.kind)
                   ? null
