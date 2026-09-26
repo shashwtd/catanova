@@ -220,19 +220,19 @@ A taller, narrower board would gain a little on the upright phone and lose more 
 
 ### What each template holds
 
-|                     | Three players                                                                                              | Four players                                                                    |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Main island         | 16: Timber 3, Clay 3, Sheep 4, Hay 3, Rock 2, desert 1                                                     | 20: Timber 4, Clay 4, Sheep 5, Hay 3, Rock 3, desert 1                          |
-| Small islands       | 8 in three isles (3, 3, 2): gold 2, Timber 1, Clay 1, Hay 2, Rock 2                                        | 10 in four isles (3, 3, 2, 2): gold 2, Timber 1, Clay 1, Hay 3, Rock 3          |
-| All land            | 24: Timber 4, Clay 4, Sheep 4, Hay 5, Rock 4, gold 2, desert 1                                             | 30: Timber 5, Clay 5, Sheep 5, Hay 6, Rock 6, gold 2, desert 1                  |
-| Sea                 | 48: 30 ring, 18 inside                                                                                     | 47: 32 ring, 15 inside                                                          |
-| Main-island tokens  | 15: 2, 3, 4, 4, 5, 6, 6, 8, 8, 9, 10, 10, 11, 11, 12. Classic's 18 without one each of 3, 5 and 9; 48 pips | 19: Classic's 18 and a third 10; 61 pips                                        |
-| Small-island tokens | 8: 2, 4, 5, 6, 8, 9, 10, 12; 26 pips                                                                       | 10: one each of 2, 3, 4, 5, 6, 8, 9, 10, 11, 12; 30 pips                        |
-| Harbours            | 8: three 3:1, and one 2:1 for each resource                                                                | 9: four 3:1, and one 2:1 for each resource, as in Classic                       |
-| Main-island coast   | 36 edges, facing 21 sea hexes                                                                              | 40 edges, facing 23 sea hexes                                                   |
-| Whole board         | 178 intersections; 249 edges, of which 66 are outer rim and 148 can hold a ship                            | 190 intersections; 266 edges, of which 70 are outer rim and 150 can hold a ship |
-| Robber start        | The desert                                                                                                 | The desert                                                                      |
-| Pirate start        | (4, −2)                                                                                                    | (2, 4)                                                                          |
+|                     | Three players                                                                                              | Four players                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Main island         | 16: Timber 3, Clay 3, Sheep 4, Hay 3, Rock 2, desert 1                                                     | 20: Timber 4, Clay 4, Sheep 5, Hay 3, Rock 3, desert 1                                      |
+| Small islands       | 8 in three isles (3, 3, 2): gold 2, Timber 1, Clay 1, Hay 2, Rock 2                                        | 10 in four isles (3, 3, 2, 2): gold 2, Timber 1, Clay 1, Hay 3, Rock 3                      |
+| All land            | 24: Timber 4, Clay 4, Sheep 4, Hay 5, Rock 4, gold 2, desert 1                                             | 30: Timber 5, Clay 5, Sheep 5, Hay 6, Rock 6, gold 2, desert 1                              |
+| Sea                 | 48: 30 ring, 18 inside                                                                                     | 47: 32 ring, 15 inside                                                                      |
+| Main-island tokens  | 15: 2, 3, 4, 4, 5, 6, 6, 8, 8, 9, 10, 10, 11, 11, 12. Classic's 18 without one each of 3, 5 and 9; 48 pips | 19: Classic's 18 and a third 10; 61 pips                                                    |
+| Small-island tokens | 8: 2, 4, 5, 6, 8, 9, 10, 12; 26 pips                                                                       | 10: one each of 2, 3, 4, 5, 6, 8, 9, 10, 11, 12; 30 pips                                    |
+| Harbours            | 8: three 3:1, and one 2:1 for each resource; 16 layouts round the main island                              | 9: four 3:1, and one 2:1 for each resource, as in Classic; 18 layouts round the main island |
+| Main-island coast   | 36 edges, facing 21 sea hexes                                                                              | 40 edges, facing 23 sea hexes                                                               |
+| Whole board         | 178 intersections; 249 edges, of which 66 are outer rim and 148 can hold a ship                            | 190 intersections; 266 edges, of which 70 are outer rim and 150 can hold a ship             |
+| Robber start        | The desert                                                                                                 | The desert                                                                                  |
+| Pirate start        | (4, −2)                                                                                                    | (2, 4)                                                                                      |
 
 Every producing hex gets exactly one token: 23 tokens for 23 hexes with three players, 29 for 29 with four. Both main-island token sets average 3.2 pips, like Classic's.
 
@@ -262,12 +262,14 @@ No two islands border each other, so rules 1 and 5–7 only ever compare tiles o
 
 ### Outer Isles harbours
 
-Harbours follow the two `balanced-v2` rules on the main island's coast: no two share or neighbour an intersection, and no two face the same or neighbouring sea hexes.
+Harbours follow the two `balanced-v2` rules on the main island's coast: no two share or neighbour an intersection, and no two face the same or neighbouring sea hexes. A rotation of the spacing is used only if it keeps both.
 
-- Three players: 8 harbours on 36 coastal edges, spaced 4, 5, 4, 5, 4, 5, 4, 5 edges apart. 28 of the 36 rotations meet the sea-hex rule. The other 8 each put one pair of harbours on the same or neighbouring sea hexes.
-- Four players: 9 harbours on 40 coastal edges, spaced 4, 4, 5, 4, 5, 4, 5, 4, 5 edges apart. 29 of the 40 rotations meet the sea-hex rule. Of the other 11, 7 put one pair on the same or neighbouring sea hexes and 4 put two.
+Round these coasts the spacing alone does not keep harbours off neighbouring intersections, as it does round the Classic and Big Table islands. Each main island ends, west and east, in a hex joined to the rest by a single edge: (−2, −1) and (3, 0) with three players, (−3, 0) and (3, 0) with four. Both ends of that inland edge are on the coast, so a harbour beside each end would sit on neighbouring intersections.
 
-Round these coasts the spacing does not keep harbours off neighbouring intersections by itself, as it does round the Classic and Big Table islands. Each main island ends, west and east, in a hex joined to the rest by a single edge: (−2, −1) and (3, 0) with three players, (−3, 0) and (3, 0) with four. Both ends of that inland edge are on the coast, so a harbour beside each end would sit on neighbouring intersections. Rotations that do this are not used either. That leaves 12 of the 28 rotations with three players, and 16 of the 29 with four. The three-player spacing repeats every 9 edges, so its 12 rotations make only 3 different layouts; the four-player template's make 16. Another order of the same four 4s and four 5s would allow more: 4, 4, 4, 4, 5, 5, 5, 5 allows 16 layouts.
+- Three players: 8 harbours on 36 coastal edges, spaced 4, 4, 4, 4, 5, 5, 5, 5 edges apart. 16 of the 36 rotations keep both rules, each a different layout. 28 keep the sea-hex rule, and the necks rule out 12 of those.
+- Four players: 9 harbours on 40 coastal edges, spaced 4, 4, 4, 5, 4, 4, 5, 5, 5 edges apart, counted clockwise. 18 of the 40 rotations keep both rules, each a different layout. 27 keep the sea-hex rule, and the necks rule out 9 of those.
+
+Every gap is 4 or 5 edges, as even as the coast allows, and each template uses the spacing of 4s and 5s with the most layouts under both rules. With four players three spacings tie at 18. Two of them are mirror images, the same gaps counted in opposite directions, and spread their 5-edge gaps more evenly than the third; the template uses the one above, counted clockwise as the code walks the coast. The spacings first planned, 4, 5, 4, 5, 4, 5, 4, 5 and 4, 4, 5, 4, 5, 4, 5, 4, 5, spread their 5s evenly but keep both rules in only 3 and 16 layouts. The three-player one repeats every 9 edges, so its 12 qualifying rotations were only 3 layouts.
 
 Each board uses one qualifying rotation at random and shuffles the harbour types onto it.
 
@@ -301,7 +303,7 @@ Once per template, the tests check:
 3. Every small island is reachable by ship from the main island's coast, and stays reachable with any one sea hex blocked by the pirate.
 4. The pirate's start touches no land, so no starting ship can be placed next to it.
 5. Starting room: the worst case above leaves at least 9 intersections for the last starting settlement.
-6. Exactly 12 harbour rotations qualify with three players, making 3 layouts, and 16 with four; 28 and 29 meet the sea-hex rule alone.
+6. Exactly 16 harbour rotations keep both harbour rules with three players and 18 with four, each a different layout, and 28 and 27 keep the sea-hex rule alone. No spacing whose gaps are all 4 or 5 edges gives more layouts, and none that gives as many spreads its 5s more evenly.
 
 Over 500 seeds per template, they check:
 

@@ -115,34 +115,34 @@
   },
   "outer-isles-v1/3": {
     "boards": [
-      [0, "8a0607146fe2d264de42ca6ed5ecdc4796361c58393499bf792eea29dda3f3e9"],
-      [1, "0772d105900343124164b7bbf695f5812e120e71a3eb0377038c3ecb0c2afbc6"],
-      [2, "f96ba5f4aa4e27945d2090e62541cc431937a753d042dc95966da4d6f5373669"],
-      [3, "4d54ad9c28c5e1297bf806c9d7051abf5d58b721517ad1e0c1aa30689211e730"],
-      [4, "a2ab588270c512aa8da2a1d85895128fbe386b51e9a3b396cb77f7edbbc2d24c"],
-      [5, "7b9c9d22c72abdc96f0f7b9c8b89c8ad01195128febfb34ae0fbf41496ac0a35"],
-      [6, "03b888441f897ed88814b8c5ca50bb08f0f876247cd764663dc4346b2c33255f"],
-      [7, "8bca84d7681d7954824a2377650fc3d43abaa2d3f266f98b29397fe8c7aa0e5f"],
-      [8, "9739fd106aaf9d00c66ddb4ccab6f76c46cd06fa7acc59e842442e2a9da71f3d"],
-      [9, "bf3259566d587ab179bd99476f9317735828f7b84b2ffb34bfc245edefea7188"],
-      [10, "dd04d13f93af50ea68d37bcfa9ac2892799a9a3e473ea8038af9bbdd47de7b4c"],
-      [11, "0f701b095d1b35c8a651d1c43fb6f02ecf40608ceb9b7cf0dba5f04f1df6d53f"],
-      [12, "52b6f00570903588e6920ab075e86effe3adcd7c1b070a1d9001841e7f9e0b50"],
-      [13, "ce48dd39a9d2cd655046e7baf034eeef7a6c6f721c58aa862314955bfb2fdb85"],
-      [14, "d7e3292edae14f6014d7b16e275cd934d82b09ac1efab302caac11844b2ccd1e"],
-      [15, "b529936055ee59e7bd44b369f3a89907ab4309d0f5e8ff28a5c6e9cf2f0c57c9"],
-      [16, "68c800c81efad34175ed030ddfca5212082cff51b51d54130d27895919f423d1"],
-      [17, "6414612764ad6e9fc41c1b3c301d60d0b56fe3e8bf99e15603fb35c7f521858e"],
-      [18, "f7a0cd0d8dc960e12d18457d51f56c92716816372b1f622234a6b0c806613e42"],
-      [19, "2a0cc0aa893118cd2b1b22ad73c49ce562a3378b265fa3348246332934c7da00"],
-      [3620437523, "b97b501483803a39d2ba8c4bf050dc8b43f0f96ae78ae707b33874ec065a2cb6"],
-      [3603468086, "7e9ab61e9fb4b07fff2f2f6d188e0479089ce51f204252c45a4c7c3ab92c6894"],
-      [1922315000, "79aa72028b9fa2fb4f4d82458b638aba9ac632f1afaa94c55e9b0a8aa5519dbd"],
-      [3582294466, "e25bdec303f50958d8ec04932d5a41d669772be920e701f7dbb74f6de9ad5482"],
-      [3835569077, "006f91bd948a2dfa1651ab49b1e91109bf5e6c5383660096c1925afa0b7faec5"],
-      [2147483648, "31074f1ace70299711c839e2c45086330b5040a54691409f4e19a089d49cdda1"],
-      [4294967295, "e744e9b89b78bc488267640713a3a296ef239d15e4ad030232b682353fb1ea8e"],
-      [-1, "e744e9b89b78bc488267640713a3a296ef239d15e4ad030232b682353fb1ea8e"]
+      [0, "fcb4d90b94c27cb23beebd13824f6822b15f384fd169b79df244d10f44e4894c"],
+      [1, "74feb021b05718be8f39f5569c676f1bb0b8af23ec2a08657c08cefecd17a322"],
+      [2, "db221f8f73fd5f2782d033e2f0a2c5e9c2a46c2a45d1314253745d41fa524794"],
+      [3, "e7c6254bed9b9f5e2d4c3f43e6257cc89022a6a8299baf136c5f1f93181be5f9"],
+      [4, "f85a5bd858cd1707b20d15c77c38796139f45125108fd011b3aa6297f10fc045"],
+      [5, "45a7971c6c87dc05741b41167cb307f919e51830f4dbe052c03f1aa34cc8987f"],
+      [6, "593fea037b19f7315cb2f7b6a431aef56cb9def1336d85a80ed8ffbd9a13827a"],
+      [7, "2859a3c812f7f2ec45ce7df640595a95b0d2b6c3e16205594418062a78fe0352"],
+      [8, "6c63f14177d69230beca61b7aea712c14b7295d3d395082103872fb656d2cbc1"],
+      [9, "11172a250aebbc36ef4a8003eebb74e954ed348bb4e82af033ea2433800309d8"],
+      [10, "19649ec4aab056e0e9e284fe6234d04b4c01d7881fb9e6f72781fc64bedd3fcd"],
+      [11, "14f51f1cdc5568228ed4b315e95af8c7ccc47f5fa07c3f845d753ba5e139f093"],
+      [12, "2bccdf829696924b57ef29aa54b7949e684784961e9e50c3c4396df831292bbf"],
+      [13, "87673bbe6df265690f60a8ff6ffad5e4f46975c6245c98153a67f4e4b9dd1a0a"],
+      [14, "103a869068e65db1d8626cd0618a68db3cfba2093662f6c4ac1cd8092819db1d"],
+      [15, "dc855808f11a9dcd8ab3ab4c6fba5a8fa6cdbd2fc192a804e06818934e79a0db"],
+      [16, "c0f718e9479ac853a445acd8d62c8a3a1aa7d2c37823705230befb773d3e52c7"],
+      [17, "289d811c9d6921461b9d0e89cb3a9e8f6fd810df6b4be989cb3159d14c832fd9"],
+      [18, "94c2d24a772f2981d8313b8c8118c9c94cf734ffa67f6058c1c98bab4c1bfdf1"],
+      [19, "75e5831c5cc3c1a64c35bc2b1bd1a4596b3492ade1623916c410b04a9c3028d0"],
+      [3620437523, "12c34a7aae95a21becdffe7702f662de080ef89cd0f5dabfee11a11a3cbff735"],
+      [3603468086, "ce11f560b43ea13d4f4e2219c331ba7eec3c88762d9a15409296138ee7e8f9cc"],
+      [1922315000, "8911ef1f78c28128dfe5e38d1a331553b8195ae45d5c4cc7e40d7fa376226998"],
+      [3582294466, "eae43192fc45adee747972325d18f8b40c341801f574ca9da4ae1d062dec1e0c"],
+      [3835569077, "cf9288311e6f8b9a1387a17f7842f68fc90dc81843ec1a37c1e1129e598e877b"],
+      [2147483648, "d4ac84ec7ae85c6f91cddc9eef127e5674e8f86d28e05e076db878262344f5a4"],
+      [4294967295, "4fffb676f3fa2399c4b1dd29f48c7c1844b1c6560656700766fb7d105356026d"],
+      [-1, "4fffb676f3fa2399c4b1dd29f48c7c1844b1c6560656700766fb7d105356026d"]
     ],
     "deal": {
       "seed": 42,
@@ -222,35 +222,35 @@
       ],
       "ports": [
         {
-          "edge": 85,
+          "edge": 118,
           "resource": "ore"
         },
         {
-          "edge": 118,
+          "edge": 136,
           "resource": "wood"
         },
         {
-          "edge": 162,
+          "edge": 185,
           "resource": "any"
         },
         {
-          "edge": 211,
+          "edge": 208,
           "resource": "any"
         },
         {
-          "edge": 178,
+          "edge": 153,
           "resource": "brick"
         },
         {
-          "edge": 123,
+          "edge": 100,
           "resource": "any"
         },
         {
-          "edge": 68,
+          "edge": 76,
           "resource": "wheat"
         },
         {
-          "edge": 75,
+          "edge": 81,
           "resource": "sheep"
         }
       ],
@@ -260,34 +260,34 @@
   },
   "outer-isles-v1/4": {
     "boards": [
-      [0, "45870c2512dea51f078d964a8f8d1dabbb6a5b5eb74f18c7ba3ba5183e9d6405"],
-      [1, "19b5b4295111991817bdc91c25efd0b4e057a4d51662f7dd00a575707e2e2cd1"],
-      [2, "9ea37221b5367af9ac7ab5deb8f9eb94a25dc9ad36060929fb77246d5eb266f1"],
-      [3, "19b6cd0e7f1683b315b2a77507a4de69d2dbd83cf2175b6ead79f1e64461da06"],
-      [4, "680fad75a0ecbcae847c611b8f115a14f6ae2810b4a74110b7ababde8dbcafb5"],
-      [5, "b79966c7514f1f79784ad61a988a68b9711edf31da1be0e1737659d8eb1f722e"],
-      [6, "462cbf4191f226b7e63c073e9c9cd96d3bcaa2b5739d18c50b2a1967ed46c6b5"],
-      [7, "a32d02b807a6bbdf5bba27a1b983f64c2766ef39666ed3a1898558a92517ffd4"],
-      [8, "7120dbd9d6f56ca6c0ed7b212fad63f8262af06a7544a9842036a0ceca95d9be"],
-      [9, "72285140744a9a24769e26fda55e4f0015a6f336126fee011088a7734b7b6aef"],
-      [10, "a82969ab457f4954a16d5698e4e1cf93f33428ab9b6597b7a5caaacaca4b4aa6"],
-      [11, "fe0da6add997be11e397f30ced1df8639fc45fdcfd2d5a72a203e8e640ee175d"],
-      [12, "c06dd18c5e1d0d79b3ccf91530541b4a538f4029753dfad58af8f292f16bbcd8"],
-      [13, "e890061a59b46e1bfe8a8836f88ad72ef167916eada6454047da14988d965397"],
-      [14, "08ef36695aa2644f901bce809d3014dd1f9ba53d53ae25fcc18c354e3511e9fe"],
-      [15, "128a8cdf4f25df11e5e6a236d5f6d487e2b2f7eca4718f1e71d1462ab41889fc"],
-      [16, "93e47f706bbf416937e027d8731cfb566b32f8e6f2908774462e49d1087cc199"],
-      [17, "c70a05f5b966d4a12d2100c1a26eb1394c31c999f11f7b69d14da84bf579b4bc"],
-      [18, "760cfcc5ec2669288a0ab5fb17641a4d427445de2da49ee0ad29e91a9be471cf"],
-      [19, "a328f80d37d00f9b0d58b8fbae5650039ee907328ec2d72c300132d9f6bf3581"],
-      [3620437523, "70d948ea7e79b758a958ec339c712cab8327f4c71a4742f5cccd49b5a1c6d397"],
-      [3603468086, "e2c596593e091875eee63469e64f244241569ae892069028f7a7f8942786cb93"],
-      [1922315000, "cf8372d5740c8a8188da8180cbf1710d37c4e88f797cd99987947a4a8a42a2e4"],
-      [3582294466, "b4c1866692c7329c0f72a626173a4da414a4bae00c3aff268674a4ccdb385dd8"],
-      [3835569077, "5f3e65c651b5a73ac05fa55329392c82072b47febde036e5ffc07d4c68832a3f"],
-      [2147483648, "3381675cfc13fe3f4d7a30a48638fe48acae205580649e2602cea0267ef86023"],
-      [4294967295, "8131047dbf59b02fd02290f897c03e7cebd8cb77fbdd8a42a2e09e2ed6ed0804"],
-      [-1, "8131047dbf59b02fd02290f897c03e7cebd8cb77fbdd8a42a2e09e2ed6ed0804"]
+      [0, "cc4f61ef3179b58c8c1f2b753d9c193582ad6e976e66d4f42bd62a2c595dcfb4"],
+      [1, "62f8ff74eab85e7daddf7ea60d582c5338664171f8ddd7850cd368e7d8741bfe"],
+      [2, "3732e0c9c204a238035e69f3287f877c43296f6f18df99295281407347561618"],
+      [3, "b2fd39af98408e97c3d06c367afaf64d72b0f8ce8574b0ee845886cb6b2ba20c"],
+      [4, "0a6829c6ddaef4252f5a99ddcd9fd0c02c12017f4ba30830a78a86574d446a19"],
+      [5, "3335e34ad33cb3edeef963b0dbc18a071dfd89b1b7621baa18cba82bf95fb04f"],
+      [6, "c9740ddaf30059a27daa1c483f2c7e37507fd98fae5ea4c03a514f01b450484e"],
+      [7, "2dea306dcd27c201a10da0fb7afdac838995b76b30383f76873129b1a89cefbc"],
+      [8, "78c4fae8da17fabadba7d97a68e8000daea44c2629bb6361affafafe36a12f0f"],
+      [9, "71be64238120005b98ce9d6a9ecebef8193c9e77f1645660dde9ea63fa8a92bf"],
+      [10, "1924858e70661aac2b944ea0d852d3c2563a2b20e914f302f9ebb981f16a1689"],
+      [11, "8b5bd2241eeac4de5d69966a48f8e60d3a562f301821e9b0951c30de1d0b4fda"],
+      [12, "d7c9f70844dd3e7c484ef7fd269eab4ec4d3bf27e4b48c5c0b4503f7aac2c379"],
+      [13, "1942370e2bc05f2624907544e9e7da4ff0f1c0fdb4a3e4b31ca5ffb12f3cc2c6"],
+      [14, "fe4c4a5d7401201213dde0562bd8cea326183673b28205946d1dd35adf3fc863"],
+      [15, "f874ca4c386bcd38464754dcf11886c2c087a5c14bc9e45012c0cc6c523923bc"],
+      [16, "4f88c78386bf7dc04fd989b78bec17b96b44e945e13bddecc8b5d074dbc81955"],
+      [17, "caa28fec639cbe345b6185ee8626bdca60189bacc145541414807c86c8e9b3e4"],
+      [18, "11ed344b4bfc4c259b24b64f3328414dbc8dc1a6d3e55461d384402ff56679e7"],
+      [19, "0459b8811edfb51f30fb4e6fefbd6c9a7d007afe6fad8d05a65a6a5e3c439244"],
+      [3620437523, "73d0fe86fdfdf0a3cc7ae75fef1f6261d00cbf8d79430563921a7ef089cec594"],
+      [3603468086, "369e39b0ba3cdccce536c0eda9b01d0da2082436b3c966836752aa0356f9adfa"],
+      [1922315000, "85b07e13721527ab86eb244d0548a843599b6819352c138147732add73c190e7"],
+      [3582294466, "9b3952027b11a9eb4a3ed17a4ae195d7f7cb0e7a71e080fcfb66b69910bb7a5a"],
+      [3835569077, "0a6eba6b704221d4264d319dd9a9844452dcc7c79173a5cdbe07224bed3ec44c"],
+      [2147483648, "c015fe4bf570cbf94392dc177a516b284c3be82f0fae8ed74fd422bb6a40f385"],
+      [4294967295, "7fd939cecba5336d8c469346e9c5e410f9be85b48b490becf6adb68c7fb29713"],
+      [-1, "7fd939cecba5336d8c469346e9c5e410f9be85b48b490becf6adb68c7fb29713"]
     ],
     "deal": {
       "seed": 42,
@@ -372,8 +372,12 @@
       ],
       "ports": [
         {
-          "edge": 102,
+          "edge": 136,
           "resource": "brick"
+        },
+        {
+          "edge": 102,
+          "resource": "any"
         },
         {
           "edge": 80,
@@ -389,22 +393,18 @@
         },
         {
           "edge": 125,
-          "resource": "any"
-        },
-        {
-          "edge": 172,
           "resource": "wood"
         },
         {
-          "edge": 224,
+          "edge": 147,
           "resource": "sheep"
         },
         {
-          "edge": 192,
+          "edge": 224,
           "resource": "wheat"
         },
         {
-          "edge": 160,
+          "edge": 192,
           "resource": "ore"
         }
       ],

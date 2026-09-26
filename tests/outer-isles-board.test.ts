@@ -97,10 +97,9 @@ const TEMPLATES = {
     production: { wood: [8, 12], brick: [8, 12], sheep: [10, 16], wheat: [8, 12], ore: [5, 8] },
     islandProduction: { a: [8, 12], b: [8, 12], c: [5, 8] },
     room: { good: 30, left: 11 },
-    // Rotations of the harbour spacing that meet the sea-hex rule, those that meet both rules, and the
-    // different layouts those make: the spacing repeats every 9 edges, so each three-player layout is four
-    // rotations.
-    rotations: { seas: 28, both: 12, layouts: 3 },
+    // Rotations of the harbour spacing that meet the sea-hex rule, those that meet both harbour rules, and
+    // the layouts those make: every qualifying rotation is a layout of its own.
+    rotations: { seas: 28, both: 16, layouts: 16 },
     pirate: { q: 4, r: -2 },
   },
   4: {
@@ -120,12 +119,13 @@ const TEMPLATES = {
     production: { wood: [10, 16], brick: [10, 16], sheep: [13, 20], wheat: [8, 12], ore: [8, 12] },
     islandProduction: { a: [5, 8], b: [8, 12], c: [5, 8], d: [8, 12] },
     room: { good: 38, left: 11 },
-    rotations: { seas: 29, both: 16, layouts: 16 },
+    rotations: { seas: 27, both: 18, layouts: 18 },
     pirate: { q: 2, r: 4 },
   },
 } as const;
 
 const sorted = (numbers: readonly number[]) => [...numbers].sort((a, b) => a - b);
+const sum = (numbers: readonly number[]) => numbers.reduce((total, n) => total + n, 0);
 const counts = (hexes: Board['hexes'], keys: readonly string[]) =>
   Object.fromEntries(keys.map((t) => [t, hexes.filter((h) => h.terrain === t).length]));
 const TERRAINS = [...RESOURCES, 'desert', 'gold'] as const;
@@ -224,7 +224,7 @@ for (const players of [3, 4] as const) {
     assert.equal(reached.size, sea.length);
     // The main island's coast is one loop, each island is whole, and no two islands share a corner.
     const main = new Set(board.hexes.filter((h) => h.island === 'main').map((h) => h.id));
-    assert.ok(coastWalk(coastOf(board, main)), 'the main island’s coast is one loop');
+    assert.ok(coastWalk(board, coastOf(board, main)), 'the main island’s coast is one loop');
     for (const island of Object.keys(expected.islands)) {
       const hexes = board.hexes.filter((h) => h.island === island);
       const joined = new Set([hexes[0]!.id]);
@@ -285,18 +285,50 @@ for (const players of [3, 4] as const) {
     assert.ok(room.left >= 9);
   });
 
-  test(`${expected.rotations.both} harbour rotations qualify on the ${players}-player main island`, () => {
+  test(`the ${players}-player harbour spacing gives the most layouts an even spacing can`, () => {
     const board = deal(5);
     const main = new Set(board.hexes.filter((h) => h.island === 'main').map((h) => h.id));
-    const rotations = harbourRotations(board, coastWalk(coastOf(board, main))!, preset.harbours.slots);
-    const both = rotations.filter((rotation) => rotation.seas && rotation.corners);
+    const loop = coastWalk(board, coastOf(board, main))!;
+    const layouts = (slots: readonly number[]) =>
+      new Set(
+        harbourRotations(board, loop, slots)
+          .filter((rotation) => rotation.seas && rotation.corners)
+          .map((rotation) => rotation.edges.join(',')),
+      ).size;
+    const rotations = harbourRotations(board, loop, preset.harbours.slots);
     assert.deepEqual(
       {
         seas: rotations.filter((rotation) => rotation.seas).length,
-        both: both.length,
-        layouts: new Set(both.map((rotation) => rotation.edges.join(','))).size,
+        both: rotations.filter((rotation) => rotation.seas && rotation.corners).length,
+        layouts: layouts(preset.harbours.slots),
       },
       expected.rotations,
+    );
+    // Every spacing whose gaps are all 4 or 5 edges, as even as this coast allows. None gives more layouts
+    // under both rules, and none of those that give as many spreads its 5-edge gaps more evenly.
+    const slotsOf = (gaps: readonly number[]) => gaps.map((_, i) => sum(gaps.slice(0, i)));
+    const gapsOf = (slots: readonly number[]) =>
+      slots.map((slot, i) => (slots[i + 1] ?? loop.length + slots[0]!) - slot);
+    const unevenness = (gaps: readonly number[]) => {
+      const fives = gaps.flatMap((gap, i) => (gap === 5 ? [i] : []));
+      const apart = fives.map((at, i) => (fives[i + 1] ?? fives[0]! + gaps.length) - at);
+      return sum(apart.map((d) => (d - gaps.length / fives.length) ** 2));
+    };
+    // Every list of `count` gaps of 4 or 5 edges that adds up to `total`.
+    const spacings = (count: number, total: number): number[][] => {
+      if (!count) return total ? [] : [[]];
+      return [4, 5].flatMap((gap) => spacings(count - 1, total - gap).map((rest) => [gap, ...rest]));
+    };
+    const even = spacings(preset.harbours.slots.length, loop.length).map((gaps) => ({
+      gaps,
+      layouts: layouts(slotsOf(gaps)),
+      unevenness: unevenness(gaps),
+    }));
+    const most = Math.max(...even.map((spacing) => spacing.layouts));
+    assert.equal(layouts(preset.harbours.slots), most);
+    assert.equal(
+      unevenness(gapsOf(preset.harbours.slots)),
+      Math.min(...even.filter((spacing) => spacing.layouts === most).map((spacing) => spacing.unevenness)),
     );
   });
 
@@ -304,7 +336,7 @@ for (const players of [3, 4] as const) {
     const board0 = deal(0);
     const main = new Set(board0.hexes.filter((h) => h.island === 'main').map((h) => h.id));
     const mainCoast = new Set(coastOf(board0, main).map((e) => e.id));
-    const layouts = harbourRotations(board0, coastWalk(coastOf(board0, main))!, preset.harbours.slots)
+    const layouts = harbourRotations(board0, coastWalk(board0, coastOf(board0, main))!, preset.harbours.slots)
       .filter((rotation) => rotation.seas && rotation.corners)
       .map((rotation) => rotation.edges.join(','));
     const elapsed: number[] = [];
