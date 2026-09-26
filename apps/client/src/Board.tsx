@@ -130,6 +130,75 @@ export function ShipShape({ color }: { color: string }) {
     </>
   );
 }
+/**
+ * An edge a ship may go to, bought, free or moved there (docs/RULEBOOK-OPEN-SEA.md, sections 7 and 8): the road
+ * site's dashed guide along the edge, and on approach the ship itself, upright at its middle, as a road site shows
+ * its road.
+ */
+function ShipSite({
+  board,
+  edge,
+  kind,
+  label,
+  color,
+  guided,
+  pending,
+  onChoose,
+}: {
+  board: Island;
+  edge: number;
+  kind: 'ship' | 'moveShip';
+  label: string;
+  color: string;
+  guided: boolean;
+  pending: boolean;
+  onChoose: () => void;
+}) {
+  const { length, transform } = roadGeometry(board, edge),
+    at = edgeCentre(board, edge);
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      className="legal-road"
+      data-build-site={kind}
+      data-site-id={edge}
+      data-guided={guided}
+      data-pending={pending}
+      onClick={onChoose}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onChoose();
+        }
+      }}
+    >
+      <g transform={transform}>
+        <line className="road-hit" x1={-length / 2} y1="0" x2={length / 2} y2="0" />
+        <line
+          className="site-guide site-guide-back road-site-guide"
+          x1={-length / 2 + 4}
+          y1="0"
+          x2={length / 2 - 4}
+          y2="0"
+          aria-hidden="true"
+        />
+        <line
+          className="site-guide road-site-guide"
+          x1={-length / 2 + 4}
+          y1="0"
+          x2={length / 2 - 4}
+          y2="0"
+          aria-hidden="true"
+        />
+      </g>
+      <g className="build-site-preview" aria-hidden="true" transform={`translate(${at.x},${at.y})`}>
+        <ShipShape color={color} />
+      </g>
+    </g>
+  );
+}
 /** The pirate: a ship in the robber's colours, about a tenth larger than a player's ship. */
 export function PirateShape() {
   return (
@@ -572,6 +641,12 @@ export const Board = memo(function Board({
     interactive && (setupRoad || game?.phase === 'freeRoads' || (actions && (!mode || mode === 'road')))
       ? game!.legal.roads
       : [];
+  // Open Sea's ships go where its roads do (section 7). An edge that takes either is one site, a road's, and its
+  // confirmation offers the choice.
+  const shipSites =
+    interactive && game!.legal.ships && (setupRoad || game!.phase === 'freeRoads' || (actions && !mode))
+      ? game!.legal.ships
+      : [];
   const settlementSites =
     interactive && (setupSettlement || (actions && (!mode || mode === 'settlement')))
       ? game!.legal.settlements
@@ -586,9 +661,14 @@ export const Board = memo(function Board({
     pendingBuild &&
     (pendingBuild.kind === 'road'
       ? (setupRoad || game?.phase === 'freeRoads' || actions) && game!.legal.roads.includes(pendingBuild.edge)
-      : pendingBuild.kind === 'city'
-        ? actions && game!.legal.cities.includes(pendingBuild.vertex)
-        : (setupSettlement || actions) && game!.legal.settlements.includes(pendingBuild.vertex))
+      : pendingBuild.kind === 'ship'
+        ? (setupRoad || game?.phase === 'freeRoads' || actions) &&
+          !!game!.legal.ships?.includes(pendingBuild.edge)
+        : pendingBuild.kind === 'moveShip'
+          ? actions && !!game!.legal.shipMoves?.[pendingBuild.from]?.includes(pendingBuild.to)
+          : pendingBuild.kind === 'city'
+            ? actions && game!.legal.cities.includes(pendingBuild.vertex)
+            : (setupSettlement || actions) && game!.legal.settlements.includes(pendingBuild.vertex))
       ? pendingBuild
       : null;
   const keyActivate = (e: React.KeyboardEvent, run: () => void) => {
@@ -765,12 +845,13 @@ export const Board = memo(function Board({
               key={id}
               role="button"
               tabIndex={0}
-              aria-label={`Build road on edge ${id + 1}`}
+              aria-label={`Build ${shipSites.includes(id) ? 'road or ship' : 'road'} on edge ${id + 1}`}
               className="legal-road"
               data-build-site="road"
+              data-ship-site={shipSites.includes(id) || undefined}
               data-site-id={id}
               data-guided={setupRoad || game?.phase === 'freeRoads' || mode === 'road'}
-              data-pending={pending?.kind === 'road' && pending.edge === id}
+              data-pending={(pending?.kind === 'road' || pending?.kind === 'ship') && pending.edge === id}
               transform={transform}
               onClick={() => onAction({ kind: 'road', edge: id })}
               onKeyDown={(e) => keyActivate(e, () => onAction({ kind: 'road', edge: id }))}
@@ -798,6 +879,21 @@ export const Board = memo(function Board({
             </g>
           );
         })}
+        {shipSites
+          .filter((id) => !roadSites.includes(id))
+          .map((id) => (
+            <ShipSite
+              key={`ship-${id}`}
+              board={board}
+              edge={id}
+              kind="ship"
+              label={`Build ship on edge ${id + 1}`}
+              color={color(me!)}
+              guided={setupRoad || game?.phase === 'freeRoads'}
+              pending={pending?.kind === 'ship' && pending.edge === id}
+              onChoose={() => onAction({ kind: 'ship', edge: id })}
+            />
+          ))}
         {vertices.map(({ vertex: id, kind }) => {
           const v = board.vertices[id]!;
           return (
@@ -834,7 +930,25 @@ export const Board = memo(function Board({
             </g>
           );
         })}
+        {(pending?.kind === 'ship' || pending?.kind === 'moveShip') &&
+          (() => {
+            const at = edgeCentre(board, pending.kind === 'ship' ? pending.edge : pending.to);
+            return (
+              <g
+                className="build-ghost ship-piece"
+                data-pending-build={pending.kind}
+                role="img"
+                aria-label={pending.kind === 'ship' ? 'Ship placement preview' : 'Ship move preview'}
+                pointerEvents="none"
+                transform={`translate(${at.x},${at.y})`}
+              >
+                <ShipShape color={color(me!)} />
+              </g>
+            );
+          })()}
         {pending &&
+          pending.kind !== 'ship' &&
+          pending.kind !== 'moveShip' &&
           (() => {
             const road = pending.kind === 'road' ? roadGeometry(board, pending.edge) : null;
             const vertex = pending.kind !== 'road' ? board.vertices[pending.vertex]! : null;

@@ -177,7 +177,12 @@ test('the mode stylesheet loads after every layered sheet and adds only the bloc
   const imports = [...main.matchAll(/^import '\.\/([\w-]+\.css)';$/gm)].map((match) => match[1]);
   // Only the components' own sheets come after table-light.css, the last layered one.
   assert.ok(imports.indexOf('game-mode.css') > imports.indexOf('table-light.css'));
-  assert.deepEqual(imports.slice(imports.indexOf('table-light.css') + 1), ['game-mode.css', 'open-sea.css']);
+  assert.deepEqual(imports.slice(imports.indexOf('table-light.css') + 1), [
+    'game-mode.css',
+    'open-sea.css',
+    'ship-sites.css',
+    'placement-choice.css',
+  ]);
   const css = readFileSync(new URL('../apps/client/src/game-mode.css', import.meta.url), 'utf8');
   assert.ok(!css.includes('!important'));
   for (const rule of css.match(/^[^\s/*@}][^{]*\{/gm) ?? [])

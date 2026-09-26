@@ -13,7 +13,7 @@ import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
-import { buildShown, isBuildAction, placementValid } from './placement.js';
+import { buildShown, edgePieces, isBuildAction, placementValid } from './placement.js';
 import type { BuildAction, PlacementDraft } from './placement.js';
 import { BOARD_THEMES } from './board-theme.js';
 import { usePreferences } from './preferences.js';
@@ -139,6 +139,8 @@ import './mobile-shelf.css';
 import './table-light.css';
 import './game-mode.css';
 import './open-sea.css';
+import './ship-sites.css';
+import './placement-choice.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];
@@ -914,6 +916,19 @@ function App() {
     setBusy(true);
     connect(newSession(auth.profile.name, roomId, auth.profile));
   }
+  /** Open Sea: where the edge being confirmed takes a road or a ship, the two, with their costs when bought. */
+  function pieceChoice(draft: PlacementDraft) {
+    const a = draft.action;
+    if (!g || (a.kind !== 'road' && a.kind !== 'ship')) return undefined;
+    const pieces = edgePieces(g, a.edge),
+      costs = findRuleset(g.ruleset)?.costs;
+    if (pieces.length < 2) return undefined;
+    return {
+      pieces,
+      ...(g.phase === 'actions' && costs?.ship ? { costs: { road: costs.road, ship: costs.ship } } : {}),
+      onChoose: (kind: 'road' | 'ship') => setPlacement({ ...draft, action: { kind, edge: a.edge } }),
+    };
+  }
   function chooseRobber(hex: number) {
     if (!g || !me || disabled || !myTurn || g.phase !== 'robber' || hex === g.robber) return;
     setRobberHex(hex);
@@ -1391,6 +1406,7 @@ function App() {
             <PlacementConfirmation
               action={placement.action}
               disabled={disabled || !placementReady}
+              choice={pieceChoice(placement)}
               onCancel={() => setPlacement(null)}
               onConfirm={() => {
                 if (!placementValid(placement, g, room?.roomId, me)) return;

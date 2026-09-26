@@ -251,6 +251,12 @@ export function deriveFeedback(
       event.sites.push(`[data-road-id="${id}"]`);
       event.sounds.push('road');
     }
+  // Open Sea: a ship built, or moved to a new edge, lands like a road.
+  for (const id of Object.keys(g.ships ?? {}))
+    if (!before.ships?.[Number(id)]) {
+      event.sites.push(`[data-ship-id="${id}"]`);
+      event.sounds.push('road');
+    }
   const production = dice ? publicProduction(before, g, dice) : null;
   if (dice) {
     event.sounds.push('dice');

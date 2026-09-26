@@ -2,6 +2,7 @@ import type { RoomState } from '../../../packages/protocol/src/index.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import { owedBy } from '../../../packages/rules/src/owed.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
+import { findRuleset } from '../../../packages/rules/src/rulesets.js';
 import type { GameIconName } from './GameIcons.js';
 
 export type GameStatus = {
@@ -17,6 +18,8 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
   const active = game.players[game.active];
   const mine = active?.id === me;
   const name = active?.name ?? 'A player';
+  // Open Sea's setup piece and free pieces are roads or ships, and a seven moves the robber or the pirate.
+  const sea = !!findRuleset(game.ruleset)?.sea;
   let prompt = '',
     icon: GameIconName = 'timer',
     favicon: GameStatus['favicon'] = null;
@@ -37,13 +40,23 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
         icon = 'settlement';
         break;
       case 'setupRoad':
-        prompt = mine ? 'Place a road on a highlighted path' : `${name} is placing a road`;
+        prompt = sea
+          ? mine
+            ? 'Place a road or a ship on a highlighted path'
+            : `${name} is placing a road or a ship`
+          : mine
+            ? 'Place a road on a highlighted path'
+            : `${name} is placing a road`;
         icon = 'road';
         break;
       case 'freeRoads':
-        prompt = mine
-          ? `Place ${game.freeRoads} free road${game.freeRoads === 1 ? '' : 's'} on the highlighted paths`
-          : `${name} is placing free roads`;
+        prompt = sea
+          ? mine
+            ? `Place ${game.freeRoads} free ${game.freeRoads === 1 ? 'road or ship' : 'roads or ships'} on the highlighted paths`
+            : `${name} is placing free roads or ships`
+          : mine
+            ? `Place ${game.freeRoads} free road${game.freeRoads === 1 ? '' : 's'} on the highlighted paths`
+            : `${name} is placing free roads`;
         icon = 'road';
         break;
       case 'roll':
