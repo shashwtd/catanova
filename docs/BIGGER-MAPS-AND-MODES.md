@@ -108,8 +108,9 @@ Smaller things that will need touching, none of them hard:
   But `seatColors` gives six seats without a chosen colour coral and sky twice
   (see Phase 1).
 - `Board.preset` is `'balanced-v1' | 'balanced-v2'` (new boards are v2) and
-  `Game.schema` is `1`. `Game.ruleset` is saved on every game but never read.
-  It is what tells a Classic game from a new one, so no schema bump is needed;
+  `Game.schema` is `1`. `Game.ruleset` is saved on every game, and since
+  Release A it is read: it names the game's ruleset. It is what tells a Classic
+  game from a new one, so no schema bump is needed;
   [Game modes](GAME-MODES.md#one-ruleset-chosen-in-the-room-frozen-at-the-start)
   covers the rollback risk instead.
 
@@ -117,7 +118,8 @@ Smaller things that will need touching, none of them hard:
 
 The earlier version of this plan said only `board.ts` knew the number 19, and
 that seats were capped in three places. Both were wrong. What the codebase
-review found:
+review found, and where the mode system (Release A, step 1 of
+[Game modes](GAME-MODES.md#step-1-the-mode-system-m)) has since dealt with it:
 
 - **Protocol bounds.** `parseGameAction` rejects vertex ≥ 54, edge ≥ 72 and
   hex ≥ 19, and runs on every action before the rules. Big Table needs 80, 109
@@ -128,35 +130,48 @@ review found:
   `ResourcePicker` and `TradePanel` cap one resource at 19, below the 24 in Big
   Table's bank. The terrain shader has room for 19 hexes. Piece limits (15, 5
   and 4) are literals in several files, and the development deck is one
-  constant.
+  constant. Release A reads the bank, the deck, the pieces and the costs from
+  each game's ruleset, and the parser, `ResourcePicker` and `TradePanel` from
+  the bank; the shader went in Phase 0. The bots still read Classic's numbers,
+  since they play only Classic.
 - **Seven seat caps.** `createGame`, `Store.enter` (ROOM_FULL), the bot seat in
   `Store.lobby`, `RoomInvites.openRoom`, `RoomInvitePanel`, the lobby's
-  `SEATS` and its "/4" label. Tests pin it as well.
+  `SEATS` and its "/4" label. Tests pin it as well. All seven read the ruleset
+  since Release A.
 - **The lobby's board.** A room deals a Classic board when it is created and on
   rematch, never re-deals it when settings change, and Start hands it to
   `createGame`, which checks only the seed. A mode change must re-deal, and
-  Start must check that the board's preset matches the ruleset.
+  Start must check that the board's preset matches the ruleset. Both do since
+  Release A, and a room deals each board with its mode's preset.
 - **Stand-in bots.** Any disconnected player is covered by a stand-in after 30
   seconds. Big Table and Open Sea allow no bots, so stand-ins are off there and
   the absence rule in [Turn clock](TURN_CLOCK.md#modes-without-bots) takes their
   place. It must act even in rooms without a turn timer, or a missing player
-  could stop the game for good.
+  could stop the game for good. Built in Release A: the ruleset's `standIns`
+  decides, and the rule wakes the room on its own after the 2 minutes.
 - **The clock and unknown phases.** If `timeoutAction` has no move for the
   current phase, `expireRoom` throws CLOCK_STATE and automatic play halts for
-  that room. Every new phase ships with its timeout move.
+  that room. Every new phase ships with its timeout move. Since Release A,
+  `timeoutAction` answers every kind of move `owedMoves` lists, setup
+  included, and a test checks that through a whole game.
 - **One actor.** Every action outside discards and trade replies requires the
   active player, there is one `playedCard` flag per turn, `GameView.legal` is
   computed for the active player only, and `checkWin` looks only at the active
-  player.
+  player. Release A adds the one place that says whom the game waits on,
+  `owedMoves`, which the Partner's phase will extend; the rest is Big Table's.
 - **Terrain classes.** Production and setup treat every terrain but desert as a
   resource. A gold field would pay nothing, and a sea or gold hex next to a
   second starting settlement writes a NaN key into the hand. The client repeats
   the production rule to animate gains and must change with it.
 - **Results.** The results screen labels any point it cannot explain as a
   Victory Point card, and the results payload has no mode, ships or bonuses.
+  Since Release A the payload carries each player's score terms and the screen
+  names every part from them; the mode, ships and bonuses are still to come.
 - **Restore verifier.** It checks Classic's numbers (two to four players, 19 of
   each resource, a 25-card deck, the phase list, trade offers owned by the
-  active player) and would flag every new-mode game as corrupt.
+  active player) and would flag every new-mode game as corrupt. Since Release A
+  it reads seats, bank, deck and pieces from each game's ruleset, and names a
+  ruleset it does not know instead of misreading the game.
 - **Copy.** Player-facing copy says "2–4 players" in many places, and new wiki
   pages must be added to the page list in `docs/wiki/build_pack.py`.
 
@@ -294,9 +309,9 @@ That touches more than it looks like:
   The clock loop's comment assumes at most 12 forced steps in a row; six
   discards and a Partner's phase exceed that, which only delays the rest to
   the next tick.
-- The bot driver's `owedBy` decides who owes a move from the active seat and
-  the discard map. Bots are off in Big Table, but the absence rule needs the
-  same answer.
+- The bot driver's `owedBy` decides who owes a move, and the absence rule
+  needs the same answer. Since Release A both read `owedMoves`, so the
+  Partner's phase is added there once, with its timeout move.
 - The client's "is it my move" checks all assume one actor: `myTurn`,
   `placementValid`, turn activity and attention prompts, `cardLockReason`, the
   turn and trade buttons, and the single highlight in `PlayerRail`. There is no

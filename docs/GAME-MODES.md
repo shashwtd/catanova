@@ -349,28 +349,38 @@ scope.
 ### One ruleset, chosen in the room, frozen at the start
 
 The host picks a mode in Room setup, beside the target and the dice. The choice
-is part of `RoomSettings` and, when the game starts, is frozen into the game as
-its ruleset. `Game.ruleset` already exists as a string (`base-3-4-v1`) on every
-saved game, though nothing reads it yet; it becomes a structured, versioned
-description:
+is `mode` in `RoomSettings`, a ruleset id, and when the game starts it is frozen
+into the game as its ruleset. `Game.ruleset` stays the id string it has always
+been on every saved game (`base-3-4-v1`). Since Release A the id is read: it
+names a structured description in `packages/rules/src/rulesets.ts`, and
+`findRuleset(id)` returns it (no id means Classic, an unknown id nothing):
 
 ```ts
 type Ruleset = {
   id: string; // 'base-3-4-v1', 'big-table-v1', 'open-sea-v1'
-  board: BoardPresetId; // from Phase 0 of the maps plan
+  name: string; // Classic, Big Table, Open Sea
+  summary: string; // the line under the name in Room setup
+  board: BoardPresetId; // the preset that deals its boards
+  earlierBoards?: BoardPresetId[]; // presets whose boards a lobby may still hold
   seats: { min: number; max: number }; // 2–4, 5–6, 3–4
   victoryPoints: { default: number; min: number; max: number }; // 10 (8–15), 10 (8–15), 14 (10–18)
-  supply: Supply; // bank per resource, development deck, pieces per player
-  bots: boolean; // true only in Classic, for now
-  turns?: 'paired' | 'betweenTurnsBuild'; // Big Table, chosen by the host
-  sea?: { scenario: ScenarioId }; // 'outer-isles'
-  variants: {
-    friendlyRobber?: true;
-    discardLimit?: number;
-    harbourBonus?: true;
+  supply: {
+    bank: number; // cards of each resource: 19, 24, 19
+    deck: Record<CardKind, number>; // 25, 34, 25 development cards
+    pieces: { roads: number; settlements: number; cities: number }; // 15, 5, 4
   };
+  costs: Record<Purchase, Hand>; // per mode, so a ship never reaches Classic
+  bots: boolean; // true only in Classic, for now
+  standIns: boolean; // a stand-in bot covers an absent player; Classic only
 };
 ```
+
+Classic is written out from the constants it has always used. A mode that ships
+is added to the registry in `rulesets.ts`; `registerRuleset()` exists for tests,
+which register a hidden test mode (`tests/test-ruleset.ts`), and no environment
+setting or request can add one. Later modes add their own fields when they need
+them: the Big Table turn style (`turns?: 'paired' | 'betweenTurnsBuild'`), the
+Open Sea scenario (`sea?: { scenario }`) and the small variants.
 
 A saved game keeps the ruleset it started with. No schema bump is needed to tell
 games apart, because every game already records `base-3-4-v1`. A bump would also
@@ -381,16 +391,24 @@ games are saved. So the reader ships before the writer: first a release that
 refuses an unknown ruleset on every path that reads a game, then a release that
 can create one.
 
-In the lobby:
+In the lobby (built in Release A):
 
 - changing mode is refused while the lobby holds more players than the new mode
-  allows, or while bots are seated and the new mode allows none;
+  allows (`MODE_SEATS`), or while bots are seated and the new mode allows none
+  (`MODE_BOTS`), and a mode the host may not pick is refused as
+  `MODE_UNAVAILABLE`;
 - a mode change resets the points target to the new mode's default (10 for
-  Classic and Big Table, 14 for Open Sea), and a lobby with too few players may
-  switch and wait;
-- Start requires the mode's minimum (five for Big Table, three for Open Sea);
+  Classic and Big Table, 14 for Open Sea), whatever target came with it, and a
+  lobby with too few players may switch and wait. Room setup shows the new
+  mode's default, and the host moves the target once the mode is applied;
+- a settings change without `mode`, as a tab from before modes sends, keeps the
+  room's mode. A Classic room stores no `mode`, so its settings are unchanged;
+- Start requires the mode's minimum (five for Big Table, three for Open Sea),
+  checks again that the host may pick the mode and that no bot is seated in a
+  mode without them, and freezes the ruleset into the game;
 - the room deals its board when it is created, so a mode change re-deals it, and
-  Start refuses a board whose preset does not match the ruleset.
+  Start refuses a board whose preset does not match the ruleset
+  (`BOARD_MISMATCH`). A rematch keeps the mode and deals a board for it.
 
 ### Features, not forks
 
@@ -405,31 +423,45 @@ Four things every mode touches, so they get one home early:
 
 - **Who is owed a move.** Today one player acts at a time, apart from discards
   and trade replies. The Partner's phase, the between-turns build windows and
-  gold picks all ask a player who is not on turn for an answer. A small
-  `pending` list of `{ player, question }`, answered in order or together,
-  replaces one-off phases. The turn clock, the absence rule, the bot driver's
-  `owedBy` and the client's "your move" state all read from it.
-- **Scoring.** `score()` becomes a sum of named terms: buildings, cards, awards
-  and island bonuses (and later, perhaps, a harbour bonus). The game view, the
-  win check, player records and the admin analytics all read it. The results
-  screen needs the terms by name: today it labels any point it cannot explain as
-  a Victory Point card, so island bonuses would show as cards.
+  gold picks all ask a player who is not on turn for an answer. Built in Release
+  A as `owedMoves(game)` in `packages/rules/src/owed.ts`: a list of
+  `{ player, kind }`, one entry per player the game waits on now. In Classic the
+  kind is the phase (setup, roll, actions, robber, free roads) for the player on
+  turn, or `discard` for each player who must discard. Trade replies are never
+  owed, since nothing waits for them. The turn clock's discard clocks, the
+  absence rule, the bot driver's `owedBy`, `timeoutAction` and the client's
+  "your move" cue read from it. A later kind (`partner`, `buildWindow`,
+  `goldPick`) is added there with its timeout move in `timeout.ts`, and whatever
+  must be answered in order lists only the player whose turn it is to answer.
+- **Scoring.** `score()` is a sum of named terms (built in Release A, as
+  `scoreTerms()` in `game.ts`): settlements, cities, the two awards and victory
+  point cards, with island bonuses (and later, perhaps, a harbour bonus) to
+  come. A new term is one more entry there, read from its mode's own state. The
+  game view, the win check, player records and the admin analytics all read it.
+  The game view sends each player's terms, with cards hidden as in their points,
+  and results keep them, so the results screen names each part. Results saved
+  before terms still work their parts out as before.
 - **Supply and costs.** One table per ruleset instead of constants: 19, 24 and
   19 cards of each resource; 25, 34 and 25 development cards; 15 roads, 5
-  settlements and 4 cities per player, plus 15 ships in Open Sea. Three places
-  cap one resource at 19 (the action parser, the resource picker and the trade
-  panel), which a 24-card bank outgrows. Costs stay per ruleset too: a ship in a
-  global cost table would make Classic bots think ships are buildable.
+  settlements and 4 cities per player, plus 15 ships in Open Sea. Built in
+  Release A: the rules read the bank, deck, pieces and costs from the game's
+  ruleset. The action parser caps one resource at the largest bank of any
+  ruleset, and the rules then hold each game to its own; the resource picker and
+  the trade panel read the game's bank. Costs stay per ruleset too: a ship in a
+  global cost table would make Classic bots think ships are buildable. Bots read
+  Classic's table, since they play only Classic.
 - **Board bounds.** The action parser rejects any intersection from 54, edge
   from 72 and hex from 19 before the rules see a move. Bounds move into the
   rules and are checked against the game's own board.
 
 ### Server
 
-- **Seats.** The four-seat cap sits in seven places: `createGame`,
+- **Seats.** The four-seat cap sat in seven places: `createGame`,
   `Store.enter` (ROOM_FULL), the bot seat in `Store.lobby`,
   `RoomInvites.openRoom`, `RoomInvitePanel`, the lobby's `SEATS` and its "/4"
-  label. Tests pin it too. All of them read the ruleset.
+  label. Tests pin it too. Since Release A all of them read the ruleset, as do
+  the loading screen's minimum and the lobby's Start button, and Classic's
+  errors keep their wording ("Start with two to four players").
 - **Journal.** The compact journal stores states and copes with any board shape,
   so Big Table and Open Sea need no change. The admin's game analytics replays
   journals, so it learns each new action as it lands (ships, ship moves, gold
@@ -442,15 +474,19 @@ Four things every mode touches, so they get one home early:
   CLOCK_STATE and halts automatic play in that room.
 - **Absence.** Classic covers an empty seat with a stand-in bot after 30
   seconds. In modes without bots the stand-in is off and the absence rule takes
-  its place. It has to act in rooms with no turn timer too.
+  its place. It has to act in rooms with no turn timer too. Built in Release A:
+  the ruleset's `standIns` decides, and the rule is in
+  [Modes without bots](TURN_CLOCK.md#modes-without-bots).
 - **Rooms.** A rematch keeps the ruleset. Invitations and previews show the
   mode. An older open tab that saves settings without a mode must not turn a
   room back into Classic, so the server keeps the stored mode when the field is
-  missing.
+  missing. Release A does all of this but the invitation text; previews carry
+  the room's settings, mode included.
 - **Clients.** A client that cannot draw a mode must not start a game in it. A
-  capability flag, like the one that already gates Start on `preloadGame`, does
-  this without bumping the protocol version, which would disconnect every open
-  tab.
+  capability, like the one that already gates Start on `preloadGame`, does this
+  without bumping the protocol version, which would disconnect every open tab.
+  Built in Release A: the join message's `rulesets` lists every ruleset the
+  tab's build contains; a tab that sends none draws Classic only.
 
 ### Client
 
@@ -460,6 +496,10 @@ Four things every mode touches, so they get one home early:
   selected, and the target range each mode allows. The lobby shows the chosen
   mode. Outside Classic, "Add a bot" is shown disabled, with the reason. See
   [Interface decisions for the build](#interface-decisions-for-the-build).
+  Release A builds all of this but the turn structure, which comes with Big
+  Table. The section shows only when the host may pick more than Classic or
+  the room is already in another mode, so with Classic alone nothing on screen
+  changes.
 - **Board.** Sea tiles, ships, gold fields and the pirate; later, fog. Ships
   are upright boats in the player's colour, the pirate a black-sailed ship, and
   Open Sea's harbour markers lose their boat. The renderer changes are in the
@@ -541,6 +581,14 @@ to end (room setup, the frozen ruleset, rules, clock, journal, admin), and a
 Classic room is unchanged.
 
 It is not glamorous, and it is what makes every later mode cheap.
+
+**Status on 26 September 2026.** Built on `feature/modes-a/2026-09-26` as
+Release A, not yet merged. `tests/test-mode-e2e.test.ts` picks the hidden test
+mode, starts it, plays it through a seven, replays its journal move by move, and
+passes it through the restore verifier and the admin's game analytics. The
+Classic fixtures are byte for byte what they were, and the lobby, Room setup,
+rail and results screens are pixel for pixel what they were at 375 × 812,
+812 × 375, 1366 × 768 and 1440 × 900.
 
 ### Step 2: the board becomes data (M)
 
@@ -724,6 +772,24 @@ cannot read.
      `scripts/ci.ts` and to the `env -u` list of the runbook's
      `catanova_compose` helper.
 
+   Built on `feature/modes-a/2026-09-26`, as listed. What it adds beyond the
+   list:
+   - the switches live in `apps/server/src/modes.ts`. An unknown id in
+     `CATANOVA_MODES` is logged as `mode_unavailable`, and a server that opens
+     more than Classic logs `modes` at start-up. Only the host's snapshot
+     lists the modes they may pick (`RoomState.modes`), and only when that is
+     more than Classic;
+   - the capability is `rulesets` in the join message: the ruleset ids the
+     tab's build contains. A game in a mode this server does not know is
+     refused with `VERSION_MISMATCH`, not `CLIENT_UPDATE_REQUIRED`, since
+     refreshing cannot help;
+   - start-up and the compactor leave a game in an unknown mode exactly as it
+     is, the account history skips it, and the clock stops asking about it. Game
+     analytics refuses it, the dice statistics leave its rolls out and the
+     retention report reads no ending from it;
+   - no production code path or setting can reach the test mode, which only
+     tests register. The design preview at `/dev/lounge` fakes one of its own.
+
    The watchdog, the backup pings and the weekly drill are not installed on
    the VM yet. Switch them on
    ([Alerts](../deploy/single-vm/OPERATIONS.md#alerts)), deploy A, and let one
@@ -884,42 +950,42 @@ about 11 pixels. The renderer work is in the
 
 ### Every planned element
 
-| Element                                     | Status           | Approach                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Game mode section in Room setup             | Blends           | Built in `RoomConfiguration` with the same fieldset and `label.settings-dice-option` cards, so today's selected and hover rules apply. The legend gets its own painted icon. Shown only when the host may pick more than Classic.                                                                                             |
-| Big Table turn style                        | Needs work       | Two cards inside the Game mode fieldset, after Big Table, indented to its text, under a `.settings-caption` line and opened with `.t-acc`. Fix the copy: the Partner gets a full action phase, with no roll and no player trades.                                                                                             |
-| A blocked mode, and the points range        | Not designed yet | A `data-disabled` state on the same card selector: opacity 0.45, `--dialog-muted` text, the reason in `<small>` ("Bots play Classic only"). The existing range takes its limits and Standard label from the ruleset.                                                                                                          |
-| Mode chip in the lobby                      | Not designed yet | A `button.lobby-mode` first in `.lobby-room-options`, shaped like the goal, timer and dice chips: an 18-pixel icon, Barlow 500 at 14 px, opening Room setup. The strip already wraps; check the wrap and its dividers at 375 × 812.                                                                                           |
-| Six-seat lobby                              | Not designed yet | `room-seats.css` handles five and six places: three columns on phones with smaller portraits, checked at 812 × 375 and 1366 × 768. "Add a bot" uses the disabled `.seat-fill` with its reason; "Big Table needs five players" goes in the launch hint.                                                                        |
-| Mode in history, invitations and results    | Not designed yet | No new badge. The mode goes in the small line of `.match-row`, in the invitation text and as a Mode row in `.game-over-facts`. Match records need a ruleset column first.                                                                                                                                                     |
-| An out-of-date tab                          | Not designed yet | `CLIENT_UPDATE_REQUIRED` with a reason the player sees, "Refresh to play Big Table" or "Refresh to play Open Sea", through the existing error path.                                                                                                                                                                           |
-| Six-player rail, portrait phone             | Needs work       | One six-seat stylesheet on `.playing .player-rail` with the seat attribute. Names at least 12 px; the rank hidden while the turn chip shows; award counts moved into `.profile-stats`; medals about 22 px. The friend button keeps its reveal and only moves when shown.                                                      |
-| Six-player rail, landscape phone            | Needs work       | The same stylesheet, inside the in-game query `(max-width: 1000px) and (max-height: 600px) and (orientation: landscape)`. Re-measure at 812 × 375 and 844 × 390 with a Partner chip, live timers and an absence label; keep 8 px above the dock.                                                                              |
-| Six-player rail, desktop                    | Needs work       | Fits at 1440 × 900. At 1366 × 768 the last card runs under the dice of the last roll: add a smaller portrait in the six-seat stylesheet (the old 70-pixel step never applies) or lift the dice. Check 1280 × 720 too.                                                                                                         |
-| Seat colours 5 and 6                        | Needs work       | Fix `seatColors` first: today it gives coral and sky twice. Then check jade and rose roads, houses and ships on forest, pasture and water, and rose beside coral, on both themes. If two still confuse, change the fallback order, not the palette.                                                                           |
-| Lead and Partner markers                    | Not designed yet | Add the Partner's phase and build windows to `playerTurnActivity`, so both marker holders get the existing `.profile-turn` chip. Both get `.active`, and the timer shows only on the one acting; today both follow `game.active`. Label them with the existing, unused `.profile-turn-label`.                                 |
-| Partner's phase prompt and trade lock       | Not designed yet | `.action-prompt`: "Your Partner's phase: build, buy, trade with the bank, play one card". The attention cue for the Partner only. The trade panel greys its player offers with a muted line. The end button reads "End phase".                                                                                                |
-| Between-turns build windows                 | Not designed yet | For the player in the window: `.action-prompt` "Build window: build or buy, no trading", the timer in their chip, and the end button labelled "Done". Everyone else sees only the chip move along the rail, with no sound and no prompt.                                                                                      |
-| Turn clock in the new phases                | Not designed yet | The same `.turn-timer`, reading its deadline from whoever is owed a move. Change both its title and its visible label, which today says "Discards": "Gold picks", "Partner".                                                                                                                                                  |
-| Absent player with no stand-in              | Not designed yet | Reuse `.offline-mark` and `.profile-absence`. Change the visible "Away" and the tooltip, which says a bot takes the seat: "Auto moves in 1:32", then "Clock plays forced moves". On the smallest cards, the mark only.                                                                                                        |
-| Big Table island                            | Blends           | Measured above. The fallback's water outline peaks about 436 units out, just inside `waterOutline`'s 440-unit reach, so nothing is cut; a wider band would need the reach raised. Screenshot the 11 harbours on both themes, in WebGL and the fallback.                                                                       |
-| Tokens and harbour badges on smaller hexes  | Needs work       | Big Table's tokens are readable. On Outer Isles phones they are about 11 px, so the owner picks the framing: a narrower margin or rim, a camera that opens on the main island, or a larger token. Decide from 375 × 812 and 390 × 844 screenshots.                                                                            |
-| Sea                                         | Not designed yet | Painted water, never a hex grid. Start from the land-only preview: deep and shallow water, foam and sand from every coast, filling the whole sea. Sea edges are marked only where a ship can go at that moment, like today's road sites, with the dashed `.site-guide` lines.                                                 |
-| The board's outer edge                      | Not designed yet | The outer ring of sea stays opaque deep water. The fade into the table starts outside the rim, on a rounded, wobbling line, so there is no frame and no stepped edge. The stage shadow must fall under the islands, not along the sea.                                                                                        |
-| Ships                                       | Needs work       | A `ShipShape` beside `RoadShape` and `BuildingShape`: an upright hull in the seat colour with the house contour, a sheen line, cream `#fff0cc` sails and a plinth-like shadow. No coloured stripe. Re-mock with real colours on real sea edges.                                                                               |
-| Pirate                                      | Needs work       | A ship in the robber's colours: near-black `#172231` hull and sails, a `#c3b488` contour, one `#e7d8af` pennant stroke and the piece shadow, about 1.1 times a ship. No skull, no pure black and no darkened hex on water.                                                                                                    |
-| Harbours in Open Sea                        | Blends           | Keep the piers and the resource badge; drop the boat sprite when the board has sea. Mock one whose sea hex also holds two ships and the pirate. If they collide, pull the badge towards the shore and draw ships above it.                                                                                                    |
-| Gold field, Storybook theme                 | Needs work       | Redo it with the Storybook prompt, keeping the chosen rock, seam, pool and nuggets but moved up clear of the number token. A muted warm stone ground, not pasture green; a seam no brighter than the hay tile; calm edges. Test at board size beside real tiles.                                                              |
-| Gold field, Classic theme and fallback      | Not designed yet | A Classic tile in the denser style of `terrain-fantasy`, and a warm stone fallback colour such as `#8f7f5a`, labelled Gold. Add gold as a second texture, or build a new atlas that keeps tiles 0–5 pixel for pixel and is saved losslessly (re-saving the lossy atlas changes every tile), so Classic stays pixel-identical. |
-| New icons                                   | Not designed yet | Game mode, pirate, gold and island bonus, painted with the icon prompt. Repack the atlas to 8 × 7 with a clean gutter of at least 4 px, a new hash and new sizes. Ships use the existing boat; Move ship a line icon.                                                                                                         |
-| Road or ship on a coastal edge              | Not designed yet | The live game has no build shelf: players tap a site and confirm it. Where an edge takes either, `PlacementConfirmation` offers Road or Ship: in play, in setup and for Road Building.                                                                                                                                        |
-| Moving a ship                               | Not designed yet | "Move ship" in the dock's `.utility-actions`, styled like Trade; tapping your own ship also starts a move. Movable ships get the dashed orbit, destinations the site guide, and `PlacementConfirmation` confirms. A tooltip says why a ship cannot move.                                                                      |
-| Gold pick                                   | Not designed yet | Built from Year of Plenty's picker in `DevelopmentCards` ("Gold field: choose N", buttons limited by the bank) in a `.robber-flow`-style panel, with the discard waiting list for the order of picks and `TurnTimer` for the 20 seconds.                                                                                      |
-| Robber or pirate                            | Not designed yet | A first step with two `.robber-victim`-style buttons, robber and pirate, each with a title and one line. Then the existing target selection, on sea hexes for the pirate. Robber and pirate hexes are never targetable at once.                                                                                               |
-| Island bonus                                | Not designed yet | One celebration through `.award-celebration-layer`, +2 in the score tooltip and the log, and "Island bonus × n" with its icon in the results. No permanent board marker, unless a small pennant reads on a phone.                                                                                                             |
-| Results screen                              | Not designed yet | Points named by score term; "Longest Route" in Open Sea in the facts, the standings and the medal's label; a Mode fact. Screenshot six players at 375 × 812.                                                                                                                                                                  |
-| Trade and robber panels with five opponents | Not designed yet | `.trade-partners` is one row. Five partners in a 351-pixel phone panel, and the Partner as a trade partner during the Lead's part, need a layout. So do the discard and victim lists.                                                                                                                                         |
-| Copy, history and labels                    | Not designed yet | Per-mode quick rules, card text ("robber or pirate", "roads or ships"), costs with the ship, a guide section per mode, log lines and icons for every new action, a notice when Big Table drops below five players, and accessible names for sea, gold, ships, the pirate and the Partner.                                     |
+| Element                                     | Status            | Approach                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Game mode section in Room setup             | Built (Release A) | Built in `RoomConfiguration` with the same fieldset and `label.settings-dice-option` cards, so today's selected and hover rules apply. Shown only when the host may pick more than Classic, or the room is already in another mode. The legend's icon is a line icon (`game-mode`, three tiles) until its painted icon is made.                         |
+| Big Table turn style                        | Needs work        | Two cards inside the Game mode fieldset, after Big Table, indented to its text, under a `.settings-caption` line and opened with `.t-acc`. Fix the copy: the Partner gets a full action phase, with no roll and no player trades.                                                                                                                       |
+| A blocked mode, and the points range        | Built (Release A) | A `data-disabled` state on the same card selector: opacity 0.45, `--dialog-muted` text, the reason in `<small>` ("Bots play Classic only", "For up to four players"). The existing range takes its limits and Standard label from the ruleset; while a new mode is picked it shows that mode's default, waiting, with a `.settings-caption` saying why. |
+| Mode chip in the lobby                      | Built (Release A) | A `button.lobby-mode` first in `.lobby-room-options`, shaped like the goal, timer and dice chips: an 18-pixel icon, Barlow 500 at 14 px, opening Room setup. Shown when the room is not Classic or its host could pick another mode. On phones the four chips sit two by two (`game-mode.css`), so no divider floats at the start of a wrapped row.     |
+| Six-seat lobby                              | Not designed yet  | `room-seats.css` handles five and six places: three columns on phones with smaller portraits, checked at 812 × 375 and 1366 × 768. "Add a bot" uses the disabled `.seat-fill` with its reason; "Big Table needs five players" goes in the launch hint.                                                                                                  |
+| Mode in history, invitations and results    | Not designed yet  | No new badge. The mode goes in the small line of `.match-row`, in the invitation text and as a Mode row in `.game-over-facts`. Match records need a ruleset column first.                                                                                                                                                                               |
+| An out-of-date tab                          | Built (Release A) | `CLIENT_UPDATE_REQUIRED` with a reason the player sees, "Refresh to play Big Table" or "Refresh to play Open Sea", through the existing error path. The server builds it from the mode's name.                                                                                                                                                          |
+| Six-player rail, portrait phone             | Needs work        | One six-seat stylesheet on `.playing .player-rail` with the seat attribute. Names at least 12 px; the rank hidden while the turn chip shows; award counts moved into `.profile-stats`; medals about 22 px. The friend button keeps its reveal and only moves when shown.                                                                                |
+| Six-player rail, landscape phone            | Needs work        | The same stylesheet, inside the in-game query `(max-width: 1000px) and (max-height: 600px) and (orientation: landscape)`. Re-measure at 812 × 375 and 844 × 390 with a Partner chip, live timers and an absence label; keep 8 px above the dock.                                                                                                        |
+| Six-player rail, desktop                    | Needs work        | Fits at 1440 × 900. At 1366 × 768 the last card runs under the dice of the last roll: add a smaller portrait in the six-seat stylesheet (the old 70-pixel step never applies) or lift the dice. Check 1280 × 720 too.                                                                                                                                   |
+| Seat colours 5 and 6                        | Needs work        | Fix `seatColors` first: today it gives coral and sky twice. Then check jade and rose roads, houses and ships on forest, pasture and water, and rose beside coral, on both themes. If two still confuse, change the fallback order, not the palette.                                                                                                     |
+| Lead and Partner markers                    | Not designed yet  | Add the Partner's phase and build windows to `playerTurnActivity`, so both marker holders get the existing `.profile-turn` chip. Both get `.active`, and the timer shows only on the one acting; today both follow `game.active`. Label them with the existing, unused `.profile-turn-label`.                                                           |
+| Partner's phase prompt and trade lock       | Not designed yet  | `.action-prompt`: "Your Partner's phase: build, buy, trade with the bank, play one card". The attention cue for the Partner only. The trade panel greys its player offers with a muted line. The end button reads "End phase".                                                                                                                          |
+| Between-turns build windows                 | Not designed yet  | For the player in the window: `.action-prompt` "Build window: build or buy, no trading", the timer in their chip, and the end button labelled "Done". Everyone else sees only the chip move along the rail, with no sound and no prompt.                                                                                                                |
+| Turn clock in the new phases                | Not designed yet  | The same `.turn-timer`, reading its deadline from whoever is owed a move. Change both its title and its visible label, which today says "Discards": "Gold picks", "Partner".                                                                                                                                                                            |
+| Absent player with no stand-in              | Built (Release A) | Reuse `.offline-mark` and `.profile-absence`. Change the visible "Away" and the tooltip, which says a bot takes the seat: "Auto moves in 1:32", then "Clock plays forced moves". On the smallest cards, the mark only: the in-game rail already hides the label's words and shows only the countdown.                                                   |
+| Big Table island                            | Blends            | Measured above. The fallback's water outline peaks about 436 units out, just inside `waterOutline`'s 440-unit reach, so nothing is cut; a wider band would need the reach raised. Screenshot the 11 harbours on both themes, in WebGL and the fallback.                                                                                                 |
+| Tokens and harbour badges on smaller hexes  | Needs work        | Big Table's tokens are readable. On Outer Isles phones they are about 11 px, so the owner picks the framing: a narrower margin or rim, a camera that opens on the main island, or a larger token. Decide from 375 × 812 and 390 × 844 screenshots.                                                                                                      |
+| Sea                                         | Not designed yet  | Painted water, never a hex grid. Start from the land-only preview: deep and shallow water, foam and sand from every coast, filling the whole sea. Sea edges are marked only where a ship can go at that moment, like today's road sites, with the dashed `.site-guide` lines.                                                                           |
+| The board's outer edge                      | Not designed yet  | The outer ring of sea stays opaque deep water. The fade into the table starts outside the rim, on a rounded, wobbling line, so there is no frame and no stepped edge. The stage shadow must fall under the islands, not along the sea.                                                                                                                  |
+| Ships                                       | Needs work        | A `ShipShape` beside `RoadShape` and `BuildingShape`: an upright hull in the seat colour with the house contour, a sheen line, cream `#fff0cc` sails and a plinth-like shadow. No coloured stripe. Re-mock with real colours on real sea edges.                                                                                                         |
+| Pirate                                      | Needs work        | A ship in the robber's colours: near-black `#172231` hull and sails, a `#c3b488` contour, one `#e7d8af` pennant stroke and the piece shadow, about 1.1 times a ship. No skull, no pure black and no darkened hex on water.                                                                                                                              |
+| Harbours in Open Sea                        | Blends            | Keep the piers and the resource badge; drop the boat sprite when the board has sea. Mock one whose sea hex also holds two ships and the pirate. If they collide, pull the badge towards the shore and draw ships above it.                                                                                                                              |
+| Gold field, Storybook theme                 | Needs work        | Redo it with the Storybook prompt, keeping the chosen rock, seam, pool and nuggets but moved up clear of the number token. A muted warm stone ground, not pasture green; a seam no brighter than the hay tile; calm edges. Test at board size beside real tiles.                                                                                        |
+| Gold field, Classic theme and fallback      | Not designed yet  | A Classic tile in the denser style of `terrain-fantasy`, and a warm stone fallback colour such as `#8f7f5a`, labelled Gold. Add gold as a second texture, or build a new atlas that keeps tiles 0–5 pixel for pixel and is saved losslessly (re-saving the lossy atlas changes every tile), so Classic stays pixel-identical.                           |
+| New icons                                   | Not designed yet  | Game mode, pirate, gold and island bonus, painted with the icon prompt. Repack the atlas to 8 × 7 with a clean gutter of at least 4 px, a new hash and new sizes. Ships use the existing boat; Move ship a line icon.                                                                                                                                   |
+| Road or ship on a coastal edge              | Not designed yet  | The live game has no build shelf: players tap a site and confirm it. Where an edge takes either, `PlacementConfirmation` offers Road or Ship: in play, in setup and for Road Building.                                                                                                                                                                  |
+| Moving a ship                               | Not designed yet  | "Move ship" in the dock's `.utility-actions`, styled like Trade; tapping your own ship also starts a move. Movable ships get the dashed orbit, destinations the site guide, and `PlacementConfirmation` confirms. A tooltip says why a ship cannot move.                                                                                                |
+| Gold pick                                   | Not designed yet  | Built from Year of Plenty's picker in `DevelopmentCards` ("Gold field: choose N", buttons limited by the bank) in a `.robber-flow`-style panel, with the discard waiting list for the order of picks and `TurnTimer` for the 20 seconds.                                                                                                                |
+| Robber or pirate                            | Not designed yet  | A first step with two `.robber-victim`-style buttons, robber and pirate, each with a title and one line. Then the existing target selection, on sea hexes for the pirate. Robber and pirate hexes are never targetable at once.                                                                                                                         |
+| Island bonus                                | Not designed yet  | One celebration through `.award-celebration-layer`, +2 in the score tooltip and the log, and "Island bonus × n" with its icon in the results. No permanent board marker, unless a small pennant reads on a phone.                                                                                                                                       |
+| Results screen                              | Needs work        | Points named by score term, built in Release A. Still to do: "Longest Route" in Open Sea in the facts, the standings and the medal's label; a Mode fact. Screenshot six players at 375 × 812.                                                                                                                                                           |
+| Trade and robber panels with five opponents | Not designed yet  | `.trade-partners` is one row. Five partners in a 351-pixel phone panel, and the Partner as a trade partner during the Lead's part, need a layout. So do the discard and victim lists.                                                                                                                                                                   |
+| Copy, history and labels                    | Not designed yet  | Per-mode quick rules, card text ("robber or pirate", "roads or ships"), costs with the ship, a guide section per mode, log lines and icons for every new action, a notice when Big Table drops below five players, and accessible names for sea, gold, ships, the pirate and the Partner.                                                               |
 
 ### Checking a change
 
