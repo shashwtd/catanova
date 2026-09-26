@@ -345,9 +345,17 @@ export function createGame(
 }
 export const activePlayer = (g: Pick<Game, 'players' | 'active'>) => g.players[g.active]!;
 /** How many players are still in the game. */
-const stillPlaying = (g: Pick<Game, 'players'>) => g.players.filter((p) => !p.resigned).length;
+const stillPlaying = (g: { players: readonly { resigned?: boolean }[] }) =>
+  g.players.filter((p) => !p.resigned).length;
 /** Whether the player acting is the Partner, in their phase of a paired turn (or a card played in it). */
 export const partnerActing = (g: Pick<Game, 'pair' | 'active'>) => !!g.pair && g.active === g.pair.partner;
+/**
+ * Whether a Partner's phase follows the Lead's part under way: only while five or more players remain
+ * (docs/RULEBOOK-BIG-TABLE.md, 6.8). Asked of a game or of a player's view of it.
+ */
+export const partnerFollows = (
+  g: Pick<Game, 'pair' | 'active'> & { players: readonly { resigned?: boolean }[] },
+) => !!g.pair && !partnerActing(g) && !g.players[g.pair.partner]!.resigned && stillPlaying(g) >= 5;
 /**
  * The Partner of a paired turn led from `lead`: the third player to the Lead's left, counting only players
  * still in the game (docs/RULEBOOK-BIG-TABLE.md, 6.1). Only asked while five or more remain.
@@ -590,10 +598,6 @@ function pairUp(g: Game) {
     log(g, 'Fewer than five players remain, so turns go one player at a time from now on, with no Partner.');
   delete g.pair;
 }
-
-/** Whether a Partner's phase follows the Lead's part now ending: only while five or more remain. */
-const partnerFollows = (g: Game) =>
-  !!g.pair && !partnerActing(g) && !g.players[g.pair.partner]!.resigned && stillPlaying(g) >= 5;
 
 /** The Lead's part is over: the Partner takes their phase, first moving a robber the Lead left owing. */
 function beginPartnerPhase(g: Game, pendingRobber = false) {

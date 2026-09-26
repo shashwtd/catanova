@@ -1,4 +1,4 @@
-import { roadSites, total } from '../../../packages/rules/src/game.js';
+import { partnerFollows, roadSites, total } from '../../../packages/rules/src/game.js';
 import type { Card, CardKind, GameView } from '../../../packages/rules/src/game.js';
 export const DEVELOPMENT_ART_INDEX: Record<CardKind, number> = {
   knight: 0,
@@ -49,9 +49,9 @@ export function cardLockReason(card: Card, game: GameView, me: string): string |
   }
   if (card.boughtTurn === game.turn) return 'You can play this on your next turn.';
   if (game.players[game.active]?.id !== me) {
-    // Big Table: a Partner plays theirs in their own phase, after the Lead's part.
+    // Big Table: a Partner plays theirs in their own phase, after the Lead's part, while one still follows it.
     const seat = game.players.findIndex((p) => p.id === me);
-    return game.pair?.partner === seat && game.pair.lead === game.active
+    return game.pair?.partner === seat && partnerFollows(game)
       ? 'You can play this in your Partner’s phase.'
       : 'You can play this on your turn.';
   }
