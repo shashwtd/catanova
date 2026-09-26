@@ -145,7 +145,6 @@ import './game-mode.css';
 import './open-sea.css';
 import './ship-sites.css';
 import './placement-choice.css';
-import './robber-choice.css';
 import './gold-pick.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */

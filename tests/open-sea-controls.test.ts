@@ -321,15 +321,16 @@ test('after a seven, Open Sea offers the robber and the pirate, then only the ch
   const noSea = flow({}, { ...view, legal: { ...view.legal, pirateHexes: [] } });
   assert.equal(count(noSea, /class="robber-victim"/g), 1);
   assert.doesNotMatch(noSea, /Pirate/);
-  // Before the choice no hex is a target; after it, only that piece's hexes, land or sea, never both.
-  assert.doesNotMatch(board(view), /robber-target|pirate-target/);
+  // Before the choice no hex is a target; after it, only that piece's hexes, land or sea, never both. Both are
+  // marked as the robber's tiles are.
+  assert.doesNotMatch(board(view), /robber-target/);
   const pirate = board(view, { robberPiece: 'pirate' });
-  assert.equal(count(pirate, /class="terrain-hit pirate-target"/g), view.legal.pirateHexes!.length);
-  assert.doesNotMatch(pirate, /robber-target/);
-  assert.match(pirate, /aria-label="Sea. Move pirate here"/);
+  assert.equal(count(pirate, /class="terrain-hit robber-target"/g), view.legal.pirateHexes!.length);
+  assert.equal(count(pirate, /aria-label="Sea. Move pirate here"/g), view.legal.pirateHexes!.length);
+  assert.doesNotMatch(pirate, /Move robber here/);
   const robber = board(view, { robberPiece: 'robber' });
   assert.equal(count(robber, /class="terrain-hit robber-target"/g), view.legal.robberHexes!.length);
-  assert.doesNotMatch(robber, /pirate-target/);
+  assert.doesNotMatch(robber, /Move pirate here|aria-label="Sea\. Move/);
   // The pirate chosen: the sea hexes, and a way back to the robber.
   const sailing = flow({ piece: 'pirate' });
   assert.match(sailing, /<h2 aria-live="polite">Move the pirate<\/h2>/);
@@ -654,10 +655,9 @@ test('each new component has one stylesheet, loaded last, in the house’s selec
   assert.deepEqual(sheets.slice(sheets.indexOf('open-sea.css') + 1), [
     'ship-sites.css',
     'placement-choice.css',
-    'robber-choice.css',
     'gold-pick.css',
   ]);
-  for (const sheet of ['ship-sites.css', 'placement-choice.css', 'robber-choice.css', 'gold-pick.css']) {
+  for (const sheet of ['ship-sites.css', 'placement-choice.css', 'gold-pick.css']) {
     const css = readFileSync(`apps/client/src/${sheet}`, 'utf8');
     assert.doesNotMatch(css, /!important|#[\w-]+[\s{:.[]|:not\(|@keyframes|animation/, sheet);
     // Barlow only, never a new family or weight.
