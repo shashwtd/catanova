@@ -48,14 +48,19 @@ const CONTROL_PATHS = {
     'M8 4l4 2.3v4.6L8 13.2l-4-2.3V6.3z M16 4l4 2.3v4.6l-4 2.3-4-2.3V6.3z M12 10.9l4 2.3v4.6l-4 2.3-4-2.3v-4.6z',
   // A ship and the way it sails: Open Sea's one ship move a turn.
   'move-ship': 'M3 15.5h12.5l-2 4H5z M9.5 15.5V4 M9.5 5l5 8h-5 M17 9.5h4.5 m-2-2 2 2-2 2',
+  // Open Sea's ship, and the pennant the pirate sails under. They stand in while the ship's own look is chosen.
+  ship: 'M4 15.5h16l-2.5 4h-11z M12 15.5V3.5 M12 4.5l6 9h-6 M11 6.5l-5 7h5',
+  pirate: 'M6.5 21V3 M6.5 4h12l-3.5 4.25 3.5 4.25h-12',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
 /**
- * Open Sea's own symbols, until their painted icons are made (docs/GAME-MODES.md, "New icons"): existing painted
- * icons stand in for them, named here once so that each swap is one line.
+ * Open Sea's own symbols, until their painted icons are made (docs/GAME-MODES.md, "New icons"), named here once so
+ * that each swap is one line. The ship and the pirate take line icons, not the painted boat, whose look is being
+ * chosen again; existing painted icons stand in for gold and the island bonus.
  */
 export const SEA_ICONS = {
-  pirate: 'boat',
+  ship: 'ship',
+  pirate: 'pirate',
   gold: 'spark',
   islandBonus: 'trophy',
 } as const satisfies Record<string, GameIconName>;

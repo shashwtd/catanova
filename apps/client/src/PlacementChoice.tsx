@@ -1,7 +1,7 @@
 import type { Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import { ResourceIcon } from './Board.js';
-import { GameIcon } from './GameIcons.js';
+import { GameIcon, SEA_ICONS } from './GameIcons.js';
 
 type Piece = 'road' | 'ship';
 /** An Open Sea coastal edge takes a road or a ship, one or the other (docs/RULEBOOK-OPEN-SEA.md, section 2.4). */
@@ -33,7 +33,7 @@ export function PlacementChoice({ pieces, costs, selected, onChoose }: PieceChoi
             aria-label={cost ? `${NAMES[piece]}, ${costText(cost)}` : NAMES[piece]}
             onClick={() => onChoose(piece)}
           >
-            <GameIcon name={piece === 'road' ? 'road' : 'boat'} size={20} />
+            <GameIcon name={piece === 'road' ? 'road' : SEA_ICONS.ship} size={20} />
             <span>{NAMES[piece]}</span>
             {cost && (
               <span className="placement-option-cost" aria-hidden="true">

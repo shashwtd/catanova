@@ -1330,7 +1330,7 @@ function App() {
                 <GameIcon
                   name={
                     shipMove
-                      ? 'boat'
+                      ? 'move-ship'
                       : mode === 'city'
                         ? 'city'
                         : mode === 'road'
