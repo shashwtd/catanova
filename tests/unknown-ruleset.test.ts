@@ -83,6 +83,26 @@ function fromNewerRelease(store: Store, roomId: string, whole = false) {
   return JSON.parse(last) as Game;
 }
 
+/** The game's last row, rewritten as a finished game with a winner, the way its journal would end. */
+function finishLastRow(store: Store, roomId: string) {
+  const { revision } = store.db
+    .prepare('SELECT max(revision) AS revision FROM game_events WHERE room_id = ?')
+    .get(roomId) as { revision: number };
+  const game = store.journalState(roomId, revision)!;
+  game.phase = 'finished';
+  game.winner = game.players[0]!.id;
+  const text = JSON.stringify(game),
+    encoded = encodeState(game, text);
+  store.db
+    .prepare('INSERT OR IGNORE INTO journal_boards(hash, board) VALUES (?, ?)')
+    .run(encoded.boardHash, encoded.board);
+  store.db
+    .prepare(
+      "UPDATE game_events SET state = '{}', state_z = ?, board_hash = ?, state_hash = ? WHERE room_id = ? AND revision = ?",
+    )
+    .run(encoded.compact, encoded.boardHash, encoded.stateHash, roomId, revision);
+}
+
 const rowsOf = (store: Store, roomId: string) =>
   JSON.stringify(
     ['games', 'turn_clocks', 'room_presence', 'game_events'].map((table) =>
@@ -234,8 +254,14 @@ test('the restore verifier and the admin reads name a newer mode’s game instea
         .get(roomId)!.n as number;
     assert.ok(rolls(newer.roomId) > 0);
     assert.equal(computeStats(store.db, Date.now()).dice.overall.rolls, rolls(classic.roomId));
-    const matches = readMatches(store.db).matches;
-    assert.equal(matches.length, 2);
+    // The retention report reads how each match ended from its last row. Both games' journals now end
+    // finished: the Classic one is read, and the newer mode's is left unread, as if its row were missing.
+    finishLastRow(store, classic.roomId);
+    finishLastRow(store, newer.roomId);
+    const outcome = (roomId: string) =>
+      readMatches(store.db).matches.find((match) => match.room === roomId)!.outcome;
+    assert.equal(outcome(classic.roomId), 'finishedUnknown');
+    assert.equal(outcome(newer.roomId), 'running');
   } finally {
     store.close();
   }

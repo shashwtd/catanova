@@ -23,10 +23,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import { journalReader } from '../journal.js';
 import type { JournalRow } from '../journal.js';
 import { score } from '../../../../packages/rules/src/game.js';
-import { findRuleset } from '../../../../packages/rules/src/rulesets.js';
+import { findRuleset, rulesetOf } from '../../../../packages/rules/src/rulesets.js';
 import type { Game, Player } from '../../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../../packages/rules/src/index.js';
-import { DEFAULT_VICTORY_POINTS } from '../../../../packages/rules/src/victory.js';
 import type { HistoryEntry } from '../../../../packages/protocol/src/index.js';
 import { diceSummary } from './analysis.js';
 import type { AnalyticsPlayer, GameAnalytics, GameEndReason, ResourceCounts } from './types.js';
@@ -448,7 +447,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
     unreadable,
     status: finished ? 'finished' : final.turn === 0 ? 'setup' : 'playing',
     diceMode: mode,
-    victoryPoints: final.victoryPoints ?? DEFAULT_VICTORY_POINTS,
+    victoryPoints: final.victoryPoints ?? rulesetOf(final).victoryPoints.default,
     startedAt,
     endedAt: finished ? lastMoveAt : null,
     lastMoveAt,
