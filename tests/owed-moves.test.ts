@@ -6,6 +6,8 @@ import { owedBy, owedMoves } from '../packages/rules/src/owed.js';
 import { timeoutAction, timeoutDescription } from '../packages/rules/src/timeout.js';
 import { pips, seededRandom } from '../packages/rules/src/board.js';
 import { requiredAction } from '../apps/client/src/game-attention.js';
+import { OPEN_SEA } from '../packages/rules/src/rulesets.js';
+import { scriptedMove } from './open-sea-play.js';
 
 const seats = ['Alice', 'Bob', 'Cara'].map((name, i) => ({ id: `p${i}`, name }));
 const production = (game: Game, vertex: number) =>
@@ -131,4 +133,36 @@ test('a resigned player owes nothing, and the next player owes the robber they l
     undefined,
   );
   assert.equal(timeoutAction(resigned, 'p1', () => 0.5)?.kind, 'robber');
+});
+
+test('Open Sea owes gold picks to the player picking now only, and the clock can make every move it owes', () => {
+  // A whole Open Sea game by the scripted players, who sail for the small islands and their gold: at every step,
+  // every move the game owes has a timeout move the rules accept.
+  const random = seededRandom(2 * 7919 + 3);
+  let game = createGame(seats, 2, random, { ruleset: OPEN_SEA.id });
+  const kinds = new Set<string>();
+  for (let step = 0, turn = 0, actions = 0; step < 3000 && game.phase !== 'finished'; step++) {
+    const owed = owedMoves(game);
+    assert.ok(owed.length, `the game waits on nobody during ${game.phase}`);
+    if (game.phase === 'goldPick') {
+      assert.equal(owed.length, 1, 'gold picks are owed one player at a time');
+      assert.equal(owed[0]!.player, game.goldOwed![0]!.player);
+    }
+    for (const move of owed) {
+      kinds.add(move.kind);
+      const action = timeoutAction(game, move.player, random);
+      assert.ok(action, `no timeout move for ${move.kind}`);
+      assert.doesNotThrow(
+        () => applyAction(game, move.player, action, random),
+        `${move.kind}: ${action.kind}`,
+      );
+    }
+    if (game.turn !== turn) [turn, actions] = [game.turn, 0];
+    const next = scriptedMove(game, random)!;
+    const action = game.phase === 'actions' && ++actions > 14 ? { kind: 'endTurn' as const } : next.action;
+    game = applyAction(game, next.player, action, random);
+  }
+  assert.equal(game.phase, 'finished');
+  for (const kind of ['setupSettlement', 'setupRoad', 'roll', 'actions', 'robber', 'discard', 'goldPick'])
+    assert.ok(kinds.has(kind), `the game never owed ${kind}`);
 });
