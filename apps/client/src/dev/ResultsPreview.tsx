@@ -113,6 +113,7 @@ export function ResultsPreview() {
         onSettings={noop}
         onLeave={() => location.assign('/dev/lounge')}
         onPreviousResults={() => setShowResults(true)}
+        seats={size === 5 || size === 6 ? 6 : undefined}
       />
       {showResults && (
         <GameOver

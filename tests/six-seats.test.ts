@@ -4,16 +4,15 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
+import { InviteRoster, Lobby } from '../apps/client/src/Lobby.js';
 import { createGame, gameView } from '../packages/rules/src/game.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 
+const seated = (size: number) =>
+  Array.from({ length: size }, (_, i) => ({ id: `p${i}`, name: `Player ${i}`, connected: true }));
 /** A game view at a table of `size`. The rules deal four at most, so a fifth and sixth join after. */
 function table(size: number) {
-  const seats = Array.from({ length: size }, (_, i) => ({
-    id: `p${i}`,
-    name: `Player ${i}`,
-    connected: true,
-  }));
+  const seats = seated(size);
   const game = createGame(seats.slice(0, Math.min(size, 4)), 42, () => 0.34);
   for (const seat of seats.slice(4))
     game.players.push({
@@ -48,12 +47,52 @@ test('five and six seats also put the award counts in the score, for the small c
   assert.equal(count(six, /<div class="profile-stats">(?:(?!<\/div>).)*profile-award-counts/g), 6);
 });
 
-/** Every selector in a six-seat stylesheet, comments and at-rules aside. */
-function selectors(file: string) {
-  const css = readFileSync(new URL(`../apps/client/src/${file}`, import.meta.url), 'utf8').replace(
-    /\/\*[\s\S]*?\*\//g,
-    '',
+const lobby = (players: number, seats?: number) =>
+  renderToStaticMarkup(
+    createElement(Lobby, {
+      room: { roomId: 'BIGTABLE', revision: 1, counter: 0, players: seated(players) },
+      me: 'p0',
+      busy: false,
+      connected: true,
+      onReady() {},
+      onStart() {},
+      onInvite() {},
+      onLeave() {},
+      onEdit() {},
+      onSettings() {},
+      ...(seats ? { seats } : {}),
+    }),
   );
+
+test('the lobby marks five and six places for its three columns, and nothing less', () => {
+  const places = (html: string) => html.match(/<ol class="seat-row"[^>]*>/)![0];
+  // A table of four: an open place until it is full, and no mark either way.
+  for (const players of [1, 2, 3, 4]) assert.ok(!places(lobby(players)).includes('data-places'));
+  assert.match(places(lobby(3)), /--places:4/);
+  // Big Table's six seats: four players and an open place make five.
+  assert.match(places(lobby(4, 6)), /data-places="5"/);
+  assert.match(places(lobby(5, 6)), /data-places="6"/);
+  assert.match(places(lobby(6, 6)), /data-places="6"/);
+  assert.equal(lobby(6, 6).match(/seat-open/g), null, 'a full table of six has no open place');
+});
+
+test('an invitation counts against the seats the table has', () => {
+  const room = { roomId: 'BIGTABLE', board: createGame(seated(2), 42, () => 0.34).board };
+  const roster = (players: number, seats?: number) =>
+    renderToStaticMarkup(
+      createElement(InviteRoster, {
+        room: { ...room, started: false, players: seated(players) },
+        ...(seats ? { seats } : {}),
+      }),
+    );
+  assert.match(roster(3), /<span class="invite-capacity">3\/4<\/span>/);
+  assert.match(roster(5, 6), /<span class="invite-capacity">5\/6<\/span>/);
+});
+
+/** Every selector in a six-seat stylesheet, from `after` on, comments and at-rules aside. */
+function selectors(file: string, after = '') {
+  const source = readFileSync(new URL(`../apps/client/src/${file}`, import.meta.url), 'utf8');
+  const css = source.slice(after ? source.indexOf(after) : 0).replace(/\/\*[\s\S]*?\*\//g, '');
   return [...css.matchAll(/([^{};]+)\{/g)]
     .map((match) => match[1]!.trim())
     .filter((selector) => !selector.startsWith('@'))
@@ -71,6 +110,13 @@ test('every six-seat rule is reached only through the seat count, at no extra sp
       /:where\([^)]*\[data-seats(='[56]')?\]/,
       `${selector} must hang off the rail's seat count inside :where()`,
     );
+});
+
+test('the seat card at five and six places is reached only through their mark', () => {
+  const found = selectors('room-seats.css', '/* --- five and six places');
+  assert.ok(found.length > 10);
+  for (const selector of found)
+    assert.match(selector, /\[data-places(='[56]')?\]/, `${selector} must hang off the seat row's places`);
 });
 
 test('the six-seat stylesheet loads after every other one', () => {

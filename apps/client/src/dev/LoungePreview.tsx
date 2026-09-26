@@ -496,12 +496,15 @@ export function LoungePreview() {
           connected
           onReady={noop}
           onKick={async (id) => setRemovedPlayers((current) => [...current, id])}
+          onAddBot={noop}
+          onChooseColor={noop}
           onStart={() => setScreen('game')}
           onInvite={() => setPanel('friends')}
           onFriends={() => setPanel('friends')}
           onLeave={() => setScreen('hub')}
           onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
+          seats={tableSize > 4 ? 6 : undefined}
         />
       )}
       {screen === 'game' && (

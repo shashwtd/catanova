@@ -328,6 +328,7 @@ export function Lobby({
   onKick,
   onChooseColor,
   onPreviousResults,
+  seats = SEATS,
 }: {
   room: RoomState;
   me?: string;
@@ -345,6 +346,8 @@ export function Lobby({
   onKick?: (playerId: string) => Promise<void>;
   onChooseColor?: (color: PlayerColor) => void;
   onPreviousResults?: () => void;
+  /** How many the table seats: four, until a room's ruleset says Big Table's six. */
+  seats?: number;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -361,7 +364,7 @@ export function Lobby({
   // the size of a seat, off at the end of the row — did not read as a seat at
   // all. One more place, the same size as the rest, and it goes when full.
   const places: (RoomState['players'][number] | null)[] =
-    room.players.length < SEATS ? [...room.players, null] : [...room.players];
+    room.players.length < seats ? [...room.players, null] : [...room.players];
   // Resolved the same way the board resolves them, so the swatch on a card and
   // the roads on the island are never two different answers.
   const colors = seatHexColors(room.players);
@@ -436,6 +439,8 @@ export function Lobby({
           className="seat-row"
           aria-label="Seats at this table"
           style={{ '--places': places.length } as CSSProperties}
+          // Only five and six places are marked, for their three-column layout in room-seats.css.
+          data-places={places.length > 4 ? places.length : undefined}
         >
           {places.map((p, i) => (
             <li className="seat-place" key={p?.id ?? `open-${i}`}>
@@ -629,7 +634,7 @@ export function Lobby({
     </section>
   );
 }
-export function InviteRoster({ room }: { room: RoomPreview }) {
+export function InviteRoster({ room, seats = SEATS }: { room: RoomPreview; seats?: number }) {
   return (
     <div className="invite-roster">
       {room.players.map((p) => (
@@ -638,7 +643,7 @@ export function InviteRoster({ room }: { room: RoomPreview }) {
           <span>{p.name}</span>
         </div>
       ))}
-      <span className="invite-capacity">{room.players.length}/4</span>
+      <span className="invite-capacity">{`${room.players.length}/${seats}`}</span>
     </div>
   );
 }

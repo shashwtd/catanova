@@ -526,3 +526,86 @@
     transform: none;
   }
 }
+
+/* --- five and six places ------------------------------------------------ */
+
+/* Big Table seats six. The seat row is marked only then, so every rule here
+   leaves a table of four as it was. In a row of six the cards narrow, so the
+   portrait gives a little and the remove button tucks into the corner, clear
+   of the frame. */
+.room-lobby :where(.seat-row[data-places]) .seat-remove {
+  top: 5px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+}
+.room-lobby :where(.seat-row[data-places='6']) .seat-portrait {
+  width: clamp(64px, 6.4vw, 88px);
+}
+
+/* Three by two on a phone, with smaller cards: six places in the two-column
+   grid ran three rows deep and pushed Start below the screen. A short row of
+   two sits centred, as the odd place of three does above: each card spans two
+   of six columns, and the fourth starts one column in. */
+@media (max-width: 700px) {
+  .room-lobby .seat-row:where([data-places]) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .room-lobby .seat-row:where([data-places]) > .seat-place {
+    grid-column: span 2;
+  }
+  .room-lobby .seat-row:where([data-places]) > .seat-place:nth-child(odd):last-child {
+    grid-column: span 2;
+    justify-self: stretch;
+    width: auto;
+  }
+  .room-lobby .seat-row:where([data-places='5']) > .seat-place:nth-child(4) {
+    grid-column: 2 / span 2;
+  }
+  .room-lobby :where(.seat-row[data-places]) .seat-card {
+    min-height: 140px;
+    gap: 6px;
+    padding: 12px 6px 10px;
+  }
+  .room-lobby :where(.seat-row[data-places]) .seat-portrait {
+    width: 56px;
+  }
+  .room-lobby :where(.seat-row[data-places]) .seat-name strong {
+    font-size: 14px;
+  }
+  .room-lobby :where(.seat-row[data-places]) .seat-open-mark {
+    display: none;
+  }
+  .room-lobby :where(.seat-row[data-places]) .seat-fill {
+    padding-inline: 5px;
+    line-height: 1.15;
+  }
+  /* Your palette is wider than a card in three columns. Under the outer
+     columns it leans inward, so the screen's edge does not cut it off. */
+  .room-lobby :where(.seat-row[data-places] > .seat-place:nth-child(3n + 1)) .seat-colors {
+    margin-left: 16px;
+  }
+  .room-lobby :where(.seat-row[data-places] > .seat-place:nth-child(3n)) .seat-colors {
+    margin-left: -16px;
+  }
+}
+
+/* A phone on its side keeps its one row of every place. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .room-lobby .seat-row:where([data-places]) {
+    grid-template-columns: repeat(var(--places, 2), minmax(0, 1fr));
+  }
+  .room-lobby .seat-row:where([data-places]) > .seat-place,
+  .room-lobby .seat-row:where([data-places]) > .seat-place:nth-child(odd):last-child,
+  .room-lobby .seat-row:where([data-places='5']) > .seat-place:nth-child(4) {
+    grid-column: auto;
+  }
+  .room-lobby :where(.seat-row[data-places]) .seat-card {
+    min-height: 0;
+    padding: 12px 6px;
+  }
+  .room-lobby :where(.seat-row[data-places]) .seat-portrait {
+    width: clamp(48px, 7vw, 66px);
+  }
+}
