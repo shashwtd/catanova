@@ -9,13 +9,13 @@ import { Store } from '../apps/server/src/store.js';
 import { ABSENCE_AFTER_MS } from '../apps/server/src/store.js';
 import { computeGameAnalytics } from '../apps/server/src/admin/game-analytics.js';
 import { newSession } from '../apps/client/src/connection.js';
-import { activePlayer, gameView } from '../packages/rules/src/game.js';
+import { activePlayer, gameView, resignPlayers } from '../packages/rules/src/game.js';
 import type { Game } from '../packages/rules/src/game.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
 import { parseRoomSettings, partnerSeconds } from '../packages/protocol/src/settings.js';
 import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
-import { continueGame, gameInvariantProblems } from '../scripts/verify-restored-games.js';
+import { continueGame, gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
 import { OPEN, bigTableRoom, throughSetup } from './big-table-room.js';
 import { act, afterSetup, roll } from './big-table-helpers.js';
 import type { Room } from './big-table-room.js';
@@ -405,4 +405,48 @@ test('the new moves come over the wire like the others, and the restore verifier
   // The verifier's own mandatory move finishes a Partner's phase and a build window.
   assert.deepEqual(continueGame(partner, 'room'), { move: 'endPhase', problems: [] });
   assert.deepEqual(continueGame(windows, 'room'), { move: 'endWindow', problems: [] });
+});
+
+test('a table left with one absent player in a Partner’s phase waits at the roll, and passes the verifier', () => {
+  // Everyone but Dan, the Partner, runs out of grace while nobody is there: nobody may be declared the winner,
+  // so Dan waits as a turn begins, with no pair, no phase of his own left over and no card played.
+  const partner = act(roll(afterSetup(5), 3, 5), 'p0', { kind: 'endTurn' });
+  partner.playedCard = true;
+  const left = resignPlayers(partner, ['p0', 'p1', 'p2', 'p4'], {
+    reason: 'disconnect',
+    winnerEligibleIds: [],
+  });
+  assert.equal(left.winner, null);
+  assert.equal(activePlayer(left).id, 'p3');
+  assert.equal(left.phase, 'roll');
+  assert.equal(left.returnPhase, 'roll');
+  assert.equal(left.playedCard, false);
+  assert.equal(left.pair, undefined);
+  assert.deepEqual(gameInvariantProblems(left), []);
+  assert.deepEqual(continueGame(left, 'room'), { move: 'roll', problems: [] });
+  // The same through the store: three leave in the Partner's phase, the fifth drops, then the Partner leaves.
+  const room = bigTableRoom({ timer: 90 });
+  try {
+    throughSetup(room);
+    leadEnds(room);
+    const g = room.game();
+    assert.equal(g.phase, 'partner');
+    const dan = activePlayer(g).id;
+    const others = g.players.map((p) => p.id).filter((id) => id !== dan);
+    for (const id of others.slice(0, 3)) room.store.leave(room.seatOf(id), `leave-${id}`, room.revision());
+    room.store.setConnected(room.seatOf(others[3]!), false);
+    room.store.leave(room.seatOf(dan), `leave-${dan}`, room.revision());
+    const after = room.game();
+    assert.equal(activePlayer(after).id, others[3]);
+    assert.equal(after.phase, 'roll');
+    assert.equal(after.returnPhase, 'roll');
+    assert.equal(after.winner, null);
+    const report = verifyStore(room.store);
+    assert.deepEqual(
+      report.details.map((detail) => [detail.status, detail.problems]),
+      [['verified', []]],
+    );
+  } finally {
+    room.store.close();
+  }
 });

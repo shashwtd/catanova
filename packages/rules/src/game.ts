@@ -748,7 +748,10 @@ export function resignPlayers(
   if (remaining.length === 1) {
     if (!eligible(remaining[0]!.id)) {
       g.active = g.players.findIndex((p) => p.id === remaining[0]!.id);
+      // They wait as a turn begins, whatever part the table was in: at the roll, with no card played yet.
       g.phase = 'roll';
+      g.returnPhase = 'roll';
+      g.playedCard = false;
       g.trade = null;
       g.discards = {};
       g.freeRoads = 0;
