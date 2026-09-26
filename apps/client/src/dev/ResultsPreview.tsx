@@ -91,6 +91,8 @@ const results: MatchResults = {
   players,
   game: {
     winner: players[0]!.id,
+    // Five or six play Big Table, so their results name it.
+    ...(players.length > 4 ? { ruleset: 'big-table-v1', turns: 'paired' as const } : {}),
     turn: 84,
     longestRoad: players[0]!.id,
     largestArmy: players[1]!.id,
