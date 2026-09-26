@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { InviteRoster, Lobby } from '../apps/client/src/Lobby.js';
 import { TradePanel } from '../apps/client/src/TradePanel.js';
+import { RobberFlow } from '../apps/client/src/RobberFlow.js';
 import { createGame, emptyHand, gameView } from '../packages/rules/src/game.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 
@@ -115,6 +116,30 @@ test('a trade row is marked only with more than three partners to wrap', () => {
   assert.ok(!partners(6, 2).includes('data-partners'));
 });
 
+test('the robber panel is marked only at a table of five or six', () => {
+  const panel = (size: number) => {
+    const { room, game } = table(size);
+    game.phase = 'discard';
+    game.discards = { p1: 4 };
+    const html = renderToStaticMarkup(
+      createElement(RobberFlow, {
+        room: { ...room, game },
+        me: 'p0',
+        selectedHex: null,
+        onSelectHex() {},
+        onAction() {},
+        disabled: false,
+        connected: true,
+        onWarning() {},
+      }),
+    );
+    return html.match(/<aside class="robber-flow[^>]*>/)![0];
+  };
+  assert.ok(!panel(4).includes('data-seats'));
+  assert.match(panel(5), /data-seats="5"/);
+  assert.match(panel(6), /data-seats="6"/);
+});
+
 /** Every selector in a six-seat stylesheet, from `after` on, comments and at-rules aside. */
 function selectors(file: string, after = '') {
   const source = readFileSync(new URL(`../apps/client/src/${file}`, import.meta.url), 'utf8');
@@ -129,6 +154,7 @@ test('every six-seat rule is reached only through its mark, at no extra specific
   for (const [file, mark] of [
     ['six-seat-rail.css', /:where\([^)]*\[data-seats(='[56]')?\]/],
     ['six-seat-trade.css', /:where\([^)]*\[data-partners(='[45]')?\]/],
+    ['six-seat-robber.css', /:where\([^)]*\[data-seats\]/],
   ] as const) {
     const css = readFileSync(new URL(`../apps/client/src/${file}`, import.meta.url), 'utf8');
     assert.ok(!css.includes('!important'), file);
@@ -148,5 +174,10 @@ test('the seat card at five and six places is reached only through their mark', 
 test('the six-seat stylesheets load after every other one', () => {
   const main = readFileSync(new URL('../apps/client/src/main.tsx', import.meta.url), 'utf8');
   const sheets = [...main.matchAll(/^import '\.\/([\w-]+\.css)';$/gm)].map((match) => match[1]);
-  assert.deepEqual(sheets.slice(-3), ['table-light.css', 'six-seat-rail.css', 'six-seat-trade.css']);
+  assert.deepEqual(sheets.slice(-4), [
+    'table-light.css',
+    'six-seat-rail.css',
+    'six-seat-trade.css',
+    'six-seat-robber.css',
+  ]);
 });
