@@ -14,6 +14,7 @@ import type { BuildAction } from './placement.js';
 import {
   boardKey,
   coastline,
+  edgeCentre,
   GOLD_TILE,
   hasSea,
   HEX_SIZE as SIZE,
@@ -58,8 +59,13 @@ const TERRAIN_LABEL: Record<SceneTerrain, string> = {
   sea: 'Sea',
 };
 const TERRAIN_NAME: Record<SceneTerrain, string> = { ...TERRAIN_LABEL, gold: 'Gold field' };
-/** The fields an Open Sea board carries besides its hexes: where the robber starts. */
-type OpenSeaBoard = { robberStart?: number };
+/**
+ * What a game adds to the board in Open Sea: its ships, edge id to player id, and the pirate's sea hex. Read off
+ * the game where it has them, without the Board depending on the rules' types for them.
+ */
+type OpenSea = { ships?: Record<number, string>; pirate?: number };
+/** The fields an Open Sea board carries besides its hexes: where the robber and the pirate start. */
+type OpenSeaBoard = { robberStart?: number; pirateStart?: number };
 export type BuildMode = 'road' | 'settlement' | 'city' | null;
 function roadGeometry(board: Island, id: number) {
   const edge = board.edges[id]!,
@@ -105,6 +111,36 @@ function BuildingShape({ city, color }: { city: boolean; color: string }) {
         </>
       )}
     </>
+  );
+}
+/** A ship's outline, standing upright on its edge like a house on its corner, about a house's size. */
+const SHIP_SAILS = ['M2-21Q12-13 13.5-1H2Z', 'M-2-16Q-9.5-10-10.5-1H-2Z'];
+const SHIP_HULL = 'M-18 0H18Q15.5 9 10 9.5H-10Q-15.5 9-18 0Z';
+/** A ship: an upright boat in the seat colour with cream sails, standing on the edge it holds. */
+export function ShipShape({ color }: { color: string }) {
+  return (
+    <>
+      <ellipse className="ship-plinth" rx="17" ry="4.5" cy="10.5" />
+      {SHIP_SAILS.map((d) => (
+        <path key={d} className="ship-sail" d={d} />
+      ))}
+      <path className="ship-mast" d="M0 1V-23" />
+      <path className="ship-hull" fill={color} d={SHIP_HULL} />
+      <path className="ship-sheen" d="M-14 3.5H14" />
+    </>
+  );
+}
+/** The pirate: a ship in the robber's colours, about a tenth larger than a player's ship. */
+export function PirateShape() {
+  return (
+    <g transform="scale(1.1)">
+      {SHIP_SAILS.map((d) => (
+        <path key={d} d={d} />
+      ))}
+      <path className="pirate-mast" d="M0 1V-23" />
+      <path d={SHIP_HULL} />
+      <path className="pirate-pennant" d="M1.5-22.5H8" />
+    </g>
   );
 }
 export function Sprite({
@@ -480,6 +516,8 @@ export const Board = memo(function Board({
   selectedRobberHex = null,
   colors = EMPTY_COLORS,
   art,
+  ships,
+  pirate,
 }: {
   board: Island;
   game?: GameView;
@@ -496,6 +534,10 @@ export const Board = memo(function Board({
    *  shuffles the seats at the start, so the two orders differ. */
   colors?: Record<string, string>;
   art?: TerrainArt;
+  /** Open Sea's ships, edge id to player id. Without it the board reads `ships` off the game, if it has them. */
+  ships?: Record<number, string>;
+  /** The pirate's sea hex. Without it the board reads `pirate` off the game, or before a game its board's start. */
+  pirate?: number;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
   const key = boardKey(board);
@@ -510,7 +552,10 @@ export const Board = memo(function Board({
       ),
     [key],
   );
-  const seaBoard = board as Island & OpenSeaBoard;
+  const openSea = game as (GameView & OpenSea) | undefined,
+    seaBoard = board as Island & OpenSeaBoard;
+  const shipsShown = ships ?? openSea?.ships ?? {};
+  const pirateHex = pirate ?? (game ? openSea?.pirate : seaBoard.pirateStart);
   // A board with no room to ask — a preview, a test — falls back to the four
   // the game has always started with, in whatever order it has.
   const color = (id: string) =>
@@ -649,6 +694,18 @@ export const Board = memo(function Board({
           );
         })}
         <BoardHarbors board={board} sea={sea} />
+        {pirateHex !== undefined && board.hexes[pirateHex] && (
+          <g
+            className="pirate-piece"
+            transform={`translate(${board.hexes[pirateHex].x * SIZE},${board.hexes[pirateHex].y * SIZE + 6})`}
+            filter="url(#piece-shadow)"
+            role="img"
+            aria-label="Pirate"
+          >
+            <title>Pirate</title>
+            <PirateShape />
+          </g>
+        )}
         {game &&
           Object.entries(game.roads).map(([id, owner]) => {
             const { length, transform } = roadGeometry(board, Number(id));
@@ -666,6 +723,23 @@ export const Board = memo(function Board({
               </g>
             );
           })}
+        {Object.entries(shipsShown).map(([id, owner]) => {
+          const at = edgeCentre(board, Number(id)),
+            label = `${game?.players.find((p) => p.id === owner)?.name ?? 'Player'} · Ship ${Number(id) + 1}`;
+          return (
+            <g
+              key={id}
+              data-ship-id={id}
+              role="img"
+              aria-label={label}
+              className={`built-piece ship-piece ${owner === me ? 'own-piece' : ''}`}
+              transform={`translate(${at.x},${at.y})`}
+            >
+              <title>{label}</title>
+              <ShipShape color={color(owner)} />
+            </g>
+          );
+        })}
         {game &&
           Object.entries(game.buildings).map(([id, b]) => {
             const v = board.vertices[Number(id)]!,

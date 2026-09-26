@@ -1,4 +1,49 @@
-/* Open Sea on the board: the stage of a board with sea. */
+/* Open Sea on the board: ships and the pirate, flat pieces in the house style
+   of board-polish.css, and the stage of a board with sea. */
+.ship-plinth {
+  fill: #26373170;
+  stroke: none;
+}
+.ship-hull {
+  stroke: #31453e;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.ship-sheen {
+  fill: none;
+  stroke: #fff7d44d;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.ship-mast {
+  fill: none;
+  stroke: #31453e;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+.ship-sail {
+  fill: #fff0cc;
+  stroke: #31453e;
+  stroke-width: 0.9;
+  stroke-linejoin: round;
+}
+/* The robber's colours (.robber-piece in style.css), on a ship. */
+.pirate-piece path {
+  fill: #172231;
+  stroke: #c3b488;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+.pirate-piece .pirate-mast {
+  fill: none;
+  stroke-linecap: round;
+}
+.pirate-piece .pirate-pennant {
+  fill: none;
+  stroke: #e7d8af;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
 /* The islands cast the stage's drop shadow on the water (Terrain.tsx), so the
    sea's own edge does not cast one on the table. */
 .board-camera .sea-stage {
