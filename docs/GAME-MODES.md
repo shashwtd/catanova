@@ -642,9 +642,13 @@ with both turn structures. Rule tests name the rulebook section each checks;
 whole five- and six-player games under both structures play through the store
 with a player who leaves, a player away long enough for the clock to act, and
 Partners whose clock runs out, and their journals replay and pass the restore
-verifier and the admin's analytics. Six local players finished games in the
-browser under both structures, on phones and on desktop. The Classic fixtures
-are byte for byte what they were.
+verifier and the admin's analytics. In the browser, each player in a window of
+their own at phone and desktop sizes, six finished a game under paired turns
+(the Partner won), and five and then six finished games under the between-turns
+build, the six with a player who dropped out, was covered by the clock and came
+back through the room's link. Each win was hurried, once the game had run a
+while, by handing a player Victory Point cards. The Classic fixtures are byte
+for byte what they were.
 
 ### Step 4: Open Sea core (L)
 
