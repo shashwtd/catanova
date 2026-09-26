@@ -270,7 +270,7 @@ test('seven pauses active time and gives independent full discard deadlines; exp
       paused.discardDeadlines![game.players[0]!.id],
     );
     assert.equal(store.clock(roomId)!.discardDeadlines![second.id], undefined);
-    now = original.deadlineAt + 5000;
+    now = original.deadlineAt! + 5000;
     assert.equal(
       store.expireRoom(roomId),
       false,
@@ -313,7 +313,7 @@ test('an expired auto-roll of seven waits through discards and then completes th
       game.players[1]!.hand.sheep = 9;
       game.bank.sheep -= 9;
     });
-    now = store.clock(roomId)!.deadlineAt;
+    now = store.clock(roomId)!.deadlineAt!;
     diceSeven = true;
     store.expireRoom(roomId);
     diceSeven = false;
@@ -395,7 +395,7 @@ test('restart in the middle of automatic completion preserves a committed roll a
   try {
     const { host } = start(store),
       roomId = host.room_id;
-    now = store.clock(roomId)!.deadlineAt;
+    now = store.clock(roomId)!.deadlineAt!;
     store.db.exec(
       "CREATE TEMP TRIGGER fail_timed_end BEFORE INSERT ON game_events WHEN json_extract(NEW.action, '$.kind') = 'endTurn' BEGIN SELECT RAISE(ABORT,'End turn unavailable'); END",
     );
@@ -446,7 +446,7 @@ test('timeout finishes an already played Knight or Road Building card without sp
         cardId: 'selected',
       });
       const roads = pieces(store.loadGame(roomId)!, seat.id).roads;
-      now = store.clock(roomId)!.deadlineAt;
+      now = store.clock(roomId)!.deadlineAt!;
       store.expireRoom(roomId);
       const game = store.loadGame(roomId)!;
       assert.equal(game.turn, 2);
@@ -477,7 +477,7 @@ test('clock, game, history and receipt roll back together on save failure; retry
     const game = store.loadGame(roomId),
       clock = store.clock(roomId),
       revision = store.snapshot(roomId).revision;
-    now = clock!.deadlineAt;
+    now = clock!.deadlineAt!;
     store.db.exec(
       "CREATE TEMP TRIGGER fail_timer_receipt BEFORE INSERT ON game_receipts BEGIN SELECT RAISE(ABORT,'Timer receipt failure'); END",
     );
@@ -605,7 +605,7 @@ test('settings protocol and real multiplayer broadcasts carry server timestamps 
   const activeId = activeSeat(server.store, roomId).id;
   for (const c of clients) if (c.playerId === activeId) c.stop();
   if (host.playerId === activeId) socket.close();
-  now = server.store.clock(roomId)!.deadlineAt;
+  now = server.store.clock(roomId)!.deadlineAt!;
   await until(() => server.store.loadGame(roomId)!.turn === 2);
   await until(() => clients.filter((c) => c.status === 'connected').every((c) => c.state!.game?.turn === 2));
   assert.ok(clients.filter((c) => c.status === 'connected').every((c) => c.state!.game!.turn === 2));

@@ -69,7 +69,7 @@ const round = (value: number | null) => (value === null ? null : Math.round(valu
 /** The points the table saw: every victory point card counts once a winner revealed them. */
 const shown = (game: Game, player: Player) => score(game, player, !!game.winner);
 
-function blankPlayer(player: Player, seat: SeatRow | undefined, bot: boolean): AnalyticsPlayer {
+function blankPlayer(player: Player, seat: SeatRow | undefined, bot: boolean, sea: boolean): AnalyticsPlayer {
   return {
     id: player.id,
     name: player.name,
@@ -81,7 +81,7 @@ function blankPlayer(player: Player, seat: SeatRow | undefined, bot: boolean): A
     rank: 0,
     winner: false,
     resigned: null,
-    pieces: { settlements: 0, cities: 0, roads: 0 },
+    pieces: { settlements: 0, cities: 0, roads: 0, ...(sea ? { ships: 0 } : {}) },
     knights: 0,
     longestRoad: false,
     largestArmy: false,
@@ -91,7 +91,16 @@ function blankPlayer(player: Player, seat: SeatRow | undefined, bot: boolean): A
     resources: {
       produced: zero(),
       gained: { production: 0, setup: 0, trades: 0, bank: 0, fromCards: 0, stolen: 0 },
-      spent: { roads: 0, settlements: 0, cities: 0, devCards: 0, trades: 0, bank: 0, discarded: 0 },
+      spent: {
+        roads: 0,
+        ...(sea ? { ships: 0 } : {}),
+        settlements: 0,
+        cities: 0,
+        devCards: 0,
+        trades: 0,
+        bank: 0,
+        discarded: 0,
+      },
       lost: { robbed: 0, monopoly: 0 },
     },
     devCards: { bought: 0, played: {} },
@@ -179,12 +188,20 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
   const trades: GameAnalytics['trades'] = [];
   const turnTimes = new Map<string, number[]>();
   const partnerTimes = new Map<string, number[]>();
-  // The turn under way: whose it is, when it began, and whether a bot played any of it for a person. Times go to
-  // whoever acted: in Big Table a Partner's phase is timed for the Partner, not the Lead, and build windows,
+  // The turn under way: whose it is, when it began, whether a bot played any of it for a person, and how long it
+  // waited on other players' Open Sea gold picks, which are their time rather than the turn's player's. Times go
+  // to whoever acted: in Big Table a Partner's phase is timed for the Partner, not the Lead, and build windows,
   // which are not turns, are not timed at all.
-  let turn: { number: number; player: string; at: number; botPlayed: boolean; partner: boolean } | null =
-    null;
+  let turn: {
+    number: number;
+    player: string;
+    at: number;
+    botPlayed: boolean;
+    partner: boolean;
+    waited: number;
+  } | null = null;
   let turnKey = '';
+  let previousAt: number | null = null;
   const part = (game: Game) =>
     `${game.turn}:${game.phase === 'buildWindow' ? 'window' : partnerActing(game) ? 'partner' : 'turn'}`;
   const openTurn = (game: Game, at: number) => {
@@ -193,7 +210,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
     const holder = game.pair && !partner ? game.players[game.pair.lead]! : game.players[game.active]!;
     return game.phase === 'buildWindow'
       ? null
-      : { number: game.turn, player: holder.id, at, botPlayed: false, partner };
+      : { number: game.turn, player: holder.id, at, botPlayed: false, partner, waited: 0 };
   };
   const closeTurn = (at: number | null) => {
     if (!turn || turn.number < 1 || at === null) return;
@@ -201,7 +218,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
     if (!player) return;
     const times = turn.partner ? partnerTimes : turnTimes;
     if (turn.botPlayed && !player.bot) player.turnTime.botTurns++;
-    else times.set(turn.player, [...(times.get(turn.player) ?? []), (at - turn.at) / 1000]);
+    else times.set(turn.player, [...(times.get(turn.player) ?? []), (at - turn.at - turn.waited) / 1000]);
   };
 
   for (const row of rows) {
@@ -238,6 +255,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       legacy = entry.kind === 'legacy';
       startedAt = at;
       order = game.players.map((player) => player.id);
+      const sea = !!rulesetOf(game).sea;
       // Who was a bot at the start: the start entry names its participants; otherwise the seats do.
       const participants = row.participants
         ? (JSON.parse(row.participants) as { id: string; bot: number }[])
@@ -247,7 +265,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
           ? !!participants.find((seat) => seat.id === player.id)?.bot
           : !!seats.get(player.id)?.bot;
         if (bot) botSeats.add(player.id);
-        players.set(player.id, blankPlayer(player, seats.get(player.id), bot));
+        players.set(player.id, blankPlayer(player, seats.get(player.id), bot, sea));
       }
       turn = openTurn(game, at ?? 0);
     }
@@ -261,6 +279,9 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       else if (row.actorKind === 'timer') actor.moves.timer++;
       if (row.actorKind === 'bot' && !actor.bot && turn && turn.player === actor.id) turn.botPlayed = true;
     }
+    // Another player's gold picks: the turn's player was waiting, so the time is the picker's.
+    if (kind === 'goldPick' && turn && row.actor !== turn.player && at !== null && previousAt !== null)
+      turn.waited += Math.max(0, at - previousAt);
     if (prev) {
       const before = new Map(prev.players.map((player) => [player.id, player]));
       // Resources: each seat's change in hand, filed under what caused it.
@@ -280,12 +301,17 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
         if (!gained && !lost) continue;
         const own = row.actor === player.id;
         const { resources } = stats;
-        if (kind === 'roll') {
+        if (kind === 'roll' || (kind === 'goldPick' && prev.turn > 0)) {
+          // Open Sea's gold picks are a roll's production, made after it (docs/RULEBOOK-OPEN-SEA.md, 9.2).
           resources.gained.production += gained;
           for (const resource of RESOURCES) resources.produced[resource] += gain[resource];
-        } else if (kind === 'settlement' && prev.phase === 'setupSettlement')
+        } else if (
+          (kind === 'settlement' && prev.phase === 'setupSettlement') ||
+          (kind === 'goldPick' && prev.turn === 0)
+        )
           resources.gained.setup += gained;
         else if (kind === 'road' && own) resources.spent.roads += lost;
+        else if (kind === 'ship' && own) resources.spent.ships = (resources.spent.ships ?? 0) + lost;
         else if (kind === 'settlement' && own) resources.spent.settlements += lost;
         else if (kind === 'city' && own) resources.spent.cities += lost;
         else if (kind === 'buyCard' && own) resources.spent.devCards += lost;
@@ -296,7 +322,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
           resources.gained.trades += gained;
           resources.spent.trades += lost;
         } else if (kind === 'discard') resources.spent.discarded += lost;
-        else if (kind === 'robber') {
+        else if (kind === 'robber' || kind === 'pirate') {
           resources.gained.stolen += gained;
           resources.lost.robbed += lost;
         } else if (kind === 'playCard') {
@@ -315,9 +341,10 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
           if (played.kind === 'knight') pendingKnight = true;
         }
       }
-      // The robber: who moved it where, and whether a card was taken.
-      if (kind === 'robber' && actor) {
-        const hex = game.board.hexes[game.robber];
+      // The robber, or Open Sea's pirate: who moved it where, and whether a card was taken.
+      if ((kind === 'robber' || kind === 'pirate') && actor) {
+        const pirate = kind === 'pirate';
+        const hex = game.board.hexes[pirate ? game.pirate! : game.robber];
         const victim = action.victim ? players.get(action.victim) : undefined;
         const victimBefore = action.victim ? before.get(action.victim) : undefined;
         const victimAfter = action.victim
@@ -337,6 +364,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
           victimId: action.victim ?? null,
           stole,
           cause: pendingKnight ? 'knight' : 'seven',
+          ...(pirate ? { piece: 'pirate' as const } : {}),
         });
         pendingKnight = false;
       }
@@ -400,6 +428,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       closeTurn(at);
       turn = openTurn(game, at ?? 0);
     }
+    previousAt = at ?? previousAt;
     pointsByTurn.set(
       game.turn,
       order.map((id) => {
@@ -430,6 +459,9 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       cities: Object.values(final.buildings).filter((b) => b.player === player.id && b.kind === 'city')
         .length,
       roads: Object.values(final.roads).filter((owner) => owner === player.id).length,
+      ...(final.ships
+        ? { ships: Object.values(final.ships).filter((owner) => owner === player.id).length }
+        : {}),
     };
     const times = turnTimes.get(player.id) ?? [];
     const mean = (values: number[]) =>

@@ -2,9 +2,9 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import type { ReactNode, PointerEvent } from 'react';
 import type { Board } from '../../../packages/rules/src/board.js';
 import { useGameInteractionGuards } from './useGameInteractionGuards.js';
-import { BoardGesture, constrainCamera, fitBoard, wheelScale, zoomAt } from './camera.js';
+import { BoardGesture, constrainCamera, fitBoard, openingCamera, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
-import { boardKey, MATERIAL_GUTTER, MATERIAL_QUADRANTS, worldBox } from './scene.js';
+import { boardKey, islandsBox, MATERIAL_GUTTER, MATERIAL_QUADRANTS, worldBox } from './scene.js';
 
 export function BoardViewport({
   board,
@@ -18,7 +18,8 @@ export function BoardViewport({
 }) {
   useGameInteractionGuards();
   const key = boardKey(board),
-    box = useMemo(() => worldBox(board), [key]);
+    box = useMemo(() => worldBox(board), [key]),
+    islands = useMemo(() => islandsBox(board), [key]);
   const viewport = useRef<HTMLDivElement>(null),
     current = useRef<Camera>({ scale: 1, x: 0, y: 0 }),
     target = useRef(current.current),
@@ -27,9 +28,13 @@ export function BoardViewport({
     frame = useRef<number | null>(null),
     quiet = useRef(reducedMotion),
     // A ref, like `quiet`, because the wheel handler outlives the render that registered it.
-    world = useRef(box);
+    world = useRef(box),
+    opening = useRef(() => openingCamera(bounds.current, box, islands)),
+    // Until the player moves the camera, it keeps to the opening view as the screen changes size.
+    untouched = useRef(true);
   quiet.current = reducedMotion;
   world.current = box;
+  opening.current = () => openingCamera(bounds.current, box, islands);
   const patternId = `table-${useId().replaceAll(':', '')}`;
   const [camera, setCamera] = useState(current.current),
     [dragging, setDragging] = useState(false);
@@ -85,7 +90,8 @@ export function BoardViewport({
   useEffect(() => {
     clearGesture();
     stopGlide();
-    move({ scale: 1, x: 0, y: 0 });
+    untouched.current = true;
+    move(opening.current());
     target.current = current.current;
   }, [key]);
   useEffect(() => {
@@ -104,7 +110,7 @@ export function BoardViewport({
       origin.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       clearGesture();
       stopGlide();
-      move(current.current);
+      move(untouched.current ? opening.current() : current.current);
       target.current = current.current;
     };
     const observer = new ResizeObserver(measure);
@@ -117,6 +123,7 @@ export function BoardViewport({
       const rect = element.getBoundingClientRect();
       const delta =
         event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 100 : event.deltaY;
+      untouched.current = false;
       glide(
         zoomAt(
           target.current,
@@ -187,7 +194,10 @@ export function BoardViewport({
       bounds.current,
       world.current,
     );
-    if (next) move(next);
+    if (next) {
+      untouched.current = false;
+      move(next);
+    }
     target.current = current.current;
     captureGesture(event);
   }
@@ -230,7 +240,8 @@ export function BoardViewport({
         if (event.target !== event.currentTarget || !['+', '=', '-', '0'].includes(event.key)) return;
         if (gesture.current.pointerIds.length) return;
         event.preventDefault();
-        if (event.key === '0') glide({ scale: 1, x: 0, y: 0 });
+        untouched.current = event.key === '0';
+        if (event.key === '0') glide(opening.current());
         else
           glide(
             zoomAt(

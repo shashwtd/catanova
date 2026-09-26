@@ -4,6 +4,7 @@ import { COSTS, DEVELOPMENT_DECK, RESOURCES, RULESET, SUPPLY } from '../packages
 import {
   BIG_TABLE,
   CLASSIC,
+  OPEN_SEA,
   findRuleset,
   handLimit,
   registerRuleset,
@@ -66,13 +67,16 @@ test('a saved id finds its ruleset; no id is Classic, and an id this build does 
   assert.equal(findRuleset(undefined), CLASSIC);
   assert.equal(findRuleset('base-3-4-v1'), CLASSIC);
   assert.equal(findRuleset('big-table-v1'), BIG_TABLE);
+  assert.equal(findRuleset('open-sea-v1'), OPEN_SEA);
   assert.equal(rulesetOf({}), CLASSIC);
   assert.throws(() => rulesetOf({ ruleset: 'big-table-v2' }), /big-table-v2, which this version cannot play/);
-  // Classic and Big Table ship in this release; nothing else is registered until a test registers it. The
-  // largest count of one resource any action may name is Big Table's 24, and a Classic game holds to its 19.
+  assert.throws(() => rulesetOf({ ruleset: 'open-sea-v2' }), /open-sea-v2, which this version cannot play/);
+  // Classic, Big Table and Open Sea ship in this release; nothing else is registered until a test registers it.
+  // The largest count of one resource any action may name is Big Table's 24, and a Classic or Open Sea game
+  // holds to its 19.
   assert.deepEqual(
     rulesets().map((ruleset) => ruleset.id),
-    ['base-3-4-v1', 'big-table-v1'],
+    ['base-3-4-v1', 'big-table-v1', 'open-sea-v1'],
   );
   assert.equal(handLimit(), 24);
   assert.throws(

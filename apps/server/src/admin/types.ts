@@ -428,7 +428,8 @@ export type AnalyticsPlayer = {
   rank: number;
   winner: boolean;
   resigned: { turn: number; how: string } | null;
-  pieces: { settlements: number; cities: number; roads: number };
+  /** `ships` only in Open Sea. */
+  pieces: { settlements: number; cities: number; roads: number; ships?: number };
   knights: number;
   longestRoad: boolean;
   largestArmy: boolean;
@@ -437,14 +438,15 @@ export type AnalyticsPlayer = {
   /** Times a bot took the seat over while its player was away. */
   standIns: number;
   /**
-   * Seconds from the start of each of its turns to the next, leaving out turns a stand-in played. In Big Table a
-   * turn is the player's own, or their part as Lead; build windows are not counted.
+   * Seconds from the start of each of its turns to the next, leaving out turns a stand-in played, and the time
+   * other players took over Open Sea gold picks in them, which is theirs. In Big Table a turn is the player's
+   * own, or their part as Lead; build windows are not counted.
    */
   turnTime: { turns: number; meanSeconds: number | null; medianSeconds: number | null; botTurns: number };
   /** Big Table under paired turns: the seconds each of the player's Partner's phases took. */
   partnerTime?: { phases: number; meanSeconds: number | null; medianSeconds: number | null };
   resources: {
-    /** From dice rolls, by type. */
+    /** From dice rolls, by type, Open Sea's gold picks included. */
     produced: ResourceCounts;
     /** `fromCards`: taken with Year of Plenty or Monopoly. */
     gained: {
@@ -457,6 +459,8 @@ export type AnalyticsPlayer = {
     };
     spent: {
       roads: number;
+      /** Open Sea only. */
+      ships?: number;
       settlements: number;
       cities: number;
       devCards: number;
@@ -503,6 +507,7 @@ export type GameAnalytics = {
     playerId: string | null;
     fromId: string | null;
   }[];
+  /** The robber's moves, and in Open Sea the pirate's, which the same seven or Knight may make instead. */
   robberMoves: {
     turn: number;
     playerId: string;
@@ -511,6 +516,8 @@ export type GameAnalytics = {
     victimId: string | null;
     stole: boolean;
     cause: 'seven' | 'knight';
+    /** Open Sea: the pirate moved, to a sea hex, rather than the robber. */
+    piece?: 'pirate';
   }[];
   /** Exchanges between players, as the game announced them. */
   trades: { turn: number; text: string }[];

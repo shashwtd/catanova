@@ -3,6 +3,7 @@ import type { Resource } from './index.js';
 import { BOARD_PRESETS } from './board.js';
 import type { Board, BoardPreset } from './board.js';
 import { DEFAULT_VICTORY_POINTS, MAX_VICTORY_POINTS, MIN_VICTORY_POINTS } from './victory.js';
+import { LONGEST_ROUTE, OPEN_SEA_RULESET, SEA_COSTS, SEA_SUPPLY } from './sea.js';
 
 type CardKind = keyof typeof DEVELOPMENT_DECK;
 /** What a player pays for: a piece, or a development card. */
@@ -61,11 +62,16 @@ export type Ruleset = {
     bank: number;
     /** The development deck, in the order it is laid out before it is shuffled. */
     deck: Readonly<Record<CardKind, number>>;
-    /** The pieces each player has. */
-    pieces: { roads: number; settlements: number; cities: number };
+    /** The pieces each player has. Ships only in a mode with the sea. */
+    pieces: { roads: number; settlements: number; cities: number; ships?: number };
   };
-  /** What each purchase costs. Per mode, so that a piece only one mode has is never offered in another. */
-  costs: Readonly<Record<Purchase, Readonly<Record<Resource, number>>>>;
+  /**
+   * What each purchase costs. Per mode, so that a piece only one mode has is never offered in another: only a
+   * mode with the sea prices a ship.
+   */
+  costs: Readonly<Record<Purchase, Readonly<Record<Resource, number>>>> & {
+    readonly ship?: Readonly<Record<Resource, number>>;
+  };
   /** Whether the host may seat bots. */
   bots: boolean;
   /**
@@ -78,6 +84,11 @@ export type Ruleset = {
    * Classic. The one chosen is frozen into the game when it starts.
    */
   turns?: readonly TurnStructure[];
+  /**
+   * Open Sea: the scenario whose board the mode deals. It turns on the sea's rules, which sea.ts and gold.ts
+   * hold and game.ts applies: ships, gold fields, the pirate, Longest Route and island bonuses.
+   */
+  sea?: { scenario: 'outer-isles' };
 };
 
 /** The base game, as Catanova has always played it. Its numbers are the constants in index.ts. */
@@ -121,10 +132,39 @@ export const BIG_TABLE: Ruleset = {
   turns: ['paired', 'betweenTurnsBuild'],
 };
 
+/**
+ * Open Sea, for three or four players: ships, gold fields, the pirate and small islands, on Outer Isles
+ * (docs/RULEBOOK-OPEN-SEA.md). Classic's bank, deck and costs, a ship for 1 Timber and 1 Sheep, and 15 ships
+ * each. No bots, and no stand-ins: an absent player's forced moves are the clock's.
+ */
+export const OPEN_SEA: Ruleset = {
+  id: OPEN_SEA_RULESET,
+  name: 'Open Sea',
+  summary: 'Ships, gold and small islands, for three or four players.',
+  board: 'outer-isles-v1',
+  seats: { min: 3, max: 4 },
+  victoryPoints: { default: 14, min: 10, max: 18 },
+  supply: {
+    bank: SUPPLY.resourcesPerType,
+    deck: DEVELOPMENT_DECK,
+    pieces: {
+      roads: SEA_SUPPLY.roads,
+      settlements: SEA_SUPPLY.settlements,
+      cities: SEA_SUPPLY.cities,
+      ships: SEA_SUPPLY.ships,
+    },
+  },
+  costs: SEA_COSTS,
+  bots: false,
+  standIns: false,
+  sea: { scenario: 'outer-isles' },
+};
+
 /** The rulesets this build can play, by id. Classic is always one of them, and always first. */
 const registry = new Map<string, Ruleset>([
   [CLASSIC.id, CLASSIC],
   [BIG_TABLE.id, BIG_TABLE],
+  [OPEN_SEA.id, OPEN_SEA],
 ]);
 
 /** Every ruleset this build plays, Classic first. A client lists these as the rulesets it can draw. */
@@ -162,6 +202,13 @@ export const seatRange = (ruleset: Ruleset) =>
   ruleset.seats.min === ruleset.seats.max
     ? numberWord(ruleset.seats.min)
     : `${numberWord(ruleset.seats.min)} ${ruleset.seats.max === ruleset.seats.min + 1 ? 'or' : 'to'} ${numberWord(ruleset.seats.max)}`;
+
+/**
+ * What a mode calls the award for the longest line of pieces: Longest Road, or Longest Route where ships count
+ * (docs/RULEBOOK-OPEN-SEA.md, section 11.1). The award keeps its Classic key, `longestRoad`, in every mode.
+ */
+export const routeAwardName = (ruleset: Ruleset | undefined) =>
+  ruleset?.sea ? LONGEST_ROUTE.name : 'Longest Road';
 
 /** Which modes seat bots, as the host is told when a mode has none: "Bots play Classic only". */
 export const botsPlayIn = () =>
@@ -245,6 +292,8 @@ export function rulesetProblems(ruleset: Ruleset): string[] {
       new Set(ruleset.turns).size !== ruleset.turns.length)
   )
     problems.push('the turn structures must be known ones, each listed once');
+  if (ruleset.sea && !(whole(supply.pieces.ships, 1) && ruleset.costs.ship))
+    problems.push('a mode with the sea needs ships and a price for them');
   return problems;
 }
 

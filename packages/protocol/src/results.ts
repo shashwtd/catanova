@@ -17,7 +17,10 @@ export type ResultGame = Pick<
   'winner' | 'finishReason' | 'turn' | 'longestRoad' | 'largestArmy'
 > & {
   players: ResultPlayer[];
-  /** The mode played, when it was not Classic, and its turn structure where it had a choice. */
+  /**
+   * The mode played, when it was not Classic, and its turn structure where it had a choice. Results name some
+   * parts by the mode, such as Open Sea's Longest Route.
+   */
   ruleset?: string;
   turns?: GameView['turns'];
 };
@@ -39,7 +42,7 @@ export function resultsFromRoom(room: RoomState, id = `${room.roomId}:${room.rou
     game: {
       winner: game.winner,
       ...(game.finishReason ? { finishReason: game.finishReason } : {}),
-      ...(game.ruleset !== CLASSIC.id ? { ruleset: game.ruleset } : {}),
+      ...(game.ruleset && game.ruleset !== CLASSIC.id ? { ruleset: game.ruleset } : {}),
       ...(game.turns ? { turns: game.turns } : {}),
       turn: game.turn,
       longestRoad: game.longestRoad,

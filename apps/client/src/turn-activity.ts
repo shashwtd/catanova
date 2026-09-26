@@ -1,4 +1,6 @@
 import type { GameView } from '../../../packages/rules/src/game.js';
+import { findRuleset } from '../../../packages/rules/src/rulesets.js';
+import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { GameIconName } from './GameIcons.js';
 
 /**
@@ -14,7 +16,10 @@ export function turnMarker(game: GameView, playerId: string): TurnActivity['mark
   return seat === game.pair.lead ? 'Lead' : seat === game.pair.partner ? 'Partner' : undefined;
 }
 
-/** Discard obligations belong to each player, independently of whose turn it is. */
+/**
+ * Discard obligations belong to each player, independently of whose turn it is, and so do Open Sea's gold
+ * picks, which go one player at a time.
+ */
 export function playerTurnActivity(game: GameView, playerId: string): TurnActivity | null {
   if (game.winner || game.phase === 'finished' || game.players.find((p) => p.id === playerId)?.resigned)
     return null;
@@ -24,23 +29,37 @@ export function playerTurnActivity(game: GameView, playerId: string): TurnActivi
   if (game.phase === 'discard' && count > 0) {
     return { icon: 'discard', label: `Discard ${count} resource ${count === 1 ? 'card' : 'cards'}`, ...held };
   }
+  const picking = game.phase === 'goldPick' ? game.goldOwed?.[0] : undefined;
+  if (picking?.player === playerId) {
+    const picks = Math.min(
+      picking.picks,
+      RESOURCES.reduce((n, r) => n + game.bank[r], 0),
+    );
+    return {
+      icon: 'spark',
+      label: `Pick ${picks} ${picks === 1 ? 'resource' : 'resources'} from a gold field`,
+    };
+  }
   if (game.players[game.active]?.id !== playerId) {
     // The marker holder who is not acting still holds the turn, and may still win in it.
     if (marker === 'Lead') return { icon: 'timer', label: 'Lead: the Partner is taking their phase', marker };
     if (marker === 'Partner') return { icon: 'timer', label: 'Partner: acts after the Lead', marker };
     return null;
   }
+  const sea = !!findRuleset(game.ruleset)?.sea;
   switch (game.phase) {
     case 'setupSettlement':
       return { icon: 'settlement', label: 'Place a starting settlement' };
     case 'setupRoad':
-      return { icon: 'road', label: 'Place a starting road' };
+      return { icon: 'road', label: sea ? 'Place a starting road or ship' : 'Place a starting road' };
     case 'freeRoads':
-      return { icon: 'road', label: 'Place a free road', ...held };
+      return { icon: 'road', label: sea ? 'Place a free road or ship' : 'Place a free road', ...held };
     case 'roll':
       return { icon: 'dice', label: 'Roll the dice', ...held };
     case 'robber':
-      return { icon: 'robber', label: 'Move the robber', ...held };
+      return { icon: 'robber', label: sea ? 'Move the robber or the pirate' : 'Move the robber', ...held };
+    case 'goldPick':
+      return { icon: 'timer', label: 'Waiting for gold picks' };
     case 'actions':
       return { icon: 'trade', label: 'Build, trade or play a development card', ...held };
     case 'discard':

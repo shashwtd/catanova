@@ -8,7 +8,12 @@ import { GameIcon } from './GameIcons.js';
 import { finalStandings, pointBreakdown } from './player-ranking.js';
 import { playerHexColor } from './player-colors.js';
 import type { CSSProperties } from 'react';
-import { CLASSIC, TURN_STRUCTURES, findRuleset } from '../../../packages/rules/src/rulesets.js';
+import {
+  CLASSIC,
+  TURN_STRUCTURES,
+  findRuleset,
+  routeAwardName,
+} from '../../../packages/rules/src/rulesets.js';
 
 /**
  * Who took an award, and on what.
@@ -20,8 +25,10 @@ import { CLASSIC, TURN_STRUCTURES, findRuleset } from '../../../packages/rules/s
 function award(game: ResultGame, kind: 'longestRoad' | 'largestArmy') {
   const holder = game.players.find((p) => p.id === game[kind]);
   if (!holder) return 'Nobody claimed it';
+  // Open Sea's route counts ships too (docs/RULEBOOK-OPEN-SEA.md, 11).
+  const pieces = findRuleset(game.ruleset)?.sea ? 'roads and ships' : 'roads';
   return kind === 'longestRoad'
-    ? `${holder.name} · ${holder.roadLength} roads`
+    ? `${holder.name} · ${holder.roadLength} ${pieces}`
     : `${holder.name} · ${holder.knights} knights`;
 }
 
@@ -229,7 +236,7 @@ export function GameOver({
               <dd>{game.turn}</dd>
             </div>
             <div>
-              <dt>Longest Road</dt>
+              <dt>{routeAwardName(findRuleset(game.ruleset))}</dt>
               <dd>{award(game, 'longestRoad')}</dd>
             </div>
             <div>

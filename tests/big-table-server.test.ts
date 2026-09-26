@@ -122,7 +122,7 @@ test('§9.2: the Partner’s phase has half the room’s time, rounded up to a w
     try {
       throughSetup(room);
       const lead = room.store.clock(room.roomId)!;
-      assert.equal(lead.deadlineAt - lead.startedAt, timer * 1000, 'the Lead’s part has the room’s time');
+      assert.equal(lead.deadlineAt! - lead.startedAt, timer * 1000, 'the Lead’s part has the room’s time');
       room.clock.now += 5_000;
       leadEnds(room);
       const g = room.game();
@@ -130,7 +130,7 @@ test('§9.2: the Partner’s phase has half the room’s time, rounded up to a w
       const partner = room.store.clock(room.roomId)!;
       assert.equal(partner.playerId, activePlayer(g).id, 'the clock follows the Partner');
       assert.equal(partner.turn, g.turn);
-      assert.equal(partner.deadlineAt - partner.startedAt, partnerSeconds(timer) * 1000);
+      assert.equal(partner.deadlineAt! - partner.startedAt, partnerSeconds(timer) * 1000);
       assert.equal(partner.startedAt, room.clock.now);
     } finally {
       room.store.close();
@@ -264,7 +264,7 @@ test('§9.2 and §9.3: every build window has 20 seconds, with or without a turn
       const first = activePlayer(g);
       const clock = room.store.clock(room.roomId)!;
       assert.equal(clock.playerId, first.id);
-      assert.equal(clock.deadlineAt - clock.startedAt, 20_000);
+      assert.equal(clock.deadlineAt! - clock.startedAt, 20_000);
       // The player may pass at once; the next window has its own 20 seconds.
       room.clock.now += 3_000;
       room.act(first.id, { kind: 'endWindow' });
@@ -287,7 +287,7 @@ test('§9.2 and §9.3: every build window has 20 seconds, with or without a turn
       assert.equal(activePlayer(g).id, first.id, 'the next turn goes to the first window’s player');
       const turn = room.store.clock(room.roomId);
       if (timer === null) assert.equal(turn, undefined);
-      else assert.equal(turn!.deadlineAt - turn!.startedAt, timer * 1000);
+      else assert.equal(turn!.deadlineAt! - turn!.startedAt, timer * 1000);
     } finally {
       room.store.close();
     }

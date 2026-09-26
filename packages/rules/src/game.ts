@@ -1,9 +1,8 @@
 import { DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES } from './index.js';
 import type { Resource } from './index.js';
-import { generateBoard, shuffle } from './board.js';
+import { dealBoard, isLand, shuffle } from './board.js';
 import {
   TURN_STRUCTURES,
-  boardPresetOf,
   findRuleset,
   fullBank,
   handLimit,
@@ -17,6 +16,39 @@ import type { TurnStructure } from './rulesets.js';
 import type { Board } from './board.js';
 import { rollDice } from './dice.js';
 import type { DiceMode, BalancedDiceState } from './dice.js';
+import {
+  SEA_LOG,
+  SHIP_MOVE_BLOCKS,
+  canPlaceRoadOpenSea,
+  canPlaceShip,
+  islandBonusForSettlement,
+  islandBonusPoints,
+  knightTargets,
+  legalShipDestinations,
+  longestRoute,
+  movableShips,
+  moveShip,
+  pirateMoveIssue,
+  placeSettlement,
+  placeShip,
+  producedResource,
+  roadBuildingSites,
+  roadSitesOpenSea,
+  settlementSitesOpenSea,
+  shipMoveBlock,
+  shipSites,
+} from './sea.js';
+import type { ShipMoveBlock } from './sea.js';
+import {
+  applyGoldPick,
+  goldOwedForRoll,
+  goldPickIssue,
+  goldPickText,
+  goldPickTypes,
+  remainingGoldOwed,
+  startingResources,
+} from './gold.js';
+import type { GoldOwed } from './gold.js';
 
 export type Hand = Record<Resource, number>;
 export type CardKind = keyof typeof DEVELOPMENT_DECK;
@@ -34,6 +66,10 @@ export type Building = { player: string; kind: 'settlement' | 'city' };
  * What the game waits for. Big Table adds two: 'partner', the Partner's phase of a paired turn, and
  * 'buildWindow', one player's window to build between turns. In both, `active` is the player acting, as it is
  * in every other phase; `pair` and `windows` say whose turn it is.
+ *
+ * `goldPick` is Open Sea's: the players owed gold choose their resources, one at a time, before the action phase
+ * (docs/RULEBOOK-OPEN-SEA.md, section 9.2). In Open Sea, `setupRoad` takes a road or a ship, `robber` moves the
+ * robber or the pirate, and `freeRoads` places roads or ships.
  */
 export type Phase =
   | 'setupSettlement'
@@ -45,6 +81,7 @@ export type Phase =
   | 'freeRoads'
   | 'partner'
   | 'buildWindow'
+  | 'goldPick'
   | 'finished';
 export type TradeProposal = { player: string; give: Hand };
 export type Trade = {
@@ -104,11 +141,38 @@ export type Game = {
    * resigned player left owing, which the next player makes before rolling, once the windows are over.
    */
   windows?: { after: number; robber?: true };
+} & SeaFields;
+/**
+ * What an Open Sea game keeps besides Classic's fields (docs/RULEBOOK-OPEN-SEA.md), all public. A game in any
+ * other mode has none of them, so a Classic game saves exactly as it always has.
+ */
+export type SeaFields = {
+  /** Edge id to the player whose ship is on it (section 7). */
+  ships?: Record<number, string>;
+  /** The sea hex the pirate stands on (section 10). */
+  pirate?: number;
+  /** The edges of the ships built this turn, bought or free, which may not move until the next (8.4). */
+  shipsBuiltThisTurn?: number[];
+  /** Whether the player on turn has made this turn's ship move (8.4). */
+  shipMovedThisTurn?: boolean;
+  /** Ships of a closed line that another player's settlement has since broken: closed for good (8.7, L). */
+  lockedShips?: number[];
+  /** By a ship's edge, its ends recorded as closed when another player settled there (8.7, E). */
+  closedShipEnds?: Record<number, number[]>;
+  /** By player, the small islands on which they have earned the island bonus (12.2). */
+  islandBonuses?: Record<string, string[]>;
+  /** The gold picks still owed, in the order they are made: the first is being made now (9.2). */
+  goldOwed?: GoldOwed[];
 };
 export type GameAction =
   | { kind: 'start' | 'returnToLobby' }
   | { kind: 'settlement' | 'city'; vertex: number }
   | { kind: 'road'; edge: number }
+  // Open Sea's own moves: a ship (bought, free or at setup), a ship move, the pirate and a player's gold picks.
+  | { kind: 'ship'; edge: number }
+  | { kind: 'moveShip'; from: number; to: number }
+  | { kind: 'pirate'; hex: number; victim?: string }
+  | { kind: 'goldPick'; resources: Hand }
   | { kind: 'roll' | 'endTurn' | 'buyCard' | 'cancelTrade' }
   /** The Partner ends their phase. `expired`: the clock ended it, leaving free roads still owed unplaced. */
   | { kind: 'endPhase'; expired?: true }
@@ -157,13 +221,15 @@ function log(g: Game, text: string) {
 export const BOARD_ID_LIMIT = 4096;
 /**
  * Whether every corner, edge and hex an action names is on this board. It reads the fields, not the kinds, so a
- * new action that names a `vertex`, `edge` or `hex` is checked without being listed here.
+ * new action that names a `vertex`, `edge` or `hex` is checked without being listed here. A ship move names two
+ * edges by other names, so it is checked by its kind.
  */
 function onBoard(board: Board, a: GameAction) {
   return (
     (!('vertex' in a) || a.vertex < board.vertices.length) &&
     (!('edge' in a) || a.edge < board.edges.length) &&
-    (!('hex' in a) || a.hex < board.hexes.length)
+    (!('hex' in a) || a.hex < board.hexes.length) &&
+    (a.kind !== 'moveShip' || (a.from < board.edges.length && a.to < board.edges.length))
   );
 }
 
@@ -229,8 +295,14 @@ export function parseGameAction(input: unknown): GameAction {
     case 'city':
       return { kind: a.kind, vertex: index(a.vertex, BOARD_ID_LIMIT) };
     case 'road':
+    case 'ship':
       return { kind: a.kind, edge: index(a.edge, BOARD_ID_LIMIT) };
+    case 'moveShip':
+      return { kind: a.kind, from: index(a.from, BOARD_ID_LIMIT), to: index(a.to, BOARD_ID_LIMIT) };
+    case 'goldPick':
+      return { kind: a.kind, resources: hand(a.resources) };
     case 'robber':
+    case 'pirate':
       return {
         kind: a.kind,
         hex: index(a.hex, BOARD_ID_LIMIT),
@@ -302,7 +374,12 @@ export function createGame(
   requireRule(new Set(seats.map((p) => p.id)).size === seats.length, 'Seats must be unique');
   requireRule(!options.board || options.board.seed === seed >>> 0, 'The island does not match its seed');
   requireRule(!options.board || playsBoard(rules, options.board), 'The island was dealt for another mode');
-  const board = options.board ? structuredClone(options.board) : generateBoard(seed, boardPresetOf(rules));
+  // Outer Isles has a template for three players and one for four: the island must be the one for this table.
+  requireRule(
+    !options.board?.players || options.board.players === seats.length,
+    'The island was dealt for another number of players',
+  );
+  const board = options.board ? structuredClone(options.board) : dealBoard(seed, rules.board, seats.length);
   const g: Game = {
     schema: 1,
     ruleset: rules.id,
@@ -338,8 +415,14 @@ export function createGame(
     diceMode: options.diceMode ?? 'classic',
     victoryPoints: options.victoryPoints ?? rules.victoryPoints.default,
     ...(rules.turns ? { turns: options.turns ?? rules.turns[0]! } : {}),
+    ...(rules.sea ? seaStart(board) : {}),
   };
-  log(g, 'The island is ready. Place two settlements and roads in snake order.');
+  log(
+    g,
+    rules.sea
+      ? 'The islands are ready. Place two settlements on the main island, each with a road or a ship, in snake order.'
+      : 'The island is ready. Place two settlements and roads in snake order.',
+  );
   if (g.turns) log(g, `This game plays ${TURN_STRUCTURES[g.turns].name}.`);
   return g;
 }
@@ -417,12 +500,12 @@ export function longestTrail(g: BoardState, player: string): number {
 /** One part of a player's points, named so that a results screen can say where each point came from. */
 export type ScoreTerm = { id: ScoreTermId; points: number; count: number };
 /**
- * The buildings (a point per settlement, two per city), the two awards and victory point cards. A mode that
- * scores something new adds its term here, read from its own part of the game (Open Sea's island bonuses),
- * and every reader of score() counts it: the game view, the win check, player records and the admin views.
+ * The buildings (a point per settlement, two per city), the two awards, Open Sea's island bonuses and victory
+ * point cards. A mode that scores something new adds its term here, read from its own part of the game, and every
+ * reader of score() counts it: the game view, the win check, player records and the admin views.
  */
-export type ScoreTermId = 'settlements' | 'cities' | 'longestRoad' | 'largestArmy' | 'cards';
-type Scored = Pick<Game, 'buildings' | 'longestRoad' | 'largestArmy'>;
+export type ScoreTermId = 'settlements' | 'cities' | 'longestRoad' | 'largestArmy' | 'islandBonus' | 'cards';
+type Scored = Pick<Game, 'buildings' | 'longestRoad' | 'largestArmy' | 'islandBonuses'>;
 /**
  * Where a player's points come from, in the order results list them, leaving out the terms worth nothing.
  * `hidden` counts victory point cards, which only their holder sees until someone wins.
@@ -438,6 +521,12 @@ export function scoreTerms(g: Scored, p: Pick<Player, 'id' | 'cards'>, hidden = 
     { id: 'cities', points: cities * 2, count: cities },
     { id: 'longestRoad', points: award(g.longestRoad) * 2, count: award(g.longestRoad) },
     { id: 'largestArmy', points: award(g.largestArmy) * 2, count: award(g.largestArmy) },
+    // Open Sea: 2 points for each small island the player was first of theirs to settle (section 12.2).
+    {
+      id: 'islandBonus',
+      points: islandBonusPoints(g, p.id),
+      count: g.islandBonuses?.[p.id]?.length ?? 0,
+    },
     { id: 'cards', points: cards, count: cards },
   ];
   return terms.filter((term) => term.points > 0);
@@ -446,9 +535,13 @@ export function scoreTerms(g: Scored, p: Pick<Player, 'id' | 'cards'>, hidden = 
 export function score(g: Scored, p: Pick<Player, 'id' | 'cards'>, hidden = true): number {
   return scoreTerms(g, p, hidden).reduce((n, term) => n + term.points, 0);
 }
+/** A player's longest line for the route award: roads alone, or in Open Sea roads and ships (section 11). */
+const routeLength = (g: Game, player: string) =>
+  rulesetOf(g).sea ? longestRoute(g, player).length : longestTrail(g, player);
 function updateAwards(g: Game) {
+  const sea = !!rulesetOf(g).sea;
   for (const [key, minimum, values] of [
-    ['longestRoad', 5, g.players.map((p) => (p.resigned ? 0 : longestTrail(g, p.id)))],
+    ['longestRoad', 5, g.players.map((p) => (p.resigned ? 0 : routeLength(g, p.id)))],
     ['largestArmy', 3, g.players.map((p) => (p.resigned ? 0 : p.knights))],
   ] as const) {
     const max = Math.max(...values);
@@ -465,7 +558,9 @@ function updateAwards(g: Game) {
     if (g[key] && g[key] !== old)
       log(
         g,
-        `${g.players.find((p) => p.id === g[key])!.name} claimed ${key === 'longestRoad' ? 'Longest Road' : 'Largest Army'} (+2 points).`,
+        key === 'longestRoad' && sea
+          ? SEA_LOG.longestRoute(g.players.find((p) => p.id === g[key])!.name)
+          : `${g.players.find((p) => p.id === g[key])!.name} claimed ${key === 'longestRoad' ? 'Longest Road' : 'Largest Army'} (+2 points).`,
       );
   }
 }
@@ -506,10 +601,12 @@ export function robberVictims(
   ];
 }
 function finishFreeRoads(g: Game) {
+  const id = activePlayer(g).id;
   if (
     g.freeRoads <= 0 ||
-    pieces(g, activePlayer(g).id).roads >= rulesetOf(g).supply.pieces.roads ||
-    !roadSites(g, activePlayer(g).id).length
+    (rulesetOf(g).sea
+      ? !freePieceSites(g, id)
+      : pieces(g, id).roads >= rulesetOf(g).supply.pieces.roads || !roadSites(g, id).length)
   ) {
     g.freeRoads = 0;
     g.phase = g.returnPhase;
@@ -518,16 +615,19 @@ function finishFreeRoads(g: Game) {
 function produce(g: Game, number: number) {
   const owed = g.players.map(() => emptyHand());
   const received = g.players.map(() => emptyHand());
-  for (const h of g.board.hexes)
-    if (h.number === number && h.id !== g.robber && h.terrain !== 'desert') {
+  for (const h of g.board.hexes) {
+    // A desert, a gold field and the sea pay no resource here: Open Sea's gold is picked afterwards (9.2).
+    const resource = producedResource(h);
+    if (h.number === number && h.id !== g.robber && resource) {
       for (const v of h.vertices) {
         const b = g.buildings[v];
         if (b) {
           const i = g.players.findIndex((p) => p.id === b.player);
-          if (!g.players[i]?.resigned) owed[i]![h.terrain as Resource] += b.kind === 'city' ? 2 : 1;
+          if (!g.players[i]?.resigned) owed[i]![resource] += b.kind === 'city' ? 2 : 1;
         }
       }
     }
+  }
   for (const r of RESOURCES) {
     const recipients = owed.map((h, i) => ({ n: h[r], i })).filter((x) => x.n > 0);
     const needed = recipients.reduce((n, p) => n + p.n, 0);
@@ -544,7 +644,9 @@ function produce(g: Game, number: number) {
   }
   for (const [i, hand] of received.entries())
     if (total(hand)) log(g, `${g.players[i]!.name} received ${resourceText(hand)}.`);
-  if (!received.some((hand) => total(hand))) log(g, 'No resources produced.');
+  // Open Sea: gold picks may still follow ordinary production (section 9.2), and then something is produced.
+  if (!received.some((hand) => total(hand)) && !(rulesetOf(g).sea && goldOwedForRoll(g, number).length))
+    log(g, 'No resources produced.');
 }
 
 /** How a turn is announced: in a paired turn, with its Partner. */
@@ -572,8 +674,15 @@ function advanceTurn(g: Game, pendingRobber = false) {
   g.playedCard = false;
   g.freeRoads = 0;
   g.trade = null;
+  const sea = !!rulesetOf(g).sea;
+  // Open Sea: a new turn may move a ship again, and any ship built last turn may move in it (section 8.4).
+  if (sea) {
+    g.shipsBuiltThisTurn = [];
+    g.shipMovedThisTurn = false;
+  }
   pairUp(g);
-  log(g, `${turnLine(g)}${pendingRobber ? ' Move the robber, then roll.' : ''}`);
+  const robber = sea ? ' Move the robber or the pirate, then roll.' : ' Move the robber, then roll.';
+  log(g, `${turnLine(g)}${pendingRobber ? robber : ''}`);
 }
 
 /**
@@ -713,6 +822,12 @@ export function resignPlayers(
           : `${p.name} resigned after not reconnecting.`,
       );
     }
+  // Open Sea: a resigned player's gold picks lapse, and the others' go on from the bank as it now stands,
+  // their returned cards included (section 9.2).
+  if (g.goldOwed?.length) {
+    g.goldOwed = remainingGoldOwed(g.goldOwed, g.bank, g.players);
+    if (g.phase === 'goldPick' && !g.goldOwed.length) endGoldPicks(g);
+  }
   if (g.trade) {
     if (g.players.find((p) => p.id === g.trade!.player)?.resigned) g.trade = null;
     else {
@@ -733,6 +848,7 @@ export function resignPlayers(
     g.discards = {};
     g.freeRoads = 0;
     g.setupVertex = null;
+    if (g.goldOwed) g.goldOwed = [];
     log(
       g,
       remaining.length
@@ -752,6 +868,7 @@ export function resignPlayers(
       // One player cannot pair up or have a window: they only wait here to come back and win.
       delete g.pair;
       delete g.windows;
+      if (g.goldOwed) g.goldOwed = [];
       return g;
     }
     g.winner = remaining[0]!.id;
@@ -760,6 +877,7 @@ export function resignPlayers(
     g.trade = null;
     g.discards = {};
     g.freeRoads = 0;
+    if (g.goldOwed) g.goldOwed = [];
     log(g, `${remaining[0]!.name} wins by resignation.`);
     return g;
   }
@@ -767,6 +885,8 @@ export function resignPlayers(
     if (g.phase === 'setupSettlement' || g.phase === 'setupRoad') {
       g.setupIndex++;
       advanceSetup(g);
+    } else if (g.phase === 'goldPick') {
+      // The others still owed gold pick first; the turn passes after the last pick (section 9.2).
     } else if (g.phase !== 'discard' || !Object.keys(g.discards).length)
       // Their part of the turn ends there: a Lead's part is still followed by the Partner's phase, and a build
       // window by the next one (docs/RULEBOOK-BIG-TABLE.md, 9.6).
@@ -783,7 +903,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   const a = parseGameAction(raw);
   requireRule(onBoard(state.board, a), 'Invalid board location');
   const rules = rulesetOf(state),
-    { bank, pieces: supply } = rules.supply;
+    { bank, pieces: supply } = rules.supply,
+    sea = !!rules.sea;
   requireRule(handsWithin(bank, a), `Choose whole resource counts from 0 to ${bank}`);
   const g = structuredClone(state);
   const p = g.players.find((p) => p.id === playerId);
@@ -804,6 +925,15 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
         endPart(g, true);
         checkWin(g);
       } else g.phase = 'robber';
+    }
+    return g;
+  }
+  if (a.kind === 'goldPick') {
+    // Whoever is owed gold picks in their turn to pick, on turn or not (section 9.2).
+    pickGold(g, p.id, a.resources);
+    if (g.phase !== 'goldPick' && g.turn && activePlayer(g).resigned) {
+      advanceTurn(g);
+      checkWin(g);
     }
     return g;
   }
@@ -936,6 +1066,11 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   }
   requireRule(isActive, 'Wait for your turn');
   const owned = pieces(g, p.id);
+  if (g.phase === 'setupSettlement' && sea) {
+    requireRule(a.kind === 'settlement', 'Place a starting settlement on the main island');
+    placeStartingSettlement(g, p.id, a.vertex);
+    return g;
+  }
   if (g.phase === 'setupSettlement') {
     requireRule(
       a.kind === 'settlement' && settlementSites(g, p.id, true).includes(a.vertex),
@@ -959,6 +1094,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       log(g, `${p.name} received ${resourceText(startingResources)} from the starting settlement.`);
     return g;
   }
+  if (g.phase === 'setupRoad' && sea) {
+    placeStartingPiece(g, p.id, a);
+    g.setupIndex++;
+    advanceSetup(g);
+    return g;
+  }
   if (g.phase === 'setupRoad') {
     requireRule(
       a.kind === 'road' && roadSites(g, p.id, g.setupVertex).includes(a.edge),
@@ -970,8 +1111,18 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     advanceSetup(g);
     return g;
   }
+  if (a.kind === 'pirate') {
+    requireRule(sea, 'That action is unavailable');
+    requireRule(g.phase === 'robber', 'Move the pirate only after a seven or a Knight');
+    movePirate(g, p.id, a.hex, a.victim, random);
+    g.phase = g.returnPhase;
+    checkWin(g);
+    return g;
+  }
   if (a.kind === 'robber') {
     requireRule(g.phase === 'robber' && a.hex !== g.robber, 'Move the robber to a different tile');
+    // Open Sea: the robber stays on land, any island's (section 10.1).
+    requireRule(!sea || isLand(g.board.hexes[a.hex]!), 'Move the robber to a land tile');
     const victims = robberVictims(g, p.id, a.hex);
     requireRule(
       victims.length ? !!a.victim && victims.includes(a.victim) : !a.victim,
@@ -992,9 +1143,22 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     checkWin(g);
     return g;
   }
+  if (a.kind === 'ship' && g.phase === 'freeRoads') {
+    // Open Sea's Road Building places ships too (section 13.2), and a free ship counts as built this turn.
+    requireRule(sea && canPlaceShip(g, p.id, a.edge, 'roadBuilding'), 'Choose a legal edge for the ship');
+    Object.assign(g, placeShip(g, p.id, a.edge, 'roadBuilding'));
+    g.freeRoads--;
+    finishFreeRoads(g);
+    updateAwards(g);
+    checkWin(g);
+    log(g, SEA_LOG.freeShip(p.name, a.edge));
+    return g;
+  }
   if (a.kind === 'road' && g.phase === 'freeRoads') {
     requireRule(
-      owned.roads < supply.roads && roadSites(g, p.id).includes(a.edge),
+      sea
+        ? canPlaceRoadOpenSea(g, p.id, a.edge)
+        : owned.roads < supply.roads && roadSites(g, p.id).includes(a.edge),
       'Choose a legal road site',
     );
     g.roads[a.edge] = p.id;
@@ -1034,7 +1198,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       p.knights++;
       g.phase = 'robber';
     }
-    if (card.kind === 'roadBuilding') {
+    if (card.kind === 'roadBuilding' && sea) {
+      // Two roads, two ships or one of each (section 13.2): as many as the supply and the sites allow.
+      requireRule(freePieceSites(g, p.id), 'No legal road or ship is available');
+      g.freeRoads = Math.min(2, supply.roads - owned.roads + supply.ships! - shipCount(g, p.id));
+      g.phase = 'freeRoads';
+    } else if (card.kind === 'roadBuilding') {
       requireRule(owned.roads < supply.roads && roadSites(g, p.id).length, 'No legal road is available');
       g.freeRoads = Math.min(2, supply.roads - owned.roads);
       g.phase = 'freeRoads';
@@ -1082,6 +1251,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     } else {
       produce(g, sum);
       g.phase = 'actions';
+      // Open Sea: then the gold picks, one player at a time, before the action phase (section 9.2).
+      if (sea) oweGold(g, sum);
     }
     return g;
   }
@@ -1105,7 +1276,9 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   switch (a.kind) {
     case 'road':
       requireRule(
-        owned.roads < supply.roads && roadSites(g, p.id).includes(a.edge),
+        sea
+          ? canPlaceRoadOpenSea(g, p.id, a.edge)
+          : owned.roads < supply.roads && roadSites(g, p.id).includes(a.edge),
         'Choose a legal road site',
       );
       transfer(p.hand, g.bank, rules.costs.road);
@@ -1113,6 +1286,10 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       log(g, `${p.name} built a road on edge ${a.edge + 1}.`);
       break;
     case 'settlement':
+      if (sea) {
+        buildSeaSettlement(g, p.id, a.vertex);
+        break;
+      }
       requireRule(
         owned.settlements < supply.settlements && settlementSites(g, p.id).includes(a.vertex),
         'Choose a legal settlement site',
@@ -1121,6 +1298,23 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       g.buildings[a.vertex] = { player: p.id, kind: 'settlement' };
       log(g, `${p.name} built a settlement at corner ${a.vertex + 1}.`);
       break;
+    case 'ship':
+      requireRule(sea, 'That action is unavailable');
+      requireRule(canPlaceShip(g, p.id, a.edge, 'build'), 'Choose a legal edge for the ship');
+      transfer(p.hand, g.bank, rules.costs.ship!);
+      Object.assign(g, placeShip(g, p.id, a.edge, 'build'));
+      log(g, SEA_LOG.ship(p.name, a.edge));
+      break;
+    case 'moveShip': {
+      requireRule(sea, 'That action is unavailable');
+      // Once a turn, in the action phase only, never between Road Building's placements (section 8).
+      const block = shipMoveBlock(g, p.id, a.from);
+      requireRule(!block, block ? SHIP_MOVE_BLOCKS[block] : '');
+      requireRule(legalShipDestinations(g, p.id, a.from).includes(a.to), 'The ship cannot move to that edge');
+      Object.assign(g, moveShip(g, p.id, a.from, a.to));
+      log(g, SEA_LOG.shipMove(p.name, a.from, a.to));
+      break;
+    }
     case 'city':
       requireRule(
         owned.cities < supply.cities &&
@@ -1216,10 +1410,26 @@ export type PlayerView = {
   points: number;
   /** Where `points` come from, with the same cards hidden. */
   terms: ScoreTerm[];
+  /** The longest line for the route award: roads, or in Open Sea roads and ships (Longest Route). */
   roadLength: number;
-  pieces: ReturnType<typeof pieces>;
+  /** Pieces on the board. `ships` only in Open Sea. */
+  pieces: ReturnType<typeof pieces> & { ships?: number };
   hand?: Hand;
   cards?: Card[];
+};
+/** What Open Sea adds to a player's legal moves (docs/RULEBOOK-OPEN-SEA.md). Absent in every other mode. */
+export type SeaLegal = {
+  /** Edges where the viewer may put a ship now: beside their new settlement in setup, free, or bought. */
+  ships: number[];
+  /** In the viewer's action phase: each ship of theirs that may move, with the edges it may move to (8). */
+  shipMoves: Record<number, number[]>;
+  /** In the viewer's action phase: why each of their other ships cannot move (14). */
+  shipMoveBlocks: Record<number, ShipMoveBlock>;
+  /** While the viewer owes the move after a seven or a Knight: where the robber and the pirate may go (10). */
+  robberHexes?: number[];
+  pirateHexes?: number[];
+  /** When it is the viewer's turn to pick from a gold field: how many cards, of which types (9.2). */
+  goldPick?: { count: number; types: Resource[] };
 };
 export type GameView = Omit<
   Game,
@@ -1234,7 +1444,7 @@ export type GameView = Omit<
     playableCards: string[];
     canBuyCard: boolean;
     rates: Hand;
-  };
+  } & Partial<SeaLegal>;
 };
 export function gameView(g: Game, viewer: string): GameView {
   const {
@@ -1249,10 +1459,15 @@ export function gameView(g: Game, viewer: string): GameView {
   const me = players.find((p) => p.id === viewer);
   const active = !!me && !me.resigned && activePlayer(g).id === viewer;
   const owned = pieces(g, viewer);
-  const { costs, supply } = rulesetOf(g);
+  const { costs, supply, sea } = rulesetOf(g);
   // Building and buying happen in a turn's actions, and in Big Table's Partner's phase and build windows.
   const build = active && (g.phase === 'actions' || g.phase === 'partner' || g.phase === 'buildWindow'),
     setup = active && g.phase === 'setupSettlement';
+  const {
+    roads: seaRoads,
+    settlements: seaSettlements,
+    ...seaMoves
+  } = sea ? seaLegal(g, viewer, active ? me : undefined) : { roads: undefined, settlements: undefined };
   return {
     ...structuredClone(publicState),
     deckCount: deck.length,
@@ -1265,22 +1480,24 @@ export function gameView(g: Game, viewer: string): GameView {
       knights: p.knights,
       points: score(g, p, p.id === viewer || !!g.winner),
       terms: scoreTerms(g, p, p.id === viewer || !!g.winner),
-      roadLength: longestTrail(g, p.id),
-      pieces: pieces(g, p.id),
+      roadLength: routeLength(g, p.id),
+      pieces: sea ? { ...pieces(g, p.id), ships: shipCount(g, p.id) } : pieces(g, p.id),
       ...(p.id === viewer ? { hand: { ...p.hand }, cards: structuredClone(p.cards) } : {}),
     })),
     legal: {
-      roads:
-        owned.roads >= supply.pieces.roads
+      roads: seaRoads
+        ? seaRoads
+        : owned.roads >= supply.pieces.roads
           ? []
           : active && g.phase === 'setupRoad'
             ? roadSites(g, viewer, g.setupVertex)
             : (active && g.phase === 'freeRoads') || (build && canPay(me.hand, costs.road))
               ? roadSites(g, viewer)
               : [],
-      settlements:
-        owned.settlements < supply.pieces.settlements &&
-        (setup || (build && canPay(me.hand, costs.settlement)))
+      settlements: seaSettlements
+        ? seaSettlements
+        : owned.settlements < supply.pieces.settlements &&
+            (setup || (build && canPay(me.hand, costs.settlement)))
           ? settlementSites(g, viewer, setup)
           : [],
       cities:
@@ -1295,6 +1512,186 @@ export function gameView(g: Game, viewer: string): GameView {
           : [],
       canBuyCard: build && deck.length > 0 && canPay(me.hand, costs.developmentCard),
       rates: Object.fromEntries(RESOURCES.map((r) => [r, tradeRate(g, viewer, r)])) as Hand,
+      ...seaMoves,
     },
+  };
+}
+
+// Open Sea (ruleset open-sea-v1, docs/RULEBOOK-OPEN-SEA.md). The rules are sea.ts's and gold.ts's; these apply
+// them to a game and write its log. applyAction and gameView reach them only for a game whose ruleset has the
+// sea, so a Classic game never does.
+
+/** The fields a new Open Sea game starts with: the pirate on its template's sea hex, and no ships yet. */
+function seaStart(board: Board): Required<SeaFields> {
+  const pirate = board.pirateStart;
+  requireRule(pirate !== undefined && !isLand(board.hexes[pirate]!), 'The island has no sea for the pirate');
+  return {
+    ships: {},
+    pirate,
+    shipsBuiltThisTurn: [],
+    shipMovedThisTurn: false,
+    lockedShips: [],
+    closedShipEnds: {},
+    islandBonuses: {},
+    goldOwed: [],
+  };
+}
+const shipCount = (g: Pick<Game, 'ships'>, player: string) =>
+  Object.values(g.ships ?? {}).filter((owner) => owner === player).length;
+/** Whether Road Building has anywhere to put a piece: a road or a ship, each by its own rule (13.2). */
+function freePieceSites(g: Game, player: string) {
+  const sites = roadBuildingSites(g, player);
+  return sites.roads.length > 0 || sites.ships.length > 0;
+}
+
+/**
+ * A starting settlement, on the main island (5.3). The second collects a resource from each producing hex beside
+ * it and a pick for each gold field, made straight away, before its road or ship (5.5 and 9.3).
+ */
+function placeStartingSettlement(g: Game, player: string, vertex: number) {
+  requireRule(
+    settlementSitesOpenSea(g, player, true).includes(vertex),
+    'Choose an empty corner of the main island at least two edges from another settlement',
+  );
+  const p = g.players.find((other) => other.id === player)!;
+  Object.assign(g, placeSettlement(g, player, vertex, true));
+  g.setupVertex = vertex;
+  g.phase = 'setupRoad';
+  log(g, `${p.name} placed a starting settlement at corner ${vertex + 1}.`);
+  if (g.setupIndex < g.players.length) return;
+  const { resources, goldPicks } = startingResources(g.board, vertex);
+  transfer(g.bank, p.hand, resources);
+  if (total(resources)) log(g, `${p.name} received ${resourceText(resources)} from the starting settlement.`);
+  g.goldOwed = remainingGoldOwed(goldPicks ? [{ player, picks: goldPicks }] : [], g.bank, g.players);
+  if (g.goldOwed.length) g.phase = 'goldPick';
+}
+/** The road or ship after a starting settlement, touching it; a ship only on a coastal or sea edge (5.4). */
+function placeStartingPiece(g: Game, player: string, a: GameAction) {
+  const p = g.players.find((other) => other.id === player)!,
+    at = g.setupVertex!;
+  if (a.kind === 'ship') {
+    requireRule(canPlaceShip(g, player, a.edge, { setup: at }), 'Place a ship touching your new settlement');
+    Object.assign(g, placeShip(g, player, a.edge, { setup: at }));
+    log(g, SEA_LOG.startingShip(p.name, a.edge));
+    return;
+  }
+  requireRule(
+    a.kind === 'road' && canPlaceRoadOpenSea(g, player, a.edge, at),
+    'Place a road or a ship touching your new settlement',
+  );
+  log(g, `${p.name} placed a starting road on edge ${a.edge + 1}.`);
+  g.roads[a.edge] = player;
+}
+/** A settlement built in play: by a road or a ship of the player's, earning any island bonus (7.4 and 12.2). */
+function buildSeaSettlement(g: Game, player: string, vertex: number) {
+  requireRule(settlementSitesOpenSea(g, player).includes(vertex), 'Choose a legal settlement site');
+  const p = g.players.find((other) => other.id === player)!;
+  const island = islandBonusForSettlement(g, player, vertex, false);
+  transfer(p.hand, g.bank, rulesetOf(g).costs.settlement);
+  Object.assign(g, placeSettlement(g, player, vertex));
+  log(g, `${p.name} built a settlement at corner ${vertex + 1}.`);
+  if (island) log(g, SEA_LOG.islandBonus(p.name));
+}
+
+/**
+ * After ordinary production, the gold picks a roll pays, in turn order from the player on turn (9.2). The action
+ * phase waits for them. From an empty bank they lapse at once, and the log says so.
+ */
+function oweGold(g: Game, roll: number) {
+  g.goldOwed = goldOwedForRoll(g, roll);
+  if (g.goldOwed.length) g.phase = 'goldPick';
+  // goldOwedForRoll owes nothing from an empty bank; asked again with a card in it, it says whether gold was due.
+  else if (!total(g.bank) && goldOwedForRoll({ ...g, bank: { ...g.bank, wood: 1 } }, roll).length)
+    log(g, 'The bank has no cards left, so nobody picks from a gold field.');
+}
+/** A player's gold picks, all in one action: exactly as many cards as they are owed, or all the bank holds (9.2). */
+function pickGold(g: Game, player: string, picks: Hand) {
+  requireRule(g.phase === 'goldPick', 'Nobody is picking from a gold field now');
+  const issue = goldPickIssue(g, player, picks);
+  requireRule(!issue, issue ?? '');
+  const name = g.players.find((other) => other.id === player)!.name,
+    waiting = g.goldOwed!.length - 1;
+  Object.assign(g, applyGoldPick(g, player, picks));
+  if (total(picks)) log(g, goldPickText(name, picks));
+  // Only an empty bank ends the queue early: every player still in it is owed a pick.
+  if (waiting && !g.goldOwed!.length) log(g, 'The bank has run out of cards, so the other gold picks lapse.');
+  if (!g.goldOwed!.length) endGoldPicks(g);
+}
+/** Once every pick is made: back to setup's road or ship, or on to the action phase (5.5 and 9.2). */
+function endGoldPicks(g: Game) {
+  g.phase = g.turn === 0 ? 'setupRoad' : 'actions';
+}
+
+/** The pirate to another sea hex, robbing a player with a ship on its edges if anyone has one (10.5). */
+function movePirate(g: Game, player: string, hex: number, victim: string | undefined, random: () => number) {
+  const issue = pirateMoveIssue(g, player, hex, victim);
+  requireRule(!issue, issue ?? '');
+  const p = g.players.find((other) => other.id === player)!;
+  g.pirate = hex;
+  const robbed = victim === undefined ? undefined : g.players.find((other) => other.id === victim)!;
+  if (!robbed) return log(g, SEA_LOG.pirate(p.name));
+  const cards = RESOURCES.flatMap((r) => Array<Resource>(robbed.hand[r]).fill(r));
+  if (cards.length) {
+    const stolen = cards[Math.floor(random() * cards.length)]!;
+    robbed.hand[stolen]--;
+    p.hand[stolen]++;
+  }
+  log(g, SEA_LOG.pirate(p.name, { name: robbed.name, hadCards: cards.length > 0 }));
+}
+
+/**
+ * What Open Sea adds to a player's view: where they may put a road, a settlement or a ship now, which of their
+ * ships may move and where, or why not, the robber's and the pirate's hexes while that move is theirs, and their
+ * gold picks. `active` is the viewer when the turn is theirs, else undefined.
+ */
+function seaLegal(
+  g: Game,
+  viewer: string,
+  active: Player | undefined,
+): SeaLegal & { roads: number[]; settlements: number[] } {
+  const { costs } = rulesetOf(g);
+  const affords = (cost: Hand) => !!active && g.phase === 'actions' && canPay(active.hand, cost);
+  const setup = active && g.phase === 'setupRoad' ? g.setupVertex : null,
+    free = !!active && g.phase === 'freeRoads';
+  const shipMoves: Record<number, number[]> = {},
+    shipMoveBlocks: Record<number, ShipMoveBlock> = {};
+  if (active && g.phase === 'actions') {
+    const movable = new Set(movableShips(g, viewer));
+    for (const [edge, owner] of Object.entries(g.ships ?? {}))
+      if (owner === viewer) {
+        const e = Number(edge);
+        if (movable.has(e)) shipMoves[e] = legalShipDestinations(g, viewer, e);
+        else shipMoveBlocks[e] = shipMoveBlock(g, viewer, e)!;
+      }
+  }
+  const picking = g.phase === 'goldPick' ? g.goldOwed?.[0] : undefined;
+  const targets = active && g.phase === 'robber' ? knightTargets(g) : undefined;
+  return {
+    roads:
+      setup !== null
+        ? roadSitesOpenSea(g, viewer, setup)
+        : free || affords(costs.road)
+          ? roadSitesOpenSea(g, viewer)
+          : [],
+    settlements:
+      active && g.phase === 'setupSettlement'
+        ? settlementSitesOpenSea(g, viewer, true)
+        : affords(costs.settlement)
+          ? settlementSitesOpenSea(g, viewer)
+          : [],
+    ships:
+      setup !== null
+        ? shipSites(g, viewer, { setup })
+        : free
+          ? shipSites(g, viewer, 'roadBuilding')
+          : affords(costs.ship!)
+            ? shipSites(g, viewer, 'build')
+            : [],
+    shipMoves,
+    shipMoveBlocks,
+    ...(targets ? { robberHexes: targets.robber, pirateHexes: targets.pirate } : {}),
+    ...(picking?.player === viewer
+      ? { goldPick: { count: Math.min(picking.picks, total(g.bank)), types: goldPickTypes(g.bank) } }
+      : {}),
   };
 }

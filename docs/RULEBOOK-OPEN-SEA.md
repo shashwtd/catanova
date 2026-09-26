@@ -6,7 +6,7 @@ Open Sea is Catanova's sea mode. It aims to reproduce the core mechanics of the 
 
 This book is a companion to the [Classic rulebook](RULEBOOK.md) (ruleset `base-3-4-v1`). Everything in the Classic rulebook applies unless this book changes it. Where the official texts leave a gap, or where Catanova departs from them, the rule is marked as a Catanova decision. Section 17 lists the points the official texts and the first decisions left open, says where each is now settled, and names the one still open.
 
-This is the rules target for the mode. The engine does not implement it yet.
+This is the rules target for the mode. The engine plays it, but the mode is not offered to players yet, and the in-game controls for ships, gold picks and the choice between robber and pirate are still to come.
 
 ## 1. Scope
 
@@ -254,7 +254,7 @@ The destination must be an edge where you could build a new ship at that moment,
 - not an edge of the pirate's hex; and
 - touching one of your settlements or cities, or another of your ships that connects there. The ship cannot use its own former position as its connection.
 
-A move must also not detach another of your ships. Call a ship attached when it touches one of your buildings, or another of your ships that connects to it. Every other ship of yours that was attached before the move must still be attached after it. A ship that was already cut off before the move, for example by an opponent's settlement, never stops a move. Catanova decision: this second check is how Catanova reads the rule that ships attach to your ships or buildings, so a move may not detach another of your ships. It matters only where an opponent's building has split one of your lines.
+A move must also not detach another of your ships. Call a ship attached when it touches one of your buildings, or another of your ships that connects to it. Every other ship of yours that was attached before the move must still be attached after it. A ship that was already cut off before the move, for example by an opponent's settlement, never stops a move. Catanova decision: this second check is how Catanova reads the rule that ships attach to your ships or buildings, so a move may not detach another of your ships. It matters only where an opponent's building has split one of your lines. Catanova decision, 26 September 2026: ships cut off together by another player's building still count as attached to each other, so moving one of them may not leave its partner detached.
 
 ### 8.6 Longest Route after a move
 
@@ -346,7 +346,7 @@ The robber on a gold field stops it producing, as on any land hex. The pirate ca
 
 ### 9.5 The pick clock
 
-Catanova decision: each player owed gold has one 20-second clock for all of their picks. It runs in every room, whether or not the room has a turn timer. If it runs out, the server makes their remaining picks: the resource they hold fewest of among the types the bank still holds, with ties broken in the order Timber, Clay, Sheep, Hay, Rock. When several cards are still owed, it takes them one at a time by the same rule, counting the cards just taken.
+Catanova decision: each player owed gold has one 20-second clock for all of their picks. It runs in every room, whether or not the room has a turn timer, and also for a second starting settlement's picks (section 5.5), although setup placements are untimed. If it runs out, the server makes their remaining picks: the resource they hold fewest of among the types the bank still holds, with ties broken in the order Timber, Clay, Sheep, Hay, Rock. When several cards are still owed, it takes them one at a time by the same rule, counting the cards just taken.
 
 For example, Green is owed 2 picks and holds 2 Timber, 0 Clay, 1 Sheep, 0 Hay and 3 Rock, and the bank holds every type. The first default is Clay: Clay and Hay tie at 0, and Clay comes first. With 1 Clay in hand, the second is Hay.
 
@@ -488,12 +488,12 @@ The target slider runs from 10 to 18, with 14 as the default. Changing the mode 
 
 The game server owns every deadline, as the [turn clock](TURN_CLOCK.md) document describes.
 
-| What the game is waiting for | Clock                                                                                                                        |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| A turn                       | The room's turn timer, as in Classic: off, or 40, 65, 90, 115 or 140 seconds                                                 |
-| A discard after a seven      | As in Classic: each player who must discard gets the full room time, and the active player's clock pauses                    |
-| Gold picks                   | 20 seconds for each player owed gold, for all their picks, in every room (section 9.5), and the active player's clock pauses |
-| Setup                        | Untimed, as in Classic; the clock places for a player absent for 2 minutes (section 15.5)                                    |
+| What the game is waiting for | Clock                                                                                                                                                |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A turn                       | The room's turn timer, as in Classic: off, or 40, 65, 90, 115 or 140 seconds                                                                         |
+| A discard after a seven      | As in Classic: each player who must discard gets the full room time, and the active player's clock pauses                                            |
+| Gold picks                   | 20 seconds for each player owed gold, for all their picks, in every room (section 9.5), and the active player's clock pauses                         |
+| Setup                        | Untimed, as in Classic, apart from a second settlement's gold picks (section 9.5); the clock places for a player absent for 2 minutes (section 15.5) |
 
 When a clock runs out:
 
@@ -503,7 +503,7 @@ When a clock runs out:
 
 Catanova decision, the two Open Sea defaults:
 
-1. A pending robber-or-pirate move: the clock always moves the robber, never the pirate. As in Classic, it moves the robber to a random land hex other than its current one, then takes a random legal victim with a settlement or city on that hex, if there is one. If the pirate has already been moved and only its victim is still to be chosen, the clock takes a random legal victim among the other players with a ship on an edge of its hex. Resigned players are never victims (section 10.5).
+1. A pending robber-or-pirate move: the clock always moves the robber, never the pirate. As in Classic, it moves the robber to a random land hex other than its current one, then takes a random legal victim with a settlement or city on that hex, if there is one. If the pirate has already been moved and only its victim is still to be chosen, the clock takes a random legal victim among the other players with a ship on an edge of its hex. Resigned players are never victims (section 10.5). Catanova decision: online, a player moves the pirate and names its victim in one move, as with the robber, so the game never waits on a victim alone and that last case does not arise.
 2. Road Building pieces still owed: for each piece, the clock places a road on a random legal road site if the player has a road left and such a site exists. Otherwise it places a ship on a random legal ship edge, never an edge of the pirate's hex, if the player has a ship left. Otherwise that piece is dropped.
 
 The clock never buys a piece, makes an optional build, moves a ship, spends resources on an optional action, accepts a trade, plays a development card the player did not choose, or resigns anyone. The only pieces it places are those still owed from a Road Building card the player already played.

@@ -11,12 +11,15 @@ import {
   constrainCamera,
   fitBoard,
   maxZoom,
+  OPENING_TOKEN_PX,
+  openingCamera,
   pinchScale,
   wheelScale,
   zoomAt,
 } from '../apps/client/src/camera.js';
 import type { Camera, Point } from '../apps/client/src/camera.js';
-import { WORLD } from '../apps/client/src/scene.js';
+import { islandsBox, WORLD, worldBox } from '../apps/client/src/scene.js';
+import { bareBoard, BIG_TABLE_SHAPE, outerIsles4 } from './board-shapes.js';
 import { FantasyTransition, FANTASY_TRANSITION_MS } from '../apps/client/src/FantasyTransition.js';
 
 test('initial island fit keeps the complete scene in view across narrow and short viewports', () => {
@@ -280,4 +283,27 @@ test('the string of lights still hangs together, for whenever it goes back up', 
   assert.ok(body.includes('pointer-events: none'));
   assert.ok(Number(body.match(/height: (\d+)px/)![1]) <= 56, 'the string stays a small thing');
   assert.match(css, /prefers-reduced-motion[\s\S]*animation: none/);
+});
+
+test('a sea board opens on its islands where the whole frame would draw small tokens, and is still all in reach', () => {
+  const board = outerIsles4(),
+    world = worldBox(board),
+    islands = islandsBox(board)!;
+  const phone = { width: 374, height: 462 },
+    desktop = { width: 1074, height: 754 };
+  // Classic, and any board without sea, always opens on the whole board.
+  assert.deepEqual(openingCamera(phone, WORLD), { scale: 1, x: 0, y: 0 });
+  assert.deepEqual(openingCamera(phone, worldBox(bareBoard(BIG_TABLE_SHAPE))), { scale: 1, x: 0, y: 0 });
+  // A desktop draws the whole frame's tokens large enough.
+  assert.ok((40 * fitBoard(desktop, world).width) / world.width >= OPENING_TOKEN_PX);
+  assert.deepEqual(openingCamera(desktop, world, islands), { scale: 1, x: 0, y: 0 });
+  // A phone opens with the islands filling its width, their tokens nearly Classic's size.
+  const opened = openingCamera(phone, world, islands),
+    unit = fitBoard(phone, world).width / world.width;
+  assert.ok(opened.scale > 1.2 && opened.scale < 1.3, `${opened.scale}`);
+  assert.ok(islands.width * unit * opened.scale <= phone.width - 24 + 1e-9);
+  assert.ok(40 * unit * opened.scale > 15);
+  assert.deepEqual(constrainCamera(opened, phone, world), opened);
+  // Pinching out still shows the whole frame.
+  assert.deepEqual(constrainCamera({ scale: 0.85, x: 0, y: 0 }, phone, world), { scale: 0.85, x: 0, y: 0 });
 });

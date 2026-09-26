@@ -35,7 +35,12 @@ const CARD_NAMES: Record<string, string> = {
   monopoly: 'Monopoly',
 };
 
-const TERRAIN_NAMES: Record<string, string> = { ...RESOURCE_NAMES, desert: 'Desert' };
+const TERRAIN_NAMES: Record<string, string> = {
+  ...RESOURCE_NAMES,
+  desert: 'Desert',
+  gold: 'Gold field',
+  sea: 'Sea',
+};
 
 /** A whole-number axis for turns: about five ticks. */
 function turnTicks(last: number): number[] {
@@ -235,6 +240,8 @@ function PointsChart({ game }: { game: GameAnalytics }) {
 }
 
 function ResourceTables({ game }: { game: GameAnalytics }) {
+  // Open Sea's ships are a spend of their own; other modes have no column for them.
+  const ships = game.players.some((player) => player.resources.spent.ships !== undefined);
   const rows = (cells: (player: AnalyticsPlayer) => number[]) =>
     game.players.map((player, index) => {
       const values = cells(player);
@@ -287,6 +294,7 @@ function ResourceTables({ game }: { game: GameAnalytics }) {
           <tr>
             <th>Player</th>
             <th className="num">Roads</th>
+            {ships && <th className="num">Ships</th>}
             <th className="num">Settlements</th>
             <th className="num">Cities</th>
             <th className="num">Dev cards</th>
@@ -301,6 +309,7 @@ function ResourceTables({ game }: { game: GameAnalytics }) {
         <tbody>
           {rows(({ resources: { spent: s, lost: l } }) => [
             s.roads,
+            ...(ships ? [s.ships ?? 0] : []),
             s.settlements,
             s.cities,
             s.devCards,
@@ -398,7 +407,9 @@ function Interactions({ game }: { game: GameAnalytics }) {
                     <td className="num">{move.turn}</td>
                     <td>{name(move.playerId)}</td>
                     <td>
-                      {TERRAIN_NAMES[move.terrain] ?? move.terrain}
+                      {move.piece === 'pirate'
+                        ? 'The pirate, to the sea'
+                        : (TERRAIN_NAMES[move.terrain] ?? move.terrain)}
                       {move.number !== null && ` ${move.number}`}
                     </td>
                     <td>

@@ -17,7 +17,7 @@ import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { seededRandom } from '../packages/rules/src/board.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
-import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
+import { BIG_TABLE, CLASSIC, OPEN_SEA } from '../packages/rules/src/rulesets.js';
 import { TEST_DECK_SIZE, TEST_TABLE, useTestTable } from './test-ruleset.js';
 
 useTestTable();
@@ -76,7 +76,12 @@ test('the test mode is picked, started, played through a seven, replayed, verifi
     const roomId = host.room_id;
     const revision = () => store.snapshot(roomId).revision;
     // The host picks the mode alone: too few players never blocks a mode, and a Classic room seats four.
-    assert.deepEqual(store.snapshot(roomId, host.id).modes, [CLASSIC.id, BIG_TABLE.id, TEST_TABLE.id]);
+    assert.deepEqual(store.snapshot(roomId, host.id).modes, [
+      CLASSIC.id,
+      BIG_TABLE.id,
+      OPEN_SEA.id,
+      TEST_TABLE.id,
+    ]);
     store.configureSettings(host, 'pick-test-mode', revision(), {
       turnTimerSeconds: null,
       diceMode: 'classic',

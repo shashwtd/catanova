@@ -46,11 +46,11 @@ import {
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
 import { owedMoves } from '../../../packages/rules/src/owed.js';
-import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
+import { dealBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
+import { GOLD_PICK_SECONDS } from '../../../packages/rules/src/gold.js';
 import {
   CLASSIC,
-  boardPresetOf,
   findRuleset,
   numberWord,
   playsBoard,
@@ -623,23 +623,42 @@ export class Store {
     const saved = this.db.prepare('SELECT board FROM room_boards WHERE room_id = ?').get(roomId) as
       { board: string } | undefined;
     const rules = this.lobbyRules(roomId);
+    let seed: number | undefined;
     if (saved) {
       // A lobby's island belongs to no game yet. One its mode does not play, such as a preset a release
       // since rolled back dealt, is dealt again below rather than leaving a room that can never start. The
       // lobby is read before Start and on every settings save, so neither ever meets it. A mode this version
       // does not know cannot deal, so its lobby keeps its island; it cannot start either way.
       const board = JSON.parse(saved.board) as Board;
-      if (!rules || playsBoard(rules, board)) return board;
+      if (!rules) return board;
+      if (playsBoard(rules, board)) {
+        if (board.players === undefined || board.players === this.templateSeats(roomId, rules)) return board;
+        // Outer Isles: the seated count moved between three and four, so the same seed is dealt on the other
+        // template. Nobody has seen the board, so this is not a settings change and leaves readiness alone.
+        seed = board.seed;
+      }
     } else if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
       throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
     // Dealt for the room's mode: a mode change deletes the board, and this deals the new mode's.
-    const board = generateBoard(randomInt(0, 2 ** 32), boardPresetOf(rules ?? CLASSIC));
+    const mode = rules ?? CLASSIC;
+    const board = dealBoard(seed ?? randomInt(0, 2 ** 32), mode.board, this.templateSeats(roomId, mode));
     this.db
       .prepare(
         'INSERT INTO room_boards(room_id, board) VALUES (?, ?) ON CONFLICT(room_id) DO UPDATE SET board = excluded.board',
       )
       .run(roomId, JSON.stringify(board));
     return board;
+  }
+  /**
+   * How many players the lobby's board is dealt for. Outer Isles has a template for three players and one for
+   * four: an Open Sea lobby holds the four-player one while four are seated and the three-player one otherwise
+   * (docs/RULEBOOK-OPEN-SEA.md, 15.1). Every other preset deals one island whatever the count.
+   */
+  private templateSeats(roomId: string, rules: Ruleset): number {
+    const seated = this.db
+      .prepare('SELECT COUNT(*) AS n FROM seats WHERE room_id = ? AND departed = 0')
+      .get(roomId)!.n as number;
+    return rules.sea ? (seated >= rules.seats.max ? rules.seats.max : rules.seats.min) : seated;
   }
   preview(reference: string) {
     const roomId = this.resolveRoom(reference);
@@ -1859,22 +1878,33 @@ export class Store {
     return row ? (JSON.parse(row.state) as TurnClock) : undefined;
   }
   private updateClock(roomId: string, next: Game, connected = this.connectedSeats) {
-    if (next.turn === 0 || next.phase === 'finished') {
+    // Open Sea's gold picks have a clock in every room, timer or not, even in setup (docs/TURN_CLOCK.md).
+    const picker = owedMoves(next).find((move) => move.kind === 'goldPick')?.player;
+    if (next.phase === 'finished' || (next.turn === 0 && !picker)) {
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
       return;
     }
     const now = this.now();
     const playerId = next.players[next.active]!.id;
     // A turn or a Lead's part runs on the room's timer; Big Table's Partner's phase and build windows have
-    // clocks of their own, which may run in a room without one (docs/TURN_CLOCK.md, "New clocks").
-    const seconds = clockSeconds(next, this.settings(roomId).turnTimerSeconds, !connected.has(playerId));
+    // clocks of their own, which may run in a room without one (docs/TURN_CLOCK.md, "New clocks"). Setup has
+    // no turn clock: only its gold picks are timed.
+    const seconds =
+      next.turn === 0
+        ? null
+        : clockSeconds(next, this.settings(roomId).turnTimerSeconds, !connected.has(playerId));
     let clock = this.clock(roomId);
     if (!clock || clock.turn !== next.turn || clock.playerId !== playerId) {
-      if (seconds === null) {
+      if (seconds === null && !picker) {
         this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
         return;
       }
-      clock = { playerId, turn: next.turn, startedAt: now, deadlineAt: now + seconds * 1000 };
+      clock = {
+        playerId,
+        turn: next.turn,
+        startedAt: now,
+        ...(seconds === null ? {} : { deadlineAt: now + seconds * 1000 }),
+      };
     }
     if (next.phase === 'discard' && seconds !== null) {
       clock.pausedAt ??= now;
@@ -1883,20 +1913,33 @@ export class Store {
       clock.discardDeadlines = Object.fromEntries(
         owedMoves(next)
           .filter((move) => move.kind === 'discard')
-          .map(({ player }) => [player, existing[player] ?? now + seconds * 1000]),
+          .map(({ player }) => [player, existing[player] ?? now + seconds! * 1000]),
       );
+    } else if (picker) {
+      // The player on turn waits while the picks are made, one player at a time, each with 20 seconds.
+      clock.pausedAt ??= now;
+      clock.goldDeadlines = { [picker]: clock.goldDeadlines?.[picker] ?? now + GOLD_PICK_SECONDS * 1000 };
     } else if (clock.pausedAt !== undefined) {
-      clock.deadlineAt += Math.max(0, now - clock.pausedAt);
+      if (clock.deadlineAt !== undefined) clock.deadlineAt += Math.max(0, now - clock.pausedAt);
       delete clock.pausedAt;
       delete clock.discardDeadlines;
+      delete clock.goldDeadlines;
+    }
+    // A room without a turn timer keeps a clock only while it times something: gold picks, a Partner's phase
+    // or a build window.
+    if (clock.deadlineAt === undefined && clock.pausedAt === undefined) {
+      this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
+      return;
     }
     const nextDeadline =
-      clock.pausedAt === undefined ? clock.deadlineAt : Math.min(...Object.values(clock.discardDeadlines!));
+      clock.pausedAt === undefined
+        ? clock.deadlineAt
+        : Math.min(...Object.values({ ...clock.discardDeadlines, ...clock.goldDeadlines }));
     this.db
       .prepare(
         'INSERT INTO turn_clocks(room_id, state, next_deadline) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET state = excluded.state, next_deadline = excluded.next_deadline',
       )
-      .run(roomId, JSON.stringify(clock), nextDeadline);
+      .run(roomId, JSON.stringify(clock), nextDeadline ?? null);
   }
   dueRooms(): string[] {
     // Reserve at least half the batch for saved deadlines. Rotate both queues even if a
@@ -1957,19 +2000,20 @@ export class Store {
     changed = this.playForAbsent(roomId) || changed;
     const firstClock = this.clock(roomId);
     if (!firstClock) return changed;
-    // At most six discards, two free roads, a robber move, a roll and an end-turn; anything more waits for the
-    // next tick. A Partner's phase or a build window that follows has a fresh clock of its own.
+    // At most six discards, two free roads, a robber move, a roll and an end-turn, or a roll, four players' gold
+    // picks and an end-turn; anything more waits for the next tick. A Partner's phase or a build window that
+    // follows has a fresh clock of its own.
     for (let step = 0; step < 12; step++) {
       const clock = this.clock(roomId);
       if (!clock || clock.turn !== firstClock.turn) break;
       let playerId = clock.playerId;
       if (clock.pausedAt !== undefined) {
-        const due = Object.entries(clock.discardDeadlines ?? {}).find(
+        const due = Object.entries({ ...clock.discardDeadlines, ...clock.goldDeadlines }).find(
           ([, deadline]) => deadline <= this.now(),
         );
         if (!due) break;
         playerId = due[0];
-      } else if (clock.deadlineAt > this.now()) break;
+      } else if (clock.deadlineAt === undefined || clock.deadlineAt > this.now()) break;
       const game = this.loadGame(roomId);
       if (!game || game.phase === 'finished') break;
       const action = timeoutAction(game, playerId, this.random);
