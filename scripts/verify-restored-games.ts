@@ -287,7 +287,7 @@ function seaProblems(game: Game, rules: Ruleset, ids: Set<string>): string[] {
     if (game.roads[edge]) problems.push(`edge ${key} holds a road and a ship`);
     fleet.set(owner, (fleet.get(owner) ?? 0) + 1);
   }
-  for (const [owner, count] of fleet)
+  for (const count of fleet.values())
     if (count > rules.supply.pieces.ships!)
       problems.push(`a player has ${count} ships; the supply is ${rules.supply.pieces.ships}`);
   for (const key of Object.keys(game.roads))

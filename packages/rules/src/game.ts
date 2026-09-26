@@ -15,7 +15,6 @@ import type { Board } from './board.js';
 import { rollDice } from './dice.js';
 import type { DiceMode, BalancedDiceState } from './dice.js';
 import {
-  LONGEST_ROUTE,
   SEA_LOG,
   SHIP_MOVE_BLOCKS,
   canPlaceRoadOpenSea,
@@ -575,7 +574,9 @@ function produce(g: Game, number: number) {
   }
   for (const [i, hand] of received.entries())
     if (total(hand)) log(g, `${g.players[i]!.name} received ${resourceText(hand)}.`);
-  if (!received.some((hand) => total(hand))) log(g, 'No resources produced.');
+  // Open Sea: gold picks may still follow ordinary production (section 9.2), and then something is produced.
+  if (!received.some((hand) => total(hand)) && !(rulesetOf(g).sea && goldOwedForRoll(g, number).length))
+    log(g, 'No resources produced.');
 }
 
 function advanceTurn(g: Game, pendingRobber = false) {
