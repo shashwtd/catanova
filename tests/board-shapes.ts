@@ -1,18 +1,16 @@
 /**
- * Board shapes that no preset deals yet, for testing that the board code takes any list of hexes rather than
- * the Classic island alone. See docs/BIGGER-MAPS-AND-MODES.md.
+ * Board shapes for testing that the board code takes any list of hexes rather than the Classic island alone.
+ * See docs/BIGGER-MAPS-AND-MODES.md.
  */
 import { isCoastalEdge, topology } from '../packages/rules/src/board.js';
 import type { Board, BoardShape, Hex } from '../packages/rules/src/board.js';
 
-/** The 5–6 player island: rows of 3, 4, 5, 6, 5, 4 and 3 hexes, each row centred under the one above. */
-export const BIG_TABLE_SHAPE: BoardShape = [3, 4, 5, 6, 5, 4, 3].flatMap((length, row) =>
-  Array.from({ length }, (_, k) => ({ q: Math.max(-3, -row) + k, r: row - 3 })),
-);
+/** The 5–6 player island, which big-table-balanced-v1 deals. */
+export { BIG_TABLE_SHAPE } from '../packages/rules/src/board.js';
 
 /**
- * Turns every hex that fails `land` into sea, as Open Sea will deal it. Sea is not a Terrain yet, so no preset
- * can; the coast rule asks isLand, which already knows the name.
+ * Turns every hex that fails `land` into sea, as Open Sea's presets do, for shapes that no preset deals. The
+ * coast rule asks isLand, which knows sea by name.
  */
 export function flood<T extends Pick<Board, 'hexes'>>(board: T, land: (hex: Hex) => boolean): T {
   for (const hex of board.hexes) if (!land(hex)) Object.assign(hex, { terrain: 'sea' });

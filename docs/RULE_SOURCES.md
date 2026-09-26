@@ -328,7 +328,7 @@ Neither mode rulebook, nor [map generation](MAP_GENERATION.md), reproduces an of
 
 These are the points section 11 of the Big Table rulebook listed as open. Each is numbered as in that section. All were closed on 26 September 2026, under the owner's delegation, by the decision named.
 
-1. **BQ1 The balanced 30-hex board:** closed by BD5. The 11-pip cap stays and is not raised. The preset ships when a tuned search keeps every board under 100 ms over 20,000 seeds, or else generates boards in a worker off the server's main thread with a documented longer limit. [Map generation](MAP_GENERATION.md#big-table-islands) has the prototype measurements.
+1. **BQ1 The balanced 30-hex board:** closed by BD5. The 11-pip cap stays and is not raised. The preset ships when a tuned search keeps every board under 100 ms over 20,000 seeds, or else generates boards in a worker off the server's main thread with a documented longer limit. [Map generation](MAP_GENERATION.md#big-table-islands) has the measurements of the release code.
 2. **BQ2 A spiral preset:** closed by BD5. None is offered in v1; one is recorded only as a possible later option.
 3. **BQ3 Resignations during a paired turn:** closed by BD19, which confirms the rulebook's section 9.6.
 4. **BQ4 A resignation that moves an award:** closed by BD14. It counts as an action and triggers the win check.

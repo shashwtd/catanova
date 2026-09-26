@@ -3,6 +3,7 @@ import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js'
 import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { CARD_NAMES, emptyHand, total } from '../../../packages/rules/src/game.js';
+import { producedResource } from '../../../packages/rules/src/sea.js';
 import type { CardKind, GameView, Hand } from '../../../packages/rules/src/game.js';
 import type { SoundCue } from './sound.js';
 export type FlightIntent = {
@@ -108,17 +109,20 @@ export function publicProduction(
   const sum = dice[0] + dice[1];
   if (sum === 7 || before.robber !== next.robber) return null;
   const owed = new Map(before.players.map((p) => [p.id, emptyHand()]));
-  for (const hex of before.board.hexes)
-    if (hex.number === sum && hex.id !== before.robber && hex.terrain !== 'desert')
+  for (const hex of before.board.hexes) {
+    // A desert, the sea and a gold field pay no resource of their own: gold is picked afterwards.
+    const resource = producedResource(hex);
+    if (hex.number === sum && hex.id !== before.robber && resource)
       for (const vertex of hex.vertices) {
         const building = before.buildings[vertex];
         if (building) {
           if (before.players.find((player) => player.id === building.player)?.resigned) continue;
           const payment = owed.get(building.player);
           if (!payment) return null;
-          payment[hex.terrain] += building.kind === 'city' ? 2 : 1;
+          payment[resource] += building.kind === 'city' ? 2 : 1;
         }
       }
+  }
   const paid = new Map(before.players.map((p) => [p.id, emptyHand()]));
   for (const resource of RESOURCES) {
     const recipients = [...owed].filter(([, hand]) => hand[resource] > 0),
@@ -254,24 +258,25 @@ export function deriveFeedback(
       ? new Map([...production].map(([id, hand]) => [id, { ...hand }]))
       : new Map<string, Hand>();
     for (const hex of before.board.hexes) {
-      if (hex.number !== dice[0] + dice[1] || hex.id === before.robber || hex.terrain === 'desert') continue;
+      const resource = producedResource(hex);
+      if (hex.number !== dice[0] + dice[1] || hex.id === before.robber || !resource) continue;
       for (const [id, payment] of remaining) {
         const units = hex.vertices.reduce(
           (n, v) =>
             n + (before.buildings[v]?.player === id ? (before.buildings[v]!.kind === 'city' ? 2 : 1) : 0),
           0,
         );
-        const amount = Math.min(units, payment[hex.terrain]);
+        const amount = Math.min(units, payment[resource]);
         if (!amount) continue;
         event.glowHexes.push(hex.id);
         event.flights.push({
-          resource: hex.terrain,
+          resource,
           amount,
           from: `[data-effect-hex="${hex.id}"]`,
-          to: id === me ? card(hex.terrain) : `[data-player-profile="${id}"]`,
+          to: id === me ? card(resource) : `[data-player-profile="${id}"]`,
         });
-        payment[hex.terrain] -= amount;
-        if (id === me) gain[hex.terrain] -= amount;
+        payment[resource] -= amount;
+        if (id === me) gain[resource] -= amount;
       }
     }
   }
