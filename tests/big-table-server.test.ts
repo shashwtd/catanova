@@ -9,15 +9,15 @@ import { Store } from '../apps/server/src/store.js';
 import { ABSENCE_AFTER_MS } from '../apps/server/src/store.js';
 import { computeGameAnalytics } from '../apps/server/src/admin/game-analytics.js';
 import { newSession } from '../apps/client/src/connection.js';
-import { activePlayer, gameView } from '../packages/rules/src/game.js';
+import { activePlayer, gameView, resignPlayers } from '../packages/rules/src/game.js';
 import type { Game } from '../packages/rules/src/game.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
 import { parseRoomSettings, partnerSeconds } from '../packages/protocol/src/settings.js';
 import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
-import { continueGame, gameInvariantProblems } from '../scripts/verify-restored-games.js';
+import { continueGame, gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
 import { OPEN, bigTableRoom, throughSetup } from './big-table-room.js';
-import { act, afterSetup, roll } from './big-table-helpers.js';
+import { act, afterSetup, clearBoard, layRoads, line, pointsTo, roll } from './big-table-helpers.js';
 import type { Room } from './big-table-room.js';
 
 const code = (expected: string) => (error: unknown) => (error as { code?: string }).code === expected;
@@ -253,6 +253,38 @@ test('§9.4: without a turn timer the Partner gets a 45-second clock only once a
   }
 });
 
+test('§9.4 and §9.5: after a pause an absent Partner’s clock starts again in full, whoever is first back', () => {
+  for (const partnerFirst of [true, false]) {
+    const room = bigTableRoom({ timer: null });
+    try {
+      throughSetup(room);
+      leadEnds(room);
+      const partner = room.seatOf(activePlayer(room.game()).id);
+      room.store.setConnected(partner, false);
+      assert.equal(room.store.clock(room.roomId)!.deadlineAt, room.clock.now + 45_000);
+      // Ten seconds in, the rest of the table goes too: the room pauses with the clock under way.
+      room.clock.now += 10_000;
+      for (const seat of room.seats) if (seat.id !== partner.id) room.store.setConnected(seat, false);
+      room.clock.now += 20_000;
+      const back = partnerFirst ? partner : room.seats.find((seat) => seat.id !== partner.id)!;
+      room.store.setConnected(back, true);
+      const clock = room.store.clock(room.roomId);
+      assert.equal(
+        clock?.playerId,
+        partner.id,
+        partnerFirst ? 'the Partner is back first' : 'another is back',
+      );
+      assert.equal(clock.startedAt, room.clock.now);
+      assert.equal(clock.deadlineAt, room.clock.now + 45_000, 'with its full time');
+      room.clock.now += 45_000;
+      room.store.expireRoom(room.roomId);
+      assert.equal(room.game().turn, 2, 'and it ends the phase');
+    } finally {
+      room.store.close();
+    }
+  }
+});
+
 test('§9.2 and §9.3: every build window has 20 seconds, with or without a turn timer, and one that runs out ends', () => {
   for (const timer of [null, 140] as const) {
     const room = bigTableRoom({ turns: 'betweenTurnsBuild', timer });
@@ -288,6 +320,59 @@ test('§9.2 and §9.3: every build window has 20 seconds, with or without a turn
       const turn = room.store.clock(room.roomId);
       if (timer === null) assert.equal(turn, undefined);
       else assert.equal(turn!.deadlineAt! - turn!.startedAt, timer * 1000);
+    } finally {
+      room.store.close();
+    }
+  }
+});
+
+test('§6.7 and §9.4: a marker holder left at the target by a leaver while away wins at the clock’s first move', () => {
+  // The Lead: the Partner leaves in their phase and hands Longest Road to the next Lead, who is away and so is not
+  // declared the winner as their turn begins. The absence rule's roll, two minutes on, declares them.
+  // The Partner: the Lead leaves in their part and hands it to their Partner, who is away; the Partner's phase
+  // follows, and the 45-second clock a room without a timer gives an absent Partner declares them as it ends.
+  for (const holder of ['Lead', 'Partner'] as const) {
+    const room = bigTableRoom({ players: 6, timer: null, victoryPoints: 8 });
+    try {
+      throughSetup(room);
+      if (holder === 'Lead') leadEnds(room);
+      else {
+        room.act(activePlayer(room.game()).id, { kind: 'roll' });
+        for (let guard = 0; guard < 12 && room.game().phase !== 'actions'; guard++) room.step();
+      }
+      const g = room.game();
+      const leaver = holder === 'Lead' ? g.players[g.pair!.partner]!.id : g.players[g.pair!.lead]!.id;
+      const winner =
+        holder === 'Lead' ? g.players[(g.pair!.lead + 1) % 6]!.id : g.players[g.pair!.partner]!.id;
+      room.rig((game) => {
+        clearBoard(game);
+        const taken = new Set<number>();
+        layRoads(game, leaver, line(game, 7, taken));
+        layRoads(game, winner, line(game, 6, taken));
+        game.longestRoad = leaver;
+        pointsTo(game, winner, 6);
+      });
+      room.store.setConnected(room.seatOf(winner), false);
+      room.store.leave(room.seatOf(leaver), `leave-${leaver}`, room.revision());
+      let after = room.game();
+      assert.equal(after.longestRoad, winner);
+      assert.equal(activePlayer(after).id, winner);
+      assert.equal(after.phase, holder === 'Lead' ? 'roll' : 'partner');
+      assert.equal(after.winner, null, 'not declared while away');
+      room.clock.now += holder === 'Lead' ? ABSENCE_AFTER_MS : 45_000;
+      room.store.expireRoom(room.roomId);
+      after = room.game();
+      assert.equal(after.winner, winner, holder);
+      const name = after.players.find((p) => p.id === winner)!.name;
+      assert.deepEqual(
+        lines(after).slice(-2),
+        holder === 'Lead'
+          ? [`${name} wins with 8 points!`, `${name} is away; dice rolled automatically.`]
+          : [
+              `${name} wins as Partner with 8 points!`,
+              `${name}'s timer expired; Partner's phase ended automatically.`,
+            ],
+      );
     } finally {
       room.store.close();
     }
@@ -405,4 +490,48 @@ test('the new moves come over the wire like the others, and the restore verifier
   // The verifier's own mandatory move finishes a Partner's phase and a build window.
   assert.deepEqual(continueGame(partner, 'room'), { move: 'endPhase', problems: [] });
   assert.deepEqual(continueGame(windows, 'room'), { move: 'endWindow', problems: [] });
+});
+
+test('a table left with one absent player in a Partner’s phase waits at the roll, and passes the verifier', () => {
+  // Everyone but Dan, the Partner, runs out of grace while nobody is there: nobody may be declared the winner,
+  // so Dan waits as a turn begins, with no pair, no phase of his own left over and no card played.
+  const partner = act(roll(afterSetup(5), 3, 5), 'p0', { kind: 'endTurn' });
+  partner.playedCard = true;
+  const left = resignPlayers(partner, ['p0', 'p1', 'p2', 'p4'], {
+    reason: 'disconnect',
+    winnerEligibleIds: [],
+  });
+  assert.equal(left.winner, null);
+  assert.equal(activePlayer(left).id, 'p3');
+  assert.equal(left.phase, 'roll');
+  assert.equal(left.returnPhase, 'roll');
+  assert.equal(left.playedCard, false);
+  assert.equal(left.pair, undefined);
+  assert.deepEqual(gameInvariantProblems(left), []);
+  assert.deepEqual(continueGame(left, 'room'), { move: 'roll', problems: [] });
+  // The same through the store: three leave in the Partner's phase, the fifth drops, then the Partner leaves.
+  const room = bigTableRoom({ timer: 90 });
+  try {
+    throughSetup(room);
+    leadEnds(room);
+    const g = room.game();
+    assert.equal(g.phase, 'partner');
+    const dan = activePlayer(g).id;
+    const others = g.players.map((p) => p.id).filter((id) => id !== dan);
+    for (const id of others.slice(0, 3)) room.store.leave(room.seatOf(id), `leave-${id}`, room.revision());
+    room.store.setConnected(room.seatOf(others[3]!), false);
+    room.store.leave(room.seatOf(dan), `leave-${dan}`, room.revision());
+    const after = room.game();
+    assert.equal(activePlayer(after).id, others[3]);
+    assert.equal(after.phase, 'roll');
+    assert.equal(after.returnPhase, 'roll');
+    assert.equal(after.winner, null);
+    const report = verifyStore(room.store);
+    assert.deepEqual(
+      report.details.map((detail) => [detail.status, detail.problems]),
+      [['verified', []]],
+    );
+  } finally {
+    room.store.close();
+  }
 });

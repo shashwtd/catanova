@@ -1648,9 +1648,17 @@ export class Store {
       }
     this.writePresence(roomId, holdFromPause(state), game);
     if (resumed) {
-      // Nobody owes an immediate automatic move for time when nobody could see the game.
+      // Nobody owes an immediate automatic move for time when nobody could see the game, so the clock under way
+      // starts again with its full time. An absent Partner's clock is one of them even when the Partner is the
+      // one back: once started it runs to the end of the phase (docs/RULEBOOK-BIG-TABLE.md, 9.4 and 9.5).
+      const saved = this.clock(roomId);
+      const partnerClock =
+        !!saved &&
+        partnerActing(game) &&
+        saved.turn === game.turn &&
+        saved.playerId === activePlayer(game).id;
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
-      this.updateClock(roomId, game, connected);
+      this.updateClock(roomId, game, connected, partnerClock);
     } else if (!paused && partnerActing(game) && !connected.has(activePlayer(game).id) && !this.clock(roomId))
       // A room without a turn timer gives the Partner's phase a clock only once the Partner is away, and it then
       // runs to the end of the phase even if they come back.
@@ -1877,7 +1885,8 @@ export class Store {
       { state: string } | undefined;
     return row ? (JSON.parse(row.state) as TurnClock) : undefined;
   }
-  private updateClock(roomId: string, next: Game, connected = this.connectedSeats) {
+  /** `partnerClock`: a Partner's clock was already running in this phase, so it runs on whoever is here. */
+  private updateClock(roomId: string, next: Game, connected = this.connectedSeats, partnerClock = false) {
     // Open Sea's gold picks have a clock in every room, timer or not, even in setup (docs/TURN_CLOCK.md).
     const picker = owedMoves(next).find((move) => move.kind === 'goldPick')?.player;
     if (next.phase === 'finished' || (next.turn === 0 && !picker)) {
@@ -1892,7 +1901,11 @@ export class Store {
     const seconds =
       next.turn === 0
         ? null
-        : clockSeconds(next, this.settings(roomId).turnTimerSeconds, !connected.has(playerId));
+        : clockSeconds(
+            next,
+            this.settings(roomId).turnTimerSeconds,
+            partnerClock || !connected.has(playerId),
+          );
     let clock = this.clock(roomId);
     if (!clock || clock.turn !== next.turn || clock.playerId !== playerId) {
       if (seconds === null && !picker) {

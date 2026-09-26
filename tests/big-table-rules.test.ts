@@ -539,6 +539,105 @@ test('§6.7 rule 2: a resignation that moves an award counts as an action, and m
   assert.equal(h.winner, 'p0');
 });
 
+test('§6.7 rule 2: a marker holder who resigns hands the other the award, and the win, before the part ends', () => {
+  // Dan, the Partner, holds Longest Road and leaves in his phase. Ann, the Lead, has the next longest road and
+  // wins by it at once: the paired turn is still under way until his phase ends.
+  let g = act(roll(afterSetup(6, { victoryPoints: 8 }), 3, 5), 'p0', { kind: 'endTurn' });
+  clearBoard(g);
+  const taken = new Set<number>();
+  layRoads(g, 'p3', line(g, 7, taken));
+  layRoads(g, 'p0', line(g, 6, taken));
+  g.longestRoad = 'p3';
+  pointsTo(g, 'p0', 6);
+  g = resignPlayers(g, ['p3'], { reason: 'leave' });
+  assert.equal(g.longestRoad, 'p0');
+  assert.equal(g.winner, 'p0');
+  assert.equal(g.turn, 1, 'in the paired turn Dan left');
+  assert.equal(lastLines(g, 1)[0], 'Ann wins with 8 points!');
+  // §6.8: Ann leads a table of five and leaves in her part, which leaves four, so no Partner's phase follows.
+  // Dan, her Partner, holds the marker until her part ends, and the Longest Road she leaves him wins it.
+  let h = roll(afterSetup(5, { victoryPoints: 8 }), 3, 5);
+  clearBoard(h);
+  const room = new Set<number>();
+  layRoads(h, 'p0', line(h, 7, room));
+  layRoads(h, 'p3', line(h, 6, room));
+  h.longestRoad = 'p0';
+  pointsTo(h, 'p3', 6);
+  h = resignPlayers(h, ['p0'], { reason: 'leave' });
+  assert.equal(h.longestRoad, 'p3');
+  assert.equal(h.winner, 'p3');
+  assert.equal(lastLines(h, 1)[0], 'Dan wins as Partner with 8 points!');
+  // A player the room cannot declare the winner yet, being away, is not; the turn goes on without the pair.
+  let away = roll(afterSetup(5, { victoryPoints: 8 }), 3, 5);
+  clearBoard(away);
+  const spare = new Set<number>();
+  layRoads(away, 'p0', line(away, 7, spare));
+  layRoads(away, 'p3', line(away, 6, spare));
+  away.longestRoad = 'p0';
+  pointsTo(away, 'p3', 6);
+  away = resignPlayers(away, ['p0'], { reason: 'leave', winnerEligibleIds: ['p1', 'p2', 'p4'] });
+  assert.equal(away.winner, null);
+  assert.equal(away.pair, undefined);
+  assert.equal(activePlayer(away).id, 'p1');
+});
+
+test('§6.7: a marker holder a resignation leaves at the target while away wins at the next move in their part', () => {
+  /** Longest Road from `from` to `to`, who then has 8 points of 8 once `from` is gone. */
+  const award = (g: Game, from: string, to: string) => {
+    clearBoard(g);
+    const taken = new Set<number>();
+    layRoads(g, from, line(g, 7, taken));
+    layRoads(g, to, line(g, 6, taken));
+    g.longestRoad = from;
+    pointsTo(g, to, 6);
+  };
+  const others = (g: Game, ...away: string[]) =>
+    g.players.map((p) => p.id).filter((id) => !away.includes(id));
+  // Dan leaves in his Partner's phase and hands the road to Ben, who is away: Ben's paired turn begins with
+  // nobody declared the winner, and his first move, the roll, declares him.
+  let lead = act(roll(afterSetup(6, { victoryPoints: 8 }), 3, 5), 'p0', { kind: 'endTurn' });
+  award(lead, 'p3', 'p1');
+  lead = resignPlayers(lead, ['p3'], { reason: 'leave', winnerEligibleIds: others(lead, 'p1', 'p3') });
+  assert.equal(lead.winner, null);
+  assert.deepEqual(pair(lead), { lead: 'p1', partner: 'p5' });
+  lead = act(lead, 'p1', timeoutAction(lead, 'p1', random)!);
+  assert.equal(lead.winner, 'p1');
+  assert.ok(lead.dice, 'after the dice, which change no points');
+  // The same road to Fay, the new Partner, who is away: Ben, here, rolls, and his roll declares her.
+  let partner = act(roll(afterSetup(6, { victoryPoints: 8 }), 3, 5), 'p0', { kind: 'endTurn' });
+  award(partner, 'p3', 'p5');
+  partner = resignPlayers(partner, ['p3'], {
+    reason: 'leave',
+    winnerEligibleIds: others(partner, 'p3', 'p5'),
+  });
+  assert.equal(partner.winner, null);
+  partner = roll(partner, 3, 5);
+  assert.equal(partner.winner, 'p5');
+  assert.equal(lastLines(partner, 1)[0], 'Fay wins as Partner with 8 points!');
+  // Ann leaves in her part and hands it to Dan, her Partner, who is away: his phase follows, and the clock's end
+  // of it declares him before the markers move on.
+  let phase = roll(afterSetup(6, { victoryPoints: 8 }), 3, 5);
+  award(phase, 'p0', 'p3');
+  phase = resignPlayers(phase, ['p0'], { reason: 'leave', winnerEligibleIds: others(phase, 'p0', 'p3') });
+  assert.equal(phase.winner, null);
+  assert.equal(phase.phase, 'partner');
+  phase = act(phase, 'p3', timeoutAction(phase, 'p3', random)!);
+  assert.equal(phase.winner, 'p3');
+  assert.equal(phase.turn, 1, 'in the paired turn he was Partner of');
+  // Between-turns build: Ann, away, has rolled when Cat leaves and hands her the target. The clock's end of her
+  // turn declares her there, before the windows, in which nobody wins.
+  let windows = roll(afterSetup(5, { turns: 'betweenTurnsBuild', victoryPoints: 8 }), 3, 5);
+  award(windows, 'p2', 'p0');
+  windows = resignPlayers(windows, ['p2'], {
+    reason: 'leave',
+    winnerEligibleIds: others(windows, 'p0', 'p2'),
+  });
+  assert.equal(windows.winner, null);
+  windows = act(windows, 'p0', timeoutAction(windows, 'p0', random)!);
+  assert.equal(windows.winner, 'p0');
+  assert.equal(windows.windows, undefined);
+});
+
 test('§6.8: with fewer than five players left, turns go one player at a time, and the log says so', () => {
   let g = afterSetup(5);
   g = resignPlayers(g, ['p2'], { reason: 'leave' });

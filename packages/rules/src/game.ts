@@ -428,9 +428,17 @@ export function createGame(
 }
 export const activePlayer = (g: Pick<Game, 'players' | 'active'>) => g.players[g.active]!;
 /** How many players are still in the game. */
-const stillPlaying = (g: Pick<Game, 'players'>) => g.players.filter((p) => !p.resigned).length;
+const stillPlaying = (g: { players: readonly { resigned?: boolean }[] }) =>
+  g.players.filter((p) => !p.resigned).length;
 /** Whether the player acting is the Partner, in their phase of a paired turn (or a card played in it). */
 export const partnerActing = (g: Pick<Game, 'pair' | 'active'>) => !!g.pair && g.active === g.pair.partner;
+/**
+ * Whether a Partner's phase follows the Lead's part under way: only while five or more players remain
+ * (docs/RULEBOOK-BIG-TABLE.md, 6.8). Asked of a game or of a player's view of it.
+ */
+export const partnerFollows = (
+  g: Pick<Game, 'pair' | 'active'> & { players: readonly { resigned?: boolean }[] },
+) => !!g.pair && !partnerActing(g) && !g.players[g.pair.partner]!.resigned && stillPlaying(g) >= 5;
 /**
  * The Partner of a paired turn led from `lead`: the third player to the Lead's left, counting only players
  * still in the game (docs/RULEBOOK-BIG-TABLE.md, 6.1). Only asked while five or more remain.
@@ -587,6 +595,16 @@ function checkWin(g: Game, eligible: (id: string) => boolean = () => true) {
   const partner = g.pair?.partner === g.players.indexOf(winner);
   log(g, `${winner.name} wins${partner ? ' as Partner' : ''} with ${score(g, winner)} points!`);
 }
+/**
+ * Whether someone on turn already has the target as their turn, or a Partner's phase, is about to end. Only a
+ * resignation can leave one there undeclared: one that began their turn, or handed them an award, while they
+ * were away, when the room may not declare them the winner (resignPlayers). They win at their next move, their
+ * own or the clock's: after the dice, for a turn that begins so, or here, rather than lose the turn to the next.
+ */
+function wonAlready(g: Game): boolean {
+  checkWin(g);
+  return g.phase === 'finished';
+}
 export function robberVictims(
   g: BoardState & { players?: { id: string; resigned?: boolean }[] },
   player: string,
@@ -699,10 +717,6 @@ function pairUp(g: Game) {
     log(g, 'Fewer than five players remain, so turns go one player at a time from now on, with no Partner.');
   delete g.pair;
 }
-
-/** Whether a Partner's phase follows the Lead's part now ending: only while five or more remain. */
-const partnerFollows = (g: Game) =>
-  !!g.pair && !partnerActing(g) && !g.players[g.pair.partner]!.resigned && stillPlaying(g) >= 5;
 
 /** The Lead's part is over: the Partner takes their phase, first moving a robber the Lead left owing. */
 function beginPartnerPhase(g: Game, pendingRobber = false) {
@@ -860,7 +874,10 @@ export function resignPlayers(
   if (remaining.length === 1) {
     if (!eligible(remaining[0]!.id)) {
       g.active = g.players.findIndex((p) => p.id === remaining[0]!.id);
+      // They wait as a turn begins, whatever part the table was in: at the roll, with no card played yet.
       g.phase = 'roll';
+      g.returnPhase = 'roll';
+      g.playedCard = false;
       g.trade = null;
       g.discards = {};
       g.freeRoads = 0;
@@ -887,13 +904,19 @@ export function resignPlayers(
       advanceSetup(g);
     } else if (g.phase === 'goldPick') {
       // The others still owed gold pick first; the turn passes after the last pick (section 9.2).
-    } else if (g.phase !== 'discard' || !Object.keys(g.discards).length)
+    } else if (g.phase !== 'discard' || !Object.keys(g.discards).length) {
+      // A resignation that hands an award on counts as an action, so the check comes before the part it was made
+      // in ends: the other marker holder of a paired turn is on turn until then (docs/RULEBOOK-BIG-TABLE.md, 6.7
+      // rule 2, and 6.8). With one player on turn, the one resigning, it finds nobody.
+      checkWin(g, eligible);
+      if (g.phase === 'finished') return g;
       // Their part of the turn ends there: a Lead's part is still followed by the Partner's phase, and a build
       // window by the next one (docs/RULEBOOK-BIG-TABLE.md, 9.6).
       endPart(g, g.phase === 'robber' || g.phase === 'discard');
+    }
     // Other players finish required discards before the next player moves the robber.
   } else if (g.phase === 'discard' && !Object.keys(g.discards).length) g.phase = 'robber';
-  // A resignation that hands an award on counts as an action: whoever is on turn may win by it.
+  // Whoever is on turn now may win by the award, or already have the target as their turn begins.
   checkWin(g, eligible);
   return g;
 }
@@ -1175,6 +1198,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       partnerActing(g) && (g.phase === 'partner' || (!!a.expired && g.phase === 'freeRoads')),
       g.phase === 'freeRoads' ? 'Place your free roads first' : 'Finish the current action first',
     );
+    if (wonAlready(g)) return g;
     advanceTurn(g);
     updateAwards(g);
     checkWin(g);
@@ -1254,6 +1278,9 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       // Open Sea: then the gold picks, one player at a time, before the action phase (section 9.2).
       if (sea) oweGold(g, sum);
     }
+    // The dice change no one's points, so this finds only a target reached before them and not yet declared
+    // (wonAlready): the roll is the first move of a turn, the player's own or the clock's.
+    checkWin(g);
     return g;
   }
   requireRule(
@@ -1378,6 +1405,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
         g.phase === 'actions',
         g.phase === 'partner' ? 'End your Partner’s phase instead' : 'Close your build window instead',
       );
+      if (wonAlready(g)) return g;
       // Under Big Table's turn structures, the Partner's phase or the build windows come next.
       endPart(g);
       break;

@@ -23,7 +23,7 @@ import { placementValid } from '../apps/client/src/placement.js';
 import { defaultProfile } from '../packages/protocol/src/profile.js';
 import { resultsFromRoom } from '../packages/protocol/src/results.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
-import { gameView } from '../packages/rules/src/game.js';
+import { gameView, resignPlayers } from '../packages/rules/src/game.js';
 import type { Game } from '../packages/rules/src/game.js';
 import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
@@ -293,6 +293,24 @@ test('card locks say when the Partner may play, and that no card is played in a 
   );
 });
 
+test('§6.8: after a drop to four in the Lead’s part, the Partner is promised no phase', () => {
+  let g = roll(afterSetup(5), 3, 5);
+  const card = deal(g, 'p3', 'knight');
+  g = resignPlayers(g, ['p1'], { reason: 'leave' });
+  // Four remain: Dan keeps the Partner marker until Ann's part ends, but no Partner's phase follows it.
+  const view = gameView(g, 'p3');
+  assert.deepEqual(view.pair, { lead: 0, partner: 3 });
+  assert.deepEqual(playerTurnActivity(view, 'p3'), {
+    icon: 'timer',
+    label: 'Partner: no phase follows, with fewer than five players left',
+    marker: 'Partner',
+  });
+  assert.equal(cardLockReason(card, view, 'p3'), 'You can play this on your turn.');
+  // With five still in the game, the phase is still to come.
+  const five = gameView(roll(afterSetup(5), 3, 5), 'p3');
+  assert.equal(playerTurnActivity(five, 'p3')!.label, 'Partner: acts after the Lead');
+});
+
 test('a site picked in the Partner’s phase or a build window stays valid to confirm', () => {
   const g = partnerPhase();
   give(g, 'p3', { wood: 1, brick: 1 });
@@ -330,11 +348,11 @@ test('history names the new situations, and the results name the mode and its tu
     /^<p><strong class="journal-person">Dan<\/strong> wins/,
   );
   // Results carry the mode and its turn style, and a Classic game's carry neither.
-  let g = afterSetup(5, { victoryPoints: 8 });
+  let g = roll(afterSetup(5, { victoryPoints: 8 }), 3, 5);
   g.players[3]!.cards.push(
     ...Array.from({ length: 8 }, (_, i) => ({ id: `vp-${i}`, kind: 'victoryPoint' as const, boughtTurn: 0 })),
   );
-  g = act(roll(g, 3, 5), 'p0', { kind: 'endTurn' });
+  g = act(g, 'p0', { kind: 'endTurn' });
   assert.equal(g.winner, 'p3');
   const state = room(g);
   const results = resultsFromRoom(state);

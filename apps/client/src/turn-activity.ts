@@ -1,3 +1,4 @@
+import { partnerFollows } from '../../../packages/rules/src/game.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import { findRuleset } from '../../../packages/rules/src/rulesets.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
@@ -42,9 +43,14 @@ export function playerTurnActivity(game: GameView, playerId: string): TurnActivi
     };
   }
   if (game.players[game.active]?.id !== playerId) {
-    // The marker holder who is not acting still holds the turn, and may still win in it.
+    // The marker holder who is not acting still holds the turn, and may still win in it. A Partner's phase
+    // follows the Lead's part only while five or more remain; below that the Partner holds the marker until the
+    // Lead's part ends, with no phase of their own (docs/RULEBOOK-BIG-TABLE.md, 6.8).
     if (marker === 'Lead') return { icon: 'timer', label: 'Lead: the Partner is taking their phase', marker };
-    if (marker === 'Partner') return { icon: 'timer', label: 'Partner: acts after the Lead', marker };
+    if (marker === 'Partner')
+      return partnerFollows(game)
+        ? { icon: 'timer', label: 'Partner: acts after the Lead', marker }
+        : { icon: 'timer', label: 'Partner: no phase follows, with fewer than five players left', marker };
     return null;
   }
   const sea = !!findRuleset(game.ruleset)?.sea;
