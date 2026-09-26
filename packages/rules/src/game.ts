@@ -590,15 +590,14 @@ function advanceTurn(g: Game, pendingRobber = false) {
   g.playedCard = false;
   g.freeRoads = 0;
   g.trade = null;
+  const sea = !!rulesetOf(g).sea;
   // Open Sea: a new turn may move a ship again, and any ship built last turn may move in it (section 8.4).
-  if (rulesetOf(g).sea) {
+  if (sea) {
     g.shipsBuiltThisTurn = [];
     g.shipMovedThisTurn = false;
   }
-  log(
-    g,
-    `${activePlayer(g).name}'s turn.${pendingRobber ? (rulesetOf(g).sea ? ' Move the robber or the pirate, then roll.' : ' Move the robber, then roll.') : ''}`,
-  );
+  const robber = sea ? ' Move the robber or the pirate, then roll.' : ' Move the robber, then roll.';
+  log(g, `${activePlayer(g).name}'s turn.${pendingRobber ? robber : ''}`);
 }
 
 function advanceSetup(g: Game) {
