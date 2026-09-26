@@ -13,7 +13,6 @@ import {
   House,
   Layers,
   Route,
-  Sailboat,
   ScrollText,
   SEA_ICONS,
   Shield,
@@ -25,13 +24,19 @@ import type { GameIconName, IconProps } from './GameIcons.js';
  * itself like a road, and the others keep their word beside their icon, as the awards do.
  */
 const SEA_WORDS: Record<string, { icon: GameIconName; word: boolean }> = {
-  ship: { icon: 'boat', word: false },
+  ship: { icon: SEA_ICONS.ship, word: false },
   pirate: { icon: SEA_ICONS.pirate, word: true },
   gold: { icon: SEA_ICONS.gold, word: true },
   'new island': { icon: SEA_ICONS.islandBonus, word: true },
 };
-const PirateIcon = (props: IconProps) => <GameIcon name={SEA_ICONS.pirate} {...props} />,
-  GoldIcon = (props: IconProps) => <GameIcon name={SEA_ICONS.gold} {...props} />;
+const seaIcon = (name: GameIconName) => (props: IconProps) => <GameIcon name={name} {...props} />;
+/** Open Sea's moves, each with its icon: a ship built, a ship moved, the pirate, and a pick from a gold field. */
+const SEA_MOVES = new Map([
+  ['ship', seaIcon(SEA_ICONS.ship)],
+  ['moveShip', seaIcon('move-ship')],
+  ['pirate', seaIcon(SEA_ICONS.pirate)],
+  ['goldPick', seaIcon(SEA_ICONS.gold)],
+]);
 
 export function historyTurns(entries: readonly HistoryEntry[]) {
   const groups = new Map<number, HistoryEntry[]>();
@@ -155,29 +160,24 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
 }
 function Move({ entry, names }: { entry: HistoryEntry; names: string[] }) {
   const Icon =
-    entry.kind === 'road'
+    SEA_MOVES.get(entry.kind) ??
+    (entry.kind === 'road'
       ? Route
-      : entry.kind === 'ship' || entry.kind === 'moveShip'
-        ? Sailboat
-        : entry.kind === 'pirate'
-          ? PirateIcon
-          : entry.kind === 'goldPick'
-            ? GoldIcon
-            : entry.kind === 'settlement'
-              ? House
-              : entry.kind === 'city'
-                ? Castle
-                : entry.kind === 'roll'
-                  ? Dices
-                  : entry.kind === 'buyCard' || entry.kind === 'playCard'
-                    ? ScrollText
-                    : entry.kind === 'endTurn' || entry.kind === 'endPhase' || entry.kind === 'endWindow'
-                      ? ArrowRight
-                      : /trade|proposal/i.test(entry.kind)
-                        ? null
-                        : entry.kind === 'discard'
-                          ? Layers
-                          : null;
+      : entry.kind === 'settlement'
+        ? House
+        : entry.kind === 'city'
+          ? Castle
+          : entry.kind === 'roll'
+            ? Dices
+            : entry.kind === 'buyCard' || entry.kind === 'playCard'
+              ? ScrollText
+              : entry.kind === 'endTurn' || entry.kind === 'endPhase' || entry.kind === 'endWindow'
+                ? ArrowRight
+                : /trade|proposal/i.test(entry.kind)
+                  ? null
+                  : entry.kind === 'discard'
+                    ? Layers
+                    : null);
   return (
     <li className={`journal-move ${!Icon && !entry.automatic ? 'journal-note' : ''}`}>
       {(Icon || entry.automatic) && (

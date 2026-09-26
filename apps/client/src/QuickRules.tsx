@@ -6,17 +6,20 @@ import { BUILD_WINDOW_SECONDS } from '../../../packages/protocol/src/settings.js
 import {
   Castle,
   Dices,
+  GameIcon,
   GameMode,
   House,
   Route,
-  Sailboat,
   ScrollText,
+  SEA_ICONS,
   Shield,
   Trophy,
   Robber,
   NextTurn,
 } from './GameIcons.js';
 import { ResourceSummary } from './ResourcePicker.js';
+
+const Ship = () => <GameIcon name={SEA_ICONS.ship} />;
 
 function GuideSection({
   title,
@@ -145,7 +148,7 @@ export function QuickRules({
               kind === 'road'
                 ? Route
                 : kind === 'ship'
-                  ? Sailboat
+                  ? Ship
                   : kind === 'settlement'
                     ? House
                     : kind === 'city'
@@ -258,7 +261,7 @@ export function QuickRules({
       </GuideSection>
       {/* Last, so that Classic's sections keep their places, and with them their ids (useId). */}
       {sea && (
-        <GuideSection title="Open Sea" icon={<Sailboat />} {...disclosure('sea')}>
+        <GuideSection title="Open Sea" icon={<Ship />} {...disclosure('sea')}>
           <p>
             <b>Ships.</b> A ship costs 1 Timber and 1 Sheep. Build it on an edge beside the sea, touching your
             settlement, city or another of your ships. Roads and ships join only at your own settlements and

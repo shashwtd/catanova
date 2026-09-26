@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -24,8 +24,8 @@ import { MoveShipButton, shipMoveUnavailable } from '../apps/client/src/ShipMove
 import { RobberFlow } from '../apps/client/src/RobberFlow.js';
 import { GoldPick } from '../apps/client/src/GoldPick.js';
 import { TurnTimer } from '../apps/client/src/TurnTimer.js';
-import { SEA_ICONS } from '../apps/client/src/GameIcons.js';
-import { ICON_ATLAS, PAINTED_ICONS } from '../apps/client/src/painted-icons.js';
+import { GAME_ICON_NAMES, GameIcon, SEA_ICONS } from '../apps/client/src/GameIcons.js';
+import type { GameIconName } from '../apps/client/src/GameIcons.js';
 import { deriveAwardCelebrations, deriveFeedback } from '../apps/client/src/feedback.js';
 import { AwardToast, GameEffects } from '../apps/client/src/GameEffects.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
@@ -44,7 +44,9 @@ import {
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
-const PAINTED_BOAT = PAINTED_ICONS[SEA_ICONS.pirate];
+/** What GameIcon draws inside its svg for an icon, painted or a line icon. */
+const drawn = (name: GameIconName) =>
+  renderToStaticMarkup(createElement(GameIcon, { name })).replace(/^<svg[^>]*>|<\/svg>$/g, '');
 /** An Open Sea game for three after setup, every player on a coastal corner with a starting ship out to sea. */
 function afterSetup(seed = 5): Game {
   let g = createGame(SEATS.slice(0, 3), seed, () => 0.5, { ruleset: OPEN_SEA.id });
@@ -343,7 +345,7 @@ test('after a seven, Open Sea offers the robber and the pirate, then only the ch
   assert.match(victims, /<strong>Red<\/strong>/);
   // The victim's button shows the pirate, not the robber.
   const red = victims.match(/<button type="button" class="robber-victim"[^]*?<\/button>/)![0];
-  assert.ok(red.includes(`x="-${PAINTED_BOAT[0]}" y="-${PAINTED_BOAT[1]}"`));
+  assert.ok(red.includes(drawn(SEA_ICONS.pirate)));
   assert.ok(hexEdges(g.board, hex).includes(redShip));
   assert.match(victims, />Choose another sea hex<\/button>/);
   // Everyone else waits, told it may be either.
@@ -441,14 +443,20 @@ test('a gold pick is made with Year of Plenty’s buttons, only from what the ba
   assert.match(card(railFor('green'), 'green'), /title="Your time to pick from the gold field"/);
 });
 
-test('the stand-in icons for the pirate, gold and the island bonus are painted icons, named in one place', () => {
-  const painted = readFileSync('apps/client/src/painted-icons.ts', 'utf8');
-  for (const name of Object.values(SEA_ICONS)) assert.match(painted, new RegExp(`^  '?${name}'?: \\[`, 'm'));
+test('the stand-in icons for ships, the pirate, gold and the island bonus are named in one place, none the boat', () => {
+  for (const name of Object.values(SEA_ICONS)) assert.ok(GAME_ICON_NAMES.includes(name), name);
+  // The painted boat is not used while the ship's look is chosen again: the client names it only in its old export.
+  assert.ok(!(Object.values(SEA_ICONS) as string[]).includes('boat'));
+  const uses = readdirSync('apps/client/src')
+    .filter((file) => /\.tsx?$/.test(file))
+    .flatMap((file) =>
+      readFileSync(`apps/client/src/${file}`, 'utf8')
+        .split('\n')
+        .filter((line) => /'boat'|"boat"|Sailboat/.test(line))
+        .map((line) => `${file}: ${line.trim()}`),
+    );
+  assert.deepEqual(uses, ["GameIcons.tsx: Sailboat = icon('boat');"]);
 });
-
-/** A painted icon's cell in the atlas, as GameIcon draws it. */
-const painted = (name: keyof typeof PAINTED_ICONS) =>
-  `<image href="${ICON_ATLAS}" x="${-PAINTED_ICONS[name][0]}" y="${-PAINTED_ICONS[name][1]}"`;
 
 test('an island bonus is celebrated once, named in the score’s tooltip, and listed with its icon in the results', () => {
   const g = blueToAct();
@@ -469,7 +477,7 @@ test('an island bonus is celebrated once, named in the score’s tooltip, and li
   assert.deepEqual(deriveAwardCelebrations(room(after), room(after, { revision: 14 })), [], 'once');
   const toast = renderToStaticMarkup(createElement(AwardToast, { award: award!, reducedMotion: true }));
   assert.match(toast, /data-award="islandBonus"/);
-  assert.ok(toast.includes(painted(SEA_ICONS.islandBonus)));
+  assert.ok(toast.includes(drawn(SEA_ICONS.islandBonus)));
   assert.match(
     toast,
     /<span class="award-recipient">Blue earns<\/span><h2>Island bonus<\/h2><p><b>1<\/b> island settled<\/p>/,
@@ -504,7 +512,7 @@ test('an island bonus is celebrated once, named in the score’s tooltip, and li
     /<dl class="game-over-facts" aria-label="This match"><div><dt>Mode<\/dt><dd>Open Sea<\/dd><\/div><div><dt>Turns<\/dt>/,
   );
   const part = results.match(/<li data-part="islandBonus">[^]*?<\/li>/)![0];
-  assert.ok(part.includes(painted(SEA_ICONS.islandBonus)));
+  assert.ok(part.includes(drawn(SEA_ICONS.islandBonus)));
   assert.match(part, /<span>Island bonus × 2<\/span><b>\+4<\/b>/);
   // Classic's results have no Mode.
   const classic = createGame(SEATS.slice(0, 3), 481, () => 0.5);
@@ -617,13 +625,13 @@ test('Open Sea’s words: the guide’s section and costs, the cards, the prompt
     island,
     /^<p><strong class="journal-person">Blue<\/strong> settled a <span class="journal-item" role="img" aria-label="new island">/,
   );
-  assert.ok(island.includes(painted(SEA_ICONS.islandBonus)));
+  assert.ok(island.includes(drawn(SEA_ICONS.islandBonus)));
   const ship = line('Blue built a ship on edge 5.');
   assert.match(
     ship,
     /<span class="journal-item" role="img" aria-label="ship"><svg[^]*?<\/svg><span><\/span><\/span> on edge 5\./,
   );
-  assert.ok(ship.includes(painted('boat')));
+  assert.ok(ship.includes(drawn(SEA_ICONS.ship)));
   assert.match(
     line('Blue moved a ship from edge 4 to edge 9.'),
     /aria-label="ship"[^]*from edge 4 to edge 9\./,
@@ -650,8 +658,10 @@ test('Open Sea’s words: the guide’s section and costs, the cards, the prompt
   );
   const actions = history.match(/<span class="journal-action">[^]*?<\/span>/g)!;
   assert.equal(actions.length, 4);
-  for (const [i, icon] of (['boat', 'boat', SEA_ICONS.pirate, SEA_ICONS.gold] as const).entries())
-    assert.ok(actions[i]!.includes(painted(icon)), icon);
+  for (const [i, icon] of (
+    [SEA_ICONS.ship, 'move-ship', SEA_ICONS.pirate, SEA_ICONS.gold] as const
+  ).entries())
+    assert.ok(actions[i]!.includes(drawn(icon)), icon);
 });
 
 test('the pirate stands clear of every harbour badge on its hex, and in the middle of any other', () => {

@@ -167,7 +167,9 @@ review found, and where the mode system (Release A, step 1 of
 - **Results.** The results screen labels any point it cannot explain as a
   Victory Point card, and the results payload has no mode, ships or bonuses.
   Since Release A the payload carries each player's score terms and the screen
-  names every part from them; the mode, ships and bonuses are still to come.
+  names every part from them. With Open Sea's controls the results also name
+  the mode, and island bonuses with their icon; ships score nothing of their
+  own.
 - **Restore verifier.** It checks Classic's numbers (two to four players, 19 of
   each resource, a 25-card deck, the phase list, trade offers owned by the
   active player) and would flag every new-mode game as corrupt. Since Release A

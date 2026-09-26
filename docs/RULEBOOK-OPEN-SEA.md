@@ -6,7 +6,7 @@ Open Sea is Catanova's sea mode. It aims to reproduce the core mechanics of the 
 
 This book is a companion to the [Classic rulebook](RULEBOOK.md) (ruleset `base-3-4-v1`). Everything in the Classic rulebook applies unless this book changes it. Where the official texts leave a gap, or where Catanova departs from them, the rule is marked as a Catanova decision. Section 17 lists the points the official texts and the first decisions left open, says where each is now settled, and names the one still open.
 
-This is the rules target for the mode. The engine plays it, but the mode is not offered to players yet, and the in-game controls for ships, gold picks and the choice between robber and pirate are still to come.
+This is the rules target for the mode. The engine plays it and the game has its controls, but the mode is not offered to players yet.
 
 ## 1. Scope
 
