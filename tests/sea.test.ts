@@ -489,9 +489,16 @@ test('§10.1 the robber stands on any land hex, gold and desert included; the pi
     sea.filter((h) => h !== sk.pirate),
   );
   // After a seven or a Knight, either may move: never both, and never neither, is the reducer's to keep.
-  assert.deepEqual(knightTargets({ board, robber: desert, pirate: sk.pirate! }), {
-    robber: robberHexes(board, desert),
-    pirate: pirateHexes(board, sk.pirate),
+  const tiny = sketch(' 1 2 3', '4 T g 5', ' 6 P 7');
+  const [timber, goldField] = ['wood', 'gold'].map((t) => tiny.board.hexes.findIndex((h) => h.terrain === t));
+  const seas = ['1', '2', '3', '4', '5', '6', '7'].map(tiny.hex);
+  assert.deepEqual(knightTargets({ board: tiny.board, robber: timber!, pirate: tiny.pirate! }), {
+    robber: [goldField],
+    pirate: seas,
+  });
+  assert.deepEqual(knightTargets({ board: tiny.board, robber: goldField!, pirate: tiny.hex('1') }), {
+    robber: [timber],
+    pirate: sorted([...seas.slice(1), tiny.pirate!]),
   });
 });
 
@@ -658,27 +665,44 @@ test('§12 your first settlement on each small island earns 2 points, whoever se
     { board } = sk;
   const on = (island: string) =>
     board.vertices.filter((v) => vertexIsland(board, v.id) === island).map((v) => v.id);
-  const red = on('a')[3]!;
-  const yours = on('a').find((v) => v !== red && !board.vertices[red]!.neighbors.includes(v))!;
-  let g: SeaState = state(sk, { settlements: { red: [red] } });
-  // Red settled there first; your first settlement there earns your bonus all the same.
-  assert.equal(islandBonusForSettlement(g, 'blue', yours, false), 'a');
-  g = { ...g, islandBonuses: { red: ['a'], blue: ['a'] } };
-  assert.equal(islandBonusForSettlement(g, 'blue', on('a').at(-1)!, false), null, 'each island once');
+  const ship = (v: number) => at(board, v).find((e) => takesShip(edgeKind(board, e)))!;
+  // Red lands on island a first; your ships touch a coast of each small island.
+  const redLanding = on('a').find((v) => isCoastalIntersection(board, v))!;
+  const clear = (v: number) =>
+    v !== redLanding && !board.vertices[redLanding]!.neighbors.includes(v) && ship(v) !== ship(redLanding);
+  const landings = ['a', 'b', 'c'].map((island) =>
+    on(island).find((v) => isCoastalIntersection(board, v) && clear(v))!,
+  );
+  let g: SeaState = state(sk, { ships: { red: [ship(redLanding)], blue: landings.map(ship) } });
+  g = { ...g, ...placeSettlement(g, 'red', redLanding) };
+  assert.equal(islandBonusForSettlement(g, 'blue', landings[0]!, true), null, 'never in setup');
   assert.equal(
     islandBonusForSettlement(g, 'blue', on(MAIN_ISLAND)[0]!, false),
     null,
     'never the main island',
   );
-  assert.equal(islandBonusForSettlement(g, 'blue', on('b')[0]!, true), null, 'never in setup');
-  assert.equal(islandBonusForSettlement(g, 'blue', on('b')[0]!, false), 'b');
-  g = { ...g, islandBonuses: { red: ['a'], blue: ['a', 'b', 'c'] } };
+  for (const v of landings) g = { ...g, ...placeSettlement(g, 'blue', v) };
+  assert.deepEqual(g.islandBonuses, { red: ['a'], blue: ['a', 'b', 'c'] });
   assert.equal(islandBonusPoints(g, 'blue'), 3 * ISLAND_BONUS, 'every bonus earned is paid');
-  assert.equal(islandBonusPoints(g, 'red'), 2);
+  assert.equal(islandBonusPoints(g, 'red'), ISLAND_BONUS);
   assert.equal(islandBonusPoints(g, 'green'), 0);
-  // The bonus stays when the settlement becomes a city: nothing about a city touches it.
-  const city = { ...g, buildings: { ...g.buildings, [red]: { player: 'red', kind: 'city' as const } } };
-  assert.equal(islandBonusPoints(city, 'red'), 2);
+});
+
+test('§12.2 a later settlement on the same island earns nothing more, and the bonus stays through a city', () => {
+  const { sk, board, H, route } = straitIslet();
+  const J = route.at(-1)!;
+  let g: SeaState = state(sk, { settlements: { blue: [H] }, ships: { blue: edgesAlong(board, route) } });
+  g = { ...g, ...placeSettlement(g, 'blue', J) };
+  assert.equal(islandBonusPoints(g, 'blue'), ISLAND_BONUS);
+  g = { ...g, buildings: { ...g.buildings, [J]: { player: 'blue', kind: 'city' } } };
+  assert.equal(islandBonusPoints(g, 'blue'), ISLAND_BONUS, 'the city keeps it');
+  // Roads round the islet from the city, and a second settlement on its far side.
+  const round = walk(board, J, 'ne', 'se', 's');
+  g = { ...g, roads: Object.fromEntries(edgesAlong(board, round).map((e) => [e, 'blue'])) };
+  assert.equal(islandBonusForSettlement(g, 'blue', round.at(-1)!, false), null);
+  g = { ...g, ...placeSettlement(g, 'blue', round.at(-1)!) };
+  assert.deepEqual(g.islandBonuses, { blue: ['a'] });
+  assert.equal(islandBonusPoints(g, 'blue'), ISLAND_BONUS);
 });
 
 test('§12.3 the book’s example: settling a small island Red already holds takes you from 11 points to 14', () => {
@@ -749,5 +773,13 @@ test('§14 the log records each ship move from and to, and the pirate’s theft 
   assert.equal(SEA_LOG.islandBonus('Blue'), 'Blue settled a new island (+2 points).');
   assert.equal(SEA_LOG.longestRoute('Blue'), 'Blue claimed Longest Route (+2 points).');
   // Which ships cannot move follows from public information, so the interface may say why.
-  for (const reason of Object.values(SHIP_MOVE_BLOCKS)) assert.ok(reason.length > 10);
+  assert.deepEqual(SHIP_MOVE_BLOCKS, {
+    'not-yours': 'That is not your ship',
+    'move-used': 'You have already moved a ship this turn',
+    'built-this-turn': 'A ship cannot move on the turn it was built',
+    pirate: 'The pirate holds ships on the edges of its hex',
+    closed: 'This ship is part of a closed line between your buildings',
+    'no-open-end': 'This ship has no open end',
+    'no-destination': 'There is no edge this ship could move to',
+  });
 });
