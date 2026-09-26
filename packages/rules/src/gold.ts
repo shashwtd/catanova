@@ -27,7 +27,8 @@ const resourceText = (hand: Hand) =>
 
 /**
  * What a second starting settlement collects (sections 5.5 and 9.3): a matching resource for each adjacent hex
- * that produces one, and a pick for each adjacent gold field. A desert or a sea hex gives nothing.
+ * that produces one, and a pick for each adjacent gold field. A desert or a sea hex gives nothing. The picks are
+ * owed straight after the settlement, before its road or ship, and made as a roll's are.
  */
 export function startingResources(board: SeaBoard, vertex: number): { resources: Hand; goldPicks: number } {
   const resources = none();
