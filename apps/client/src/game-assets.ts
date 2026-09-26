@@ -2,6 +2,8 @@ import { ICON_ATLAS } from './painted-icons.js';
 import { BOARD_THEMES, type BoardTheme } from './board-theme.js';
 export const TERRAIN_ART = '/art/optimized/terrain-fantasy.777e0ac07117.webp';
 export const ENVIRONMENT_ART = '/art/optimized/environment-painted.00c506c983c0.webp';
+/** Only a board with a gold field loads it, so it stays out of GAME_ART. */
+export const GOLD_ART = BOARD_THEMES.classic.gold;
 export const GAME_ART = [
   BOARD_THEMES.storybook.terrain,
   BOARD_THEMES.storybook.environment,
