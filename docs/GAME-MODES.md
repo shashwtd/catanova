@@ -406,9 +406,12 @@ In the lobby (built in Release A):
 - Start requires the mode's minimum (five for Big Table, three for Open Sea),
   checks again that the host may pick the mode and that no bot is seated in a
   mode without them, and freezes the ruleset into the game;
-- the room deals its board when it is created, so a mode change re-deals it, and
-  Start refuses a board whose preset does not match the ruleset
-  (`BOARD_MISMATCH`). A rematch keeps the mode and deals a board for it.
+- the room deals its board when it is created, so a mode change re-deals it. A
+  lobby's board belongs to no game yet, so one the mode does not play (from a
+  preset a later release dealt, left behind by a rollback) is dealt again
+  whenever the lobby is read, which includes every settings save and Start;
+  nothing is refused. `createGame` still refuses such a board. A rematch keeps
+  the mode and deals a board for it.
 
 ### Features, not forks
 
@@ -751,7 +754,9 @@ cannot read.
      at start-up, the journal compactor, the restore verifier and the admin
      reads. Start-up and the compactor leave such a game untouched;
    - stand-in bots that depend on the ruleset: none in a mode without bots;
-   - a check at Start that the board's preset matches the ruleset;
+   - a check at Start that the board's preset matches the ruleset. As built, a
+     lobby holding a board its mode does not play is dealt a new one instead,
+     since the board belongs to no game yet;
    - a restore verifier that reads seats and supply from the ruleset;
    - a capability flag in the join message, like `preloadGame`. The server
      refuses to start, join or watch a non-Classic room from a tab without it,

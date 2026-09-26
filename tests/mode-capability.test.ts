@@ -96,6 +96,8 @@ test('a tab that cannot draw the room’s mode is kept out of it, and told to re
   // A current tab joins; the older tab already seated stops the start until it refreshes.
   const current = open('Current', roomId);
   await until(() => host.client.state?.players.length === 3);
+  // Ready is refused against settings a tab has not seen yet, so both see the new mode first.
+  await until(() => [early.client, current.client].every((client) => client.state?.settings?.mode === TEST));
   for (const client of [early.client, current.client]) await client.lobby(true);
   await assert.rejects(
     host.client.action({ kind: 'start' }),
@@ -165,14 +167,18 @@ test('a room that cannot start in its mode says so before the loading screen, no
   }
   await until(() => host.state?.players.length === 3);
   await host.settings({ turnTimerSeconds: 90, mode: TEST });
+  // Ready is refused against settings a tab has not seen yet, so every guest sees the new mode first.
+  await until(() => clients.every((client) => client.state?.settings?.mode === TEST));
   for (const guest of clients.slice(1)) await guest.lobby(true);
   await until(() => host.state?.players.filter((p) => p.ready).length === 2);
-  // An island from an older deal is no board for the test mode: refused at once, and no launch begins.
-  const board = server.store.board(roomId);
+  // A bot seated some other way, by an older release or a race, has no place in a mode without bots:
+  // refused at once, with the reason, and no launch begins.
   server.store.db
-    .prepare('UPDATE room_boards SET board = ? WHERE room_id = ?')
-    .run(JSON.stringify({ ...board, preset: 'balanced-v1' }), roomId);
-  await assert.rejects(host.action({ kind: 'start' }), /BOARD_MISMATCH/);
+    .prepare(
+      "INSERT INTO seats(id, room_id, token_hash, name, profile, ready, bot, bot_level) VALUES ('bot-seat', ?, 'no-token', 'Anchor', NULL, 1, 1, 'steady')",
+    )
+    .run(roomId);
+  await assert.rejects(host.action({ kind: 'start' }), /MODE_BOTS: Bots play Classic only/);
   assert.equal(host.state?.launch, undefined);
   assert.equal(server.store.loadGame(roomId), undefined);
 });

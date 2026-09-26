@@ -606,13 +606,22 @@ export class Store {
     if (game) return game.board;
     const saved = this.db.prepare('SELECT board FROM room_boards WHERE room_id = ?').get(roomId) as
       { board: string } | undefined;
-    if (saved) return JSON.parse(saved.board) as Board;
-    if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
+    const rules = this.lobbyRules(roomId);
+    if (saved) {
+      // A lobby's island belongs to no game yet. One its mode does not play, such as a preset a release
+      // since rolled back dealt, is dealt again below rather than leaving a room that can never start. The
+      // lobby is read before Start and on every settings save, so neither ever meets it. A mode this version
+      // does not know cannot deal, so its lobby keeps its island; it cannot start either way.
+      const board = JSON.parse(saved.board) as Board;
+      if (!rules || playsBoard(rules, board)) return board;
+    } else if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
       throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
     // Dealt for the room's mode: a mode change deletes the board, and this deals the new mode's.
-    const board = generateBoard(randomInt(0, 2 ** 32), boardPresetOf(this.lobbyRules(roomId) ?? CLASSIC));
+    const board = generateBoard(randomInt(0, 2 ** 32), boardPresetOf(rules ?? CLASSIC));
     this.db
-      .prepare('INSERT INTO room_boards(room_id, board) VALUES (?, ?)')
+      .prepare(
+        'INSERT INTO room_boards(room_id, board) VALUES (?, ?) ON CONFLICT(room_id) DO UPDATE SET board = excluded.board',
+      )
       .run(roomId, JSON.stringify(board));
     return board;
   }
@@ -656,8 +665,9 @@ export class Store {
   }
   /**
    * The ruleset a lobby would start with, or why it cannot. Checked at Start, not only when the mode was
-   * chosen: a switch may have closed it since, a bot may have sat down, or the lobby may hold an older island.
-   * The server asks before the loading screen too, so the host hears why at once.
+   * chosen: a switch may have closed it since, or a bot may have sat down. The server asks before the loading
+   * screen too, so the host hears why at once. The island needs no check here: the lobby is dealt a new one
+   * whenever its mode does not play the one it holds (board()), and createGame refuses one it does not.
    */
   startingRules(roomId: string): Ruleset {
     const mode = this.settings(roomId).mode ?? CLASSIC.id,
@@ -672,11 +682,6 @@ export class Store {
       this.db.prepare('SELECT 1 FROM seats WHERE room_id = ? AND departed = 0 AND bot = 1').get(roomId)
     )
       throw new ProtocolError('MODE_BOTS', `${switchBlock(rules, [{ bot: true }])!.reason}.`);
-    if (!playsBoard(rules, this.board(roomId)))
-      throw new ProtocolError(
-        'BOARD_MISMATCH',
-        'This island was dealt for another game mode. Change the mode to deal a new one.',
-      );
     return rules;
   }
   /** The modes the room's host may pick, Classic first: decided by the host's account (modes.ts). */
