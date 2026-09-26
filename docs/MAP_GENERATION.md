@@ -4,7 +4,7 @@ Catanova defaults to a **balanced** board preset, requested for this project. It
 
 Each island retains the normal 19 terrain tiles, number-token supply, 54 intersections, 72 road sites, and nine harbours. The five resources appear as **Timber, Clay, Sheep, Hay, and Rock**. Storage IDs remain `wood`, `brick`, `sheep`, `wheat`, and `ore` for continuity with the source ledger.
 
-The sections from here to [Big Table islands](#big-table-islands) describe Classic's `balanced-v2` preset. Big Table and Open Sea deal their boards from presets of their own, specified after it. Neither is built yet.
+The sections from here to [Big Table islands](#big-table-islands) describe Classic's `balanced-v2` preset. Big Table and Open Sea deal their boards from presets of their own, specified after it. Both are built in `packages/rules/src/board.ts`, and no room deals them yet.
 
 ## Terrain and numbers
 
@@ -38,7 +38,7 @@ The test suite checks 500 seeds against every rule above, including harbour alte
 
 ## Big Table islands
 
-Big Table, for five and six players (ruleset `big-table-v1`), deals every board from one preset, `big-table-balanced-v1`. It is Catanova's balanced approach adapted to the 30-hex island, and the default and only board in v1. It is our own policy, not the official setup. The official lettered spiral is described for reference in the [Big Table rulebook](RULEBOOK-BIG-TABLE.md). It is not offered in `big-table-v1`, and a spiral preset is recorded only as a possible later option. There is no fixed first-game layout. Nothing here is built yet. The measurements below come from a throwaway prototype, not from release code.
+Big Table, for five and six players (ruleset `big-table-v1`), deals every board from one preset, `big-table-balanced-v1`. It is Catanova's balanced approach adapted to the 30-hex island, and the default and only board in v1. It is our own policy, not the official setup. The official lettered spiral is described for reference in the [Big Table rulebook](RULEBOOK-BIG-TABLE.md). It is not offered in `big-table-v1`, and a spiral preset is recorded only as a possible later option. There is no fixed first-game layout. The preset is `BIG_TABLE_BALANCED_V1` in `packages/rules/src/board.ts`, and the [measurements](#measurements-so-far) below are of that code.
 
 ### The island
 
@@ -73,7 +73,7 @@ For scale: 10,374 sets of 11 coastal edges meet the intersection rule alone, and
 
 ### Deserts and the robber
 
-The robber starts on one of the two deserts, chosen with the map seed, each equally likely. The board records that hex. Game creation must read it: today it takes the first desert it finds, which would always pick the same one.
+The robber starts on one of the two deserts, chosen with the map seed, each equally likely. The board records that hex as `robberStart`. Game creation must read it: today `createGame` takes the first desert it finds, which would always pick the same one.
 
 ### Generation order and search limits
 
@@ -86,25 +86,41 @@ On 30 hexes the number rules are the hard part, and they depend only on where th
 
 Every numbering that meets rules 4–7 for the chosen deserts is equally likely to be dealt, and every terrain layout that then meets rules 1–3 is equally likely to be chosen. As in `balanced-v2`, abandoning a deal early only skips deals the full check would reject.
 
-Starting search limits: up to 10 desert pairs; for each pair, up to 4 million number deals; for each valid numbering, up to 10,000 terrain shuffles before a new numbering is dealt, which counts against the same 4 million. If every limit runs out, generation fails. No rule is weakened.
+Only about 1 uniform deal in 190,000 keeps rules 4–7, so the release code deals in a way that skips most of the failures without changing which numbering comes out:
+
+- The six red numbers go down first, on a set of six hexes drawn uniformly from every set in which no two of them touch. Depending on the deserts there are between 10,900 and 16,500 such sets, listed afresh for each board. The three 6s and three 8s are then shuffled onto the set. A red number can only clash with another red number, and all six carry 5 pips, so this is exactly the deal a uniform shuffle of all 28 tokens makes once its red numbers are apart. It skips the 96 or 97 in every 100 uniform deals that put two of them side by side.
+- The other 22 tokens go down strongest first, each on a uniformly random hex without a number yet, and a deal stops at the first token that breaks a rule, as in step 2.
+
+Every valid numbering stays exactly as likely as before. A typical board needs about 4,800 of these deals, against about 130,000 uniform deals in the prototype below.
+
+Search limits: up to 10 desert pairs; for each pair, up to 1 million tries, where a try is one deal of the numbers as above or one terrain shuffle; for each valid numbering, up to 10,000 terrain shuffles before a new numbering is dealt. A deal with the red numbers apart stands for about 27 uniform deals, so the limit is well above the 4 million uniform deals first planned. If every limit runs out, generation fails. No rule is weakened. Each finished board is checked once more against every rule, so the search's piecemeal checks cannot let an unfair board through.
 
 ### Measurements so far
 
-A prototype of these rules ran on a development laptop:
+A throwaway prototype of these rules ran first, on a development laptop:
 
 - The `balanced-v2` search ported unchanged (terrain first, 20,000 deals per terrain) found a board for each of 300 seeds, but slowly: about 45 ms for a typical board and up to about 440 ms. It needed about 500 terrain shuffles on average and up to about 3,200. The Classic island never needs more than 60.
 - The deal is what costs. On the Classic island about 1 random deal in 2,700 passes every number rule. On the 30-hex island about 1 in 300,000 does. Three copies of most numbers make equal neighbours far more likely, and many more intersections touch three tiles.
 - Numbers first, as above, found a board for each of 1,000 seeds: about 26 ms for a typical board and up to about 430 ms. The first valid numbering always had a valid terrain, within at most 529 shuffles. Number deals took about 130,000 for a typical board and up to about 2.25 million.
 - With a 12-pip cap instead of 11, the same search took about 1 ms for a typical board and never more than 13 ms. But 970 of the 1,000 boards then had an intersection of 12 pips.
 
-These are prototype figures. Before release the real implementation must be measured over 20,000 seeds, as `balanced-v2` was, and keep every board under the same 100 ms limit.
+The release code was measured with `npx tsx scripts/measure-boards.ts`, which deals seeds 0 to 19,999 of every preset and deals its 50 slowest boards again, keeping each one's best time, as the tests do. On a development laptop (Apple M4, Node 26), shared with other work while it ran:
+
+| Preset                        | Median | p99    | Slowest of 20,000 |
+| ----------------------------- | ------ | ------ | ----------------- |
+| `balanced-v2`, for comparison | 0.8 ms | 4.8 ms | 8.7 ms            |
+| `big-table-balanced-v1`       | 2.4 ms | 15 ms  | 41 ms             |
+
+Every board found its numbers with the first pair of deserts. The numbers took a median of 4,790 deals, 1% of boards needed more than 42,700, and the most was 133,396 (seed 13898), about an eighth of the limit. The terrain took at most 774 shuffles.
+
+On this laptop the 100 ms rule is met: the slowest board, seed 13898 with the most deals, took 41 ms. The server deals a room's board on its main thread, on an Azure Standard_B2als_v2 VM with two burstable AMD EPYC vCPUs. We assume its cores run this code 2 to 2.5 times slower than the laptop's performance cores; that is an estimate, not a measurement. The slowest of 20,000 boards would then take about 80 to 105 ms, at the limit rather than safely under it, while a typical board takes 5 or 6 ms. When the VM has used up its burst credits it runs at a fraction of a core, and board dealing slows with everything else. Before Big Table is switched on, run `node dist/scripts/measure-boards.js --preset big-table-balanced-v1` in the production container. If its slowest board is over 100 ms, the second route below applies.
 
 Catanova decision, made on 26 September 2026 under the owner's delegation: the 11-pip cap stays, and it is not raised to 12. The preset ships only when one of these holds:
 
 1. A tuned search keeps every board under the 100 ms limit over 20,000 seeds.
 2. If no tuned search can, boards are generated off the server's main thread, in a worker. A longer limit is then chosen from the 20,000-seed measurement and written down here before release.
 
-Either way the preset does not ship until the release code has been measured.
+Either way the preset does not ship until the release code has been measured. The tuned search above takes the first route on the laptop; the measurement on the VM decides whether it holds there.
 
 ### Tests
 
@@ -119,9 +135,11 @@ The test suite for `big-table-balanced-v1` must check:
 7. A rule that cannot be met, such as a 5-pip cap, makes generation fail within its limits rather than hang.
 8. The `balanced-v2` tests and fixture pass unchanged, so Classic boards do not drift.
 
+They are in `tests/big-table-board.test.ts`. The pinned boards, 28 seeds by hash and one written out in full, are in `tests/fixtures/preset-boards.json`, which `npx tsx tests/board-presets.ts` rewrites only when a preset is added.
+
 ## Open Sea: Outer Isles
 
-Outer Isles is Open Sea's first scenario (ruleset `open-sea-v1`, scenario id `outer-isles`), for three or four players. Its boards come from the preset `outer-isles-v1`: a fixed template for each player count, with terrain, numbers and harbours shuffled every game under fairness rules. The templates are our own designs, not copies of an official map. The game rules are in the [Open Sea rulebook](RULEBOOK-OPEN-SEA.md). Nothing here is built yet. Templates for five and six players come later.
+Outer Isles is Open Sea's first scenario (ruleset `open-sea-v1`, scenario id `outer-isles`), for three or four players. Its boards come from the preset `outer-isles-v1`: a fixed template for each player count, with terrain, numbers and harbours shuffled every game under fairness rules. The templates are our own designs, not copies of an official map. The game rules are in the [Open Sea rulebook](RULEBOOK-OPEN-SEA.md). The preset is `OUTER_ISLES_V1` in `packages/rules/src/board.ts`: one `BoardPreset` per template, found by player count with `boardPreset('outer-isles-v1', players)`. Templates for five and six players come later.
 
 ### Coordinates
 
@@ -249,6 +267,8 @@ Harbours follow the two `balanced-v2` rules on the main island's coast: no two s
 - Three players: 8 harbours on 36 coastal edges, spaced 4, 5, 4, 5, 4, 5, 4, 5 edges apart. 28 of the 36 rotations meet the sea-hex rule. The other 8 each put one pair of harbours on the same or neighbouring sea hexes.
 - Four players: 9 harbours on 40 coastal edges, spaced 4, 4, 5, 4, 5, 4, 5, 4, 5 edges apart. 29 of the 40 rotations meet the sea-hex rule. Of the other 11, 7 put one pair on the same or neighbouring sea hexes and 4 put two.
 
+Round these coasts the spacing does not keep harbours off neighbouring intersections by itself, as it does round the Classic and Big Table islands. Each main island ends, west and east, in a hex joined to the rest by a single edge: (−2, −1) and (3, 0) with three players, (−3, 0) and (3, 0) with four. Both ends of that inland edge are on the coast, so a harbour beside each end would sit on neighbouring intersections. Rotations that do this are not used either. That leaves 12 of the 28 rotations with three players, and 16 of the 29 with four. The three-player spacing repeats every 9 edges, so its 12 rotations make only 3 different layouts; the four-player template's make 16. Another order of the same four 4s and four 5s would allow more: 4, 4, 4, 4, 5, 5, 5, 5 allows 16 layouts.
+
 Each board uses one qualifying rotation at random and shuffles the harbour types onto it.
 
 ### Generation and validation
@@ -261,9 +281,16 @@ The main island and the small islands share no intersection, so each is dealt on
 4. Pick a harbour rotation and shuffle the harbour types onto it.
 5. Put the robber on the desert and the pirate on the template's start. A later template with more than one desert picks the robber's desert with the map seed, as Big Table does.
 
-Steps 2 and 3 each have the `balanced-v2` limits: 10,000 terrain shuffles, with up to 20,000 deals for each. If a limit runs out, generation fails. No rule is weakened.
+Steps 2 and 3 each have the `balanced-v2` limits: 10,000 terrain shuffles, with up to 20,000 deals for each. If a limit runs out, generation fails. No rule is weakened. The release code deals each part's tokens strongest first, each on a uniformly random hex without a number yet, which deals every numbering with the same chance as `balanced-v2`'s hex-by-hex deal and finds most clashes within a few tokens. Each finished board is checked once more against every rule.
 
-In a prototype, 2,000 seeds per template all produced boards. A typical board took about 2 ms with three players and 3 ms with four. The slowest took 33 ms and 110 ms. The main island needed at most 76 and 47 terrain shuffles, and the small islands at most 6. The four-player diamond is the slow one: 21 of its 61 intersections touch three main-island hexes, so the 11-pip cap rejects more deals, and one terrain layout needed 16,058 deals. Its slowest board is over the 100 ms limit, so the Big Table rule applies here too: before release, a tuned search keeps every board under 100 ms over 20,000 seeds, or boards are generated in a worker with a limit measured and written down here.
+A prototype of the search, on 2,000 seeds per template, took 110 ms for its slowest four-player board. The four-player diamond is the slow one: 21 of its 61 intersections touch three main-island hexes, so the 11-pip cap rejects more deals. The release code, measured as Big Table's was on seeds 0 to 19,999:
+
+| Template      | Median | p99    | Slowest of 20,000 |
+| ------------- | ------ | ------ | ----------------- |
+| Three players | 0.7 ms | 2.5 ms | 5.9 ms            |
+| Four players  | 0.9 ms | 2.7 ms | 5.4 ms            |
+
+The main island needed at most 143 terrain shuffles with three players and 56 with four, and at most 6,998 and 20,000 deals for one layout. With four players, 4 boards of the 20,000 used up a layout's 20,000 deals and shuffled the terrain again, as the limits allow. The small islands needed at most 9 shuffles and 98 deals. Every board is well under the 100 ms limit, on the VM too at the margin assumed for Big Table.
 
 ### Outer Isles tests
 
@@ -274,13 +301,15 @@ Once per template, the tests check:
 3. Every small island is reachable by ship from the main island's coast, and stays reachable with any one sea hex blocked by the pirate.
 4. The pirate's start touches no land, so no starting ship can be placed next to it.
 5. Starting room: the worst case above leaves at least 9 intersections for the last starting settlement.
-6. Exactly 28 harbour rotations qualify with three players, and 29 with four.
+6. Exactly 12 harbour rotations qualify with three players, making 3 layouts, and 16 with four; 28 and 29 meet the sea-hex rule alone.
 
 Over 500 seeds per template, they check:
 
 7. Every fairness rule, the robber on the desert and the pirate on its start.
 8. Reproducibility, with one fixture board per template.
 9. That no board takes longer than 100 ms.
+
+They are in `tests/outer-isles-board.test.ts`, with helpers written apart from the generator in `tests/board-presets.ts`, and the pinned boards in `tests/fixtures/preset-boards.json`. The tests also check the doc's measures of the map: the starting room is 11 of 30 and 11 of 38, and two ships reach each small island.
 
 ## Versions
 
@@ -289,8 +318,8 @@ Each board records the preset that generated it, and a seed produces a different
 - **`balanced-v2`** (current) added the rules against equal numbers and against the 2 beside the 12, and made harbours alternate with open sea. In 5,000 version-1 islands, 81% had equal numbers on neighbouring tiles, 24% had the 2 beside the 12, and 41% had three pairs of harbours on neighbouring sea spaces.
 - **`balanced-v1`** had the same terrain, production and 6/8 rules and the same harbour spacing, but let the spacing take any of its ten rotations.
 
-A preset is data: `BALANCED_V2` in `packages/rules/src/board.ts` lists the hexes of the island, how many tiles of each terrain it deals, the number tokens, the harbour slots and trades, and the fairness limits above. `generateBoard(seed, preset)` deals from it, and a preset that cannot be dealt, such as one with more hexes than tiles, is refused before any search. `tests/fixtures/classic-board.json` pins the boards `balanced-v2` deals, seed by seed, so a change to the code that deals them cannot move a tile unnoticed.
+A preset is data: `BALANCED_V2` in `packages/rules/src/board.ts` lists the hexes of the island, how many tiles of each terrain it deals, the number tokens, the harbour slots and trades, and the fairness limits above. It also names the search that deals it: `balanced` for Classic, `numbers-first` for Big Table, `islands` for Open Sea. `generateBoard(seed, preset)` deals from it, and a preset that cannot be dealt, such as one with more hexes than tiles, is refused before any search. `BOARD_PRESETS` lists every preset that deals new boards, Classic's first; `boardPreset(id, players)` finds the one a room needs, since Outer Isles has one per player count, and `dealBoard(seed, id, players)` deals from it. `tests/fixtures/classic-board.json` pins the boards `balanced-v2` deals, seed by seed, so a change to the code that deals them cannot move a tile unnoticed.
 
 Next balance evidence should come from playtests: compare first/last setup seats, resource scarcity, win rate by seat, and player feedback before tightening these bounds. An official-style board preset can be added separately.
 
-Big Table and Open Sea add two presets, versioned separately from Classic's: **`big-table-balanced-v1`** and **`outer-isles-v1`**, both planned and not built. `Board.preset` must widen to accept them. A seed means nothing across presets. Any later change to their rules or templates becomes a new version, such as `outer-isles-v2`, never an edit to v1, so saved games and fixtures keep their boards.
+Big Table and Open Sea add two presets, versioned separately from Classic's: **`big-table-balanced-v1`** and **`outer-isles-v1`**, both built, and `Board.preset` accepts them. Their boards record what a game needs to start: `robberStart`, the desert the robber starts on, and for Outer Isles `pirateStart`, the template's `players`, and each land hex's `island`. A seed means nothing across presets. Any later change to their rules or templates becomes a new version, such as `outer-isles-v2`, never an edit to v1, so saved games and fixtures keep their boards.

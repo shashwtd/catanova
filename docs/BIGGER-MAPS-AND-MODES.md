@@ -225,8 +225,8 @@ intersections, 109 edges and 38 coastal edges. Our balanced generator, adapted
 to 30 hexes, is the default and only board in v1: the 11 harbours go on the 38
 coastal edges with no two on the same or neighbouring intersections, types
 shuffled. The official lettered spiral is documented only as reference. The
-exact rules are in [Map generation](MAP_GENERATION.md). A prototype meets them
-on 30 hexes, but slowly. The 11-pip cap per intersection stays (a Catanova
+exact rules are in [Map generation](MAP_GENERATION.md), with measurements of
+the preset as built. The 11-pip cap per intersection stays (a Catanova
 decision of 26 September 2026): the preset ships only when a tuned search keeps
 every board under 100 ms over 20,000 seeds, or else generates boards in a
 worker off the server's main thread, with a documented longer limit. That is a
