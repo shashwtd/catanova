@@ -4,8 +4,11 @@ import type { Board as Island } from '../../../packages/rules/src/board.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import type { GameAction, GameView } from '../../../packages/rules/src/game.js';
+import { SHIP_MOVE_BLOCKS } from '../../../packages/rules/src/sea.js';
 import { Terrain, type TerrainArt } from './Terrain.js';
 import { DEFAULT_SEAT_HEX } from './player-colors.js';
+import { ShipMoveTooltip } from './ShipMove.js';
+import type { ShipMove } from './ShipMove.js';
 
 /** One shared empty map, so an unsupplied `colors` is not a new object. */
 const EMPTY_COLORS: Record<string, string> = {};
@@ -587,6 +590,9 @@ export const Board = memo(function Board({
   art,
   ships,
   pirate,
+  shipMove = null,
+  onShip,
+  reducedMotion = false,
 }: {
   board: Island;
   game?: GameView;
@@ -607,8 +613,15 @@ export const Board = memo(function Board({
   ships?: Record<number, string>;
   /** The pirate's sea hex. Without it the board reads `pirate` off the game, or before a game its board's start. */
   pirate?: number;
+  /** Open Sea: a ship move under way, which hides the build sites and marks the ships that may move. */
+  shipMove?: ShipMove | null;
+  /** Open Sea: the player chose one of their ships to move. */
+  onShip?: (edge: number) => void;
+  reducedMotion?: boolean;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
+  /** The ship whose reason for staying put is showing, and the mark it hangs from. */
+  const [explained, setExplained] = useState<{ edge: number; anchor: Element } | null>(null);
   const key = boardKey(board);
   const world = useMemo(() => worldBox(board), [key]);
   const coast = useMemo(() => coastline(board), [key]);
@@ -635,27 +648,34 @@ export const Board = memo(function Board({
     setupRoad = game?.phase === 'setupRoad',
     actions = game?.phase === 'actions';
   const robberMode = interactive && game?.phase === 'robber';
+  // While a ship is being moved, nothing is built.
+  const building = interactive && !shipMove;
   // The server's legal lists already include affordability, supply, and connection rules.
   // A toolbar choice filters the sites; no choice still permits direct placement.
   const roadSites =
-    interactive && (setupRoad || game?.phase === 'freeRoads' || (actions && (!mode || mode === 'road')))
+    building && (setupRoad || game?.phase === 'freeRoads' || (actions && (!mode || mode === 'road')))
       ? game!.legal.roads
       : [];
   // Open Sea's ships go where its roads do (section 7). An edge that takes either is one site, a road's, and its
   // confirmation offers the choice.
   const shipSites =
-    interactive && game!.legal.ships && (setupRoad || game!.phase === 'freeRoads' || (actions && !mode))
+    building && game!.legal.ships && (setupRoad || game!.phase === 'freeRoads' || (actions && !mode))
       ? game!.legal.ships
       : [];
   const settlementSites =
-    interactive && (setupSettlement || (actions && (!mode || mode === 'settlement')))
+    building && (setupSettlement || (actions && (!mode || mode === 'settlement')))
       ? game!.legal.settlements
       : [];
-  const citySites = interactive && actions && (!mode || mode === 'city') ? game!.legal.cities : [];
+  const citySites = building && actions && (!mode || mode === 'city') ? game!.legal.cities : [];
   const vertices = [
     ...settlementSites.map((vertex) => ({ kind: 'settlement' as const, vertex })),
     ...citySites.map((vertex) => ({ kind: 'city' as const, vertex })),
   ];
+  // Open Sea: the player's own ships in their action phase, those that may move and why the others may not
+  // (section 8). A chosen ship shows where it may go.
+  const shipMoves = interactive && actions && !mode ? game!.legal.shipMoves : undefined,
+    shipBlocks = (shipMoves && game!.legal.shipMoveBlocks) ?? {};
+  const destinations = shipMove?.from != null ? (shipMoves?.[shipMove.from] ?? []) : [];
   const pending =
     ownTurn &&
     pendingBuild &&
@@ -671,6 +691,8 @@ export const Board = memo(function Board({
             : (setupSettlement || actions) && game!.legal.settlements.includes(pendingBuild.vertex))
       ? pendingBuild
       : null;
+  const explain = (edge: number, anchor: Element) => setExplained({ edge, anchor });
+  const explainedBlock = explained ? shipBlocks[explained.edge] : undefined;
   const keyActivate = (e: React.KeyboardEvent, run: () => void) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -813,6 +835,8 @@ export const Board = memo(function Board({
               role="img"
               aria-label={label}
               className={`built-piece ship-piece ${owner === me ? 'own-piece' : ''}`}
+              // Lifted while its move waits to be confirmed.
+              data-moving={pending?.kind === 'moveShip' && pending.from === Number(id) ? true : undefined}
               transform={`translate(${at.x},${at.y})`}
             >
               <title>{label}</title>
@@ -838,6 +862,55 @@ export const Board = memo(function Board({
               </g>
             );
           })}
+        {Object.keys({ ...shipMoves, ...shipBlocks }).map((id) => {
+          // The player's own ships, as the city upgrade marks a settlement: a movable one takes the orbit, and
+          // any other says why it stays.
+          const edge = Number(id),
+            at = edgeCentre(board, edge),
+            block = shipBlocks[edge],
+            chosen = shipMove?.from === edge;
+          const activate = (target: Element) =>
+            block
+              ? setExplained((open) => (open?.edge === edge ? null : { edge, anchor: target }))
+              : onShip?.(edge);
+          return (
+            <g
+              key={`move-${id}`}
+              role="button"
+              tabIndex={0}
+              className="ship-move-site"
+              data-build-site={block ? undefined : 'movable'}
+              data-guided={!block && (chosen || shipMove?.from === null)}
+              aria-pressed={block ? undefined : chosen}
+              aria-disabled={block ? true : undefined}
+              aria-describedby={explained?.edge === edge ? 'ship-move-reason' : undefined}
+              aria-label={
+                block
+                  ? `Your ship on edge ${edge + 1}. It cannot move: ${SHIP_MOVE_BLOCKS[block]}`
+                  : `Your ship on edge ${edge + 1}. ${chosen ? 'Chosen to move' : 'Move this ship'}`
+              }
+              // Round the ship itself, which stands on its edge: half a mast above the middle.
+              transform={`translate(${at.x},${at.y - 6})`}
+              onClick={(e) => activate(e.currentTarget)}
+              onKeyDown={(e) => keyActivate(e, () => activate(e.currentTarget))}
+              onPointerEnter={(e) => {
+                if (block && e.pointerType === 'mouse') explain(edge, e.currentTarget);
+              }}
+              onPointerLeave={(e) => {
+                if (e.pointerType === 'mouse') setExplained(null);
+              }}
+              onFocus={(e) => {
+                if (block) explain(edge, e.currentTarget);
+              }}
+              onBlur={() => setExplained(null)}
+            >
+              <circle className="vertex-hit" r="24" />
+              {!block && (
+                <circle className="site-guide vertex-site-guide" r="27" pathLength={100} aria-hidden="true" />
+              )}
+            </g>
+          );
+        })}
         {roadSites.map((id) => {
           const { length, transform } = roadGeometry(board, id);
           return (
@@ -894,6 +967,19 @@ export const Board = memo(function Board({
               onChoose={() => onAction({ kind: 'ship', edge: id })}
             />
           ))}
+        {destinations.map((id) => (
+          <ShipSite
+            key={`to-${id}`}
+            board={board}
+            edge={id}
+            kind="moveShip"
+            label={`Move the ship to edge ${id + 1}`}
+            color={color(me!)}
+            guided
+            pending={pending?.kind === 'moveShip' && pending.to === id}
+            onChoose={() => onAction({ kind: 'moveShip', from: shipMove!.from!, to: id })}
+          />
+        ))}
         {vertices.map(({ vertex: id, kind }) => {
           const v = board.vertices[id]!;
           return (
@@ -979,6 +1065,15 @@ export const Board = memo(function Board({
           aria-hidden="true"
         />
       </svg>
+      {explained && explainedBlock && (
+        <ShipMoveTooltip
+          id="ship-move-reason"
+          anchor={explained.anchor}
+          reason={SHIP_MOVE_BLOCKS[explainedBlock]}
+          reducedMotion={reducedMotion}
+          onClose={() => setExplained(null)}
+        />
+      )}
     </div>
   );
 });

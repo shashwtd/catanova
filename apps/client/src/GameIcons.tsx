@@ -46,6 +46,8 @@ const CONTROL_PATHS = {
   // Three tiles of an island: which game the table plays. Stands in until the painted icon is made.
   'game-mode':
     'M8 4l4 2.3v4.6L8 13.2l-4-2.3V6.3z M16 4l4 2.3v4.6l-4 2.3-4-2.3V6.3z M12 10.9l4 2.3v4.6l-4 2.3-4-2.3v-4.6z',
+  // A ship and the way it sails: Open Sea's one ship move a turn.
+  'move-ship': 'M3 15.5h12.5l-2 4H5z M9.5 15.5V4 M9.5 5l5 8h-5 M17 9.5h4.5 m-2-2 2 2-2 2',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
 export const GAME_ICON_NAMES = [

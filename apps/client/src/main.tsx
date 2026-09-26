@@ -4,6 +4,8 @@ import { GameOver } from './GameOver.js';
 import { GameStatistics } from './GameStatistics.js';
 import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
+import { MoveShipButton } from './ShipMove.js';
+import type { ShipMove } from './ShipMove.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
 import { LiveConnectionPanel } from './ConnectionPanel.js';
@@ -315,6 +317,8 @@ function App() {
   const lastError = useLastMessage(error || auth.error);
   const [robberHex, setRobberHex] = useState<number | null>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
+  /** Open Sea: a ship move under way, from the dock's Move ship or a tap on one of the player's ships. */
+  const [shipMove, setShipMove] = useState<ShipMove | null>(null);
   const [isFullscreen, setFullscreen] = useState(!!document.fullscreenElement);
 
   const g = room?.game,
@@ -409,7 +413,9 @@ function App() {
     if (placement && (!placementValid(placement, g, room?.roomId, me) || !connected)) setPlacement(null);
   }, [placement, g, room?.roomId, me, connected]);
   useEffect(() => {
-    if (panel) setPlacement(null);
+    if (!panel) return;
+    setPlacement(null);
+    setShipMove(null);
   }, [panel]);
   useEffect(() => {
     if (!placement) return;
@@ -441,12 +447,17 @@ function App() {
    * which defeats the board's memo on its own; the ref keeps the identity
    * fixed while always calling the current logic.
    */
-  const handlers = useRef({ previewPlacement: (_: GameAction) => {}, chooseRobber: (_: number) => {} });
+  const handlers = useRef({
+    previewPlacement: (_: GameAction) => {},
+    chooseRobber: (_: number) => {},
+    chooseShip: (_: number) => {},
+  });
   const onBoardAction = useCallback((action: GameAction) => handlers.current.previewPlacement(action), []);
   const onBoardRobber = useCallback((hex: number) => handlers.current.chooseRobber(hex), []);
-  // Both are hoisted declarations further down, so this reads them fresh on
+  const onBoardShip = useCallback((edge: number) => handlers.current.chooseShip(edge), []);
+  // All are hoisted declarations further down, so this reads them fresh on
   // every render while the identities the board sees never change.
-  handlers.current = { previewPlacement, chooseRobber };
+  handlers.current = { previewPlacement, chooseRobber, chooseShip };
 
   function previewPlacement(action: GameAction) {
     if (disabled || !g || !room || !me) return;
@@ -785,7 +796,12 @@ function App() {
   useEffect(() => {
     setMode(null);
     setRobberHex(null);
+    setShipMove(null);
   }, [g?.phase, g?.turn]);
+  // A ship chosen to move that no longer may, as when the pirate has come alongside, is let go.
+  useEffect(() => {
+    if (shipMove?.from != null && !g?.legal.shipMoves?.[shipMove.from]) setShipMove(null);
+  }, [shipMove, g]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), 2200);
@@ -800,6 +816,7 @@ function App() {
       await c.action(action);
       setMode(null);
       setRobberHex(null);
+      setShipMove(null);
       return true;
     } catch (e) {
       if (connection.current === c)
@@ -916,6 +933,13 @@ function App() {
     setBusy(true);
     connect(newSession(auth.profile.name, roomId, auth.profile));
   }
+  /** Open Sea: the player chose one of their ships to move, or the same one again to choose another. */
+  function chooseShip(edge: number) {
+    if (!g || disabled || !actionPhase || !g.legal.shipMoves?.[edge]) return;
+    setPlacement(null);
+    setPanel(null);
+    setShipMove((current) => ({ from: current?.from === edge ? null : edge }));
+  }
   /** Open Sea: where the edge being confirmed takes a road or a ship, the two, with their costs when bought. */
   function pieceChoice(draft: PlacementDraft) {
     const a = draft.action;
@@ -1009,17 +1033,27 @@ function App() {
     setName(canonical.name);
     setPanel(null);
   }
+  // Open Sea: what the dock's Move ship is waiting for, a ship and then where it goes (section 8).
+  const shipMoveText = !shipMove
+    ? ''
+    : shipMove.from !== null
+      ? 'Choose where the ship goes'
+      : Object.keys(g?.legal.shipMoves ?? {}).length
+        ? 'Choose one of your ships to move'
+        : 'None of your ships can move now';
   const phaseText = !g
     ? ''
     : room?.spectating || player?.resigned || room?.paused
       ? (gameNotice?.prompt ?? '')
       : ['discard', 'robber'].includes(g.phase)
         ? ''
-        : mode && myTurn && g.phase === 'actions'
-          ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
-          : g.phase === 'actions'
-            ? ''
-            : (gameNotice?.prompt ?? '');
+        : shipMove && actionPhase
+          ? shipMoveText
+          : mode && myTurn && g.phase === 'actions'
+            ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
+            : g.phase === 'actions'
+              ? ''
+              : (gameNotice?.prompt ?? '');
   return (
     <main
       className={`game-world ${g ? 'playing' : room ? 'lobby' : playerHome ? 'player-home' : 'entry-world'}`}
@@ -1047,6 +1081,9 @@ function App() {
               pendingBuild={placementReady ? placement?.action : submittedBuild}
               onAction={onBoardAction}
               onRobber={onBoardRobber}
+              shipMove={shipMove}
+              onShip={onBoardShip}
+              reducedMotion={reducedMotion}
             />
           </BoardViewport>
           <ReactionLayer flying={reactions.flying} />
@@ -1262,17 +1299,23 @@ function App() {
       {g && (
         <>
           {phaseText && (
-            <div className="action-prompt" role="status" key={`${g.turn}:${g.phase}:${mode}`}>
+            <div
+              className="action-prompt"
+              role="status"
+              key={`${g.turn}:${g.phase}:${mode}${shipMove ? `:ship:${shipMove.from}` : ''}`}
+            >
               {gameNotice && (
                 <GameIcon
                   name={
-                    mode === 'city'
-                      ? 'city'
-                      : mode === 'road'
-                        ? 'road'
-                        : mode === 'settlement'
-                          ? 'settlement'
-                          : gameNotice.icon
+                    shipMove
+                      ? 'boat'
+                      : mode === 'city'
+                        ? 'city'
+                        : mode === 'road'
+                          ? 'road'
+                          : mode === 'settlement'
+                            ? 'settlement'
+                            : gameNotice.icon
                   }
                   size={20}
                 />
@@ -1283,6 +1326,17 @@ function App() {
                   label="Cancel placement"
                   onClick={() => {
                     setMode(null);
+                    setPlacement(null);
+                  }}
+                >
+                  <X />
+                </IconButton>
+              )}
+              {shipMove && (
+                <IconButton
+                  label="Cancel ship move"
+                  onClick={() => {
+                    setShipMove(null);
                     setPlacement(null);
                   }}
                 >
@@ -1341,6 +1395,20 @@ function App() {
                       <ArrowLeftRight size={33} />
                       <span>Trade</span>
                     </button>
+                    {actionPhase && me && findRuleset(g.ruleset)?.sea && (
+                      <MoveShipButton
+                        game={g}
+                        me={me}
+                        active={!!shipMove}
+                        disabled={disabled}
+                        onToggle={() => {
+                          setPanel(null);
+                          setMode(null);
+                          setPlacement(null);
+                          setShipMove(shipMove ? null : { from: null });
+                        }}
+                      />
+                    )}
                   </div>
                   <button
                     className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}

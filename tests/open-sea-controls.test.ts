@@ -12,12 +12,13 @@ import { applyAction, createGame, gameView } from '../packages/rules/src/game.js
 import type { Game, GameAction, GameView } from '../packages/rules/src/game.js';
 import { OPEN_SEA } from '../packages/rules/src/rulesets.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
-import { edgeKind, isCoastalIntersection } from '../packages/rules/src/sea.js';
+import { SHIP_MOVE_BLOCKS, edgeKind, isCoastalIntersection } from '../packages/rules/src/sea.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { Board } from '../apps/client/src/Board.js';
 import { PlacementConfirmation, placementSelector } from '../apps/client/src/PlacementConfirmation.js';
 import { buildShown, edgePieces, isBuildAction, placementValid } from '../apps/client/src/placement.js';
 import type { BuildAction } from '../apps/client/src/placement.js';
+import { MoveShipButton, shipMoveUnavailable } from '../apps/client/src/ShipMove.js';
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
@@ -177,4 +178,83 @@ test('the confirmation offers Road or Ship on an edge that takes both, with the 
   // Classic's confirmation is as it was.
   assert.match(render({}), /<strong>Confirm road\?<\/strong>/);
   assert.doesNotMatch(render({}), /placement-choice/);
+});
+
+test('a ship that may move takes the orbit and a chosen one shows where it may go; the others say why they stay', () => {
+  const g = blueToAct();
+  const view = gameView(g, 'blue');
+  assert.ok(Object.keys(view.legal.shipMoves!).length, 'a starting ship may move on its owner’s first turn');
+  // One of Blue's ships built this turn stays put, and says so.
+  const built = view.legal.ships!.find((e) => edgeKind(g.board, e) === 'sea')!;
+  const after = applyAction(g, 'blue', { kind: 'ship', edge: built }, () => 0.5);
+  const busy = gameView(after, 'blue');
+  const movable = Object.keys(busy.legal.shipMoves!).map(Number);
+  assert.ok(movable.length);
+  assert.equal(busy.legal.shipMoveBlocks![built], 'built-this-turn');
+  const html = board(busy);
+  assert.equal(
+    count(html, /class="ship-move-site" data-build-site="movable"/g),
+    Object.keys(busy.legal.shipMoves!).length,
+  );
+  assert.match(
+    html,
+    new RegExp(
+      `aria-disabled="true" aria-label="Your ship on edge ${built + 1}. It cannot move: ${SHIP_MOVE_BLOCKS['built-this-turn']}"`,
+    ),
+  );
+  // Nothing marks a ship until it is the player's own action phase.
+  assert.doesNotMatch(board(gameView(after, 'red'), { me: 'red' }), /ship-move-site/);
+  assert.doesNotMatch(board({ ...busy, phase: 'roll' }), /ship-move-site/);
+  // Move ship: every movable ship orbits, and nothing is built meanwhile.
+  const choosing = board(busy, { shipMove: { from: null } });
+  assert.equal(count(choosing, /data-build-site="movable" data-guided="true"/g), movable.length);
+  assert.doesNotMatch(choosing, /data-build-site="(road|ship|settlement|city)"/);
+  // A ship chosen: its destinations are sites, guided, and nothing else is.
+  const from = movable[0]!;
+  const destinations = busy.legal.shipMoves![from]!;
+  const chosen = board(busy, { shipMove: { from } });
+  assert.equal(count(chosen, /data-build-site="moveShip"/g), destinations.length);
+  assert.match(
+    chosen,
+    new RegExp(`aria-pressed="true"[^>]*aria-label="Your ship on edge ${from + 1}. Chosen to move"`),
+  );
+  for (const to of destinations)
+    assert.match(
+      chosen,
+      new RegExp(
+        `aria-label="Move the ship to edge ${to + 1}" class="legal-road" data-build-site="moveShip" data-site-id="${to}" data-guided="true"`,
+      ),
+    );
+  // Confirming it: the ship waits lifted, and its ghost stands where it goes.
+  const move = { kind: 'moveShip' as const, from, to: destinations[0]! };
+  assert.ok(placementValid(draft(busy, move), busy, 'ROOM', 'blue'));
+  const pending = board(busy, { shipMove: { from }, pendingBuild: move });
+  assert.match(pending, new RegExp(`data-ship-id="${from}"[^>]*data-moving="true"`));
+  assert.match(pending, /class="build-ghost ship-piece" data-pending-build="moveShip"/);
+  // The move made: one a turn, and the dock's button says so.
+  const moved = applyAction(after, 'blue', { kind: 'moveShip', from, to: destinations[0]! }, () => 0.5);
+  const done = gameView(moved, 'blue');
+  assert.deepEqual(done.legal.shipMoves, {});
+  assert.ok(!placementValid(draft(done, move), done, 'ROOM', 'blue'));
+  assert.ok(buildShown(done, move));
+  assert.equal(shipMoveUnavailable(done, 'blue'), SHIP_MOVE_BLOCKS['move-used']);
+  const button = (view: GameView) =>
+    renderToStaticMarkup(
+      createElement(MoveShipButton, {
+        game: view,
+        me: 'blue',
+        active: false,
+        disabled: false,
+        onToggle: noop,
+      }),
+    );
+  assert.match(
+    button(busy),
+    /<button class="trade-action ship-move-action " aria-label="Move ship" aria-pressed="false" title="Move ship">/,
+  );
+  assert.match(button(done), /title="Move ship · You have already moved a ship this turn" disabled=""/);
+  assert.match(
+    button({ ...busy, ships: {} }),
+    /title="Move ship · You have no ships on the board" disabled=""/,
+  );
 });
