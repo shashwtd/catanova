@@ -14,7 +14,10 @@ import type { Game } from '../packages/rules/src/game.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
 import { parseRoomSettings, partnerSeconds } from '../packages/protocol/src/settings.js';
 import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
+import { parseClientMessage } from '../packages/protocol/src/index.js';
+import { continueGame, gameInvariantProblems } from '../scripts/verify-restored-games.js';
 import { OPEN, bigTableRoom, throughSetup } from './big-table-room.js';
+import { act, afterSetup, roll } from './big-table-helpers.js';
 import type { Room } from './big-table-room.js';
 
 const code = (expected: string) => (error: unknown) => (error as { code?: string }).code === expected;
@@ -356,4 +359,50 @@ test('turn times go to whoever acted: a Partner’s phase is the Partner’s, an
   } finally {
     room.store.close();
   }
+});
+
+test('the new moves come over the wire like the others, and the restore verifier checks the new phases', () => {
+  for (const action of [{ kind: 'endPhase' }, { kind: 'endWindow' }, { kind: 'endPhase', expired: true }])
+    assert.deepEqual(
+      parseClientMessage(
+        JSON.stringify({ type: 'action', commandId: 'big-table-1', expectedRevision: 3, action }),
+      ),
+      { type: 'action', commandId: 'big-table-1', expectedRevision: 3, action },
+    );
+  assert.throws(() =>
+    parseClientMessage(
+      JSON.stringify({
+        type: 'action',
+        commandId: 'big-table-2',
+        expectedRevision: 3,
+        action: { kind: 'endPhase', expired: 'yes' },
+      }),
+    ),
+  );
+  // A sound game passes; each way of breaking the markers or the windows is named.
+  const partner = act(roll(afterSetup(5), 3, 5), 'p0', { kind: 'endTurn' });
+  assert.deepEqual(gameInvariantProblems(partner), []);
+  const broken = (edit: (g: Game) => void) => {
+    const g = structuredClone(partner);
+    edit(g);
+    return gameInvariantProblems(g);
+  };
+  assert.match(
+    broken((g) => (g.pair = { lead: 0, partner: 0 })).join(),
+    /Lead and Partner markers are not on two seats/,
+  );
+  assert.match(broken((g) => (g.active = 1)).join(), /holding neither marker is acting/);
+  assert.match(broken((g) => delete g.turns).join(), /turn structure undefined is not one this mode offers/);
+  assert.match(
+    broken((g) => (g.windows = { after: 0 })).join(),
+    /build windows are open outside Between-turns build/,
+  );
+  const windows = act(roll(afterSetup(5, { turns: 'betweenTurnsBuild' }), 3, 5), 'p0', { kind: 'endTurn' });
+  assert.deepEqual(gameInvariantProblems(windows), []);
+  const rigged = structuredClone(windows);
+  delete rigged.windows;
+  assert.match(gameInvariantProblems(rigged).join(), /a build window is open with no turn before it/);
+  // The verifier's own mandatory move finishes a Partner's phase and a build window.
+  assert.deepEqual(continueGame(partner, 'room'), { move: 'endPhase', problems: [] });
+  assert.deepEqual(continueGame(windows, 'room'), { move: 'endWindow', problems: [] });
 });
