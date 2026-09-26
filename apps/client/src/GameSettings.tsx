@@ -11,14 +11,11 @@
  * panel, which made the host's choices look like personal preferences and made
  * a guest's preferences look like they were changing the game for everyone.
  */
-import {
-  DEFAULT_VICTORY_POINTS,
-  MIN_VICTORY_POINTS,
-  MAX_VICTORY_POINTS,
-} from '../../../packages/rules/src/victory.js';
+import { CLASSIC, findRuleset, switchBlock } from '../../../packages/rules/src/rulesets.js';
+import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
 import { useEffect, useId, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { Check, Clock3, Dices, Trophy, Volume2, Music, Eye } from './GameIcons.js';
+import { Check, Clock3, Dices, GameMode, Trophy, Volume2, Music, Eye } from './GameIcons.js';
 import type { Preferences } from './preferences.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { roomHostId } from '../../../packages/protocol/src/room-host.js';
@@ -282,20 +279,45 @@ export function RoomConfiguration({
   const [draft, setDraft] = useState(room?.settings ?? DEFAULT_ROOM_SETTINGS),
     [saving, setSaving] = useState(false),
     [error, setError] = useState('');
+  const saved = room?.settings ?? DEFAULT_ROOM_SETTINGS;
+  // The mode the room plays, and the one the host has picked but not applied yet.
+  const roomMode = saved.mode ?? CLASSIC.id,
+    mode = draft.mode ?? roomMode,
+    rules = findRuleset(mode) ?? CLASSIC,
+    savedTarget = saved.victoryPoints ?? (findRuleset(roomMode) ?? CLASSIC).victoryPoints.default,
+    // A new mode starts from its own default target, which the host can move once the mode is applied.
+    switching = mode !== roomMode,
+    target = switching ? rules.victoryPoints.default : (draft.victoryPoints ?? rules.victoryPoints.default);
+  // The server lists what this host may pick only when that is more than Classic.
+  const offered = room?.modes ?? [CLASSIC.id],
+    modes = [...new Set([...offered, roomMode])].flatMap((id) => findRuleset(id) ?? []);
   const started = !!room?.game,
     editable = !!room && !started && roomHostId(room.players) === me,
     seconds = draft.turnTimerSeconds ?? DEFAULT_TURN_TIMER_SECONDS,
     timerEnabled = draft.turnTimerSeconds !== null,
     locked = !editable || busy || saving,
     changed =
-      draft.turnTimerSeconds !== (room?.settings ?? DEFAULT_ROOM_SETTINGS).turnTimerSeconds ||
-      (draft.diceMode ?? 'classic') !== (room?.settings?.diceMode ?? 'classic') ||
-      (draft.victoryPoints ?? DEFAULT_VICTORY_POINTS) !==
-        (room?.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS);
+      draft.turnTimerSeconds !== saved.turnTimerSeconds ||
+      (draft.diceMode ?? 'classic') !== (saved.diceMode ?? 'classic') ||
+      switching ||
+      target !== savedTarget;
   useEffect(
     () => setDraft(room?.settings ?? DEFAULT_ROOM_SETTINGS),
-    [room?.roomId, room?.settings?.turnTimerSeconds, room?.settings?.diceMode, room?.settings?.victoryPoints],
+    [
+      room?.roomId,
+      room?.settings?.turnTimerSeconds,
+      room?.settings?.diceMode,
+      room?.settings?.victoryPoints,
+      room?.settings?.mode,
+    ],
   );
+  /** Why the host cannot switch to a mode now, if they cannot. The room's own mode is never blocked. */
+  const blocked = (option: Ruleset) =>
+    option.id === roomMode
+      ? undefined
+      : !offered.includes(option.id)
+        ? 'Not open to this room'
+        : room && switchBlock(option, room.players)?.reason;
   return (
     <div className="settings-content settings-menu settings-configure">
       <p className="settings-owner-note">
@@ -306,6 +328,46 @@ export function RoomConfiguration({
             : 'The host sets these for the table.'}
       </p>
       <section className="settings-room" aria-labelledby="timer-label">
+        {/* Shown only when there is a choice to see: a host who may pick more than Classic, or a room already
+            in another mode. With Classic alone, Room setup is exactly what it was. */}
+        {(modes.length > 1 || roomMode !== CLASSIC.id) && (
+          <fieldset className="settings-dice settings-mode" disabled={locked}>
+            <legend>
+              <GameMode /> Game mode
+            </legend>
+            {modes.map((option) => {
+              const reason = blocked(option);
+              return (
+                <label
+                  key={option.id}
+                  className="settings-dice-option"
+                  data-selected={mode === option.id}
+                  {...(reason ? { 'data-disabled': true } : {})}
+                >
+                  <input
+                    type="radio"
+                    name="game-mode"
+                    value={option.id}
+                    checked={mode === option.id}
+                    disabled={!!reason}
+                    onChange={() =>
+                      setDraft({
+                        ...draft,
+                        mode: option.id,
+                        // Back to the room's own mode, its own target; any other mode starts from its default.
+                        victoryPoints: option.id === roomMode ? saved.victoryPoints : undefined,
+                      })
+                    }
+                  />
+                  <span>
+                    <strong>{option.name}</strong>
+                    <small>{reason ?? option.summary}</small>
+                  </span>
+                </label>
+              );
+            })}
+          </fieldset>
+        )}
         <div className="settings-timer-block">
           <RowHeading
             label={
@@ -378,30 +440,32 @@ export function RoomConfiguration({
                 <Trophy /> Points to win
               </label>
             }
-            value={<output htmlFor="victory-target">{draft.victoryPoints ?? DEFAULT_VICTORY_POINTS}</output>}
+            value={<output htmlFor="victory-target">{target}</output>}
           />
           <input
             id="victory-target"
             type="range"
             className="settings-range"
-            min={MIN_VICTORY_POINTS}
-            max={MAX_VICTORY_POINTS}
+            min={rules.victoryPoints.min}
+            max={rules.victoryPoints.max}
             step={1}
-            value={draft.victoryPoints ?? DEFAULT_VICTORY_POINTS}
-            disabled={locked}
-            aria-valuetext={`${draft.victoryPoints ?? DEFAULT_VICTORY_POINTS} victory points`}
+            value={target}
+            disabled={locked || switching}
+            aria-valuetext={`${target} victory points`}
             style={
               {
-                '--range-fill': `${(((draft.victoryPoints ?? DEFAULT_VICTORY_POINTS) - MIN_VICTORY_POINTS) / (MAX_VICTORY_POINTS - MIN_VICTORY_POINTS)) * 100}%`,
+                '--range-fill': `${((target - rules.victoryPoints.min) / (rules.victoryPoints.max - rules.victoryPoints.min)) * 100}%`,
               } as CSSProperties
             }
             onChange={(event) => setDraft({ ...draft, victoryPoints: Number(event.target.value) })}
           />
           <div className="settings-timer-stops">
-            <span>{MIN_VICTORY_POINTS}</span>
-            <span>10 · Standard</span>
-            <span>{MAX_VICTORY_POINTS}</span>
+            <span>{rules.victoryPoints.min}</span>
+            {/* One text node, as the fixed label was: split in two, its letters would be spaced differently. */}
+            <span>{`${rules.victoryPoints.default} · Standard`}</span>
+            <span>{rules.victoryPoints.max}</span>
           </div>
+          {switching && <p className="settings-caption">Apply the new mode first to change its target.</p>}
         </section>
         <fieldset className="settings-dice" disabled={locked}>
           <legend>

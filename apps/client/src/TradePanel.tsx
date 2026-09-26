@@ -4,6 +4,7 @@ import { canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
+import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
 import { ArrowLeftRight, LightCheck as Check, Exchange, GameIcon, Users, X } from './GameIcons.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -246,7 +247,9 @@ export function TradePanel({
       !trade.declinedBy?.includes(p.player),
   );
   const partner = chosen && game.players.find((p) => p.id === chosen.player && !p.resigned);
-  const requestLimit = Object.fromEntries(RESOURCES.map((r) => [r, give[r] ? 0 : 19])) as Hand;
+  // Nobody can hold more of one resource than the game's bank started with.
+  const bank = (findRuleset(game.ruleset) ?? CLASSIC).supply.bank;
+  const requestLimit = Object.fromEntries(RESOURCES.map((r) => [r, give[r] ? 0 : bank])) as Hand;
   return (
     <aside className="game-panel floating-panel trade-panel" role="dialog" aria-label="Trade">
       <header className="trade-header">
@@ -368,6 +371,7 @@ export function TradePanel({
                   get={open ? null : want}
                   getControl={
                     <ResourcePicker
+                      bank={bank}
                       label="You get"
                       value={open ? emptyHand() : want}
                       max={requestLimit}
@@ -392,6 +396,7 @@ export function TradePanel({
                   }
                   giveControl={
                     <ResourcePicker
+                      bank={bank}
                       label="You give"
                       value={give}
                       max={hand}
@@ -470,7 +475,14 @@ export function IncomingTrade({ game, me, disabled, onAction, roomPlayers }: Pro
         get={trade.give}
         giveControl={
           trade.open && !proposal ? (
-            <ResourcePicker label="You give" value={give} onChange={setGive} max={limits} disabled={locked} />
+            <ResourcePicker
+              bank={(findRuleset(game.ruleset) ?? CLASSIC).supply.bank}
+              label="You give"
+              value={give}
+              onChange={setGive}
+              max={limits}
+              disabled={locked}
+            />
           ) : undefined
         }
       />

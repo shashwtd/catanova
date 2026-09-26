@@ -1,5 +1,6 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
-import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
+import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
+import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { CARD_NAMES, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { CardKind, GameView, Hand } from '../../../packages/rules/src/game.js';
@@ -293,7 +294,10 @@ export function deriveFeedback(
       });
     if (hand[r] < old[r]) {
       const spent = old[r] - hand[r];
-      const purchaseCost = Math.min(spent, purchasedCards * COSTS.developmentCard[r]);
+      const purchaseCost = Math.min(
+        spent,
+        purchasedCards * (findRuleset(g.ruleset) ?? CLASSIC).costs.developmentCard[r],
+      );
       if (purchaseCost)
         event.flights.push({
           resource: r,

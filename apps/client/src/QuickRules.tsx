@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
-import { COSTS } from '../../../packages/rules/src/index.js';
+import { CLASSIC } from '../../../packages/rules/src/rulesets.js';
+import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
 import { Castle, Dices, House, Route, ScrollText, Shield, Trophy, Robber, NextTurn } from './GameIcons.js';
 import { ResourceSummary } from './ResourcePicker.js';
 
@@ -39,7 +39,14 @@ function GuideSection({
   );
 }
 
-export function QuickRules({ victoryPoints = DEFAULT_VICTORY_POINTS }: { victoryPoints?: number }) {
+export function QuickRules({
+  ruleset = CLASSIC,
+  victoryPoints = ruleset.victoryPoints.default,
+}: {
+  /** The mode being played, for its costs and its default target. */
+  ruleset?: Ruleset;
+  victoryPoints?: number;
+}) {
   const [section, setSection] = useState<string | null>('build');
   const disclosure = (key: string) => ({
     open: section === key,
@@ -91,7 +98,7 @@ export function QuickRules({ victoryPoints = DEFAULT_VICTORY_POINTS }: { victory
                 </dt>
                 <dd>
                   <span className="recipe-pay">Pay</span>
-                  <ResourceSummary hand={COSTS[kind]} />
+                  <ResourceSummary hand={ruleset.costs[kind]} />
                 </dd>
               </div>
             );

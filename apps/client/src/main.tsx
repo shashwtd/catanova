@@ -87,7 +87,7 @@ import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
 import { emptyHand } from '../../../packages/rules/src/game.js';
-import { rulesets } from '../../../packages/rules/src/rulesets.js';
+import { CLASSIC, findRuleset, rulesets } from '../../../packages/rules/src/rulesets.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
@@ -137,6 +137,7 @@ import './landing-features.css';
 import './room-seats.css';
 import './mobile-shelf.css';
 import './table-light.css';
+import './game-mode.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];
@@ -1576,7 +1577,10 @@ function App() {
       )}
       {panel === 'rules' && (
         <Dialog side={!!g} tool="rules" title="How to play" onClose={() => setPanel(null)}>
-          <QuickRules victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints} />
+          <QuickRules
+            ruleset={findRuleset(g?.ruleset ?? room?.settings?.mode) ?? CLASSIC}
+            victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints}
+          />
         </Dialog>
       )}
     </main>
