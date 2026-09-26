@@ -1,5 +1,6 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
+import { owedBy } from '../../../packages/rules/src/owed.js';
 import type { GameIconName } from './GameIcons.js';
 
 export type GameStatus = {
@@ -88,14 +89,12 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
   return { prompt, icon, favicon, title: `${prompt} — Catanova` };
 }
 
+/** The move the game is waiting on this player for, other than the open-ended actions of their turn. */
 export function requiredAction(game: GameView, me?: string) {
   if (!me || game.winner || game.phase === 'finished' || game.players.find((p) => p.id === me)?.resigned)
     return null;
-  if (game.phase === 'discard' && (game.discards[me] ?? 0) > 0) return 'discard';
-  if (game.players[game.active]?.id !== me) return null;
-  return ['roll', 'setupSettlement', 'setupRoad', 'freeRoads', 'robber'].includes(game.phase)
-    ? game.phase
-    : null;
+  const owed = owedBy(game, me)?.kind;
+  return owed && owed !== 'actions' ? owed : null;
 }
 
 /** Do not repeat a cue for presence updates, re-syncs, or a reconnect to the same obligation. */
