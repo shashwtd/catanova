@@ -240,6 +240,7 @@ const PHASE_LABELS: Record<string, string> = {
   discard: 'Discarding',
   robber: 'Moving the robber',
   freeRoads: 'Free roads',
+  goldPick: 'Picking from a gold field',
   finished: 'Finished',
 };
 export const phaseLabel = (phase: string | null | undefined) =>
