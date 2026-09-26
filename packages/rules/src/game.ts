@@ -771,13 +771,19 @@ export function resignPlayers(
     if (g.phase === 'setupSettlement' || g.phase === 'setupRoad') {
       g.setupIndex++;
       advanceSetup(g);
-    } else if (g.phase !== 'discard' || !Object.keys(g.discards).length)
+    } else if (g.phase !== 'discard' || !Object.keys(g.discards).length) {
+      // A resignation that hands an award on counts as an action, so the check comes before the part it was made
+      // in ends: the other marker holder of a paired turn is on turn until then (docs/RULEBOOK-BIG-TABLE.md, 6.7
+      // rule 2, and 6.8). With one player on turn, the one resigning, it finds nobody.
+      checkWin(g, eligible);
+      if (g.phase === 'finished') return g;
       // Their part of the turn ends there: a Lead's part is still followed by the Partner's phase, and a build
       // window by the next one (docs/RULEBOOK-BIG-TABLE.md, 9.6).
       endPart(g, g.phase === 'robber' || g.phase === 'discard');
+    }
     // Other players finish required discards before the next player moves the robber.
   } else if (g.phase === 'discard' && !Object.keys(g.discards).length) g.phase = 'robber';
-  // A resignation that hands an award on counts as an action: whoever is on turn may win by it.
+  // Whoever is on turn now may win by the award, or already have the target as their turn begins.
   checkWin(g, eligible);
   return g;
 }

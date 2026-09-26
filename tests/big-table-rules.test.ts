@@ -539,6 +539,48 @@ test('§6.7 rule 2: a resignation that moves an award counts as an action, and m
   assert.equal(h.winner, 'p0');
 });
 
+test('§6.7 rule 2: a marker holder who resigns hands the other the award, and the win, before the part ends', () => {
+  // Dan, the Partner, holds Longest Road and leaves in his phase. Ann, the Lead, has the next longest road and
+  // wins by it at once: the paired turn is still under way until his phase ends.
+  let g = act(roll(afterSetup(6, { victoryPoints: 8 }), 3, 5), 'p0', { kind: 'endTurn' });
+  clearBoard(g);
+  const taken = new Set<number>();
+  layRoads(g, 'p3', line(g, 7, taken));
+  layRoads(g, 'p0', line(g, 6, taken));
+  g.longestRoad = 'p3';
+  pointsTo(g, 'p0', 6);
+  g = resignPlayers(g, ['p3'], { reason: 'leave' });
+  assert.equal(g.longestRoad, 'p0');
+  assert.equal(g.winner, 'p0');
+  assert.equal(g.turn, 1, 'in the paired turn Dan left');
+  assert.equal(lastLines(g, 1)[0], 'Ann wins with 8 points!');
+  // §6.8: Ann leads a table of five and leaves in her part, which leaves four, so no Partner's phase follows.
+  // Dan, her Partner, holds the marker until her part ends, and the Longest Road she leaves him wins it.
+  let h = roll(afterSetup(5, { victoryPoints: 8 }), 3, 5);
+  clearBoard(h);
+  const room = new Set<number>();
+  layRoads(h, 'p0', line(h, 7, room));
+  layRoads(h, 'p3', line(h, 6, room));
+  h.longestRoad = 'p0';
+  pointsTo(h, 'p3', 6);
+  h = resignPlayers(h, ['p0'], { reason: 'leave' });
+  assert.equal(h.longestRoad, 'p3');
+  assert.equal(h.winner, 'p3');
+  assert.equal(lastLines(h, 1)[0], 'Dan wins as Partner with 8 points!');
+  // A player the room cannot declare the winner yet, being away, is not; the turn goes on without the pair.
+  let away = roll(afterSetup(5, { victoryPoints: 8 }), 3, 5);
+  clearBoard(away);
+  const spare = new Set<number>();
+  layRoads(away, 'p0', line(away, 7, spare));
+  layRoads(away, 'p3', line(away, 6, spare));
+  away.longestRoad = 'p0';
+  pointsTo(away, 'p3', 6);
+  away = resignPlayers(away, ['p0'], { reason: 'leave', winnerEligibleIds: ['p1', 'p2', 'p4'] });
+  assert.equal(away.winner, null);
+  assert.equal(away.pair, undefined);
+  assert.equal(activePlayer(away).id, 'p1');
+});
+
 test('§6.8: with fewer than five players left, turns go one player at a time, and the log says so', () => {
   let g = afterSetup(5);
   g = resignPlayers(g, ['p2'], { reason: 'leave' });
