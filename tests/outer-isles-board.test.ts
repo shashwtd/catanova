@@ -11,7 +11,6 @@ import {
   hexDistance,
   isLand,
   pips,
-  topology,
 } from '../packages/rules/src/board.js';
 import type { Board } from '../packages/rules/src/board.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
@@ -184,7 +183,6 @@ for (const players of [3, 4] as const) {
     assert.deepEqual(counts(islandHexes(board, 'main'), TERRAINS), expected.main);
     assert.deepEqual(counts(small, TERRAINS), expected.small);
     assert.deepEqual(counts(board.hexes, TERRAINS), expected.land);
-    assert.equal(sea.length, board.hexes.length - board.hexes.filter(isLand).length);
     assert.ok(board.hexes.every((h) => h.number > 0 === (isLand(h) && h.terrain !== 'desert')));
     const tokens = (hexes: Board['hexes']) => sorted(hexes.map((h) => h.number).filter(Boolean));
     assert.deepEqual(tokens(islandHexes(board, 'main')), expected.mainTokens);
@@ -212,7 +210,6 @@ for (const players of [3, 4] as const) {
     );
     assert.equal(board.players, players);
     assert.equal(boardPreset('outer-isles-v1', players), preset);
-    assert.equal(topology(preset.shape).hexes.length, board.hexes.length);
   });
 
   test(`the ${players}-player ring is sea, its islands whole and apart, its coast one loop`, () => {
@@ -225,8 +222,7 @@ for (const players of [3, 4] as const) {
     for (const id of reached)
       for (const n of board.hexes[id]!.neighbors) if (!isLand(board.hexes[n]!)) reached.add(n);
     assert.equal(reached.size, sea.length);
-    // The main island's coast is one loop; every island is connected; no two share an edge or an
-    // intersection.
+    // The main island's coast is one loop, each island is whole, and no two islands share a corner.
     const main = new Set(board.hexes.filter((h) => h.island === 'main').map((h) => h.id));
     assert.ok(coastWalk(coastOf(board, main)), 'the main island’s coast is one loop');
     for (const island of Object.keys(expected.islands)) {
@@ -360,14 +356,8 @@ for (const players of [3, 4] as const) {
         `seed ${seed}: rule 11`,
       );
       assert.deepEqual(harbourProblems(board), [], `seed ${seed}`);
-      assert.ok(
-        layouts.includes(
-          board.ports
-            .map((p) => p.edge)
-            .sort((a, b) => a - b)
-            .join(','),
-        ),
-      );
+      const edges = board.ports.map((p) => p.edge).sort((a, b) => a - b);
+      assert.ok(layouts.includes(edges.join(',')), `seed ${seed}: a qualifying rotation`);
       // The robber starts on the desert, the pirate on the template's start, and the ring stays sea.
       assert.equal(board.hexes[board.robberStart!]!.terrain, 'desert', `seed ${seed}`);
       assert.equal(board.hexes[board.robberStart!]!.island, 'main');

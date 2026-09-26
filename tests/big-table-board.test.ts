@@ -171,9 +171,8 @@ test('500 Big Table boards keep every rule, harbour rule and robber start, quick
         assert.ok(!(x === 2 && y === 12), `seed ${seed}: rule 7`);
         assert.ok(!(h.terrain === 'desert' && board.hexes[n]!.terrain === 'desert'), `seed ${seed}: rule 8`);
       }
-    // Harbours: never on the same or neighbouring intersections, nor facing the same or neighbouring sea
-    // spaces, so every other sea space holds one and three of the six tips do; always one of the 18
-    // rotations.
+    // Harbours keep off the same and neighbouring intersections and sea spaces, so every other sea space
+    // holds one and three of the six tips do; the layout is always one of the 18 rotations.
     assert.deepEqual(harbourProblems(board), [], `seed ${seed}`);
     const seas = board.ports.map((p) => place(seaAcross(board, board.edges[p.edge]!)));
     assert.equal(
@@ -181,15 +180,8 @@ test('500 Big Table boards keep every rule, harbour rule and robber start, quick
       3,
       `seed ${seed}: harbours off three of the six tips`,
     );
-    assert.ok(
-      layouts.includes(
-        board.ports
-          .map((p) => p.edge)
-          .sort((a, b) => a - b)
-          .join(','),
-      ),
-      `seed ${seed}`,
-    );
+    const edges = board.ports.map((p) => p.edge).sort((a, b) => a - b);
+    assert.ok(layouts.includes(edges.join(',')), `seed ${seed}: one of the 18 rotations`);
     // The robber starts on one of the two deserts, chosen with the seed.
     const deserts = board.hexes.filter((h) => h.terrain === 'desert').map((h) => h.id);
     assert.ok(deserts.includes(board.robberStart!), `seed ${seed}: the robber starts on a desert`);
