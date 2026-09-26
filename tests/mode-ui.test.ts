@@ -106,7 +106,12 @@ test('a mode the table does not fit is shown blocked, with the reason where its 
   // A room left in a mode its host may no longer pick keeps it selected, and says so.
   const closed = cards(setup(room(3, { settings: { turnTimerSeconds: 90, mode: TEST } })));
   assert.equal(closed.length, 2);
-  assert.match(closed[1]!, /data-selected="true"[^]*<small>A mode for tests/);
+  assert.match(closed[1]!, /data-selected="true"[^]*<small>No longer open to this room<\/small>/);
+  assert.ok(!closed[1]!.includes('data-disabled'), 'the room keeps it until the host picks another');
+  // The others at the table read the section without reasons: nothing is theirs to pick.
+  const guest = cards(setup(room(5, { settings: { turnTimerSeconds: 90, mode: TEST } }), 'p1'));
+  assert.ok(guest.every((card) => !card.includes('data-disabled')));
+  assert.match(guest[1]!, /<small>A mode for tests/);
 });
 
 test('the target’s range and its standard come from the room’s mode', () => {

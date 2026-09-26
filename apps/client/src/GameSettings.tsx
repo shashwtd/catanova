@@ -311,13 +311,14 @@ export function RoomConfiguration({
       room?.settings?.mode,
     ],
   );
-  /** Why the host cannot switch to a mode now, if they cannot. The room's own mode is never blocked. */
+  /**
+   * Why the host cannot switch to a mode now, if they cannot. The room's own mode is never blocked, and the
+   * others at the table only read the section, so it gives them no reasons.
+   */
   const blocked = (option: Ruleset) =>
-    option.id === roomMode
-      ? undefined
-      : !offered.includes(option.id)
-        ? 'Not open to this room'
-        : room && switchBlock(option, room.players)?.reason;
+    editable && option.id !== roomMode ? room && switchBlock(option, room.players)?.reason : undefined;
+  // A room left in a mode its host may no longer pick keeps it, and says why Start will refuse it.
+  const closed = editable && !offered.includes(roomMode);
   return (
     <div className="settings-content settings-menu settings-configure">
       <p className="settings-owner-note">
@@ -361,7 +362,10 @@ export function RoomConfiguration({
                   />
                   <span>
                     <strong>{option.name}</strong>
-                    <small>{reason ?? option.summary}</small>
+                    <small>
+                      {reason ??
+                        (closed && option.id === roomMode ? 'No longer open to this room' : option.summary)}
+                    </small>
                   </span>
                 </label>
               );

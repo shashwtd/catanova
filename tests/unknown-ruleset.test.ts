@@ -17,7 +17,7 @@ import { openGame } from '../apps/server/src/admin/rooms.js';
 import { readMatches } from '../scripts/reporting/retention.js';
 import { formatReport, gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
 import { newSession } from '../apps/client/src/connection.js';
-import { activePlayer, gameView } from '../packages/rules/src/game.js';
+import { activePlayer } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 

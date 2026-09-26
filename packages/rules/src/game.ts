@@ -2,7 +2,6 @@ import { DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES } from './index.js';
 import type { Resource } from './index.js';
 import { generateBoard, shuffle } from './board.js';
 import {
-  CLASSIC,
   boardPresetOf,
   findRuleset,
   fullBank,
