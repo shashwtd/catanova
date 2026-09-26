@@ -60,10 +60,11 @@ export function seaAcross(board: Board, edge: Edge): Axial {
 export const coastOf = (board: Board, island?: ReadonlySet<number>) =>
   board.edges.filter((e) => isCoastalEdge(board, e) && (!island || e.hexes.some((h) => island.has(h))));
 /**
- * The edges of a coast in order round it, from its first edge in either direction, or null when they do not
- * make one loop: some corner on it with other than two of them, or more than one loop.
+ * The edges of a coast in order round it, clockwise on screen from its first edge, or null when they do not
+ * make one loop: some corner on it with other than two of them, or more than one loop. Harbour spacings count
+ * clockwise, and one that is not its own mirror image lays out differently the other way round.
  */
-export function coastWalk(coast: readonly Edge[]): Edge[] | null {
+export function coastWalk(board: Board, coast: readonly Edge[]): Edge[] | null {
   const at = new Map<number, Edge[]>();
   for (const e of coast) for (const v of [e.a, e.b]) at.set(v, [...(at.get(v) ?? []), e]);
   if ([...at.values()].some((edges) => edges.length !== 2)) return null;
@@ -75,7 +76,18 @@ export function coastWalk(coast: readonly Edge[]): Edge[] | null {
     walk.push(next);
     v = next.a === v ? next.b : next.a;
   }
-  return walk.length === coast.length ? walk : null;
+  if (walk.length !== coast.length) return null;
+  // Twice the signed area round the edges' midpoints: positive when the walk turns clockwise, as y runs down.
+  const mid = (e: Edge) => ({
+    x: board.vertices[e.a]!.x + board.vertices[e.b]!.x,
+    y: board.vertices[e.a]!.y + board.vertices[e.b]!.y,
+  });
+  const area = walk.reduce((sum, e, i) => {
+    const p = mid(e),
+      q = mid(walk[(i + 1) % walk.length]!);
+    return sum + p.x * q.y - q.x * p.y;
+  }, 0);
+  return area > 0 ? walk : [walk[0]!, ...walk.slice(1).reverse()];
 }
 
 /**
@@ -86,12 +98,13 @@ export function coastWalk(coast: readonly Edge[]): Edge[] | null {
 export function harbourRotations(board: Board, loop: readonly Edge[], slots: readonly number[]) {
   const near = (e: Edge, f: Edge) =>
     [e.a, e.b].some((v) => [v, ...board.vertices[v]!.neighbors].some((n) => n === f.a || n === f.b));
+  const seas = new Map(loop.map((e) => [e, seaAcross(board, e)]));
   return loop.map((_, offset) => {
     const edges = slots.map((slot) => loop[(slot + offset) % loop.length]!);
     const pairs = edges.flatMap((e, i) => edges.slice(i + 1).map((f) => [e, f] as const));
     return {
       edges: edges.map((e) => e.id).sort((a, b) => a - b),
-      seas: pairs.every(([e, f]) => hexDistance(seaAcross(board, e), seaAcross(board, f)) >= 2),
+      seas: pairs.every(([e, f]) => hexDistance(seas.get(e)!, seas.get(f)!) >= 2),
       corners: pairs.every(([e, f]) => !near(e, f)),
     };
   });
