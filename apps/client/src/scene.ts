@@ -239,9 +239,9 @@ export function frameDistance(centres: readonly ShorePoint[], x: number, y: numb
   );
 }
 /**
- * The size of the patches the open sea is painted in. The water material is one mirrored tile, and over a whole
- * Open Sea frame its mirror lines would line up into a kaleidoscope, so each patch starts from its own place in
- * the tile and blends into its neighbours.
+ * The size of the patches a sea board's water is painted in. The water material is one mirrored tile, and over a
+ * whole Open Sea frame its mirror lines would line up into a kaleidoscope, so each patch starts from its own place
+ * in the tile and blends into its neighbours.
  */
 export const OPEN_WATER_PATCH = 300;
 /**

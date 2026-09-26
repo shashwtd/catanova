@@ -138,12 +138,16 @@ uniform int uSeaCount;
 uniform vec4 uWorld;
 uniform float uConcept;
 ${shaderFunctions}
-// The open sea is far more water than Classic's band, and one mirrored tile of it repeats into a kaleidoscope.
-// Every ${glsl(OPEN_WATER_PATCH)} units the deep water starts from its own place in the tile, blended into its neighbours.
-vec3 openWater(vec2 p){
+// A sea board has far more water than Classic's band, and one mirrored tile of it repeats into a kaleidoscope.
+// So every ${glsl(OPEN_WATER_PATCH)} units the water starts from its own place in the tile, blended into its neighbours,
+// and each patch's middle falls well inside a tile, so no mirror line runs through where a patch shows alone.
+vec3 water(vec2 p,vec2 cell){
   vec2 q=p/${glsl(OPEN_WATER_PATCH)},i=floor(q),f=smoothstep(0.2,0.8,fract(q));
   vec3 w[4];
-  for(int k=0;k<4;k++){vec2 c=i+vec2(k%2,k/2);w[k]=environment((p+vec2(470,430)+740.0*vec2(hash(c),hash(c+17.0)))/370.0,vec2(0,0));}
+  for(int k=0;k<4;k++){
+    vec2 c=i+vec2(k%2,k/2),middle=floor(vec2(hash(c),hash(c+17.0))*2.0)+0.25+0.5*vec2(hash(c+31.0),hash(c+47.0));
+    w[k]=environment((p-c*${glsl(OPEN_WATER_PATCH)})/370.0+middle,cell);
+  }
   return mix(mix(w[0],w[1],f.x),mix(w[2],w[3],f.x),f.y);
 }
 void main(){
@@ -164,9 +168,8 @@ void main(){
   float outer=-${glsl(SEA_SMOOTHING)}*log(frame)-seaWidth;
   if(outer>=0.0){outColor=vec4(0);return;}
   float rough=(noise(p*0.13)-0.5)*3.0+(noise(p*0.043)-0.5)*3.0;
-  vec2 waterUv=(p+vec2(470,430))/370.0;
-  vec3 deep=openWater(p);
-  vec3 shallow=environment(waterUv,vec2(1,0));
+  vec3 deep=water(p,vec2(0,0));
+  vec3 shallow=water(p,vec2(1,0));
   vec3 color=mix(deep,shallow,1.0-smoothstep(10.0,69.0,shoal));
   float foam=(1.0-smoothstep(0.4,1.7,abs(land+rough-11.0)))*(0.35+noise(p*0.09)*0.4);
   color=mix(color,vec3(0.87,0.96,0.86),foam);
