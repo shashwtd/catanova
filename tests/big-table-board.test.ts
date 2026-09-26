@@ -6,6 +6,8 @@ import {
   BIG_TABLE_SHAPE,
   BOARD_PRESETS,
   BALANCED_V2,
+  boardPreset,
+  dealBoard,
   fairnessIssues,
   generateBoard,
   hexDistance,
@@ -207,7 +209,10 @@ test('500 Big Table boards keep every rule, harbour rule and robber start, quick
 
 test('a Big Table board is reproduced by its seed, and pinned boards do not drift', () => {
   assert.deepEqual(deal(281), deal(281));
+  assert.deepEqual(dealBoard(281, 'big-table-balanced-v1', 5), deal(281));
+  assert.deepEqual(dealBoard(281, 'big-table-balanced-v1', 6), deal(281));
   assert.equal(deal(281).preset, 'big-table-balanced-v1');
+  assert.equal(boardPreset('big-table-balanced-v1', 6), preset);
   assert.ok(BOARD_PRESETS.includes(preset));
   assert.equal(BOARD_PRESETS[0], BALANCED_V2);
   const pinned = (JSON.parse(readFileSync(PRESET_FIXTURE, 'utf8')) as PresetFixture)[

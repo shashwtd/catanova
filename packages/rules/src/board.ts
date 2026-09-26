@@ -12,6 +12,11 @@ export type Hex = {
   number: number;
   vertices: number[];
   neighbors: number[];
+  /**
+   * Open Sea: the island a land hex belongs to, 'main' or the small island's letter in the template's sketch
+   * in docs/MAP_GENERATION.md. Absent on sea hexes, and on boards that are a single island.
+   */
+  island?: string;
 };
 export type Vertex = {
   id: number;
@@ -31,15 +36,19 @@ export type Board = {
    * valid.
    */
   preset: 'balanced-v1' | 'balanced-v2' | 'big-table-balanced-v1' | 'outer-isles-v1';
+  /** Open Sea: the player count of the template the board was dealt from. */
+  players?: number;
   hexes: Hex[];
   vertices: Vertex[];
   edges: Edge[];
   ports: Port[];
   /**
    * The desert the robber starts on, for a preset that chooses it: Big Table picks one of its two deserts
-   * with the seed. Classic boards leave it out, having only the one.
+   * with the seed, and Open Sea records its desert. Classic boards leave it out, having only the one.
    */
   robberStart?: number;
+  /** Open Sea: the sea hex the pirate starts on. */
+  pirateStart?: number;
 };
 export const pips = (n: number) => (n >= 2 && n <= 12 && n !== 7 ? 6 - Math.abs(7 - n) : 0);
 export function seededRandom(seed: number): () => number {
@@ -194,6 +203,13 @@ export type FairnessRules = {
   cornerPips: number;
   /** Big Table: no two deserts border each other, which would make one wider dead patch. */
   desertsApart?: boolean;
+  /**
+   * Open Sea: the board is a main island and small islands, dealt separately. Spread and production count the
+   * main island's tiles, and spread only asks it of a resource with two or more there. Each small island
+   * keeps its own pips, gold included, within `pipsPerHex` of its size. No gold field carries a 6 or an 8,
+   * and no island holds two gold fields.
+   */
+  islands?: boolean;
 };
 /** The limits balanced-v1 and balanced-v2 both deal within. */
 export const BALANCED_FAIRNESS: FairnessRules = {
@@ -209,6 +225,11 @@ export function fairnessIssues(
   rules: FairnessRules = BALANCED_FAIRNESS,
 ): string[] {
   const issues: string[] = [];
+  const [low, high] = rules.pipsPerHex;
+  const productive = (tiles: readonly Hex[]) => {
+    const production = tiles.reduce((sum, h) => sum + pips(h.number), 0);
+    return production >= Math.ceil(tiles.length * low) && production <= tiles.length * high;
+  };
   for (const resource of RESOURCES) {
     const tiles = board.hexes.filter((h) => h.terrain === resource);
     const visited = new Set<number>();
@@ -230,12 +251,14 @@ export function fairnessIssues(
       if (size > rules.largestCluster)
         issues.push(`${resource}: cluster larger than ${rules.largestCluster}`);
     }
-    if (!tiles.some((a) => tiles.some((b) => hexDistance(a, b) >= rules.spread)))
+    // Open Sea deals its small islands apart from the main island, so only the main island's tiles count.
+    const counted = rules.islands ? tiles.filter((h) => h.island === 'main') : tiles;
+    if (
+      (!rules.islands || counted.length >= 2) &&
+      !counted.some((a) => counted.some((b) => hexDistance(a, b) >= rules.spread))
+    )
       issues.push(`${resource}: insufficient spread`);
-    const production = tiles.reduce((sum, h) => sum + pips(h.number), 0);
-    const [low, high] = rules.pipsPerHex;
-    if (production < Math.ceil(tiles.length * low) || production > tiles.length * high)
-      issues.push(`${resource}: production outside range`);
+    if (!productive(counted)) issues.push(`${resource}: production outside range`);
   }
   for (const [issue, clash] of BORDER_RULES)
     for (const h of board.hexes)
@@ -250,6 +273,16 @@ export function fairnessIssues(
     )
   )
     issues.push('Deserts border each other');
+  if (rules.islands) {
+    if (board.hexes.some((h) => h.terrain === 'gold' && red(h.number))) issues.push('Gold field on a 6 or 8');
+    for (const island of new Set(board.hexes.map((h) => h.island))) {
+      if (island === undefined || island === 'main') continue;
+      const hexes = board.hexes.filter((h) => h.island === island);
+      if (!productive(hexes)) issues.push(`Island ${island}: production outside range`);
+      if (hexes.filter((h) => h.terrain === 'gold').length > 1)
+        issues.push(`Island ${island}: two gold fields`);
+    }
+  }
   return issues;
 }
 
@@ -282,10 +315,18 @@ function dealNumbers(
  * spaces. With the Classic island's nine harbours on its eighteen sea spaces, that makes harbour and open sea
  * alternate all the way round, as on the fixed frame in docs/SETUP.md, with harbours off three of the six tips.
  * The other four of every ten rotations put three pairs of harbours side by side and leave every tip bare.
+ *
+ * Every rotation also keeps harbours off the same and neighbouring intersections. Round a coast like
+ * Classic's the spacing sees to that by itself; across a neck of land one hex wide, an inland edge joins two
+ * corners of the coast, and a rotation that puts a harbour at each end is not used either.
+ *
+ * `loop` is the coast the slots count round, in order. By default it is every coastal edge on the board, in
+ * order of its angle round the origin, where topology() centres a board that is one island.
  */
 function harbourLayouts(
   graph: Pick<Board, 'hexes' | 'vertices' | 'edges'>,
   slots: readonly number[],
+  loop?: readonly Edge[],
 ): Edge[][] {
   // Twice the edge's midpoint. Its angle orders the coast, and subtracting the land hex's centre gives the centre
   // of the sea space across the edge: neighbouring sea spaces are √3 apart, any other two at least 3.
@@ -297,15 +338,49 @@ function harbourLayouts(
     x: out(e).x - shoreHex(graph, e).x,
     y: out(e).y - shoreHex(graph, e).y,
   });
-  const apart = (e: Edge, f: Edge) => Math.hypot(sea(e).x - sea(f).x, sea(e).y - sea(f).y) > 2;
-  const coast = graph.edges
-    .filter((e) => isCoastalEdge(graph, e))
-    .sort((a, b) => Math.atan2(out(a).y, out(a).x) - Math.atan2(out(b).y, out(b).x));
+  const apart = (e: Edge, f: Edge) =>
+    Math.hypot(sea(e).x - sea(f).x, sea(e).y - sea(f).y) > 2 &&
+    [e.a, e.b].every((v) => ![v, ...graph.vertices[v]!.neighbors].some((n) => n === f.a || n === f.b));
+  const coast =
+    loop ??
+    graph.edges
+      .filter((e) => isCoastalEdge(graph, e))
+      .sort((a, b) => Math.atan2(out(a).y, out(a).x) - Math.atan2(out(b).y, out(b).x));
   if (coast.length <= Math.max(...slots))
     throw new Error('The harbour slots go round past the end of the coast');
   return coast
     .map((_, offset) => slots.map((slot) => coast[(slot + offset) % coast.length]!))
     .filter((edges) => edges.every((e, i) => edges.slice(i + 1).every((f) => apart(e, f))));
+}
+
+/**
+ * The coast of one island as a loop: the edges between `island` and the sea, walked clockwise on screen from
+ * the northernmost edge, the westernmost of those. Harbour slots count round it on a board of islands.
+ */
+function coastLoop(graph: Pick<Board, 'hexes' | 'vertices' | 'edges'>, island: readonly Hex[]): Edge[] {
+  const ids = new Set(island.map((h) => h.id));
+  const coast = graph.edges.filter((e) => isCoastalEdge(graph, e) && e.hexes.some((h) => ids.has(h)));
+  const ends = new Map<number, Edge[]>();
+  for (const e of coast) for (const v of [e.a, e.b]) ends.set(v, [...(ends.get(v) ?? []), e]);
+  if (!coast.length || [...ends.values()].some((edges) => edges.length !== 2))
+    throw new Error('The coast is not one loop');
+  // Twice the midpoint, rounded so that edges level with each other compare equal: y first, then x.
+  const mid = (e: Edge) =>
+    (['y', 'x'] as const).map((axis) =>
+      Math.round((graph.vertices[e.a]![axis] + graph.vertices[e.b]![axis]) * 1e6),
+    );
+  const start = [...coast].sort((e, f) => mid(e)[0]! - mid(f)[0]! || mid(e)[1]! - mid(f)[1]!)[0]!;
+  let at = graph.vertices[start.a]!.x > graph.vertices[start.b]!.x ? start.a : start.b;
+  const loop = [start];
+  for (let edge = start; ;) {
+    const next = ends.get(at)!.find((e) => e !== edge)!;
+    if (next === start) break;
+    loop.push(next);
+    at = next.a === at ? next.b : next.a;
+    edge = next;
+  }
+  if (loop.length !== coast.length) throw new Error('The coast is not one loop');
+  return loop;
 }
 
 /** How many hexes of each terrain a preset deals. Gold and sea are Open Sea's; others leave them out. */
@@ -314,6 +389,9 @@ export type TerrainCounts = Readonly<
 >;
 /** The order a preset's terrain counts are laid out in before they are shuffled. */
 const TERRAINS: readonly (Resource | 'desert')[] = ['desert', ...RESOURCES];
+/** The land tiles of `counts` as the newer generators lay them out: desert, the resources, then gold. */
+const landTiles = (counts: TerrainCounts) =>
+  [...TERRAINS, 'gold' as const].flatMap((t) => Array<Terrain>(counts[t] ?? 0).fill(t));
 /**
  * One way to deal a board: its shape, the tiles, numbers and harbours dealt onto it, and the rules a deal must
  * pass. Every board records the id of the preset that dealt it, since a seed reproduces a board only under the
@@ -336,10 +414,29 @@ export type BoardPreset = {
    * How the deal is searched for; each generator deals only boards with no fairnessIssues under `fairness`.
    * 'balanced' shuffles the terrain until it keeps the terrain rules, then deals numbers onto it (Classic).
    * 'numbers-first' picks the deserts, deals the numbers, then shuffles the terrain onto them (Big Table).
+   * 'islands' deals an Open Sea template: its main island, then its small islands, each terrain first.
    */
-  generator: 'balanced' | 'numbers-first';
+  generator: 'balanced' | 'numbers-first' | 'islands';
   fairness: FairnessRules;
+  /** An 'islands' preset's template; its `terrain` and `numbers` above are the totals of its two parts. */
+  islands?: IslandTemplate;
 };
+/** Tiles and number tokens dealt together onto one part of an Open Sea template's land. */
+export type IslandDeal = { terrain: TerrainCounts; numbers: readonly number[] };
+/**
+ * An Open Sea template: where its islands are and what each part holds. The main island and the small islands
+ * share no corner, so each part is dealt on its own. Every hex of the shape on no island is sea.
+ */
+export type IslandTemplate = {
+  /** The player count the template is drawn for. */
+  players: number;
+  main: IslandDeal & { hexes: readonly Axial[] };
+  /** The small islands' hexes, by the letter each has in the template's sketch, dealt as one part. */
+  small: IslandDeal & { hexes: Readonly<Record<string, readonly Axial[]>> };
+  /** The sea hex the pirate starts on. */
+  pirate: Axial;
+};
+
 /** The Classic island as Catanova deals it by default: see docs/MAP_GENERATION.md. */
 export const BALANCED_V2: BoardPreset = {
   id: 'balanced-v2',
@@ -373,14 +470,142 @@ export const BIG_TABLE_BALANCED_V1: BoardPreset = {
   fairness: { ...BALANCED_FAIRNESS, spread: 4, desertsApart: true },
 };
 
+/** Every hex in rows `top` to `bottom` whose column, 2q + r in half hexes, runs from `left` to `right`. */
+function rectangle(top: number, bottom: number, left: number, right: number): Axial[] {
+  const shape: Axial[] = [];
+  for (let r = top; r <= bottom; r++)
+    for (let column = left; column <= right; column++)
+      if ((column - r) % 2 === 0) shape.push({ q: (column - r) / 2, r });
+  return shape;
+}
+/** Hexes by their coordinates, each given as (q, r). */
+function hexesAt(...coordinates: [q: number, r: number][]): Axial[] {
+  return coordinates.map(([q, r]) => ({ q, r }));
+}
+/** Hexes along rows, each row given as its r and the q of its first and last hex. */
+function runs(...rows: [r: number, first: number, last: number][]): Axial[] {
+  return rows.flatMap(([r, first, last]) =>
+    Array.from({ length: last - first + 1 }, (_, k) => ({ q: first + k, r })),
+  );
+}
+/** An Open Sea preset for one template: terrain and numbers total its two parts', and the rest is sea. */
+function outerIsles(
+  shape: BoardShape,
+  harbours: BoardPreset['harbours'],
+  islands: IslandTemplate,
+): BoardPreset {
+  const { main, small } = islands;
+  const total = (t: Resource | 'desert' | 'gold') => (main.terrain[t] ?? 0) + (small.terrain[t] ?? 0);
+  const land = main.hexes.length + Object.values(small.hexes).flat().length;
+  return {
+    id: 'outer-isles-v1',
+    shape,
+    terrain: {
+      desert: total('desert'),
+      wood: total('wood'),
+      brick: total('brick'),
+      sheep: total('sheep'),
+      wheat: total('wheat'),
+      ore: total('ore'),
+      gold: total('gold'),
+      sea: shape.length - land,
+    },
+    numbers: [...main.numbers, ...small.numbers],
+    harbours,
+    generator: 'islands',
+    fairness: { ...BALANCED_FAIRNESS, islands: true },
+    islands,
+  };
+}
 /**
- * The presets that deal new boards, the default first: Classic's, then Big Table's. balanced-v1 deals no more
- * boards; the ones it dealt live on in saved games, which keep the board JSON they were dealt.
+ * Outer Isles, Open Sea's first scenario: a template for three players and one for four, looked up by the
+ * player count. Both deal as outer-isles-v1. The sketches and the rules are in docs/MAP_GENERATION.md.
  */
-export const BOARD_PRESETS: readonly [BoardPreset, ...BoardPreset[]] = [BALANCED_V2, BIG_TABLE_BALANCED_V1];
+export const OUTER_ISLES_V1: Readonly<Record<3 | 4, BoardPreset>> = {
+  3: outerIsles(
+    rectangle(-4, 4, -7, 8),
+    // Eight harbours round the main island's 36 coastal edges, spaced 4, 5, 4, 5, 4, 5, 4 and 5 edges apart.
+    { slots: [0, 4, 9, 13, 18, 22, 27, 31], trades: ['any', 'any', 'any', ...RESOURCES] },
+    {
+      players: 3,
+      // A shield with its point to the south, in rows of 5, 5, 3, 2 and 1.
+      main: {
+        hexes: runs([-1, -2, 2], [0, -1, 3], [1, -1, 1], [2, -1, 0], [3, -1, -1]),
+        terrain: { desert: 1, wood: 3, brick: 3, sheep: 4, wheat: 3, ore: 2 },
+        // Classic's 18 without one each of 3, 5 and 9.
+        numbers: [2, 3, 4, 4, 5, 6, 6, 8, 8, 9, 10, 10, 11, 11, 12],
+      },
+      small: {
+        hexes: {
+          a: hexesAt([1, -3], [2, -3], [3, -3]),
+          b: hexesAt([-3, 1], [-3, 2], [-3, 3]),
+          c: hexesAt([2, 2], [1, 3]),
+        },
+        terrain: { desert: 0, wood: 1, brick: 1, sheep: 0, wheat: 2, ore: 2, gold: 2 },
+        numbers: [2, 4, 5, 6, 8, 9, 10, 12],
+      },
+      pirate: { q: 4, r: -2 },
+    },
+  ),
+  4: outerIsles(
+    rectangle(-4, 4, -8, 8),
+    // Nine harbours round the main island's 40 coastal edges, spaced 4, 4, 5, 4, 5, 4, 5, 4, 5 edges apart.
+    { slots: [0, 4, 8, 13, 17, 22, 26, 31, 35], trades: ['any', 'any', 'any', 'any', ...RESOURCES] },
+    {
+      players: 4,
+      // A diamond in rows of 2, 4, 7, 4, 2 and 1.
+      main: {
+        hexes: runs([-2, 0, 1], [-1, -1, 2], [0, -3, 3], [1, -2, 1], [2, -1, 0], [3, -1, -1]),
+        terrain: { desert: 1, wood: 4, brick: 4, sheep: 5, wheat: 3, ore: 3 },
+        // Classic's 18 and a third 10.
+        numbers: [...NUMBER_SPIRAL, 10],
+      },
+      small: {
+        hexes: {
+          a: hexesAt([-1, -3], [-2, -2]),
+          b: hexesAt([3, -3], [4, -3], [4, -2]),
+          c: hexesAt([2, 2], [1, 3]),
+          d: hexesAt([-4, 2], [-4, 3], [-3, 3]),
+        },
+        terrain: { desert: 0, wood: 1, brick: 1, sheep: 0, wheat: 3, ore: 3, gold: 2 },
+        numbers: [2, 3, 4, 5, 6, 8, 9, 10, 11, 12],
+      },
+      pirate: { q: 2, r: 4 },
+    },
+  ),
+};
+
+/**
+ * The presets that deal new boards, the default first: Classic's, Big Table's and Outer Isles' two templates.
+ * balanced-v1 deals no more boards; the ones it dealt live on in saved games, which keep the board JSON they
+ * were dealt.
+ */
+export const BOARD_PRESETS: readonly [BoardPreset, ...BoardPreset[]] = [
+  BALANCED_V2,
+  BIG_TABLE_BALANCED_V1,
+  OUTER_ISLES_V1[3],
+  OUTER_ISLES_V1[4],
+];
+/**
+ * The preset that deals `id`'s boards for a table of `players`. Outer Isles has a template for three players
+ * and one for four; every other preset deals one island whatever the count, and its ruleset checks the seats.
+ * An Open Sea lobby deals the three-player template until four are seated (docs/RULEBOOK-OPEN-SEA.md, 15.1).
+ */
+export function boardPreset(id: Board['preset'], players: number): BoardPreset {
+  const presets = BOARD_PRESETS.filter((preset) => preset.id === id);
+  if (!presets.length) throw new Error(`${id} deals no new boards`);
+  const preset = presets.find((p) => !p.islands || p.islands.players === players);
+  if (!preset) throw new Error(`${id} has no board for ${players} players`);
+  return preset;
+}
+/** A new board from preset `id` for a table of `players`, as a room deals it: see boardPreset. */
+export const dealBoard = (seed: number, id: Board['preset'], players: number): Board =>
+  generateBoard(seed, boardPreset(id, players));
+
 /** Deals a board from `preset`, Classic's by default. A seed reproduces a board only under its preset. */
 export function generateBoard(seed: number, preset: BoardPreset = BOARD_PRESETS[0]): Board {
   if (preset.generator === 'numbers-first') return dealNumbersFirst(seed, preset);
+  if (preset.generator === 'islands') return dealIslands(seed, preset);
   const random = seededRandom(seed),
     graph = topology(preset.shape),
     land = graph.hexes.filter(isLand),
@@ -488,10 +713,134 @@ function dealNumbersFirst(seed: number, preset: BoardPreset): Board {
 }
 
 /**
+ * Open Sea's search, as docs/MAP_GENERATION.md describes for Outer Isles. The main island and the small
+ * islands share no corner, so each part is dealt on its own the balanced-v2 way: terrain first, then numbers.
+ */
+function dealIslands(seed: number, preset: BoardPreset): Board {
+  const template = preset.islands;
+  if (!template) throw new Error(`${preset.id} has no islands to deal`);
+  const random = seededRandom(seed),
+    graph = topology(preset.shape),
+    rules = preset.fairness;
+  const byPlace = new Map(graph.hexes.map((h) => [`${h.q},${h.r}`, h]));
+  const hex = ({ q, r }: Axial) => {
+    const h = byPlace.get(`${q},${r}`);
+    if (!h) throw new Error(`${preset.id} puts ${q},${r} off its board`);
+    return h;
+  };
+  for (const h of graph.hexes) h.terrain = 'sea';
+  // Land starts as desert, so the coast is where it will be; the deal then shuffles the real tiles onto it.
+  const settle = (hexes: readonly Axial[], island: string) =>
+    hexes.map(hex).map((h) => {
+      if (h.island) throw new Error(`${preset.id} puts ${h.q},${h.r} on two islands`);
+      h.terrain = 'desert';
+      h.island = island;
+      return h;
+    });
+  const main = settle(template.main.hexes, 'main');
+  const small = Object.entries(template.small.hexes).flatMap(([island, hexes]) => settle(hexes, island));
+  const pirate = hex(template.pirate);
+  if (isLand(pirate)) throw new Error(`${preset.id} starts its pirate on land`);
+  for (const [part, hexes] of [
+    [template.main, main],
+    [template.small, small],
+  ] as const) {
+    const tiles = landTiles(part.terrain).length,
+      producing = hexes.length - part.terrain.desert;
+    if (tiles !== hexes.length)
+      throw new Error(`${preset.id} deals ${tiles} tiles onto ${hexes.length} hexes`);
+    if (part.numbers.length !== producing)
+      throw new Error(`${preset.id} has ${part.numbers.length} numbers for ${producing} hexes`);
+  }
+  if (preset.harbours.trades.length !== preset.harbours.slots.length)
+    throw new Error(
+      `${preset.id} has ${preset.harbours.trades.length} trades for ${preset.harbours.slots.length} harbours`,
+    );
+  // Harbours go on the main island's coast only.
+  const harbours = harbourLayouts(graph, preset.harbours.slots, coastLoop(graph, main));
+  if (!harbours.length) throw new Error(`${preset.id} has no way to lay out its harbours`);
+  const letters = Object.keys(template.small.hexes),
+    island = (letter: string) => small.filter((h) => h.island === letter);
+  const mainDealt = dealPart(
+    graph,
+    main,
+    template.main,
+    rules.cornerPips,
+    random,
+    () => clustersWithin(graph, main, rules.largestCluster) && spreadAtLeast(main, rules.spread, true),
+    () => productionWithin(main, rules.pipsPerHex),
+  );
+  const smallDealt =
+    mainDealt &&
+    dealPart(
+      graph,
+      small,
+      template.small,
+      rules.cornerPips,
+      random,
+      () =>
+        clustersWithin(graph, small, rules.largestCluster) &&
+        letters.every((letter) => island(letter).filter((h) => h.terrain === 'gold').length <= 1),
+      () => letters.every((letter) => pipsWithin(island(letter), rules.pipsPerHex)),
+    );
+  if (!smallDealt) throw new Error('Could not generate the islands within the search limit');
+  const layoutEdges = harbours[Math.floor(random() * harbours.length)]!;
+  const trades = shuffle(preset.harbours.trades, random);
+  const ports = layoutEdges.map((edge, n) => ({ edge: edge.id, resource: trades[n]! }));
+  const deserts = graph.hexes.filter((h) => h.terrain === 'desert').map((h) => h.id);
+  const robberStart = deserts[Math.floor(random() * deserts.length)]!;
+  return checked(
+    {
+      seed: seed >>> 0,
+      preset: preset.id,
+      players: template.players,
+      ...graph,
+      ports,
+      robberStart,
+      pirateStart: pirate.id,
+    },
+    rules,
+  );
+}
+
+/**
+ * Deals one part of an Open Sea board the balanced-v2 way, within its limits: shuffles the part's tiles onto
+ * `hexes` until `layoutKept`, then deals its numbers until `numbersKept` too. Says whether it found a deal.
+ */
+function dealPart(
+  graph: Pick<Board, 'hexes' | 'vertices'>,
+  hexes: readonly Hex[],
+  part: IslandDeal,
+  cap: number,
+  random: () => number,
+  layoutKept: () => boolean,
+  numbersKept: () => boolean,
+): boolean {
+  const tiles = landTiles(part.terrain);
+  for (let layout = 0; layout < 10000; layout++) {
+    const shuffled = shuffle(tiles, random);
+    for (const [i, h] of hexes.entries()) {
+      h.terrain = shuffled[i]!;
+      h.number = 0;
+    }
+    if (!layoutKept()) continue;
+    const deal = numberDealer(
+      graph,
+      hexes.filter((h) => h.terrain !== 'desert'),
+      part.numbers,
+      cap,
+      random,
+    );
+    for (let attempt = 0; attempt < 20000; attempt++) if (deal() && numbersKept()) return true;
+  }
+  return false;
+}
+
+/**
  * Deals `numbers` onto `hexes`, one uniformly random deal per call, and says whether the deal keeps the
- * number rules: BORDER_RULES between neighbours and at most `cap` pips on a corner. A deal stops at the first
- * token that breaks one; the full check would reject it anyway, so every valid numbering stays equally
- * likely, as in dealNumbers. Tokens go down strongest first, each on a random
+ * number rules: BORDER_RULES between neighbours, at most `cap` pips on a corner, and no red number on a gold
+ * field. A deal stops at the first token that breaks one; the full check would reject it anyway, so every
+ * valid numbering stays equally likely, as in dealNumbers. Tokens go down strongest first, each on a random
  * free hex, so most failing deals fail within a few tokens. A deal that keeps the rules is written onto the
  * hexes.
  *
@@ -514,11 +863,14 @@ function numberDealer(
   // Only a neighbour in this deal can clash: every other hex carries no number yet, or never will.
   const neighbours = graph.hexes.map((h) => (dealt.has(h.id) ? h.neighbors.filter((n) => dealt.has(n)) : []));
   const corners = graph.hexes.map((h) => h.vertices);
+  const gold = graph.hexes.map((h) => h.terrain === 'gold');
   const reds = redsApart ? numbers.filter(red) : [];
   const tokens = numbers.filter((n) => !redsApart || !red(n)).sort((a, b) => pips(b) - pips(a) || a - b);
   const tokenPips = tokens.map(pips),
+    tokenRed = tokens.map(red),
     redPips = pips(6);
-  const sets = reds.length ? hexSets(hexes, reds.length, true) : new Int32Array();
+  const places = hexes.filter((h) => h.terrain !== 'gold');
+  const sets = reds.length ? hexSets(places, reds.length, true) : new Int32Array();
   const num = new Int32Array(graph.hexes.length),
     sum = new Int32Array(graph.vertices.length),
     redHexes = new Int32Array(reds.length);
@@ -530,7 +882,7 @@ function numberDealer(
       // Numbered in set order for now; the red numbers are shuffled onto these hexes once the deal holds.
       let set = sets[Math.floor(random() * sets.length)]!;
       for (let i = 0; set; i++, set &= set - 1) {
-        const h = hexes[31 - Math.clz32(set & -set)]!.id,
+        const h = places[31 - Math.clz32(set & -set)]!.id,
           at = corners[h]!;
         redHexes[i] = h;
         num[h] = reds[i]!;
@@ -541,6 +893,7 @@ function numberDealer(
       // A uniformly random hex without a number yet: draw again while the draw lands on a numbered one.
       let h = ids[Math.floor(random() * ids.length)]!;
       while (num[h]) h = ids[Math.floor(random() * ids.length)]!;
+      if (tokenRed[t] && gold[h]) return false;
       const clash = CLASHES[tokens[t]!]!,
         near = neighbours[h]!,
         at = corners[h]!,
@@ -595,11 +948,16 @@ function clustersWithin(graph: Pick<Board, 'hexes'>, hexes: readonly Hex[], larg
   }
   return true;
 }
-/** Rule 2 on `hexes`: some two tiles of each resource there are at least `steps` apart. */
-function spreadAtLeast(hexes: readonly Hex[], steps: number): boolean {
+/**
+ * Rule 2 on `hexes`: some two tiles of each resource there are at least `steps` apart. With `twoOrMore`, only
+ * a resource with two or more tiles there has to be spread.
+ */
+function spreadAtLeast(hexes: readonly Hex[], steps: number, twoOrMore = false): boolean {
   return RESOURCES.every((resource) => {
     const tiles = hexes.filter((h) => h.terrain === resource);
-    return tiles.some((a) => tiles.some((b) => hexDistance(a, b) >= steps));
+    return (
+      (twoOrMore && tiles.length < 2) || tiles.some((a) => tiles.some((b) => hexDistance(a, b) >= steps))
+    );
   });
 }
 /** Rule 3 on `hexes`: each resource's tiles there carry pips within `range` per tile. */
