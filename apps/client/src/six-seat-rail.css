@@ -1,0 +1,166 @@
+/*
+ * Five and six players on the rail.
+ *
+ * PlayerRail writes `data-seats` on the rail only at a table of five or six,
+ * so nothing here can reach a table of four. Every selector is the one it
+ * overrides with the seat count added inside `:where()`, which adds nothing to
+ * its specificity: this sheet loads last and wins on order alone, exactly as
+ * the rule it replaces would have won over the one before it.
+ *
+ * On a phone the cards get small, so what a card shows changes with them. Its
+ * award counts join the score instead of sitting on a portrait with no room at
+ * its foot (PlayerRail renders them in both places; this sheet shows one), and
+ * the leader's badge steps aside for the turn chip rather than hiding under
+ * it. Held upright, the phone also drops the development-card count.
+ */
+
+/* --- desktop ------------------------------------------------------------- */
+
+/* On a laptop, six full cards run under the dice of the last roll, which sit
+   2px below the rail's own bottom line. The portrait shrinks just enough for
+   the cards to end 6px above that line: the rail's top and padding take 36px
+   and its gaps 12px each, and a card is its portrait and 12px of padding. It
+   never grows past 84px, so a taller screen keeps its cards as they are. */
+.playing :where(.player-rail[data-seats='5']) .player-profile,
+.playing :where(.player-rail[data-seats='5']) .player-profile.active {
+  --portrait-size: min(84px, calc((100dvh - var(--hud-bottom) - 6px - 36px - 4 * 12px) / 5 - 12px));
+}
+.playing :where(.player-rail[data-seats='6']) .player-profile,
+.playing :where(.player-rail[data-seats='6']) .player-profile.active {
+  --portrait-size: min(84px, calc((100dvh - var(--hud-bottom) - 6px - 36px - 5 * 12px) / 6 - 12px));
+}
+/* The second copy of the award counts, in the score, is for phones. */
+.playing :where(.player-rail[data-seats]) .player-profile .profile-stats > span:where(.profile-award-counts) {
+  display: none;
+}
+
+/* --- phones, either way up ----------------------------------------------- */
+
+@media (max-width: 700px) and (orientation: portrait),
+  (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing :where(.player-rail[data-seats]) .profile-portrait > .profile-award-counts {
+    display: none;
+  }
+  .playing
+    :where(.player-rail[data-seats])
+    .player-profile
+    .profile-stats
+    > span:where(.profile-award-counts) {
+    display: inline-flex;
+    gap: 4px;
+  }
+  /* The turn chip sits where the leader's badge does. */
+  :where(.playing .player-rail[data-seats] .profile-portrait:has(> .profile-turn)) > .profile-rank {
+    display: none;
+  }
+  :where(.playing .player-rail[data-seats]) .profile-medal {
+    width: 22px;
+    height: 22px;
+  }
+  :where(.playing .player-rail[data-seats]) .profile-medal .game-icon {
+    width: 20px;
+    height: 20px;
+  }
+  /* An absent player's portrait carries the mark alone, whose tooltip names
+     it, rather than a label with no room under it. */
+  :where(.playing .player-rail[data-seats] .profile-portrait:has(> .offline-mark)) > .profile-absence {
+    display: none;
+  }
+  /* Shown only while the card is hovered, focused or tapped, as before, and
+     then off the portrait's corner rather than over the face. */
+  .playing :where(.player-rail[data-seats]) .profile-portrait > .profile-friend {
+    top: -9px;
+    right: -14px;
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* --- a phone held upright: three columns --------------------------------- */
+
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing .player-rail:where([data-seats]) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 5px;
+  }
+  .playing :where(.player-rail[data-seats]) .player-profile,
+  .playing :where(.player-rail[data-seats]) .player-profile.active {
+    --portrait-size: 40px;
+    gap: 3px;
+    padding: 2px;
+  }
+  .playing :where(.player-rail[data-seats]) .player-profile .profile-caption {
+    grid-template-rows: 14px minmax(0, 1fr);
+  }
+  .playing :where(.player-rail[data-seats]) .profile-name-row {
+    translate: 0 2px;
+  }
+  .playing :where(.player-rail[data-seats]) .player-profile .profile-name-banner,
+  .playing :where(.player-rail[data-seats]) .player-profile.self .profile-name-banner,
+  .playing :where(.player-rail[data-seats]) .player-profile.active .profile-name-banner {
+    font-size: 12px;
+  }
+  /* Two lines under the name: the score and the hand, then the road and the
+     knights. The stats box steps aside so its two parts can take them. */
+  .playing :where(.player-rail[data-seats]) .player-profile .profile-caption .profile-stats {
+    display: contents;
+  }
+  .playing :where(.player-rail[data-seats]) .profile-details {
+    grid-template-rows: auto auto;
+  }
+  .playing
+    :where(.player-rail[data-seats])
+    .player-profile
+    .profile-stats
+    > span:where(.profile-award-counts) {
+    grid-area: 2 / 1 / 3 / -1;
+    justify-content: flex-start;
+  }
+  .playing :where(.player-rail[data-seats]) .player-profile .profile-stats .profile-score .game-icon {
+    width: 13px;
+    height: 13px;
+  }
+  .playing :where(.player-rail[data-seats]) .player-profile .profile-stats .profile-score b {
+    font-size: 13px;
+  }
+  :where(.playing .player-rail[data-seats]) .profile-inventories .profile-inventory-art {
+    width: 12px;
+    height: 14px;
+  }
+  :where(.playing .player-rail[data-seats]) .profile-inventories > span:where(.profile-development-count) {
+    display: none;
+  }
+}
+
+/* --- a phone on its side: one tight column ------------------------------- */
+
+/* Six cards end at least 8px above the hand dock, whose top is its measured
+   height and its 14px margin up from the bottom. The rail starts 5px down and
+   pads 6px, and a card is its portrait and 6px of padding. The portrait is
+   38px wherever that fits, as on an 812 × 375 phone. */
+@media (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing .player-rail:where([data-seats]) {
+    gap: 3px;
+  }
+  .playing :where(.player-rail[data-seats]) .player-profile,
+  .playing :where(.player-rail[data-seats]) .player-profile.active {
+    --portrait-size: 38px;
+  }
+  .playing :where(.player-rail[data-seats]) .player-profile .profile-portrait .offline-mark .game-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .playing :where(.player-rail[data-seats='6']) .player-profile,
+  .playing :where(.player-rail[data-seats='6']) .player-profile.active {
+    --portrait-size: min(
+      38px,
+      calc(
+        (
+            100dvh - max(14px, env(safe-area-inset-bottom)) - var(--dock-height, 64px) - 8px -
+              var(--mobile-safe-top, 0px) - 11px - 5 * 3px
+          ) /
+          6 - 6px
+      )
+    );
+  }
+}
