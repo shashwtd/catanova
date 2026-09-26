@@ -657,8 +657,10 @@ are to playtest after release; that is a balance question, not a rules one.
 (`feature/map-presets/2026-09-26`), and the room deals by its seated count on
 `feature/open-sea/2026-09-26`: the four-player template while four are seated,
 the three-player one otherwise, dealt again from the same seed as the count
-moves, within the 100 ms budget (a board takes a few milliseconds). Start
-refuses a board dealt for another count.
+moves, within the 100 ms budget (a board takes a few milliseconds). Like the
+re-deal of a board the mode does not play, this happens whenever the lobby is
+read, so Start always meets the board for its count; `createGame` still
+refuses one dealt for another count.
 
 ### Step 6: more Open Sea (M each)
 
