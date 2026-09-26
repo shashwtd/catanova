@@ -19,7 +19,8 @@ export type FeedbackEvent = {
   /** Stable committed roll identity, independent of later room/presence revisions. */
   diceId?: string;
   notices: string[];
-  cardPlay?: { kind: Exclude<CardKind, 'victoryPoint'>; playerName: string };
+  /** A card played, and whether in Open Sea, where a Knight and Road Building do more. */
+  cardPlay?: { kind: Exclude<CardKind, 'victoryPoint'>; playerName: string; sea?: true };
   sounds: SoundCue[];
   flights: FlightIntent[];
   glowHexes: number[];
@@ -252,6 +253,12 @@ export function deriveFeedback(
       event.sites.push(`[data-road-id="${id}"]`);
       event.sounds.push('road');
     }
+  // Open Sea: a ship built, or moved to a new edge, lands like a road.
+  for (const id of Object.keys(g.ships ?? {}))
+    if (!before.ships?.[Number(id)]) {
+      event.sites.push(`[data-ship-id="${id}"]`);
+      event.sounds.push('road');
+    }
   const production = dice ? publicProduction(before, g, dice) : null;
   if (dice) {
     event.sounds.push('dice');
@@ -339,7 +346,7 @@ export function deriveFeedback(
     }
   if (event.flights.some((f) => !f.spending && f.resource !== 'any')) event.sounds.push('gain');
   if (event.flights.some((f) => f.spending)) event.sounds.push('spend');
-  if (before.robber !== g.robber) event.sounds.push('robber');
+  if (before.robber !== g.robber || before.pirate !== g.pirate) event.sounds.push('robber');
   const resignation = g.players.some(
     (p) => p.resigned && !before.players.find((q) => q.id === p.id)?.resigned,
   );
@@ -367,7 +374,11 @@ export function deriveFeedback(
     for (const player of g.players)
       for (const kind of ['knight', 'roadBuilding', 'yearOfPlenty', 'monopoly'] as const)
         if (line === `${player.name} played ${CARD_NAMES[kind]}.`)
-          event.cardPlay = { kind, playerName: player.name };
+          event.cardPlay = {
+            kind,
+            playerName: player.name,
+            ...(findRuleset(g.ruleset)?.sea ? { sea: true as const } : {}),
+          };
   event.notices = lines
     .filter((s) => !s.endsWith("'s turn.") && !before.players.some((player) => rollFaces(s, player.name)))
     .filter(
@@ -391,9 +402,10 @@ export type AwardCelebration = {
   id: string;
   /** The snapshot that earned it; the celebration waits until the board shows that move. */
   revision: number;
-  kind: 'longestRoad' | 'largestArmy';
+  /** The two awards, or Open Sea's island bonus, celebrated the same way once for each island. */
+  kind: 'longestRoad' | 'largestArmy' | 'islandBonus';
   /** Open Sea calls the route award Longest Route. */
-  name: 'Longest Road' | 'Longest Route' | 'Largest Army';
+  name: 'Longest Road' | 'Longest Route' | 'Largest Army' | 'Island bonus';
   playerId: string;
   playerName: string;
   previousPlayerName?: string;
@@ -406,7 +418,7 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
     return [];
   const before = previous.game,
     game = next.game;
-  return (['longestRoad', 'largestArmy'] as const).flatMap((kind) => {
+  const awards = (['longestRoad', 'largestArmy'] as const).flatMap((kind): AwardCelebration[] => {
     const owner = game[kind];
     if (!owner || owner === before[kind]) return [];
     const player = game.players.find((p) => p.id === owner);
@@ -425,6 +437,25 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
       },
     ];
   });
+  // Open Sea: a player's first settlement on a small island, whoever settled it before (section 12.2).
+  const islands = game.players.flatMap((player): AwardCelebration[] => {
+    const count = game.islandBonuses?.[player.id]?.length ?? 0;
+    return count > (before.islandBonuses?.[player.id]?.length ?? 0)
+      ? [
+          {
+            id: `${next.roomId}:${next.revision}:islandBonus:${player.id}`,
+            revision: next.revision,
+            kind: 'islandBonus',
+            name: 'Island bonus',
+            playerId: player.id,
+            playerName: player.name,
+            count,
+            minimum: 1,
+          },
+        ]
+      : [];
+  });
+  return islands.length ? [...awards, ...islands] : awards;
 }
 /** Separate from coalesced card effects: a fast move cannot erase an award or its later transfer. */
 export class AwardPresentationQueue {

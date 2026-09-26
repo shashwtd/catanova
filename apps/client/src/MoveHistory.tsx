@@ -4,7 +4,34 @@ import type { GameView } from '../../../packages/rules/src/game.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { ResourceIcon } from './Board.js';
-import { ArrowRight, Castle, Clock3, Dices, House, Layers, Route, ScrollText, Shield } from './GameIcons.js';
+import {
+  ArrowRight,
+  Castle,
+  Clock3,
+  Dices,
+  GameIcon,
+  House,
+  Layers,
+  Route,
+  Sailboat,
+  ScrollText,
+  SEA_ICONS,
+  Shield,
+} from './GameIcons.js';
+import type { GameIconName, IconProps } from './GameIcons.js';
+
+/**
+ * Open Sea's words in the log (docs/RULEBOOK-OPEN-SEA.md, section 14), with the icon each takes: a ship stands for
+ * itself like a road, and the others keep their word beside their icon, as the awards do.
+ */
+const SEA_WORDS: Record<string, { icon: GameIconName; word: boolean }> = {
+  ship: { icon: 'boat', word: false },
+  pirate: { icon: SEA_ICONS.pirate, word: true },
+  gold: { icon: SEA_ICONS.gold, word: true },
+  'new island': { icon: SEA_ICONS.islandBonus, word: true },
+};
+const PirateIcon = (props: IconProps) => <GameIcon name={SEA_ICONS.pirate} {...props} />,
+  GoldIcon = (props: IconProps) => <GameIcon name={SEA_ICONS.gold} {...props} />;
 
 export function historyTurns(entries: readonly HistoryEntry[]) {
   const groups = new Map<number, HistoryEntry[]>();
@@ -24,7 +51,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   const actor = people.find(
     (name) =>
       line.startsWith(name) &&
-      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|took|claimed|wins|begins)\b|'s (?:turn|timer|build window)\b)/.test(
+      /^(?: (?:is willing|declined|placed|built|bought|rolled|offered|traded|proposed|withdrew|played|collected|received|moved|discarded|took|claimed|settled|wins|begins)\b|'s (?:turn|timer|build window)\b)/.test(
         line.slice(name.length),
       ),
   );
@@ -49,6 +76,10 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
         at = actor.length + ' moved the robber. '.length;
       else if (body.startsWith(`'s turn, with ${name} as Partner.`))
         at = actor.length + "'s turn, with ".length;
+      else if (body === ` moved the pirate and stole a card from ${name}.`)
+        at = actor.length + ' moved the pirate and stole a card from '.length;
+      else if (body === ` moved the pirate. ${name} had no resource cards.`)
+        at = actor.length + ' moved the pirate. '.length;
       if (at >= 0) {
         spans.push({ at, name });
         break;
@@ -57,7 +88,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   }
   const resourceNames = Object.values(RESOURCE_NAMES);
   const pattern = new RegExp(
-    `\\b(\\d+) (${resourceNames.map(escaped).join('|')})\\b|\\b(Longest Road|Longest Route|Largest Army|settlement|city|road|development card)\\b`,
+    `\\b(\\d+) (${resourceNames.map(escaped).join('|')})\\b|\\b(Longest Road|Longest Route|Largest Army|settlement|city|road|development card|ship|pirate|gold|new island)\\b`,
     'g',
   );
   const parts: ReactNode[] = [];
@@ -83,6 +114,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
         );
       } else {
         const word = match[3]!,
+          sea = SEA_WORDS[word],
           Icon =
             word === 'settlement'
               ? House
@@ -95,9 +127,11 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
                     : ScrollText;
         parts.push(
           <span key={offset + at} className="journal-item" role="img" aria-label={word}>
-            <Icon />
+            {sea ? <GameIcon name={sea.icon} /> : <Icon />}
             <span>
-              {word === 'Longest Road' || word === 'Longest Route' || word === 'Largest Army' ? word : null}
+              {sea?.word || word === 'Longest Road' || word === 'Longest Route' || word === 'Largest Army'
+                ? word
+                : null}
             </span>
           </span>,
         );
@@ -123,21 +157,27 @@ function Move({ entry, names }: { entry: HistoryEntry; names: string[] }) {
   const Icon =
     entry.kind === 'road'
       ? Route
-      : entry.kind === 'settlement'
-        ? House
-        : entry.kind === 'city'
-          ? Castle
-          : entry.kind === 'roll'
-            ? Dices
-            : entry.kind === 'buyCard' || entry.kind === 'playCard'
-              ? ScrollText
-              : entry.kind === 'endTurn' || entry.kind === 'endPhase' || entry.kind === 'endWindow'
-                ? ArrowRight
-                : /trade|proposal/i.test(entry.kind)
-                  ? null
-                  : entry.kind === 'discard'
-                    ? Layers
-                    : null;
+      : entry.kind === 'ship' || entry.kind === 'moveShip'
+        ? Sailboat
+        : entry.kind === 'pirate'
+          ? PirateIcon
+          : entry.kind === 'goldPick'
+            ? GoldIcon
+            : entry.kind === 'settlement'
+              ? House
+              : entry.kind === 'city'
+                ? Castle
+                : entry.kind === 'roll'
+                  ? Dices
+                  : entry.kind === 'buyCard' || entry.kind === 'playCard'
+                    ? ScrollText
+                    : entry.kind === 'endTurn' || entry.kind === 'endPhase' || entry.kind === 'endWindow'
+                      ? ArrowRight
+                      : /trade|proposal/i.test(entry.kind)
+                        ? null
+                        : entry.kind === 'discard'
+                          ? Layers
+                          : null;
   return (
     <li className={`journal-move ${!Icon && !entry.automatic ? 'journal-note' : ''}`}>
       {(Icon || entry.automatic) && (

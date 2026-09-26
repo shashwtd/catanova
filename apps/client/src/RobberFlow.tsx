@@ -5,12 +5,16 @@ import { emptyHand, robberVictims, total } from '../../../packages/rules/src/gam
 import type { GameAction, Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
+import { findRuleset } from '../../../packages/rules/src/rulesets.js';
+import { pirateVictims } from '../../../packages/rules/src/sea.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
 import { ResourceIcon } from './Board.js';
 import { playerHexColor } from './player-colors.js';
-import { Check, GameIcon, WifiOff } from './GameIcons.js';
+import { Check, GameIcon, SEA_ICONS, WifiOff } from './GameIcons.js';
 import { TurnTimer } from './TurnTimer.js';
+import { PieceChoice, PieceSwitch } from './RobberChoice.js';
+import type { RobberPiece } from './RobberChoice.js';
 
 /** A changing hand or deadline cannot leave an invalid selection enabled. */
 export function discardChoice(
@@ -128,6 +132,8 @@ export function RobberFlow({
   connected,
   offset,
   onWarning,
+  piece = null,
+  onPiece,
 }: {
   room: RoomState;
   me?: string;
@@ -138,6 +144,9 @@ export function RobberFlow({
   connected: boolean;
   offset?: number;
   onWarning: () => void;
+  /** Open Sea: whether the player chose to move the robber or the pirate (docs/RULEBOOK-OPEN-SEA.md, 10). */
+  piece?: RobberPiece | null;
+  onPiece?: (piece: RobberPiece | null) => void;
 }) {
   const game = room.game;
   if (!game || !['discard', 'robber'].includes(game.phase) || game.winner) return null;
@@ -146,8 +155,17 @@ export function RobberFlow({
   const required = game.discards[me ?? ''] ?? 0;
   const player = game.players.find((p) => p.id === me);
   const waiting = game.players.filter((p) => (game.discards[p.id] ?? 0) > 0);
-  const choosingVictim = mine && game.phase === 'robber' && selectedHex !== null;
-  const victims = choosingVictim ? robberVictims(game, me!, selectedHex) : [];
+  // Open Sea moves the robber or the pirate: first the choice, then its hex, then whom to rob.
+  const sea = !!findRuleset(game.ruleset)?.sea,
+    moving = piece ?? 'robber',
+    pieceName = sea ? 'robber or the pirate' : 'robber';
+  const choosingPiece = sea && mine && game.phase === 'robber' && !piece;
+  const choosingVictim = mine && game.phase === 'robber' && selectedHex !== null && !choosingPiece;
+  const victims = choosingVictim
+    ? moving === 'pirate'
+      ? pirateVictims(game, me!, selectedHex)
+      : robberVictims(game, me!, selectedHex)
+    : [];
   const stage = game.phase === 'discard' ? 0 : choosingVictim ? 2 : 1;
   const headline =
     game.phase === 'discard'
@@ -157,8 +175,10 @@ export function RobberFlow({
       : mine
         ? choosingVictim
           ? 'Choose who to steal from'
-          : 'Move the robber'
-        : `${active.name} is moving the robber`;
+          : choosingPiece
+            ? `Move the ${pieceName}`
+            : `Move the ${moving}`
+        : `${active.name} is moving the ${pieceName}`;
   return (
     <aside
       className={`robber-flow ${required || mine ? 'needs-you' : 'waiting'}`}
@@ -167,7 +187,7 @@ export function RobberFlow({
       data-seats={game.players.length > 4 ? game.players.length : undefined}
     >
       <div className="robber-flow-heading">
-        <GameIcon name="robber" size={29} />
+        <GameIcon name={moving === 'pirate' ? SEA_ICONS.pirate : 'robber'} size={29} />
         <h2 aria-live="polite">{headline}</h2>
         {!!required && (
           <TurnTimer
@@ -233,8 +253,13 @@ export function RobberFlow({
               onDiscard={(resources) => onAction({ kind: 'discard', resources })}
             />
           )}
-          <p className="robber-next">Next: {mine ? 'you move' : `${active.name} moves`} the robber.</p>
+          <p className="robber-next">
+            Next: {mine ? 'you move' : `${active.name} moves`}
+            {` the ${pieceName}.`}
+          </p>
         </>
+      ) : choosingPiece ? (
+        <PieceChoice game={game} disabled={disabled} onPiece={(chosen) => onPiece?.(chosen)} />
       ) : mine ? (
         choosingVictim ? (
           <>
@@ -251,7 +276,7 @@ export function RobberFlow({
                         className="robber-victim"
                         key={id}
                         disabled={disabled}
-                        onClick={() => onAction({ kind: 'robber', hex: selectedHex!, victim: id })}
+                        onClick={() => onAction({ kind: moving, hex: selectedHex!, victim: id })}
                       >
                         <Avatar profile={seat?.profile ?? defaultProfile(target.name)} />
                         <span>
@@ -267,13 +292,15 @@ export function RobberFlow({
             ) : (
               <>
                 <p className="robber-explanation">
-                  No opponent touches this tile. Move here without stealing.
+                  {moving === 'pirate'
+                    ? 'No other player has a ship beside this hex. Move here without stealing.'
+                    : 'No opponent touches this tile. Move here without stealing.'}
                 </p>
                 <button
                   type="button"
                   className="gold-button"
                   disabled={disabled}
-                  onClick={() => onAction({ kind: 'robber', hex: selectedHex! })}
+                  onClick={() => onAction({ kind: moving, hex: selectedHex! })}
                 >
                   <Check size={18} />
                   Move here
@@ -286,14 +313,40 @@ export function RobberFlow({
               disabled={disabled}
               onClick={() => onSelectHex(null)}
             >
-              Choose another tile
+              {moving === 'pirate' ? 'Choose another sea hex' : 'Choose another tile'}
             </button>
           </>
+        ) : moving === 'pirate' ? (
+          <>
+            <p className="robber-explanation">
+              Choose a sea hex, then a player with a ship beside it to steal from.
+            </p>
+            <PieceSwitch
+              game={game}
+              chosen="pirate"
+              disabled={disabled}
+              onPiece={(chosen) => onPiece?.(chosen)}
+            />
+          </>
         ) : (
-          <p className="robber-explanation">
-            Choose a highlighted tile, then an opponent beside it to steal from.
-          </p>
+          <>
+            <p className="robber-explanation">
+              Choose a highlighted tile, then an opponent beside it to steal from.
+            </p>
+            {sea && (
+              <PieceSwitch
+                game={game}
+                chosen="robber"
+                disabled={disabled}
+                onPiece={(chosen) => onPiece?.(chosen)}
+              />
+            )}
+          </>
         )
+      ) : sea ? (
+        <p className="robber-explanation">
+          {`${active.name} is choosing the robber or the pirate, where it goes and whom to rob. Play resumes after the steal.`}
+        </p>
       ) : (
         <p className="robber-explanation">
           {active.name} is choosing a tile and an opponent. Play resumes after the steal.

@@ -9,6 +9,7 @@ export function TurnTimer({
   connected,
   onWarning,
   discard = false,
+  goldPicker,
 }: {
   room: RoomState;
   me?: string;
@@ -16,6 +17,8 @@ export function TurnTimer({
   connected: boolean;
   onWarning: () => void;
   discard?: boolean;
+  /** Open Sea: the player picking from a gold field, whose own 20 seconds this shows instead of the turn's. */
+  goldPicker?: string;
 }) {
   const [now, setNow] = useState(Date.now),
     fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() }),
@@ -23,13 +26,25 @@ export function TurnTimer({
   if (fallback.current.server !== room.serverNow && room.serverNow)
     fallback.current = { server: room.serverNow, local: Date.now() };
   const clock = room.turnClock,
-    deadline = discard ? (me ? clock?.discardDeadlines?.[me] : undefined) : clock?.deadlineAt;
-  const paused = room.paused || (clock?.pausedAt !== undefined && !discard);
+    deadline = goldPicker
+      ? clock?.goldDeadlines?.[goldPicker]
+      : discard
+        ? me
+          ? clock?.discardDeadlines?.[me]
+          : undefined
+        : clock?.deadlineAt;
+  const paused = room.paused || (clock?.pausedAt !== undefined && !discard && !goldPicker);
   const serverNow = now + (offset ?? fallback.current.server - fallback.current.local),
     remaining = deadline
       ? Math.max(0, Math.ceil((deadline - (paused ? (clock?.pausedAt ?? serverNow) : serverNow)) / 1000))
       : 0;
-  const mine = !!clock && (discard ? !!(me && clock.discardDeadlines?.[me]) : clock.playerId === me);
+  const mine =
+    !!clock &&
+    (goldPicker
+      ? goldPicker === me
+      : discard
+        ? !!(me && clock.discardDeadlines?.[me])
+        : clock.playerId === me);
   const warning = useRef(onWarning);
   warning.current = onWarning;
   useEffect(() => {
@@ -48,13 +63,17 @@ export function TurnTimer({
   }, [remaining, mine, paused, connected, room.roomId, clock?.turn, deadline]);
   if (!clock || !deadline || !room.game || room.game.winner || room.paused) return null;
   // Big Table's own clocks, for whoever the game is waiting on: the Partner's phase and a build window.
-  const stint = discard
-    ? null
-    : partnerActing(room.game)
-      ? { label: 'Partner', title: mine ? 'Your Partner’s phase: time left' : 'Partner’s phase: time left' }
-      : room.game.phase === 'buildWindow'
-        ? { label: 'Build window', title: mine ? 'Your build window: time left' : 'Build window: time left' }
-        : null;
+  const stint =
+    discard || goldPicker
+      ? null
+      : partnerActing(room.game)
+        ? { label: 'Partner', title: mine ? 'Your Partner’s phase: time left' : 'Partner’s phase: time left' }
+        : room.game.phase === 'buildWindow'
+          ? {
+              label: 'Build window',
+              title: mine ? 'Your build window: time left' : 'Build window: time left',
+            }
+          : null;
   // Open Sea's gold picks pause the turn as discards do; their own 20 seconds are the picker's.
   const picking = room.game.phase === 'goldPick';
   return (
@@ -67,11 +86,15 @@ export function TurnTimer({
             ? picking
               ? 'Turn clock paused while players pick from a gold field'
               : 'Turn clock paused while players discard'
-            : stint
-              ? stint.title
-              : mine
-                ? 'Your remaining time'
-                : 'Active player’s remaining time'
+            : goldPicker
+              ? mine
+                ? 'Your time to pick from the gold field'
+                : 'Time left to pick from the gold field'
+              : stint
+                ? stint.title
+                : mine
+                  ? 'Your remaining time'
+                  : 'Active player’s remaining time'
       }
     >
       {paused ? <Pause size={13} /> : <Clock3 size={13} />}

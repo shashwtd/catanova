@@ -10,7 +10,7 @@ import { Avatar } from './Profile.js';
 import { seatColorMap } from './player-colors.js';
 import { playerTurnActivity } from './turn-activity.js';
 import { DisconnectStatus, absenceText } from './DisconnectStatus.js';
-import { playerStandings } from './player-ranking.js';
+import { playerStandings, pointBreakdown } from './player-ranking.js';
 import { CardTooltip } from './CardTooltip.js';
 import type { FriendStatus } from './social-presence.js';
 
@@ -256,6 +256,9 @@ export function PlayerRail({
                 forcedMovesAt: seat.disconnectedAt + ABSENCE_AFTER_MS,
               })
             : undefined;
+        // Open Sea: island bonuses are public, and the score's tooltip names them (section 12.2).
+        const bonus = pointBreakdown(game, p).find((part) => part.key === 'islandBonus'),
+          score = `${p.points} victory points${bonus ? ` · ${bonus.label} +${bonus.points}` : ''}`;
         return (
           <article
             key={p.id}
@@ -323,11 +326,7 @@ export function PlayerRail({
               </div>
               <div className="profile-details">
                 <div className="profile-stats">
-                  <span
-                    className="profile-score"
-                    title={`${p.points} victory points`}
-                    aria-label={`${p.points} victory points`}
-                  >
+                  <span className="profile-score" title={score} aria-label={score}>
                     <Trophy size={23} />
                     <b>{p.points}</b>
                   </span>

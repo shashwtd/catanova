@@ -1,6 +1,7 @@
 import type { GameView } from '../../../packages/rules/src/game.js';
 import { findRuleset } from '../../../packages/rules/src/rulesets.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
+import { SEA_ICONS } from './GameIcons.js';
 import type { GameIconName } from './GameIcons.js';
 
 /**
@@ -36,7 +37,7 @@ export function playerTurnActivity(game: GameView, playerId: string): TurnActivi
       RESOURCES.reduce((n, r) => n + game.bank[r], 0),
     );
     return {
-      icon: 'spark',
+      icon: SEA_ICONS.gold,
       label: `Pick ${picks} ${picks === 1 ? 'resource' : 'resources'} from a gold field`,
     };
   }

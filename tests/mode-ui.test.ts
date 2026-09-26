@@ -180,6 +180,10 @@ test('the mode stylesheet loads after every layered sheet and adds only the bloc
   assert.deepEqual(imports.slice(imports.indexOf('table-light.css') + 1), [
     'game-mode.css',
     'open-sea.css',
+    'ship-sites.css',
+    'placement-choice.css',
+    'robber-choice.css',
+    'gold-pick.css',
     'six-seat-rail.css',
     'six-seat-trade.css',
     'six-seat-robber.css',

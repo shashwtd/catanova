@@ -4,7 +4,7 @@ import { useEffect, useId, useRef } from 'react';
 import type { GameStatistics as Statistics, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { GameIcon } from './GameIcons.js';
+import { GameIcon, SEA_ICONS } from './GameIcons.js';
 import { finalStandings, pointBreakdown } from './player-ranking.js';
 import { playerHexColor } from './player-colors.js';
 import type { CSSProperties } from 'react';
@@ -32,7 +32,7 @@ function award(game: ResultGame, kind: 'longestRoad' | 'largestArmy') {
     : `${holder.name} · ${holder.knights} knights`;
 }
 
-/** The mode a game played, when it was not Classic: "Big Table · Paired turns". */
+/** The mode a game played, when it was not Classic: "Big Table · Paired turns", or "Open Sea". */
 function modeFact(game: ResultGame) {
   const rules = findRuleset(game.ruleset);
   if (!game.ruleset || game.ruleset === CLASSIC.id) return null;
@@ -205,6 +205,9 @@ export function GameOver({
                           <li key={part.key} data-part={part.key}>
                             {part.key === 'longestRoad' && <GameIcon name="road-award" size={18} />}
                             {part.key === 'largestArmy' && <GameIcon name="army-award" size={18} />}
+                            {part.key === 'islandBonus' && (
+                              <GameIcon name={SEA_ICONS.islandBonus} size={18} />
+                            )}
                             <span>{part.label}</span>
                             <b>+{part.points}</b>
                           </li>
