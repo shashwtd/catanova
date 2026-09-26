@@ -38,7 +38,11 @@ import { Store } from '../apps/server/src/store.js';
 import { applyAction, pieces, roadSites, settlementSites, total } from '../packages/rules/src/game.js';
 import type { CardKind, Game, GameAction, Phase } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
+import { isLand } from '../packages/rules/src/board.js';
 import { CLASSIC, findRuleset } from '../packages/rules/src/rulesets.js';
+import type { Ruleset } from '../packages/rules/src/rulesets.js';
+import { edgeKind, takesRoad, takesShip, vertexIsland } from '../packages/rules/src/sea.js';
+import { owedMoves } from '../packages/rules/src/owed.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 
 export const REPORT_SCHEMA = 1;
@@ -50,6 +54,7 @@ const PHASES: Phase[] = [
   'discard',
   'robber',
   'freeRoads',
+  'goldPick',
   'finished',
 ];
 const MISSING_JOURNAL_CHECK =
@@ -214,6 +219,7 @@ export function gameInvariantProblems(game: Game): string[] {
     }
     if (!Number.isInteger(game.robber) || game.robber < 0 || game.robber >= game.board.hexes.length)
       problems.push(`the robber stands on missing tile ${String(game.robber)}`);
+    if (rules.sea) problems.push(...seaProblems(game, rules, ids));
 
     // Phase and the player to move.
     const active = players[game.active];
@@ -228,8 +234,8 @@ export function gameInvariantProblems(game: Game): string[] {
         problems.push('a finished game without a winner must have been abandoned');
     } else {
       if (game.winner !== null) problems.push('a game in progress already has a winner');
-      // During discards the active seat may have resigned; others still discard first.
-      if (game.phase !== 'discard' && active?.resigned)
+      // During discards and gold picks the active seat may have resigned; others still discard or pick first.
+      if (game.phase !== 'discard' && game.phase !== 'goldPick' && active?.resigned)
         problems.push(`the active player has resigned during ${game.phase}`);
       const setup = game.phase === 'setupSettlement' || game.phase === 'setupRoad';
       if (setup && game.turn !== 0) problems.push(`setup is still running on turn ${game.turn}`);
@@ -258,6 +264,64 @@ export function gameInvariantProblems(game: Game): string[] {
   return problems;
 }
 
+/**
+ * Open Sea's own invariants (docs/RULEBOOK-OPEN-SEA.md): every ship a seated player's, on an edge that takes a ship
+ * and holds no road, no more than the supply; the pirate on a sea hex and the robber on land; gold picks owed
+ * exactly while the game waits for them, one entry per playing seat; and an island bonus only where its player has
+ * built.
+ */
+function seaProblems(game: Game, rules: Ruleset, ids: Set<string>): string[] {
+  const problems: string[] = [];
+  const { board } = game;
+  const ships = game.ships ?? {};
+  const fleet = new Map<string, number>();
+  for (const [key, owner] of Object.entries(ships)) {
+    const edge = Number(key);
+    if (!Number.isInteger(edge) || edge < 0 || edge >= board.edges.length) {
+      problems.push(`a ship lies on missing edge ${key}`);
+      continue;
+    }
+    if (!ids.has(owner)) problems.push(`the ship on edge ${key} belongs to no player`);
+    if (!takesShip(edgeKind(board, edge)))
+      problems.push(`the ship on edge ${key} is on an edge no ship takes`);
+    if (game.roads[edge]) problems.push(`edge ${key} holds a road and a ship`);
+    fleet.set(owner, (fleet.get(owner) ?? 0) + 1);
+  }
+  for (const [owner, count] of fleet)
+    if (count > rules.supply.pieces.ships!)
+      problems.push(`a player has ${count} ships; the supply is ${rules.supply.pieces.ships}`);
+  for (const key of Object.keys(game.roads))
+    if (board.edges[Number(key)] && !takesRoad(edgeKind(board, Number(key))))
+      problems.push(`the road on edge ${key} is on an edge no road takes`);
+  const pirate = game.pirate;
+  if (pirate === undefined || !board.hexes[pirate] || isLand(board.hexes[pirate]!))
+    problems.push(`the pirate is not on a sea hex (${String(pirate)})`);
+  if (board.hexes[game.robber] && !isLand(board.hexes[game.robber]!))
+    problems.push(`the robber stands on the sea (tile ${game.robber})`);
+  const owed = game.goldOwed ?? [];
+  if ((game.phase === 'goldPick') !== owed.length > 0)
+    problems.push(`gold picks are ${owed.length ? '' : 'not '}owed during ${game.phase}`);
+  for (const entry of owed) {
+    const player = game.players.find((p) => p.id === entry.player);
+    if (!player || player.resigned) problems.push('a gold pick is owed by a seat that is not playing');
+    if (!Number.isInteger(entry.picks) || entry.picks < 1)
+      problems.push(`a gold pick of ${entry.picks} is owed`);
+  }
+  if (new Set(owed.map((entry) => entry.player)).size !== owed.length)
+    problems.push('a player is owed gold picks twice');
+  for (const [player, islands] of Object.entries(game.islandBonuses ?? {}))
+    for (const island of islands)
+      if (
+        island === 'main' ||
+        !Object.entries(game.buildings).some(
+          ([vertex, building]) =>
+            building.player === player && vertexIsland(board, Number(vertex)) === island,
+        )
+      )
+        problems.push(`an island bonus for ${island} has no building of its player there`);
+  return problems;
+}
+
 /** A deterministic [0, 1) source per room, so a drill repeats exactly. */
 export function seededRandom(seed: string): () => number {
   let state = createHash('sha256').update(seed).digest().readUInt32LE(0);
@@ -278,11 +342,17 @@ export function continueGame(game: Game, seed: string): { move: string | null; p
   if (game.phase === 'finished') return { move: null, problems: [] };
   const random = seededRandom(seed);
   const actor =
-    game.phase === 'discard' ? Object.keys(game.discards).sort()[0] : game.players[game.active]?.id;
+    game.phase === 'discard'
+      ? Object.keys(game.discards).sort()[0]
+      : game.phase === 'goldPick'
+        ? owedMoves(game)[0]?.player
+        : game.players[game.active]?.id;
   if (!actor) return { move: null, problems: ['no player is due to move'] };
   let action: GameAction | undefined;
   try {
-    if (game.phase === 'setupSettlement') {
+    // Open Sea's setup follows its own placement rules, which the clock's setup moves already keep.
+    if (findRuleset(game.ruleset)?.sea) action = timeoutAction(game, actor, random);
+    else if (game.phase === 'setupSettlement') {
       const vertex = settlementSites(game, actor, true)[0];
       action = vertex === undefined ? undefined : { kind: 'settlement', vertex };
     } else if (game.phase === 'setupRoad') {
