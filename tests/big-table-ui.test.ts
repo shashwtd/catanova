@@ -348,11 +348,11 @@ test('history names the new situations, and the results name the mode and its tu
     /^<p><strong class="journal-person">Dan<\/strong> wins/,
   );
   // Results carry the mode and its turn style, and a Classic game's carry neither.
-  let g = afterSetup(5, { victoryPoints: 8 });
+  let g = roll(afterSetup(5, { victoryPoints: 8 }), 3, 5);
   g.players[3]!.cards.push(
     ...Array.from({ length: 8 }, (_, i) => ({ id: `vp-${i}`, kind: 'victoryPoint' as const, boughtTurn: 0 })),
   );
-  g = act(roll(g, 3, 5), 'p0', { kind: 'endTurn' });
+  g = act(g, 'p0', { kind: 'endTurn' });
   assert.equal(g.winner, 'p3');
   const state = room(g);
   const results = resultsFromRoom(state);

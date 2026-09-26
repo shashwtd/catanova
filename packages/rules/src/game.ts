@@ -500,6 +500,16 @@ function checkWin(g: Game, eligible: (id: string) => boolean = () => true) {
   const partner = g.pair?.partner === g.players.indexOf(winner);
   log(g, `${winner.name} wins${partner ? ' as Partner' : ''} with ${score(g, winner)} points!`);
 }
+/**
+ * Whether someone on turn already has the target as their turn, or a Partner's phase, is about to end. Only a
+ * resignation can leave one there undeclared: one that began their turn, or handed them an award, while they
+ * were away, when the room may not declare them the winner (resignPlayers). They win at their next move, their
+ * own or the clock's: after the dice, for a turn that begins so, or here, rather than lose the turn to the next.
+ */
+function wonAlready(g: Game): boolean {
+  checkWin(g);
+  return g.phase === 'finished';
+}
 export function robberVictims(
   g: BoardState & { players?: { id: string; resigned?: boolean }[] },
   player: string,
@@ -1024,6 +1034,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       partnerActing(g) && (g.phase === 'partner' || (!!a.expired && g.phase === 'freeRoads')),
       g.phase === 'freeRoads' ? 'Place your free roads first' : 'Finish the current action first',
     );
+    if (wonAlready(g)) return g;
     advanceTurn(g);
     updateAwards(g);
     checkWin(g);
@@ -1096,6 +1107,9 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       produce(g, sum);
       g.phase = 'actions';
     }
+    // The dice change no one's points, so this finds only a target reached before them and not yet declared
+    // (wonAlready): the roll is the first move of a turn, the player's own or the clock's.
+    checkWin(g);
     return g;
   }
   requireRule(
@@ -1197,6 +1211,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
         g.phase === 'actions',
         g.phase === 'partner' ? 'End your Partner’s phase instead' : 'Close your build window instead',
       );
+      if (wonAlready(g)) return g;
       // Under Big Table's turn structures, the Partner's phase or the build windows come next.
       endPart(g);
       break;

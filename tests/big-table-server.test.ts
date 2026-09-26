@@ -17,7 +17,7 @@ import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
 import { continueGame, gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
 import { OPEN, bigTableRoom, throughSetup } from './big-table-room.js';
-import { act, afterSetup, roll } from './big-table-helpers.js';
+import { act, afterSetup, clearBoard, layRoads, line, pointsTo, roll } from './big-table-helpers.js';
 import type { Room } from './big-table-room.js';
 
 const code = (expected: string) => (error: unknown) => (error as { code?: string }).code === expected;
@@ -320,6 +320,59 @@ test('§9.2 and §9.3: every build window has 20 seconds, with or without a turn
       const turn = room.store.clock(room.roomId);
       if (timer === null) assert.equal(turn, undefined);
       else assert.equal(turn!.deadlineAt - turn!.startedAt, timer * 1000);
+    } finally {
+      room.store.close();
+    }
+  }
+});
+
+test('§6.7 and §9.4: a marker holder left at the target by a leaver while away wins at the clock’s first move', () => {
+  // The Lead: the Partner leaves in their phase and hands Longest Road to the next Lead, who is away and so is not
+  // declared the winner as their turn begins. The absence rule's roll, two minutes on, declares them.
+  // The Partner: the Lead leaves in their part and hands it to their Partner, who is away; the Partner's phase
+  // follows, and the 45-second clock a room without a timer gives an absent Partner declares them as it ends.
+  for (const holder of ['Lead', 'Partner'] as const) {
+    const room = bigTableRoom({ players: 6, timer: null, victoryPoints: 8 });
+    try {
+      throughSetup(room);
+      if (holder === 'Lead') leadEnds(room);
+      else {
+        room.act(activePlayer(room.game()).id, { kind: 'roll' });
+        for (let guard = 0; guard < 12 && room.game().phase !== 'actions'; guard++) room.step();
+      }
+      const g = room.game();
+      const leaver = holder === 'Lead' ? g.players[g.pair!.partner]!.id : g.players[g.pair!.lead]!.id;
+      const winner =
+        holder === 'Lead' ? g.players[(g.pair!.lead + 1) % 6]!.id : g.players[g.pair!.partner]!.id;
+      room.rig((game) => {
+        clearBoard(game);
+        const taken = new Set<number>();
+        layRoads(game, leaver, line(game, 7, taken));
+        layRoads(game, winner, line(game, 6, taken));
+        game.longestRoad = leaver;
+        pointsTo(game, winner, 6);
+      });
+      room.store.setConnected(room.seatOf(winner), false);
+      room.store.leave(room.seatOf(leaver), `leave-${leaver}`, room.revision());
+      let after = room.game();
+      assert.equal(after.longestRoad, winner);
+      assert.equal(activePlayer(after).id, winner);
+      assert.equal(after.phase, holder === 'Lead' ? 'roll' : 'partner');
+      assert.equal(after.winner, null, 'not declared while away');
+      room.clock.now += holder === 'Lead' ? ABSENCE_AFTER_MS : 45_000;
+      room.store.expireRoom(room.roomId);
+      after = room.game();
+      assert.equal(after.winner, winner, holder);
+      const name = after.players.find((p) => p.id === winner)!.name;
+      assert.deepEqual(
+        lines(after).slice(-2),
+        holder === 'Lead'
+          ? [`${name} wins with 8 points!`, `${name} is away; dice rolled automatically.`]
+          : [
+              `${name} wins as Partner with 8 points!`,
+              `${name}'s timer expired; Partner's phase ended automatically.`,
+            ],
+      );
     } finally {
       room.store.close();
     }
