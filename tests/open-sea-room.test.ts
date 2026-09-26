@@ -112,7 +112,8 @@ function rig(t: Table, edit: (game: Game) => void) {
 }
 /**
  * Rig the next roll to pay gold to `pickers`, in the order given: a settlement for each on a corner of a gold
- * field, and the dice queued for its number. Nothing else on the board has that number.
+ * field, with the island bonus it would have earned, and the dice queued for its number. Nothing else on the
+ * board has that number.
  */
 function goldRoll(t: Table, pickers: string[]) {
   const g = game(t);
@@ -120,8 +121,10 @@ function goldRoll(t: Table, pickers: string[]) {
   rig(t, (rigged) => {
     for (const h of rigged.board.hexes) if (h.id !== gold.id && h.number === gold.number) h.number = 0;
     const corners = gold.vertices.filter((v) => !rigged.buildings[v]);
-    for (const [i, player] of pickers.entries())
+    for (const [i, player] of pickers.entries()) {
       rigged.buildings[corners[i * 2]!] = { player, kind: 'settlement' };
+      rigged.islandBonuses![player] = [...(rigged.islandBonuses![player] ?? []), gold.island!];
+    }
   });
   const first = Math.max(1, gold.number - 6);
   t.queue.push(die(first), die(gold.number - first));
