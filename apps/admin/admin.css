@@ -513,6 +513,29 @@ input {
   gap: 6px;
   color: var(--ink-2);
 }
+/* Modes: each mode's name over its summary, and the second look before opening one to everyone. */
+.modes td {
+  vertical-align: middle;
+}
+.cell-mode span {
+  display: block;
+}
+.modes-notice,
+.tester-add {
+  margin-top: 12px;
+}
+.mode-confirm-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tester-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
 .pager {
   display: flex;
   align-items: center;
@@ -1787,5 +1810,9 @@ select {
   /* Beside the cell before it, to the end of the line. */
   table.stacked .cell-rest {
     grid-column: 2 / -1;
+  }
+  /* A mode's name, its switch and who set it, each on its own line. */
+  table.modes td {
+    grid-column: 1 / -1;
   }
 }

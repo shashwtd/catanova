@@ -157,11 +157,13 @@ export function Tabs<T extends string>({
   options,
   onChange,
   label,
+  disabled = false,
 }: {
   value: T;
   options: { value: T; label: ReactNode }[];
   onChange: (value: T) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="segmented" role="group" aria-label={label}>
@@ -170,6 +172,7 @@ export function Tabs<T extends string>({
           key={option.value}
           type="button"
           aria-pressed={option.value === value}
+          disabled={disabled}
           onClick={() => onChange(option.value)}
         >
           {option.label}

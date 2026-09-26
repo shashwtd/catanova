@@ -71,7 +71,10 @@ export async function startServer(
     captcha?: { siteKey: string } | null;
     now?: () => number;
     trustedProxyCidrs?: string[];
-    /** Which modes hosts may pick. Read from CATANOVA_MODES and CATANOVA_MODE_TESTERS when absent. */
+    /**
+     * Which modes hosts may pick until the admin console says otherwise. Read from CATANOVA_MODES and
+     * CATANOVA_MODE_TESTERS when absent.
+     */
     modes?: ModeSwitches;
   } = {},
 ) {
@@ -141,7 +144,7 @@ export async function startServer(
       ? undefined
       : (options.captcha?.siteKey ?? process.env.TURNSTILE_SITE_KEY)?.trim();
   const captcha = siteKey ? { siteKey } : undefined;
-  // Read once, here: changing a switch means recreating the container (docs/GAME-MODES.md).
+  // The start-up defaults, read once. The admin console's Modes tab overrides them while the server runs.
   const modes = options.modes ?? readModeSwitches(process.env);
   if (modes.open.length > 1 || modes.testers.size)
     console.log(JSON.stringify({ event: 'modes', open: modes.open, testers: modes.testers.size }));

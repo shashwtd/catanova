@@ -886,6 +886,23 @@ cannot read.
    Release A is where every later rollback lands. Once any mode game exists,
    never roll back past it.
 
+   **The switches moved to the admin console** in the release after Big Table
+   and Open Sea were brought together. The console's **Modes** tab
+   ([Admin console](ADMIN.md#what-each-tab-shows)) sets each mode but Classic
+   to Off, Testers or Everyone, and adds and removes testers, there or with
+   **Make tester** on a player's page. A change applies at once, with no
+   restart: the server reads the switches each time it needs them, and every
+   lobby with someone connected is sent its room again, so a host's Game mode
+   section appears or goes while they watch. Games already started keep their
+   mode. The console's choices are kept in the game database (`mode_access`
+   and `mode_testers`), win over the two variables, and are audited. The
+   variables are now only the starting point: a mode the console has not set
+   is open to everyone if `CATANOVA_MODES` lists it and to testers otherwise,
+   and an account in `CATANOVA_MODE_TESTERS` is a tester the console cannot
+   remove. Off is off for every tester. A release older than this one ignores
+   the console's tables, so a rollback past it closes every mode but Classic
+   until the release returns; nothing else changes.
+
 2. **Release B: Big Table**, testers first. The plan was two releases, the
    board, seats and supply first and hidden, then paired turns; they were built
    together (`feature/big-table/2026-09-26`), so they ship together, with the
@@ -897,15 +914,14 @@ cannot read.
    [Map generation](MAP_GENERATION.md#measurements-so-far) asks: the server
    deals a room's board on its main thread when the room is created, returns to
    the lobby or changes mode, so every deal must stay under 100 ms there, or
-   dealing moves to a worker. After the deploy, the owner adds their own
-   account id and a few friends' to `CATANOVA_MODE_TESTERS` (the id is in the
-   admin console's player address) and recreates the container. The host must
-   be a tester; the others join by code with up-to-date tabs. A tester may pick
-   every mode the build contains, and the build with Big Table carries Open
-   Sea's engine too: the two were brought together on
-   `feature/modes-all/2026-09-26`. So add testers only from a build that also
-   has Open Sea's in-game controls for ships, gold picks and the
-   robber-or-pirate choice (step 5). Test:
+   dealing moves to a worker. After the deploy, the owner makes their own
+   account and a few friends' testers in the admin console: **Make tester** on
+   each player's page, or their account id on the Modes tab. Nothing restarts.
+   The host must be a tester; the others join by code with up-to-date tabs. A
+   tester may pick every mode set to Testers, which is every mode the console
+   has not set, and the build with Big Table carries Open Sea too: the two
+   were brought together on `feature/modes-all/2026-09-26`. To test Big Table
+   alone, set Open Sea to Off first. Test:
    - several full five- and six-player games under each turn structure, on
      portrait and landscape phones and on desktop, including 1366 × 768;
    - a player who drops out and comes back (the 2-minute absence rule), a
@@ -918,12 +934,12 @@ cannot read.
    - locally, Release A on a copy of a database with Big Table games: it must
      refuse those games, not misplay them, and their players must still be
      able to create, join and play Classic rooms.
-3. **Opening to everyone.** Add `big-table-v1` to `CATANOVA_MODES` and recreate
-   the container. In the same window, ship the release that changes the copy
-   saying "two to four" or "2–4". The public pages are prerendered when the
-   image is built, so this is a code release, not an environment edit. Setting
-   `CATANOVA_MODES` in `production.env` before running the deploy subshell
-   makes both one container swap. Today the copy is in:
+3. **Opening to everyone.** Set Big Table to Everyone on the Modes tab, which
+   asks once more before it opens. In the same window, ship the release that
+   changes the copy saying "two to four" or "2–4". The public pages are
+   prerendered when the image is built, so the copy is a code release: deploy
+   it, then open the mode straight after, which takes effect at once. Today
+   the copy is in:
    - `apps/client/src/PublicPages.tsx`: the home page's description, the FAQ
      answers to "What is Catanova?" and "How many players do you need?"
      ("Two to four."), the structured data's `numberOfPlayers`
@@ -946,17 +962,18 @@ cannot read.
    Between-turns build option opens with it: the host of any Big Table room
    chooses.
 
-4. **The kill switch.** Take the mode out of `CATANOVA_MODES`, clear
-   `CATANOVA_MODE_TESTERS`, and recreate the container. Taking it out of
-   `CATANOVA_MODES` alone leaves it open to testers. Started games keep their
-   frozen ruleset and play on; no new game can start in the mode.
+4. **The kill switch.** Set the mode to Off on the Modes tab. It applies at
+   once, testers included, with no restart. Started games keep their frozen
+   ruleset and play on; no new game can start in the mode, and a lobby that
+   had picked it is told at Start and keeps its picker to choose another.
+   Testers only closes it to everyone else.
 5. **Open Sea follows the same path.** Its engine and its in-game controls
    for ships, gold picks and the robber-or-pirate choice are in the same build
    as Big Table. The build registers `open-sea-v1`, so it advertises the mode
-   in every tab's `rulesets`, and any tester can pick it, Big Table's testers
-   included. Outer Isles goes to testers once the owner is happy with its look,
-   then to everyone, with its own capability value ("Refresh to play Open Sea"),
-   its own copy changes and the same kill switch.
+   in every tab's `rulesets`, and every tester can pick it until the Modes tab
+   sets it to Off. Outer Isles goes to testers once the owner is happy with its
+   look, then to everyone, with its own capability value ("Refresh to play Open
+   Sea"), its own copy changes and the same kill switch.
 
 ### What needs the owner
 

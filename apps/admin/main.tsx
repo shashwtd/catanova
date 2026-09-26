@@ -16,6 +16,7 @@ import { GameRound } from './pages/GameAnalytics.js';
 import { PlayerDetail, Players } from './pages/Players.js';
 import { Stats } from './pages/Stats.js';
 import { Feedback } from './pages/Feedback.js';
+import { Modes } from './pages/Modes.js';
 import { System } from './pages/System.js';
 import { Audit } from './pages/Audit.js';
 import './admin.css';
@@ -77,6 +78,7 @@ function App() {
           (route.id ? <PlayerDetail userId={route.id} /> : <Players params={route.params} />)}
         {route.page === 'stats' && <Stats />}
         {route.page === 'feedback' && <Feedback params={route.params} />}
+        {route.page === 'modes' && <Modes />}
         {route.page === 'system' && <System />}
         {route.page === 'audit' && <Audit />}
       </main>

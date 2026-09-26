@@ -10,6 +10,7 @@ import type { AuditEntry } from './audit.js';
 import type { ServerErrorEntry } from './errors.js';
 import type { LoopWindow, MetricSample } from './metrics.js';
 import type { FeedbackItem } from '../feedback.js';
+import type { ModeSetting, Tester } from '../modes.js';
 
 export type { AuditEntry, LoopWindow, Metric, MetricSample, ServerErrorEntry };
 
@@ -370,6 +371,8 @@ export type PlayerDetail = {
   matches: PlayerMatch[];
   seats: { roomId: string; roomCode: string | null; name: string; departed: boolean }[];
   feedback: { id: number; at: number; category: string; status: string }[];
+  /** Whether the account may pick modes open to testers, and who made it a tester. */
+  tester: Tester | null;
 };
 
 /**
@@ -638,3 +641,15 @@ export type RetentionReport = {
   metrics: Metric[];
   csv: string;
 };
+
+/** A game mode on the Modes tab: who may pick it, and whether the console or a start-up switch decided. */
+export type AdminMode = ModeSetting & {
+  name: string;
+  summary: string;
+  seats: { min: number; max: number };
+  bots: boolean;
+};
+
+export type AdminTester = Tester & { name: string | null };
+
+export type AdminModes = { modes: AdminMode[]; testers: AdminTester[]; now: number };

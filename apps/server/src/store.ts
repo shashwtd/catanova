@@ -61,7 +61,7 @@ import {
   validTarget,
 } from '../../../packages/rules/src/rulesets.js';
 import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
-import { CLASSIC_ONLY, modesFor } from './modes.js';
+import { CLASSIC_ONLY, ModeAccess } from './modes.js';
 import type { ModeSwitches } from './modes.js';
 import { PlayerRecords, parseGamesCursor } from './player-records.js';
 import { decodeState, encodeState } from './journal.js';
@@ -147,8 +147,8 @@ export class Store {
   private readonly random: () => number;
   private readonly codeRandom: (max: number) => number;
   private readonly trackPresence: boolean;
-  /** Which modes a host may pick (modes.ts). Read once when the server starts. */
-  private readonly modes: ModeSwitches;
+  /** Which modes a host may pick (modes.ts): the admin console's choices over the start-up switches. */
+  readonly modes: ModeAccess;
   private readonly records: PlayerRecords;
   private connectedSeats = new Set<string>();
   /** Which bot turns up when a seat is filled. Drawn from the store's own
@@ -182,7 +182,6 @@ export class Store {
     } = {},
   ) {
     this.now = options.now ?? Date.now;
-    this.modes = options.modes ?? CLASSIC_ONLY;
     this.random = options.random ?? privateRandom;
     this.codeRandom = options.codeRandom ?? ((max) => randomInt(max));
     this.trackPresence = options.trackPresence ?? false;
@@ -376,6 +375,7 @@ export class Store {
       INSERT INTO game_phases(room_id, phase) SELECT room_id, json_extract(state, '$.phase') FROM games;
     `);
     this.records = new PlayerRecords(this.db);
+    this.modes = new ModeAccess(this.db, options.modes ?? CLASSIC_ONLY);
     for (const row of this.db.prepare('SELECT id FROM seats WHERE bot = 1 AND departed = 0').all())
       this.botSeats.add(row.id as string);
     if (this.trackPresence) this.initializePresence();
@@ -725,7 +725,7 @@ export class Store {
       .prepare('SELECT id, user_id, bot FROM seats WHERE room_id = ? AND departed = 0 ORDER BY rowid')
       .all(roomId) as { id: string; user_id: string | null; bot: number }[];
     const host = roomHostId(seats.map((seat) => ({ id: seat.id, bot: !!seat.bot })));
-    return modesFor(this.modes, seats.find((seat) => seat.id === host)?.user_id);
+    return this.modes.modesFor(seats.find((seat) => seat.id === host)?.user_id);
   }
   hasAccountSeat(roomId: string, userId: string) {
     return !!this.db

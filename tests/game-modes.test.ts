@@ -4,9 +4,10 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { Store } from '../apps/server/src/store.js';
 import type { Seat } from '../apps/server/src/store.js';
-import { modesFor, readModeSwitches } from '../apps/server/src/modes.js';
+import { ModeAccess, readModeSwitches } from '../apps/server/src/modes.js';
 import type { ModeSwitches } from '../apps/server/src/modes.js';
 import { RoomInviteService } from '../apps/server/src/room-invites.js';
 import { GameLaunch } from '../apps/server/src/game-launch.js';
@@ -22,6 +23,8 @@ import { TEST_TABLE, useTestTable } from './test-ruleset.js';
 useTestTable();
 const TEST = TEST_TABLE.id;
 const OPEN: ModeSwitches = { open: [CLASSIC.id, TEST], testers: new Set() };
+/** The switches as the server reads them, with nothing set in the admin console. */
+const access = (switches: ModeSwitches) => new ModeAccess(new DatabaseSync(':memory:'), switches);
 const identity = (id: string) => ({ id, name: 'Account', expiresAt: Date.now() + 3_600_000 });
 const code = (expected: string) => (error: unknown) => (error as { code?: string }).code === expected;
 
@@ -75,20 +78,20 @@ test('the switches: Classic always, open modes for every host, every mode for te
   const testers = readModeSwitches({ CATANOVA_MODE_TESTERS: 'acct-1' }, log);
   // Testers may pick every mode the build contains: Big Table and Open Sea ship in it, and this file registers
   // the test mode.
-  assert.deepEqual(modesFor(testers, 'acct-1'), [CLASSIC.id, BIG_TABLE.id, OPEN_SEA.id, TEST]);
-  assert.deepEqual(modesFor(testers, 'acct-9'), [CLASSIC.id]);
+  assert.deepEqual(access(testers).modesFor('acct-1'), [CLASSIC.id, BIG_TABLE.id, OPEN_SEA.id, TEST]);
+  assert.deepEqual(access(testers).modesFor('acct-9'), [CLASSIC.id]);
   // An account id matches whatever its case, as copied from wherever it was shown.
   const copied = readModeSwitches({ CATANOVA_MODE_TESTERS: ' 0A1B2C3D-0000-4000-8000-00000000000F ,' }, log);
-  assert.deepEqual(modesFor(copied, '0a1b2c3d-0000-4000-8000-00000000000f'), [
+  assert.deepEqual(access(copied).modesFor('0a1b2c3d-0000-4000-8000-00000000000f'), [
     CLASSIC.id,
     BIG_TABLE.id,
     OPEN_SEA.id,
     TEST,
   ]);
-  assert.deepEqual(modesFor(testers, 'ACCT-1'), [CLASSIC.id, BIG_TABLE.id, OPEN_SEA.id, TEST]);
+  assert.deepEqual(access(testers).modesFor('ACCT-1'), [CLASSIC.id, BIG_TABLE.id, OPEN_SEA.id, TEST]);
   // Local playtest mode has no accounts, so CATANOVA_MODES alone decides.
-  assert.deepEqual(modesFor(testers, undefined), [CLASSIC.id]);
-  assert.deepEqual(modesFor(switches, undefined), [CLASSIC.id, TEST]);
+  assert.deepEqual(access(testers).modesFor(undefined), [CLASSIC.id]);
+  assert.deepEqual(access(switches).modesFor(undefined), [CLASSIC.id, TEST]);
 });
 
 test('room settings carry the mode, and a target is checked against its own mode', () => {
