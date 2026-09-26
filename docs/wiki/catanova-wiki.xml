@@ -18,7 +18,7 @@
     <id>1</id>
     <revision>
       <id>1</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -26,18 +26,21 @@
       <origin>1</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2122" sha1="smoq09t0qirb8bq19s8iy6sj0x33ag6">__NOTOC__
+      <text xml:space="preserve" bytes="2612" sha1="24c4tfu0zct956ztuspsis1b6gpswe9">__NOTOC__
 {| class="wikitable" style="float:right; margin:0 0 1em 1em; max-width:22em;"
 |+ Catanova at a glance
 |-
 ! Players
-| 2–4 invited friends
+| 2–4 seats today, friends or bots · 5 or 6 planned in [[Big Table]]
+|-
+! Modes
+| Classic · Big Table and Open Sea being built
 |-
 ! Goal
-| 10 points on your own turn
+| 10 points on your own turn in Classic (host can set 8–15)
 |-
 ! Island
-| 19 land hexes · 5 resources
+| 19 land hexes in Classic · 5 resources
 |-
 ! Play
 | Browser · Google or guest account
@@ -58,25 +61,27 @@ Welcome to the '''Catanova Wiki''': a guide to the island, its resources, and th
 |-
 | [[Development cards]] || Knights, special actions, and hidden points
 |-
-| [[Awards]] || Longest Road, Largest Army, and the race to ten points
+| [[Awards]] || Longest Road, Largest Army, and the race to the points target
 |-
 | [[Map generation]] || How Catanova balances a new island
+|-
+| [[Game modes]] || Classic, and two modes being built: [[Big Table]], for five and six players, and [[Open Sea]]
 |}
 
 == Play together ==
-* [[Getting started]] — create a room, invite friends, and place your first buildings.
-* [[Accounts and friends]] — usernames, guest expiry, Google linking, and reconnecting.
+* [[Getting started]] — create a room, invite friends or add bots, place your first buildings, and play again.
+* [[Accounts and friends]] — usernames, your record, guest expiry, friends online, watching games, and reconnecting.
 * [[Turn timer]] — the optional clock and what happens when time runs out.
 * [[FAQ]] — quick answers to common surprises.
 
 == About these guides ==
-Catanova is an independently developed, open-source game inspired by CATAN. These are original Catanova guides, not an official CATAN publication. Three- and four-player games follow the base-game target; the [[Getting started|two-player option]], [[Map generation|balanced map preset]], and [[Turn timer|timer]] are Catanova choices. Rare development-card cases are marked where their rulings remain provisional.
+Catanova is an independently developed, open-source game inspired by CATAN. These are original Catanova guides, not an official CATAN publication. Three- and four-player games follow the base-game target; the [[Getting started|two-player option]], [[Getting started|bots]], [[Awards|points target]], [[Map generation|balanced map preset and dice]], and [[Turn timer|timer]] are Catanova choices. Rare development-card cases are marked where their rulings remain provisional. The [[Big Table]] and [[Open Sea]] pages describe planned rules for modes that are not yet playable.
 
 For the complete specification, use the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes]. See [[Project:Copyrights]] for reuse of this wiki's starter text.
 
 [[Category:Guides]]
 </text>
-      <sha1>smoq09t0qirb8bq19s8iy6sj0x33ag6</sha1>
+      <sha1>24c4tfu0zct956ztuspsis1b6gpswe9</sha1>
     </revision>
   </page>
   <page>
@@ -85,7 +90,7 @@ For the complete specification, use the [https://github.com/shashwtd/catanova/bl
     <id>2</id>
     <revision>
       <id>2</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -93,14 +98,33 @@ For the complete specification, use the [https://github.com/shashwtd/catanova/bl
       <origin>2</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2345" sha1="3q6gcrzjabujgp31nutmp8mfz3m1hji">'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. Rooms support two to four invited players. There is no solo mode or public matchmaking.
+      <text xml:space="preserve" bytes="6547" sha1="m1j0me3tfwz5a4kh9npisbnem9eki1p">'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. The host can set a different target, from 8 to 15, before the game starts. A table has two to four seats, filled by invited friends or by bots, so one person can also play against bots alone. There is no public matchmaking. This is the Classic mode, the only one playable today; see [[#Choose a mode|Choose a mode]].
 
 == Gather your players ==
 # Continue with Google or as a guest, then choose your username and avatar when prompted. See [[Accounts and friends]].
-# Create a room, or join a friend's room using its code or invitation. An invitation lets you inspect the room before joining.
-# The host chooses the settings. Other players mark themselves ready; the host starts once everyone is present and ready. The host does not need a separate ready check.
+# Create a room, or join a friend's room using its four-character code or invitation link. An invitation lets you inspect the room before joining.
+# Fill the open seats. Share the code or link, or use '''Invite a friend''' on an open seat to invite a Google-linked friend directly. The host can also choose '''Add a bot'''; see [[#Playing with bots|Playing with bots]].
+# Pick one of eight colours under your own card. Your pieces carry no names, so colour is how the table tells them apart. Two players cannot hold the same colour.
+# The host chooses the room settings. Other people mark themselves ready; bots are always ready. The host starts once every seat is connected and ready. The host does not need a separate ready check.
 
-Settings lock when the game starts. Changing them beforehand clears the other players' ready status. New players cannot take a seat after the game has begun, but an existing player can reconnect.
+{| class="wikitable"
+! Room setting !! New rooms !! Choices
+|-
+| Points to win || 10 || Any whole number from 8 to 15
+|-
+| [[Turn timer]] || 90 seconds || 40, 65, 90, 115 or 140 seconds, or off
+|-
+| Dice || Balanced || Balanced or Natural; see [[Map generation]]
+|}
+
+Settings lock when the game starts. Changing them beforehand clears the other people's ready status. Before the start, the host can remove a player from the lobby; that player cannot rejoin it until after the room's next game. New players cannot take a seat after the game has begun. Opening that room's code or link lets them watch instead, and an existing player can reconnect.
+
+== Choose a mode ==
+Every room plays Classic today. Two more [[Game modes|game modes]] are being built and are not yet playable:
+* [[Big Table]], for five and six players, on a larger island. The host chooses whether two players share each turn or everyone gets a short build window between turns.
+* [[Open Sea]], for three or four players, with ships, gold fields, a pirate and bonus points for settling small islands.
+
+When they open, the host will pick the mode in Room setup, beside the other settings. A mode fixes how many seats the table needs, and bots can sit only in Classic, so the lobby refuses a change of mode that the current seats do not fit. See [[Game modes#Choosing a mode|Choosing a mode]].
 
 == Place your first pieces ==
 The server shuffles player order. Each player places a settlement and an attached road, then everyone takes a second placement in reverse order.
@@ -126,12 +150,31 @@ Choose sites with useful resource variety and dice numbers. [[Map generation|Dot
 
 You may also play one eligible [[Development cards|development card]] before rolling or during your action phase. Select a building site to preview it, then confirm '''Build'''. A preview does not spend cards.
 
+== At the table ==
+Each player has a card with their portrait in their colour, their points, and how many resource and development cards they hold. A small plate under the portrait shows their longest road and Knights played; the award holder's number is gold. See [[Awards]].
+
+* '''Reactions:''' twelve drawn faces you can send across the board. A quick burst of up to ten is fine; after that the button rests for a few seconds.
+* '''Move history:''' every public action, grouped by turn. Discarded cards and Year of Plenty picks are named; a stolen card is not.
+* '''Dice statistics''' in the menu: this game's roll totals beside the expected average.
+* '''Add friend:''' hover over or tap another Google player's card to send them a friend request. See [[Accounts and friends]].
+* '''Send feedback''' in the menu: report a problem or an idea without leaving the game.
+
+== Playing with bots ==
+The host fills an open seat with '''Add a bot'''. The server draws one of three kinds: steady, sharp or champion. A champion turns up about one time in five. The seat says only '''Bot''', and each kind has its own small machine mark beside its name. A bot sees what your browser would see from its seat: its own hand, the board and the player cards. It gets no view of other hands, no peek at the deck, and no adjusted dice.
+
+Bots follow the same rules and pause briefly before each move. They trade with the bank and ports but never answer or make player offers. A game with bots still needs a person at the table: when only bots remain connected, the game pauses. Bots also cover a player who loses their connection; see [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
+
+== After the game ==
+The results screen shows the final standings, each player's points, the number of turns, and who held each award. '''Return to lobby''' takes you back to the same room for a rematch. The code, settings, colours and bots stay; a new island is dealt and turn order is shuffled again. People mark themselves ready again and the host starts.
+
+Each person can keep reading the results while others return. The lobby's '''Previous results''' button shows them until the next game starts. '''Back to hub''' leaves the room. A player who resigned does not return to the lobby with the group.
+
 == Playing with two ==
-The two-player option keeps the same island, bank, costs, piece limits, normal turns, and ten-point goal. It adds no neutral players. This is a Catanova variant, not an official two-player ruleset; its balance still needs human playtesting.
+The two-player option keeps the same island, bank, costs, piece limits, normal turns, and points target. It adds no neutral players. This is a Catanova variant, not an official two-player ruleset; its balance still needs human playtesting. Two people can also add one or two bots for a three- or four-seat game.
 
 [[Category:Guides]]
 </text>
-      <sha1>3q6gcrzjabujgp31nutmp8mfz3m1hji</sha1>
+      <sha1>m1j0me3tfwz5a4kh9npisbnem9eki1p</sha1>
     </revision>
   </page>
   <page>
@@ -140,7 +183,7 @@ The two-player option keeps the same island, bank, costs, piece limits, normal t
     <id>3</id>
     <revision>
       <id>3</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -148,7 +191,7 @@ The two-player option keeps the same island, bank, costs, piece limits, normal t
       <origin>3</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2367" sha1="fdsjpy77xu6shcq1hxhmf5rk4wnsncd">'''Resources''' pay for [[Buildings|building]] and [[Development cards|development cards]]. There are 19 cards of each type in the bank. Spent, discarded, and bank-traded resources return there.
+      <text xml:space="preserve" bytes="2499" sha1="nsdnlq9edzu672gjsaj62m2xqzgslbb">'''Resources''' pay for [[Buildings|building]] and [[Development cards|development cards]]. There are 19 cards of each type in the bank. Spent, discarded, and bank-traded resources return there.
 
 {| class="wikitable"
 ! Resource !! Terrain !! Familiar names !! Main uses
@@ -172,9 +215,9 @@ When the dice total matches a hex's number, every adjacent settlement receives o
 If the bank cannot cover a resource's production for several players, nobody receives that resource from the roll. If only one player is entitled to it, that player receives as many as remain, up to their entitlement. Other resource types still produce normally. Missing cards are not owed later.
 
 == Seven and the robber ==
-A seven produces no resources. Each player with '''more than seven resource cards''' discards half, rounded down. With eleven, discard five; with seven, discard none. Development cards do not count. There is no permanent seven-card hand limit.
+A seven produces no resources. Each player with '''more than seven resource cards''' discards half, rounded down. With eleven, discard five; with seven, discard none. Development cards do not count. There is no permanent seven-card hand limit. Discards go back to the bank in view, so the move history names them.
 
-After every required discard, the roller moves the robber to a '''different land hex''', then chooses one adjacent opponent and steals one random resource. An empty-handed adjacent opponent is a legal choice, but yields nothing. No adjacent opponent means no theft. The robber cannot steal development cards.
+After every required discard, the roller moves the robber to a '''different land hex''', then chooses one adjacent opponent and steals one random resource. An empty-handed adjacent opponent is a legal choice, but yields nothing. No adjacent opponent means no theft. The robber cannot steal development cards. Only the thief and the victim learn which resource was taken.
 
 The robber blocks its hex's future production. It does not prevent building, trading, using ports, or producing from other hexes. A [[Development cards|Knight]] moves and steals in the same way, without causing discards.
 
@@ -183,7 +226,7 @@ The robber blocks its hex's future production. It does not prevent building, tra
 
 [[Category:Game rules]]
 </text>
-      <sha1>fdsjpy77xu6shcq1hxhmf5rk4wnsncd</sha1>
+      <sha1>nsdnlq9edzu672gjsaj62m2xqzgslbb</sha1>
     </revision>
   </page>
   <page>
@@ -192,7 +235,7 @@ The robber blocks its hex's future production. It does not prevent building, tra
     <id>4</id>
     <revision>
       <id>4</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -243,7 +286,7 @@ Choose a legal site to review the piece and its cost, then confirm '''Build'''. 
     <id>5</id>
     <revision>
       <id>5</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -251,14 +294,16 @@ Choose a legal site to review the piece and its cost, then confirm '''Build'''. 
       <origin>5</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2096" sha1="lao4vltjisg92pdf46pdu9w2sstg2a6">'''Trading''' exchanges [[Resources|resources]] during the active player's action phase. You can trade before or after building, and make several exchanges in one turn.
+      <text xml:space="preserve" bytes="2671" sha1="h3vldi9iomuprwdes60fxj6vdbcv8rn">'''Trading''' exchanges [[Resources|resources]] during the active player's action phase. You can trade before or after building, and make several exchanges in one turn.
 
 == Trade with players ==
 Every completed player trade must include the active player. Both sides must give at least one resource, and the same resource type cannot appear on both sides. Development cards, buildings, gifts, loans, and future payments are not tradeable.
 
-In '''Trade''', select cards for what you give and what you want. A fixed offer specifies both sides. '''? Open to offers''' specifies your contribution and lets opponents propose a return. They may change or withdraw proposals; you choose which one to accept.
+In '''Trade''', select cards for what you give and what you want. A fixed offer specifies both sides. '''? Open to offers''' specifies your contribution and lets opponents propose a return.
 
-Offers do not reserve cards. A trade completes only if both players can still pay. Changing or withdrawing an offer, ending the turn, or taking another active-player game action invalidates its old replies. Opponents may reply to your offer, but cannot trade with each other during your turn.
+You can have '''one live offer''' at a time, with no limit on offers per turn. To offer something different, cancel the current offer first. Each opponent can decline, accept a fixed offer, or propose a return to an open one. An acceptance or proposal stays committed until the offer ends: it cannot be withdrawn or changed. When several opponents are willing, you choose the partner and confirm. In a game with only two players left, accepting a fixed offer completes the trade at once. If every opponent declines, the offer closes.
+
+Offers do not reserve cards. A trade completes only if both players can still pay, and both sides' cards change hands together. Cancelling the offer, ending the turn, or taking another active-player game action ends it and its replies. Opponents may reply to your offer, but cannot trade with each other during your turn. Bots never answer or make player offers; they trade only with the bank and ports.
 
 == Trade with the bank ==
 {| class="wikitable"
@@ -282,7 +327,7 @@ There are nine ports: five specialized 2:1 ports, one per resource, and four gen
 
 [[Category:Game rules]]
 </text>
-      <sha1>lao4vltjisg92pdf46pdu9w2sstg2a6</sha1>
+      <sha1>h3vldi9iomuprwdes60fxj6vdbcv8rn</sha1>
     </revision>
   </page>
   <page>
@@ -291,7 +336,7 @@ There are nine ports: five specialized 2:1 ports, one per resource, and four gen
     <id>6</id>
     <revision>
       <id>6</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -299,7 +344,7 @@ There are nine ports: five specialized 2:1 ports, one per resource, and four gen
       <origin>6</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2563" sha1="f4u4glcx9kunqyiib2tsrq60bnzzjvy">'''Development cards''' provide special actions or hidden points. Buying one costs '''1 Sheep + 1 Hay + 1 Rock''' and draws privately from the shuffled deck. You do not choose its type.
+      <text xml:space="preserve" bytes="2679" sha1="5rkyxffrmu1bn8pr2bntsmfobjrltdj">'''Development cards''' provide special actions or hidden points. Buying one costs '''1 Sheep + 1 Hay + 1 Rock''' and draws privately from the shuffled deck. You do not choose its type.
 
 {| class="wikitable"
 ! Card !! Copies !! Effect
@@ -320,12 +365,12 @@ You may play '''one non-Victory-Point development card per turn''', before rolli
 
 Select a held card to review its effect and use its '''Play''' action. Finish that effect before trading or building normally. You may buy several cards in a turn if you can pay and the deck is not empty. Played cards never return to it.
 
-Victory Point cards are different: they count without being played, including on the turn they are bought. They do not use your one-card allowance. They can bring you to ten points and win immediately on your own turn.
+Victory Point cards are different: they count without being played, including on the turn they are bought. They do not use your one-card allowance. They can bring you to the room's [[Awards|points target]] and win immediately on your own turn.
 
 == Useful distinctions ==
 * Knights count toward [[Awards|Largest Army]] only after being played. A Knight can move the robber before you roll.
 * Road Building places roads one at a time. The second may connect to the first; [[Awards|Longest Road]] and victory are checked after each.
-* Year of Plenty takes cards from the bank; Monopoly takes them from opponents. Monopoly may legally collect nothing.
+* Year of Plenty takes cards from the bank; Monopoly takes them from opponents. Monopoly may legally collect nothing. The move history names the cards Year of Plenty took and says how many Monopoly collected.
 * Unplayed cards are private. They cannot be traded, stolen, or discarded as resources.
 
 == Provisional rare cases ==
@@ -335,7 +380,7 @@ Year of Plenty takes one card if that is all the bank contains, and cannot be pl
 
 [[Category:Game rules]]
 </text>
-      <sha1>f4u4glcx9kunqyiib2tsrq60bnzzjvy</sha1>
+      <sha1>5rkyxffrmu1bn8pr2bntsmfobjrltdj</sha1>
     </revision>
   </page>
   <page>
@@ -344,7 +389,7 @@ Year of Plenty takes one card if that is all the bank contains, and cannot be pl
     <id>7</id>
     <revision>
       <id>7</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -352,7 +397,11 @@ Year of Plenty takes one card if that is all the bank contains, and cannot be pl
       <origin>7</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2008" sha1="mykidbcv7f2joh3z17duwa64nl63uuj">'''Longest Road''' and '''Largest Army''' are each worth '''two points''' to their current holder. Their badges appear with the player's profile. You may hold both; losing an award also loses its points.
+      <text xml:space="preserve" bytes="2775" sha1="iab5kqtl6inymidn5bgtznizhqpz0cg">'''Longest Road''' and '''Largest Army''' are each worth '''two points''' to their current holder. Their badges appear on the holder's player card. You may hold both; losing an award also loses its points.
+
+Every player card also has a small plate under the portrait showing that player's longest road and Knights played. The holder's number is gold. You can follow both races without counting roads on the board.
+
+In [[Open Sea]], a mode still being built, ships count too, and the route award is called Longest Route.
 
 {| class="wikitable"
 ! Award !! First claim !! Taking it from the holder
@@ -385,11 +434,13 @@ Count Knights you have '''played''', not Knights waiting in your hand. Played Kn
 | Either award || 2
 |}
 
-Reach '''10 or more points during your own turn''' to win immediately. Hidden [[Development cards|Victory Point cards]] count, so the visible public score may not tell the whole story. Reaching ten during somebody else's turn is not enough: you must still have ten when your own turn arrives. There is no equalizing final round.
+Reach the room's target '''during your own turn''' to win immediately. The target is '''10 points''' unless the host chose another from 8 to 15 before the game; the '''How to play''' panel shows it. Hidden [[Development cards|Victory Point cards]] count, so the visible public score may not tell the whole story. Reaching the target during somebody else's turn is not enough: you must still have it when your own turn arrives. There is no equalizing final round.
+
+A game can also end without a points win. If every other seat resigns and one person is left, that person wins by resignation. If every person resigns, or all of them stay disconnected for three minutes, the game closes with no winner. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
 
 [[Category:Game rules]]
 </text>
-      <sha1>mykidbcv7f2joh3z17duwa64nl63uuj</sha1>
+      <sha1>iab5kqtl6inymidn5bgtznizhqpz0cg</sha1>
     </revision>
   </page>
   <page>
@@ -398,7 +449,7 @@ Reach '''10 or more points during your own turn''' to win immediately. Hidden [[
     <id>8</id>
     <revision>
       <id>8</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -406,7 +457,7 @@ Reach '''10 or more points during your own turn''' to win immediately. Hidden [[
       <origin>8</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2191" sha1="jo0aephfzis5w2pbn0ums06irjhych4">'''Balanced islands''' are Catanova's current map preset. Every island has 19 land hexes arranged in rows of 3, 4, 5, 4, and 3, with nine [[Trading and ports|ports]]. The goal is useful variety without making every starting spot equal.
+      <text xml:space="preserve" bytes="2870" sha1="ct4ygfl8hjq1mjinriawb2bgle7tckr">'''Balanced islands''' are Catanova's current map preset. Every island has 19 land hexes arranged in rows of 3, 4, 5, 4, and 3, with nine [[Trading and ports|ports]]. The goal is useful variety without making every starting spot equal.
 
 {| class="wikitable"
 ! Terrain !! Hexes
@@ -428,10 +479,12 @@ Reach '''10 or more points during your own turn''' to win immediately. Hidden [[
 * More than two connected hexes of the same resource.
 * A resource being entirely confined to one small area: each type has at least two hexes separated by three or more hex steps.
 * A 6 or 8 touching another 6 or 8.
+* Two hexes with the same number touching, so no intersection touches one number twice.
+* The 2 touching the 12.
 * An intersection exceeding eleven production dots across its adjacent hexes.
 * Resource types with average production outside the preset's range of 2.5–4 dots per hex. The lower total is rounded up when a type has three hexes.
 
-The four general ports and five specialized ports are shuffled independently over nine separated coastal edges. A corner can still touch three different resources, and some locations remain stronger than others. The [[Getting started|reverse second placement]] matters; this preset does not guarantee equal outcomes or equal seats.
+The four general ports and five specialized ports are shuffled independently over nine coastal edges. No two ports share or neighbour an intersection, and ports alternate with open sea all the way round the island. A corner can still touch three different resources, and some locations remain stronger than others. The [[Getting started|reverse second placement]] matters; this preset does not guarantee equal outcomes or equal seats.
 
 == What are production dots? ==
 {| class="wikitable"
@@ -448,23 +501,23 @@ The four general ports and five specialized ports are shuffled independently ove
 | 6 or 8 || 5 out of 36 || 5
 |}
 
-Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. New rooms use Balanced dice, which draw from a deck of the 36 dice combinations so short games stay closer to the usual curve; the host can choose Natural dice instead. Neither gives any player a catch-up bonus.
+Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. New rooms use Balanced dice, which draw from a deck of the 36 dice combinations so short games stay closer to the usual curve; the host can choose Natural dice instead. Neither gives any player a catch-up bonus. '''Dice statistics''' in the game menu compares the current game's roll totals with the expected average.
 
 == Preset status ==
-This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.
+This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. The current version of the preset added the equal-number, 2-and-12, and alternating-port rules on 23 September 2026. Each lobby is dealt its island when the room opens or returns from a game, and a game already started keeps the island it was dealt. [[Big Table]] and [[Open Sea]], modes still being built, will deal their boards from presets of their own. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.
 
 [[Category:Game rules]]
 </text>
-      <sha1>c770fhhm85wwkvy5x2ubveedry0jo6t</sha1>
+      <sha1>ct4ygfl8hjq1mjinriawb2bgle7tckr</sha1>
     </revision>
   </page>
   <page>
-    <title>Turn timer</title>
+    <title>Game modes</title>
     <ns>0</ns>
     <id>9</id>
     <revision>
       <id>9</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
@@ -472,7 +525,504 @@ This is a Catanova preset, separate from the official spiral-number setup or fix
       <origin>9</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2030" sha1="efzryp0jy1gq4ugv26zzigtryk3m1b9">The '''turn timer''' is an optional Catanova house rule. New rooms start with a '''90-second''' timer; the host can change it or switch it off before the game begins. Setup placements remain untimed.
+      <text xml:space="preserve" bytes="5860" sha1="c784jfitmj8h99ibu366pllf5n9lriu">A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for five and six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
+
+{| class="wikitable"
+! Mode !! Players !! Board !! Points target !! Bots !! Status
+|-
+| '''Classic''' || 2–4 || One island of 19 land hexes || 10; host can set 8–15 || Yes || Playable
+|-
+| '''[[Big Table]]''', for five and six players || 5 or 6 || One island of 30 land hexes || 10; host can set 8–15 || No || Being built
+|-
+| '''[[Open Sea]]''' || 3 or 4 || Outer Isles: a main island, small islands and open sea || 14; host can set 10–18 || No || Being built
+|}
+
+== Classic ==
+Classic is the game every room plays today: one island, two to four seats, and the rules described across this wiki. Start with [[Getting started]]. Its two-player option, bots, balanced island and turn timer are Catanova choices.
+
+== Big Table, for five and six players ==
+A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so the host chooses one of two ways to share each turn:
+* '''Paired turns''', the default. Each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
+* '''Between-turns build'''. After each ordinary turn, every other player gets a short window to build with the cards in their hand.
+
+See [[Big Table]].
+
+== Open Sea ==
+Islands separated by sea. Players build ships to cross it, and can move a ship at the open end of a line. Gold fields pay any resource you choose. A pirate on the sea robs ships, and the route award becomes '''Longest Route''', because ships count. Your first settlement on each small island earns 2 bonus points. The first scenario, '''Outer Isles''', is for three or four players.
+
+See [[Open Sea]].
+
+== Choosing a mode ==
+When the new modes open, the host will pick the mode in Room setup, beside the points target, the dice and the [[Turn timer|turn timer]]. Until then, every room plays Classic.
+* Only the host will change the mode. As with other settings, a change will clear the other people's ready status.
+* Each mode will deal its own island, so changing the mode will deal a new one.
+* Changing the mode will reset the points target to the new mode's default: 10 for Classic and Big Table, 14 for Open Sea.
+* The lobby will refuse a change while more players are seated than the new mode allows. For example, a table of five will not be able to switch to Open Sea. A table with too few players can switch and wait for more.
+* The lobby will also refuse a change to a mode without bots while bots are seated. Remove them first.
+* A game will start only with a player count its mode allows. The mode will then lock, and a saved game will keep its rules for good.
+
+== Bots ==
+Bots are allowed only in Classic for now. Big Table and Open Sea allow no bots, either in a seat or as a stand-in for a player who loses their connection. Every seat in those modes is a person. Bots for them are a later step in the plan, not a promise.
+
+== When a player disconnects ==
+Without stand-in bots, Big Table and Open Sea handle an absent player differently from Classic.
+
+{| class="wikitable"
+! Time away !! Classic !! Big Table and Open Sea
+|-
+| First 30 seconds || The card shows the player as away. The game waits; the room's timer, if any, runs as usual. || The same.
+|-
+| From 30 seconds || A bot plays the seat fully, with the player's own cards and pieces. || No bot. The player is still shown as disconnected, and the game keeps waiting.
+|-
+| From 2 minutes || The bot carries on. || Whenever the game waits on this player, the clock acts for them as if their time had run out. It makes only forced moves.
+|-
+| On return || The seat is handed back at once. || The clock stops acting for them at once.
+|}
+
+The 2-minute rule applies whether or not the room has a turn timer. It covers the player's setup placements, their turns and anything else they owe: a discard after a seven, a Partner's phase or build window in Big Table, and a gold pick in Open Sea. In setup, the clock places a settlement on the legal corner with the most production dots (on the main island in Open Sea), then a road touching it, or in Open Sea a ship if no road fits. The clock never builds, buys, trades, plays a card or moves a ship for anyone. Reconnecting does not reset a clock that is already running.
+
+Everything else is as in Classic. '''Leave game''' resigns for good. If every remaining player is offline, the game pauses, and it closes with no winner once nobody has returned within three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
+
+== Later ==
+None of these is part of the first versions:
+* Three more Open Sea scenarios, with names reserved: Sister Isles, with four islands; Sand Divide, with a desert barrier; and Veiled Waters, with fog.
+* Open Sea for five and six players, using Big Table's paired turns.
+* A knights mode. It is parked, and nothing about it is decided.
+
+== About the modes ==
+Big Table and Open Sea are inspired by the official 5–6 player and Seafarers expansions to the CATAN base game, but their names, maps and online rules are Catanova's own. The full specifications are the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-BIG-TABLE.md Big Table rulebook] and the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-OPEN-SEA.md Open Sea rulebook]. Each lists the cases the official rules leave open and how Catanova settles them.
+
+[[Category:Guides]]
+[[Category:Game rules]]
+</text>
+      <sha1>c784jfitmj8h99ibu366pllf5n9lriu</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Big Table</title>
+    <ns>0</ns>
+    <id>10</id>
+    <revision>
+      <id>10</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>10</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="12074" sha1="dc3c1o9yb5z6vhf4c83ziet0v94abr2">'''Big Table''', for five and six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
+
+{| class="wikitable"
+! !! Classic !! Big Table
+|-
+| Players || 2–4, friends or bots || 5 or 6, people only
+|-
+| Island || 19 land hexes in rows of 3-4-5-4-3 || 30 land hexes in rows of 3-4-5-6-5-4-3
+|-
+| Bank || 19 of each resource || 24 of each resource
+|-
+| Development deck || 25 cards || 34 cards
+|-
+| Ports || 9 || 11
+|-
+| Turns || One player at a time || Paired turns (default) or Between-turns build
+|-
+| Absent player || A bot plays the seat after about 30 seconds || The clock makes forced moves only, after 2 minutes
+|}
+
+== The island ==
+Thirty land hexes make a longer island whose widest row has six hexes. Two of them are deserts.
+
+{| class="wikitable"
+! Terrain !! Produces !! Hexes
+|-
+| Forest || Timber || 6
+|-
+| Pasture || Sheep || 6
+|-
+| Fields || Hay || 6
+|-
+| Hills || Clay || 5
+|-
+| Mountains || Rock || 5
+|-
+| Desert || Nothing || 2
+|}
+
+The 28 producing hexes carry 28 number tokens: two each of 2 and 12, and three each of 3, 4, 5, 6, 8, 9, 10 and 11.
+
+Every Big Table island comes from Catanova's balanced generator, adapted to 30 hexes. It is our own preset and the only board for now. It keeps the [[Map generation|Classic balance rules]] with bounds set for the larger island, and adds one more: the two deserts never touch. There is no fixed beginner layout.
+
+There is still one robber. It starts on one of the two deserts, chosen at random from the map seed, and can later move to any other land hex, the other desert included.
+
+=== Ports ===
+There are 11 ports: five general 3:1 ports, two Sheep 2:1 ports, and one 2:1 port each for Timber, Clay, Hay and Rock. The generator spreads them round the coast so that no two share a corner or sit on neighbouring corners, and shuffles their types. They work exactly as described in [[Trading and ports]].
+
+== Supply ==
+{| class="wikitable"
+! Item !! Big Table
+|-
+| Resource cards || 24 of each, 120 in total
+|-
+| Development cards || 34: 20 Knights, 3 Road Building, 3 Year of Plenty, 3 Monopoly, 5 Victory Point
+|-
+| Pieces for each player || 15 roads, 5 settlements, 4 cities, as in Classic
+|-
+| Awards || Longest Road and Largest Army, 2 points each, as in Classic
+|}
+
+The [[Resources|bank shortage rule]] works as in Classic, now with 24 cards of each resource. The development deck is never refilled.
+
+== Setting up ==
+Before the game, the host chooses the turn structure, the points target (10 by default, any whole number from 8 to 15), the dice and the [[Turn timer|turn timer]]. Changing the mode resets the target to the new mode's default. These settings lock when the game starts.
+
+Each player rolls both dice. The highest total starts, and players tied for highest roll again. Placement then follows the usual snake:
+
+{| class="wikitable"
+! Players !! Placement order
+|-
+| 5 || 1, 2, 3, 4, 5, 5, 4, 3, 2, 1
+|-
+| 6 || 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1
+|}
+
+Everything else is as in [[Getting started#Place your first pieces|Classic setup]]. Setup is untimed. If the draft reaches a player who has been offline for 2 minutes, the clock places for them: a settlement on the legal corner with the most production dots, with ties broken at random, then a road on a random edge touching it.
+
+== Two turn structures ==
+{| class="wikitable"
+! !! Paired turns !! Between-turns build
+|-
+| Status || The default; the current official way to play a table this size || A classic option; Room setup labels it as the older official rule
+|-
+| Who acts || The Lead plays a full turn, then the Partner has one action phase || One player takes a full turn, then every other player gets a build window
+|-
+| Second player may || Trade with the bank and ports, build, buy, play one card || Build and buy with the cards in hand only
+|-
+| Second player may not || Roll, or trade with other players || Trade in any way, or play a card
+|-
+| Winning || Lead or Partner, at once, during the paired turn || Only during your own turn
+|}
+
+== Paired turns ==
+=== Lead and Partner ===
+Each paired turn has two roles, shown by markers.
+* The '''Lead''' is the player on turn. The first Lead is the starting player.
+* The '''Partner''' is the third player to the Lead's left, counting only players still in the game. With six players, the Partner sits directly opposite the Lead. With five, the Partner sits two seats to the Lead's right.
+
+A paired turn has three steps:
+# The Lead plays a full Classic turn: an optional card before the roll, the roll, then trading with any willing player (the Partner included), trading with the bank and ports, building, buying and one card.
+# '''The Partner's phase.''' The Partner never rolls. In any order, and as often as they can pay, the Partner may trade with the bank and at their own ports, build roads, settlements and cities, buy development cards, and play one development card. A Knight moves the robber and robs as usual, and the Lead can be its victim. The Partner may not trade with any player.
+# Both markers pass one seat to the left, counting only players still in the game.
+
+Over a round, everyone is Lead once and Partner once, never both in the same paired turn.
+
+=== Everyone else ===
+Players holding neither marker are not on turn. They collect production, discard on a seven, can be robbed, and may trade with the Lead during the Lead's action phase. During the Partner's phase, nobody trades with another player.
+
+Only the Lead rolls, so only the Lead's roll can bring a seven. The Partner discards on it like anyone else. The robber can move up to three times in one paired turn: for the seven, for the Lead's Knight and for the Partner's Knight.
+
+=== Development cards ===
+The Lead may play one development card in their part, and the Partner one in their phase. A card cannot be played in the part in which it was bought. A card bought as Lead may be played later as Partner, and the other way round. Victory Point cards count without being played, as in [[Development cards|Classic]].
+
+=== Winning ===
+The Lead and the Partner are both on turn for the whole paired turn. After every action, the game checks both of them:
+* If exactly one of them has at least the target, that player wins at once.
+* If both do, the Lead wins.
+* The same check is made as a paired turn begins. A marker holder who already has the target wins before anyone acts.
+
+A resignation counts as a move here: if it hands Longest Road or Largest Army to the Lead or the Partner, the check is made at once.
+
+A player holding neither marker cannot win during that paired turn, even if someone else's move puts them at the target. They win when a later paired turn begins in which they hold the Lead or Partner marker, if they still have the target then. A new Partner can therefore win before the Lead rolls.
+
+For example, with a target of 10, the Partner has 9 points. During the Lead's part, the Lead builds a settlement that cuts a third player's road, and Longest Road passes to the Partner. Its 2 points bring the Partner to 11, and the Partner wins at once, before their own phase begins.
+
+The official rules cover a Lead or Partner winning with their own action. The other cases are settled by Catanova.
+
+=== When fewer than five remain ===
+If resignations leave fewer than five players in the game, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes. Under Between-turns build, the windows carry on at any player count.
+
+== Between-turns build ==
+Each turn is an ordinary Classic turn for one player. After it, every other player gets one build window, one at a time, starting with the player to the left of the one who just finished. That player is also the next to take a turn.
+
+In a window, using only the resource cards already in hand, a player may build roads, settlements and cities and buy development cards. They may not trade with players, trade with the bank or at a port, or play a development card.
+
+Nobody wins during a window. A player who reaches the target there, by building or because an award moves to them, wins at the start of their next turn, before rolling, if they still have the target. A card bought in a window can be played from the buyer's next turn onward, even if that turn comes straight after the window.
+
+Windows follow every turn, but not setup. Every window is optional, and you can end yours at once. The game never skips a window for you, even when you cannot afford anything, because skipping would give away something about your hand.
+
+== Clocks ==
+{| class="wikitable"
+! What the game waits for !! Clock
+|-
+| A turn, or the Lead's part || The room's [[Turn timer|turn timer]], as in Classic
+|-
+| A discard after a seven || As in Classic: each player who must discard gets the full room time
+|-
+| The Partner's phase || Half the room's turn time, rounded up to a whole second, at least 30 seconds
+|-
+| A build window || 20 seconds, with or without a turn timer
+|}
+
+{| class="wikitable"
+! Room turn timer !! 40 s !! 65 s !! 90 s !! 115 s !! 140 s !! Off
+|-
+| Partner's phase || 30 s || 33 s || 45 s || 58 s || 70 s || No clock unless the Partner is away during the phase; then 45 s, which keeps running if they come back
+|}
+
+Only the acting player's clock is shown prominently. When the Lead's clock runs out, the usual [[Turn timer#When time runs out|Classic defaults]] finish the turn, and the Partner's phase begins. When the Partner's clock or a build window's clock runs out, that phase simply ends. Nothing is bought, built or traded, and no card is played. If the Partner played Road Building, any free roads not yet placed are lost. If they played a Knight and have not moved the robber yet, the clock moves it for them.
+
+With the timer off, an absent Partner's 45 seconds start when the phase begins with the Partner away, or when they drop out during it, and keep running if they come back.
+
+== Disconnects ==
+Big Table has no bots, so nobody takes over an absent player's seat. The player is shown as disconnected and the game waits for them. Once they have been offline for 2 minutes, the clock acts for them whenever the game waits on them, exactly as if their time had run out: in setup, on their turns, their Partner's phases, their build windows and any discard they owe. This applies whether or not the room has a turn timer, and it stops the moment they reconnect.
+
+Leaving, resigning and pausing work as in Classic. A resigned player's pieces stay on the island but stop producing, and turns, Partner's phases and build windows skip them. See [[Game modes#When a player disconnects|When a player disconnects]] for a side-by-side comparison with Classic.
+
+== What stays Classic ==
+Building costs and placement, production, the bank shortage rule, sevens and discards, the robber, trading, development-card effects, [[Awards|Longest Road and Largest Army]], and what each player can see. Who holds the Lead and Partner markers, and whose build window is running, are public.
+
+== Cases settled by Catanova ==
+Some cases were left open by the official rules or by the first plan. Catanova has settled each of them. Among them:
+* the half-second Partner's clocks round up, to 33 and 58 seconds;
+* if the Lead resigns during their part, the Partner's phase still follows while five or more players remain;
+* build windows carry on when fewer than five players remain;
+* changing the mode resets the points target to the new mode's default.
+
+One thing is left to measure rather than decide. The balanced generator keeps its limit of eleven production dots per intersection, and the mode opens only once the generator is fast enough on 30 hexes, or runs in the background with a longer time limit.
+
+The full specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-BIG-TABLE.md Big Table rulebook].
+
+[[Category:Game rules]]
+</text>
+      <sha1>dc3c1o9yb5z6vhf4c83ziet0v94abr2</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Open Sea</title>
+    <ns>0</ns>
+    <id>11</id>
+    <revision>
+      <id>11</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>11</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="14545" sha1="3cuaialk6nzqbdrobd2kabrn5sgb9od">'''Open Sea''' is Catanova's sea [[Game modes|mode]]. Players build ships, sail to small islands, collect from gold fields and dodge a pirate. It is being built and is not yet playable. This page describes the planned rules for its first scenario, '''Outer Isles''', for three or four players. Everything works as in Classic unless this page says otherwise.
+
+{| class="wikitable"
+! !! Classic !! Open Sea
+|-
+| Players || 2–4, friends or bots || 3 or 4, people only
+|-
+| Board || One island of 19 land hexes || Outer Isles: a main island, small islands and sea
+|-
+| Route pieces || Roads || Roads and ships; ships can move
+|-
+| Production || Five resource terrains || Plus gold fields, which pay resources of your choice
+|-
+| After a seven or a Knight || Move the robber || Move the robber or the pirate
+|-
+| Route award || Longest Road || Longest Route, counting roads and ships
+|-
+| Points target || 10; host can set 8–15 || 14; host can set 10–18
+|-
+| Island bonus || None || 2 points for your first settlement on each small island
+|}
+
+The bank still holds 19 cards of each resource, and the development deck is Classic's 25 cards. Each player has 15 roads, 15 ships, 5 settlements and 4 cities.
+
+== The sea ==
+The board is a grid of land hexes and sea hexes. Sea hexes produce nothing, carry no number and never hold the robber. The outermost hexes form a ring of sea, and that ring is part of the board. Nothing is placed on the board's outer rim.
+
+{| class="wikitable"
+! Edge !! Between !! Road !! Ship
+|-
+| Land edge || Two land hexes || Yes || No
+|-
+| Coastal edge || Land and sea || Yes || Yes, but it holds one piece: a road or a ship
+|-
+| Sea edge || Two sea hexes || No || Yes
+|-
+| Outer rim || Sea and the edge of the board || No || No
+|}
+
+Settlements and cities go only on corners that touch land. The [[Buildings|distance rule]] counts every kind of edge, so two settlements facing each other across a narrow strait can still be too close.
+
+A port sits on a coastal edge, and a road or a ship may stand there. As in [[Trading and ports|Classic]], only your own settlement or city on one of the port's two corners gives you its rate. A ship beside a port gives nothing.
+
+== Ships ==
+{| class="wikitable"
+! Piece !! Cost !! Supply per player !! Points
+|-
+| '''Ship''' || 1 Timber + 1 Sheep || 15 || 0 by itself
+|}
+
+A new ship goes on an empty coastal or sea edge. It must touch one of your settlements or cities, or one of your ships. It may not:
+* attach directly to one of your roads;
+* pass through another player's settlement or city;
+* go on any edge of the pirate's hex.
+
+Ships may branch and form loops. A ship counts toward [[#Longest Route|Longest Route]].
+
+=== Where roads and ships meet ===
+Your roads and your ships join only at your own settlement or city. If a road and a ship both end at the same empty corner, they stay two separate networks there: a new road from that corner must attach to your road, and a new ship to your ship. Build a settlement on that corner and they join. If another player builds there first, they never join.
+
+=== Settling by ship ===
+A settlement may go on an empty corner touching one of your roads or one of your ships, if the distance rule allows. That is how you reach the small islands: sail a line of ships to an island's coast and build there. Roads can then grow from that settlement across the island.
+
+== Moving ships ==
+Once per turn, in your action phase, you may move one of your ships. The ship must:
+* not have been built this turn;
+* not be on an edge of the pirate's hex;
+* sit at an open end of a line of ships, or be freed by the loop and ring rules below;
+* not be part of a closed line.
+
+Pick it up and put it on any other edge where you could legally build a new ship right now, other than an edge of the pirate's hex. The move may not cut off another of your ships that was still connected to your ships or buildings; a ship that was already cut off, for example by another player's settlement, never stops a move. There is no distance limit, and a move costs nothing. After moving, you may build a settlement next to the ship's new position in the same turn, if the rules allow.
+
+=== Open ends and closed lines ===
+* A ship's end is '''open''' when the corner there has none of your settlements or cities and none of your other ships. Your own road at that corner does not close it.
+* A '''closed line''' is a line of your ships that joins two of your settlements or cities. None of its ships can move. It stays closed even if another player later builds a settlement on it.
+* Your ships do not connect through another player's settlement or city. If the settlement was there before your ships met at that corner, each of them has an open end there. If another player settles later on a corner where your ships already meet, those ships stay closed there, whether the line was closed or still open.
+* A '''loop''' leaves one of your buildings and comes back to the same one. Only the two ships touching that building may move.
+* A '''ring''' is a circle of your ships with no building of yours on it. Every ship in the ring may move, though a ship linking the ring to one of your buildings may not.
+* A loop or ring that passes through another player's settlement or city is broken there, so it is neither a loop nor a ring.
+
+These rules apply however many loops, rings and branches your ships form.
+
+Moving a ship never costs you Longest Route if your longest route afterwards is at least as long as before.
+
+For example, your settlement has three ships in a row heading out to sea. Only the third ship, whose far end touches nothing of yours, can move. Build a fourth ship branching from the second, and the third and fourth can each move. Had the line of three ended at another of your settlements, none of the three could move.
+
+=== Timing ===
+Ship moves happen only in your own action phase, after the roll has been dealt with. Never before rolling, during setup, on another player's turn, or between the two placements of a Road Building card. A ship placed during setup may move on its owner's first turn.
+
+== Gold fields ==
+When a gold field's number is rolled and the robber is not on it, each adjacent settlement earns its owner 1 resource of their choice, and each adjacent city earns 2, in any mix. Gold is not a resource: there are no gold cards to hold, trade or steal.
+
+# Ordinary hexes produce first, with the usual [[Resources|bank shortage rule]].
+# Then the players owed gold choose, one player at a time, in turn order starting with the player who rolled. Each choice must be a resource the bank still holds at that moment.
+# If the bank runs out of resource cards, any remaining picks are lost. Picks cannot be declined.
+
+Each player owed gold has one 20-second clock for all their picks, even in a room without a turn timer, and the clock of the player on turn pauses meanwhile. Picks are public: everyone sees what you took. If the clock runs out, the game takes, for each card still owed, the resource you hold fewest of among those the bank still has. Ties go in the order Timber, Clay, Sheep, Hay, Rock.
+
+Gold fields sit only on small islands and never carry a 6 or an 8. The robber can stand on a gold field and stop it producing. A second starting settlement next to a gold field would take 1 chosen resource for each such field, but on Outer Isles starting settlements are all on the main island, so this never happens there.
+
+== The pirate ==
+The pirate always stands on a sea hex. It starts on a sea hex set by the map, away from where starting settlements can go.
+
+After a rolled seven, once any discards are done, or after a Knight, you move either the robber or the pirate. Exactly one of them moves, never both.
+* '''The robber''' works as in [[Resources|Classic]], on land hexes only, on any island. It starts on the desert.
+* '''The pirate''' moves to a different sea hex. Then you take one random resource card from one other player who has a ship on an edge of that hex. If anyone does, you must rob one of them.
+
+Only ships make a player a target. A settlement on the coast of the pirate's hex does not. A player with several ships there still loses only one card.
+
+While the pirate is on a hex, no ship may be built on its six edges, moved onto them or moved off them. Ships already there stay, stay connected and still count for Longest Route. The pirate blocks no production, roads, settlements, cities or ports.
+
+== Longest Route ==
+In Open Sea the route award is called '''Longest Route''', because ships count. It is worth 2 points and needs one continuous route of at least 5 roads, ships, or both.
+* Roads join roads, and ships join ships, at any corner without another player's building.
+* A road and a ship join only through your own settlement or city.
+* Another player's settlement or city interrupts the route.
+
+Everything else follows [[Awards|Longest Road]]: you need a strictly longer route to take the award, a tie leaves it with its holder, and broken routes are handled the same way. [[Awards|Largest Army]] is unchanged.
+
+== Development cards ==
+* '''Knight:''' move the robber or the pirate. Nobody discards.
+* '''Road Building:''' place 2 roads, 2 ships, or one of each, free, one after the other. Each follows the rules for its own kind of piece. A ship placed this way cannot move in the same turn.
+* Year of Plenty, Monopoly and Victory Point cards are unchanged.
+
+== Outer Isles ==
+Outer Isles is Catanova's own scenario, not an official map. Every board has:
+* one main island, where all starting settlements go;
+* several small islands, reachable only by sea, each one sea hex from the main island and at least three from every other small island;
+* two gold fields, both on small islands but never on the same one;
+* one desert, where the robber starts;
+* a ring of sea around it all.
+
+{| class="wikitable"
+! !! Three players !! Four players
+|-
+| Board || 72 hexes, 24 of them land || 77 hexes, 30 of them land
+|-
+| Main island || 16 land hexes, shaped like a shield || 20 land hexes, shaped like a diamond
+|-
+| Small islands || 3 islands, 8 land hexes || 4 islands, 10 land hexes
+|-
+| Ports || 8, all on the main island || 9, all on the main island
+|}
+
+Each board is about as tall as it is wide, so it fits a phone held upright. The shape is fixed for each player count, but terrain, numbers and port types are shuffled every game under fairness rules like those of the [[Map generation|balanced island]]. No 6 or 8 borders another, ports are spaced so that no two share or neighbour a corner, and every small island stays reachable by ship even with the pirate in the way.
+
+=== Setting up ===
+Each player rolls both dice. The highest total starts, and players tied for highest roll again. Placement follows the usual snake (1, 2, 3, 3, 2, 1 with three players, 1, 2, 3, 4, 4, 3, 2, 1 with four), and both starting settlements go on the main island. After each settlement, place a road touching it or, if the settlement is on the coast, a ship instead. A starting ship may not go on an edge of the pirate's hex.
+
+== Island points and winning ==
+Your first settlement on each small island earns you '''2 bonus points''', on top of the settlement's own point.
+* Each island counts once for each player, whoever settled there first.
+* Later settlements of yours on the same island earn no bonus.
+* The bonus stays when that settlement becomes a city.
+* The main island never earns a bonus, so starting settlements never do.
+* There is no limit on how many bonuses can be paid.
+
+The target is 14 points unless the host chose another from 10 to 18. As in [[Awards#Winning|Classic]], you win as soon as you have the target during your own turn, and hidden Victory Point cards count.
+
+For example, the target is 14 and you have 12 points. You sail to a small island and build your first settlement there. It gives 1 point and the island 2 more, so you reach 15 and win at once. A second settlement on that island would have given only its own 1 point.
+
+== Clocks and disconnects ==
+{| class="wikitable"
+! What the game waits for !! Clock
+|-
+| A turn || The room's [[Turn timer|turn timer]], as in Classic
+|-
+| A discard after a seven || As in Classic
+|-
+| Gold picks || 20 seconds for each player owed gold, for all their picks, in every room
+|-
+| Setup || Untimed; the clock places for a player away 2 minutes
+|}
+
+When time runs out, the clock finishes only what must be done. If a robber-or-pirate move is still owed, it moves the robber. Road Building pieces still owed become roads where possible, otherwise ships. It never builds, buys, trades, plays a card or moves a ship for you in any other way.
+
+Open Sea has no bots. A disconnected player is shown as disconnected and the game waits for them. Once they have been offline for 2 minutes, the clock acts for them whenever the game waits on them, as if their time had run out: in setup, on their turns, their discards and their gold picks. In setup the clock places a settlement on the legal main-island corner with the most production dots, with ties broken at random, then a road touching it, or a ship if no road fits. This applies whether or not the room has a turn timer, and it stops the moment they reconnect. See [[Game modes#When a player disconnects|When a player disconnects]].
+
+== Cases settled by Catanova ==
+Some cases were left open by the official rules or by the first plan. Catanova has settled nearly all of them. Among them:
+* when a turn runs out with a robber-or-pirate move owed, the clock moves the robber;
+* the gold-pick clock runs in every room, even without a turn timer;
+* a ship move may not cut off another of your ships that was still connected, though a ship already cut off never stops a move; this can matter only where another player's building has split one of your lines;
+* when another player settles on a corner where your ships meet, those ships stay closed there, as the publisher's FAQ has it;
+* changing the mode resets the points target to the new mode's default, and a table with fewer than three players can switch to Open Sea and wait for more.
+
+Two rare development-card cases carried over from Classic remain provisional. Whether a target of 14 and a 2-point island bonus suit Outer Isles is a balance question, to be playtested after release.
+
+Later scenarios and a five-and-six-player version are listed under [[Game modes#Later|Later]]. The full specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-OPEN-SEA.md Open Sea rulebook].
+
+[[Category:Game rules]]
+</text>
+      <sha1>3cuaialk6nzqbdrobd2kabrn5sgb9od</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Turn timer</title>
+    <ns>0</ns>
+    <id>12</id>
+    <revision>
+      <id>12</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
+      <contributor>
+        <username>Catanova contributors</username>
+      </contributor>
+      <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
+      <origin>12</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text xml:space="preserve" bytes="3289" sha1="08ahybik6zcidhempfs35loogv1cs6d">The '''turn timer''' is an optional Catanova house rule. New rooms start with a '''90-second''' timer; the host can change it or switch it off before the game begins. Setup placements remain untimed.
 
 {| class="wikitable"
 ! Available durations
@@ -480,7 +1030,7 @@ This is a Catanova preset, separate from the official spiral-number setup or fix
 | 40 · 65 · 90 · 115 · 140 seconds
 |}
 
-The initial enabled value is 90 seconds. Rolling, trading, buying, playing a development card, or reconnecting does not restart the normal turn's countdown.
+The initial enabled value is 90 seconds. Rolling, trading, buying, or playing a development card does not restart the normal turn's countdown. Bots play under the same clock as people.
 
 == When time runs out ==
 The server finishes compulsory steps with legal defaults, then ends the turn:
@@ -492,87 +1042,119 @@ The server finishes compulsory steps with legal defaults, then ends the turn:
 It does '''not''' buy optional pieces or cards, spend resources on optional purchases, accept a trade, play an unchosen development card, or forfeit the player's seat. Automatic actions appear in move history.
 
 == Discarding after a seven ==
-The active player's clock pauses while required [[Resources|discards]] are outstanding. Every player who must discard gets the full configured duration for that decision. If a player runs out of time, the server discards the required number of random resource cards from that player's actual hand. Other players see the count, not the private selection.
+The active player's clock pauses while required [[Resources|discards]] are outstanding. Every player who must discard gets the full configured duration for that decision. If a player runs out of time, the server discards the required number of random resource cards from that player's actual hand. Discarded cards go back to the bank in view, so the move history names them, as it does for a discard made by hand.
 
 Once all discards finish, the active clock resumes with its remaining time. If time had already expired before the seven was automatically rolled, the server finishes the robber step and ends the turn after discards resolve.
 
 == Disconnects and restarts ==
-Deadlines survive refreshes, reconnects, and server restarts. The timer keeps running even if every player is offline. After a long server outage, the current expired turn can finish automatically, but the next player receives a fresh full turn; the server does not fast-forward through many missed turns.
+The server keeps every deadline. While at least one person is still at the table, a refresh or reconnect does not change the countdown. A player who drops keeps their clock running. After about 30 seconds a bot plays their seat until they return; see [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]]. With the timer off, that bot is what keeps an absent player's turn from holding up the table.
+
+If every person disconnects, the clock stops and nothing is played automatically. When someone returns, the current turn and any outstanding discards start again with the full configured time. A server restart is handled the same way: the game waits for its players, and nobody's turn runs out while the server is down. The server never fast-forwards through missed turns.
+
+== In other modes ==
+[[Big Table]] and [[Open Sea]], modes still being built, use the same turn timer. Big Table adds a clock for the Partner's phase, half the room's turn time rounded up to a whole second and at least 30 seconds, and 20 seconds for each build window, even with the timer off. Open Sea gives each player owed gold one 20-second clock for all their picks, also with the timer off. Those modes have no bots, so once a player has been away for 2 minutes the clock makes their forced moves instead, with or without a turn timer. That includes their setup placements, which are otherwise untimed. See [[Game modes#When a player disconnects|When a player disconnects]].
 
 [[Category:Game rules]]
 </text>
-      <sha1>5h2xjy434sjz16wqiinwzm3csic5vjj</sha1>
+      <sha1>08ahybik6zcidhempfs35loogv1cs6d</sha1>
     </revision>
   </page>
   <page>
     <title>Accounts and friends</title>
     <ns>0</ns>
-    <id>10</id>
+    <id>13</id>
     <revision>
-      <id>10</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <id>13</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
       <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
-      <origin>10</origin>
+      <origin>13</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2291" sha1="nrhk6xrhndmyblncm0gf4n6cb9iejmm">'''Accounts''' give your username, avatar, and room seats a persistent identity. Catanova supports Google sign-in and temporary guest accounts.
+      <text xml:space="preserve" bytes="5515" sha1="rkejb0ygkrbvcn1m1jbvf9f136ggn91">'''Accounts''' give your username, avatar, record, and room seats a persistent identity. Catanova supports Google sign-in and temporary guest accounts.
 
 {| class="wikitable"
 ! Feature !! Guest !! Google-linked account
 |-
 | Join and create rooms || Yes || Yes
+|-
 | Choose a game avatar || Yes || Yes
-| Use a verified Google photo || No || Yes
+|-
+| Keep a record of wins and past games || Yes || Yes
+|-
+| Watch a game from its code or link || Yes || Yes
+|-
 | Send and receive friend requests || No || Yes
+|-
+| Invite friends to a room, see them online, watch their games || No || Yes
+|-
 | Keep a guest username when linking || Yes, link before expiry || Same identity is retained
 |}
 
 == Your name and avatar ==
 Usernames contain 3–20 letters, numbers, or underscores, using A–Z and a–z. They are unique without regard to capitalization: River and river cannot belong to different accounts. Your chosen capitalization is kept.
 
-Choose from twelve game avatars. A Google-linked player may also use their verified Google photo.
+Choose from twelve game avatars. Catanova does not use your Google name or photo. Once a game starts, it keeps the names and avatars its players had at the start.
+
+== Your record ==
+After signing in you arrive at your hub, which shows your avatar, wins, games played, recent matches, and friends. Your profile lists past games with their outcome, turns, date, and each player's score.
+
+Wins and games played count only games that finished with a winner. A player who resigned receives a loss when that game finishes. An abandoned game counts toward neither total. If you still hold a seat in an unfinished game, its entry in your match history offers '''Return to game'''.
 
 == Guest expiry ==
 A guest identity expires after '''seven days without confirmed account activity'''. Closing a tab does not immediately erase it. Clearing browser storage or signing out can lose access to that anonymous identity sooner, so link Google before relying on access from another device.
 
-Linking Google before expiry retains your username, avatar, and ownership of your room seats. If that Google account already belongs to a different account, linking is refused rather than silently merging them or replacing the guest.
+Linking Google before expiry retains your username, avatar, record, and ownership of your room seats. If that Google account already belongs to a different account, linking is refused rather than silently merging them or replacing the guest.
 
 Expiry releases the username and removes access to the guest's old seats. It does not erase pieces or history from a saved game.
 
 == Friends ==
 Both players must link Google before they can become friends. Guests cannot send, receive, or accept friend requests; the app prompts them to connect an account.
 
-Search with at least three characters from the beginning of a username. A request becomes a friendship only when the recipient accepts it.
+Search with at least three characters from the beginning of a username. At a table, you can also hover over or tap another Google player's card and choose '''Add friend''', or accept their request if they asked first. A request becomes a friendship only when the recipient accepts it.
+
+Friends see each other as '''Online''' while Catanova is open in any tab, even a background one. About ten seconds after your last tab closes, you show as offline. Offline friends show when they were last online, unless they turn off '''Show when you were last online''' under Settings → Privacy. It is on by default. Only confirmed friends see any of this.
+
+* '''Invite:''' the '''Invite a friend''' button on an open lobby seat sends a room invitation. It expires after five minutes.
+* '''Watch:''' when a friend is online and playing an unfinished game, a '''Watch''' button opens it. Friends never see which room you are in unless it is a game they can watch.
+
+== Watching a game ==
+Opening the code or link of a game that has already started, without a seat in it, shows the game as a spectator. You see the public view only: the board, player cards, dice, and move history, but no hands. Spectators cannot move, trade, or send reactions. Up to 24 people can watch one game. Choose '''Stop watching''' to leave.
 
 == Leaving and reconnecting ==
-Leaving a lobby frees the seat. If the host leaves, another remaining player becomes host. Leaving or disconnecting during a started game preserves the player's seat, pieces, and history.
+Leaving a lobby frees the seat. The person who has been seated longest is the host; if the host leaves, the next longest-seated person takes over. A bot never hosts.
 
-Return with the same identity and room invitation to resume. A Google-linked identity can resume on another device; the newer connection replaces the older one. After an interrupted action, let the room synchronize before attempting it again.
+In a started game, '''Leave game''' resigns permanently. Your roads, settlements, and cities stay on the island, but they stop producing. Your resource cards return to the bank, your unplayed development cards are removed from play, and you can no longer hold an award. You cannot rejoin that game, but you can watch it. If every other seat resigns and one person is left, that person wins by resignation rather than on points.
+
+A lost connection is different. Your card first shows '''Away'''. After about 30 seconds, a bot plays your seat and the card shows '''Bot playing'''. It uses your own hand, pieces, and place in the turn order; nothing is surrendered. The moment you reconnect the seat is yours again, including any moves the bot made. Both handovers appear in the move history. This happens only while at least one person is still at the table. In [[Big Table]] and [[Open Sea]], modes still being built, no bot takes over; see [[Game modes#When a player disconnects|When a player disconnects]].
+
+If every person disconnects, the game pauses and nothing is played automatically. The cards show a countdown. If nobody returns within '''three minutes''', the game closes as abandoned, with no winner. A game where only bots remain also ends with no winner.
+
+Return with the same identity and room invitation to resume. A Google-linked identity can resume on another device; the newer connection replaces the older one. An account can hold a seat in only one unfinished game at a time. After an interrupted action, let the room synchronize before attempting it again.
 
 [[Category:Guides]]
 </text>
-      <sha1>nrhk6xrhndmyblncm0gf4n6cb9iejmm</sha1>
+      <sha1>rkejb0ygkrbvcn1m1jbvf9f136ggn91</sha1>
     </revision>
   </page>
   <page>
     <title>FAQ</title>
     <ns>0</ns>
-    <id>11</id>
+    <id>14</id>
     <revision>
-      <id>11</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <id>14</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
       <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
-      <origin>11</origin>
+      <origin>14</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2991" sha1="0an4j982znuvx2gpaib2yo3762ydjul">== How many people can play? ==
-Two to four invited players. There is no solo mode, bot opponent, or public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players.
+      <text xml:space="preserve" bytes="4998" sha1="r9ib91vk598m193e5p4082nk9i89fjl">== How many people can play? ==
+Classic, the mode playable today, has two to four seats, filled by invited friends or by bots the host adds. One person can play against one to three bots. There is no public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players. See [[Getting started#Playing with bots|Playing with bots]]. [[Big Table]], for five and six players, and [[Open Sea]], for three or four, are being built.
 
 == Are Timber and Clay different from wood and brick? ==
 Only the names differ. [[Resources|Timber, Clay, Sheep, Hay, and Rock]] correspond to wood, brick, wool, wheat, and ore.
@@ -601,68 +1183,83 @@ No. The optional [[Turn timer|timer]] completes compulsory steps and ends the tu
 == Will refreshing delete my roads? ==
 A reconnect should restore the server's saved game for the same identity and room. Wait for synchronization before repeating an uncertain action. Guest access depends on keeping that temporary identity; [[Accounts and friends|link Google]] for recovery across devices. Persistence still depends on the server's storage and backups—it is not a promise that a damaged server disk can never lose data.
 
+== What happens if someone drops out? ==
+In Classic, after about 30 seconds, a bot plays their seat with their own cards and pieces, and hands it back the moment they reconnect. '''Leave game''' is different: it resigns for good. If everyone disconnects, the game pauses and closes with no winner after three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
+
+== Can five or six people play together? ==
+Not yet. [[Big Table]], for five and six players, is being built. It uses a larger island and a bigger bank and deck, and lets a second player act in every turn so the wait between turns stays short. See [[Game modes]].
+
+== Can I add bots in Big Table or Open Sea? ==
+No. For now bots play only in Classic, and the lobby will not switch to another mode while a bot is seated. In [[Big Table]] and [[Open Sea]], two modes still being built, nobody will take over a disconnected player's seat. The game will wait, and after 2 minutes the clock will make only the moves the game cannot go on without. See [[Game modes#When a player disconnects|When a player disconnects]].
+
+== What are the Lead and the Partner? ==
+The two roles in a paired turn in [[Big Table]], a mode still being built. The Lead rolls and plays a full turn. Then the Partner, the third player to the Lead's left, gets one action phase to trade with the bank, build, buy and play a card, but not to trade with players.
+
+== Do ships count toward Longest Road? ==
+In [[Open Sea]], a mode still being built, yes. There the award is called Longest Route and counts roads and ships, which join only through your own settlement or city. Classic and Big Table have no ships and keep [[Awards|Longest Road]].
+
 == Is this an official CATAN release? ==
-No. Catanova is an independent, open-source project. Its current balanced maps, optional timer, and two-player option are identified separately; two rare development-card cases remain provisional. The [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md full rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes] explain the target and differences.
+No. Catanova is an independent, open-source project. Its current balanced maps and dice, optional timer, adjustable points target, bots, and two-player option are identified separately; two rare development-card cases remain provisional. The [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md full rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes] explain the target and differences.
 
 [[Category:Guides]]
 </text>
-      <sha1>0an4j982znuvx2gpaib2yo3762ydjul</sha1>
+      <sha1>r9ib91vk598m193e5p4082nk9i89fjl</sha1>
     </revision>
   </page>
   <page>
     <title>Category:Guides</title>
     <ns>14</ns>
-    <id>12</id>
+    <id>15</id>
     <revision>
-      <id>12</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <id>15</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
       <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
-      <origin>12</origin>
+      <origin>15</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="176" sha1="sztdkabd5nhfpw8qbq4z6l0zlnv6rl4">Guides to getting into a Catanova room, keeping an account, and finding answers. Start at [[Main Page]] or [[Getting started]]. For mechanics, browse [[:Category:Game rules]].
+      <text xml:space="preserve" bytes="213" sha1="cj8j4z7nyb32iw7m2dfikpohmmozjt6">Guides to getting into a Catanova room, choosing a [[Game modes|game mode]], keeping an account, and finding answers. Start at [[Main Page]] or [[Getting started]]. For mechanics, browse [[:Category:Game rules]].
 </text>
-      <sha1>sztdkabd5nhfpw8qbq4z6l0zlnv6rl4</sha1>
+      <sha1>cj8j4z7nyb32iw7m2dfikpohmmozjt6</sha1>
     </revision>
   </page>
   <page>
     <title>Category:Game rules</title>
     <ns>14</ns>
-    <id>13</id>
+    <id>16</id>
     <revision>
-      <id>13</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <id>16</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
       <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
-      <origin>13</origin>
+      <origin>16</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="269" sha1="cbaxcogr0czl2wm7o4sd58exso31nqc">Reference articles for Catanova's resources, building, trading, cards, awards, and optional settings. New players can begin with [[Getting started]]. The complete specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook].
+      <text xml:space="preserve" bytes="398" sha1="o0u5rijadvpn8n99l2yygzdm338peru">Reference articles for Catanova's resources, building, trading, cards, awards, optional settings, and [[Game modes|game modes]]. The [[Big Table]] and [[Open Sea]] articles describe modes that are being built and not yet playable. New players can begin with [[Getting started]]. The complete specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook].
 </text>
-      <sha1>cbaxcogr0czl2wm7o4sd58exso31nqc</sha1>
+      <sha1>o0u5rijadvpn8n99l2yygzdm338peru</sha1>
     </revision>
   </page>
   <page>
     <title>Project:Copyrights</title>
     <ns>4</ns>
-    <id>14</id>
+    <id>17</id>
     <revision>
-      <id>14</id>
-      <timestamp>2026-09-09T00:00:00Z</timestamp>
+      <id>17</id>
+      <timestamp>2026-09-26T00:00:00Z</timestamp>
       <contributor>
         <username>Catanova contributors</username>
       </contributor>
       <comment>Original MIT-licensed starter text; see Project:Copyrights.</comment>
-      <origin>14</origin>
+      <origin>17</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="1823" sha1="owuvij3o29apm7z7uxsytdpi271vb5o">== Starter text ==
-The original starter articles in this wiki were prepared for the [https://github.com/shashwtd/catanova Catanova repository] on 9 September 2026. They summarize that project's rulebook and implemented game behavior. They were not copied from CATAN rulebooks, Fandom articles, or another game's wiki.
+      <text xml:space="preserve" bytes="2022" sha1="pvvw8xhmjkpw3aae9cf29eisuayp669">== Starter text ==
+The original starter articles in this wiki were prepared for the [https://github.com/shashwtd/catanova Catanova repository] on 9 September 2026 and revised on 25 September 2026 to match the game at that date. They summarize that project's rulebook and implemented game behavior. The Game modes, Big Table and Open Sea articles, added on 26 September 2026, summarize rules planned for modes that are not yet built. They were not copied from CATAN rulebooks, Fandom articles, or another game's wiki.
 
 The repository's MIT license permits reuse and modification of this starter text when the copyright and permission notice are retained. This notice covers the imported starter material; a host's terms and the wiki's chosen contribution license govern subsequent contributions as applicable. Brand names do not imply endorsement. No official CATAN artwork is included in this pack.
 
@@ -677,7 +1274,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Return to [[Main Page]].
 </text>
-      <sha1>owuvij3o29apm7z7uxsytdpi271vb5o</sha1>
+      <sha1>pvvw8xhmjkpw3aae9cf29eisuayp669</sha1>
     </revision>
   </page>
 </mediawiki>

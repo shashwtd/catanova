@@ -89,6 +89,16 @@ Enter the **reviewed full commit hash** below. This subshell stops on failure, r
 
 Then inspect logs and HTTPS health and reconnect a test room. If the release changed anything under `deploy/single-vm/backup` or `deploy/single-vm/monitoring`, reinstall those files as their guides describe (keeping the existing `/etc/catanova/*.env`), reload systemd and run each changed service once. Then run `systemctl start catanova-watchdog.service` and confirm it passes against the new release. If only restarting the existing game process, use `catanova_compose restart game`; this also interrupts active connections. A code rollback uses the previous reviewed commit and its matching revision, provided it remains compatible with the current database. Preserve the old image until the new release is verified.
 
+**If the build fails.** The subshell checks out the new commit and rewrites `CATANOVA_REVISION` before it validates or builds anything. After a failed `config` or `build`, the old container keeps serving, but `/opt/catanova/app` and `production.env` already name the new hash. Any later `catanova_compose up` would then look for an image that was never built, which `pull_policy: never` refuses. Before any other compose command, check out the running hash again and set `CATANOVA_REVISION` back to it with the same `sed`. Trust the running container's image label, not `production.env`, for what is live:
+
+```sh
+docker inspect catanova-game --format '{{index .Config.Labels "org.opencontainers.image.revision"}}'
+```
+
+**Fast rollback.** Running the subshell with the previous hash rebuilds that commit from source: it pulls the base image and runs `npm ci` again, which takes minutes on this VM, and it replaces the kept image. To reuse the kept `catanova-local:<previous hash>` image instead, confirm it still exists with `docker image ls catanova-local`, check out the previous hash in `/opt/catanova/app`, set `CATANOVA_REVISION` back to it with the same `sed`, and run `catanova_compose up -d --no-build`. Rebuilding through the subshell is the slow fallback.
+
+**Players during the swap.** The server closes every socket as soon as it is told to stop, so the gap is usually a few seconds plus start-up; 30 seconds is the most Compose waits. At start-up the server marks every human player of an unfinished game as away and pauses the table until someone returns, and the table's clocks start again in full when it resumes. In Classic, once someone at a table is back, a player still away 30 seconds after start-up gets a stand-in bot until they return. A table nobody reopens within 3 minutes of start-up is abandoned. Ask active tables to keep the tab open and in front across the deploy.
+
 Never use `down -v`, volume pruning, or volume deletion for redeployment. Preserve **`catanova-game-data`**, **`catanova-caddy-data`**, and **`catanova-caddy-config`**. Do not start another game container against the same SQLite volume. See the [deployment details](README.md) for Caddy configuration changes and domain switching.
 
 ## If the data disk does not mount
