@@ -21,8 +21,11 @@ import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.j
 import type { AccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import {
   ABSENCE_AFTER_MS,
+  ABSENT_PARTNER_SECONDS,
+  BUILD_WINDOW_SECONDS,
   DEFAULT_ROOM_SETTINGS,
   parseRoomSettings,
+  partnerSeconds,
 } from '../../../packages/protocol/src/settings.js';
 import type { RoomSettings, TurnClock } from '../../../packages/protocol/src/settings.js';
 import type { Identity } from './auth.js';
@@ -31,10 +34,12 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  activePlayer,
   applyAction,
   createGame,
   gameView,
   parseGameAction,
+  partnerActing,
   resignPlayers,
   noteStandIn,
 } from '../../../packages/rules/src/game.js';
@@ -113,6 +118,17 @@ function holdFromPause(state: Presence): Presence {
     for (const seat of Object.values(state.seats))
       seat.resignAt = Math.max(seat.resignAt, state.pausedAt + RECONNECT_GRACE_MS);
   return state;
+}
+/**
+ * How many seconds the player acting now has, or null for no clock. A turn, and a Lead's part, run on the
+ * room's timer. Big Table's build windows always have 20 seconds, and its Partner's phase half the room's
+ * time, or 45 seconds in a room without a timer if the Partner is away (docs/TURN_CLOCK.md, "New clocks").
+ */
+function clockSeconds(game: Game, roomSeconds: number | null, away: boolean): number | null {
+  if (game.phase === 'buildWindow') return BUILD_WINDOW_SECONDS;
+  if (partnerActing(game))
+    return roomSeconds === null ? (away ? ABSENT_PARTNER_SECONDS : null) : partnerSeconds(roomSeconds);
+  return roomSeconds;
 }
 const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
 function codeForSlot(slot: number): string {
@@ -1444,11 +1460,18 @@ export class Store {
       const victoryPoints = changing ? undefined : settings.victoryPoints;
       if (victoryPoints !== undefined && !validTarget(rules, victoryPoints))
         throw new ProtocolError('INVALID_SETTINGS', targetRangeText(rules));
+      // The turn structure may come with the mode it belongs to. A change without one keeps the room's, as a
+      // tab from before Big Table sends it, and a new mode starts from its own default. Saved only when it is
+      // not the default, as the mode is only when it is not Classic.
+      const turns = settings.turns ?? (changing ? undefined : room.settings.turns);
+      if (turns !== undefined && !rules.turns?.includes(turns))
+        throw new ProtocolError('INVALID_SETTINGS', `${rules.name} has no turn structure to choose`);
       const saved: RoomSettings = {
         ...(victoryPoints === undefined ? {} : { victoryPoints }),
         turnTimerSeconds: settings.turnTimerSeconds,
         ...(settings.diceMode === undefined ? {} : { diceMode: settings.diceMode }),
         ...(mode === CLASSIC.id ? {} : { mode }),
+        ...(turns === undefined || turns === rules.turns?.[0] ? {} : { turns }),
       };
       const revision = room.revision + 1;
       this.db
@@ -1581,8 +1604,11 @@ export class Store {
     if (resumed) {
       // Nobody owes an immediate automatic move for time when nobody could see the game.
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
-      this.updateClock(roomId, game);
-    }
+      this.updateClock(roomId, game, connected);
+    } else if (!paused && partnerActing(game) && !connected.has(activePlayer(game).id) && !this.clock(roomId))
+      // A room without a turn timer gives the Partner's phase a clock only once the Partner is away, and it then
+      // runs to the end of the phase even if they come back.
+      this.updateClock(roomId, game, connected);
   }
   /** Call only for admitted sockets, after replacement checks. A returning resigned seat can watch. */
   setConnected(seat: Seat, connected: boolean) {
@@ -1805,18 +1831,25 @@ export class Store {
       { state: string } | undefined;
     return row ? (JSON.parse(row.state) as TurnClock) : undefined;
   }
-  private updateClock(roomId: string, next: Game) {
-    const seconds = this.settings(roomId).turnTimerSeconds;
-    if (seconds === null || next.turn === 0 || next.phase === 'finished') {
+  private updateClock(roomId: string, next: Game, connected = this.connectedSeats) {
+    if (next.turn === 0 || next.phase === 'finished') {
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
       return;
     }
     const now = this.now();
     const playerId = next.players[next.active]!.id;
+    // A turn or a Lead's part runs on the room's timer; Big Table's Partner's phase and build windows have
+    // clocks of their own, which may run in a room without one (docs/TURN_CLOCK.md, "New clocks").
+    const seconds = clockSeconds(next, this.settings(roomId).turnTimerSeconds, !connected.has(playerId));
     let clock = this.clock(roomId);
-    if (!clock || clock.turn !== next.turn || clock.playerId !== playerId)
+    if (!clock || clock.turn !== next.turn || clock.playerId !== playerId) {
+      if (seconds === null) {
+        this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
+        return;
+      }
       clock = { playerId, turn: next.turn, startedAt: now, deadlineAt: now + seconds * 1000 };
-    if (next.phase === 'discard') {
+    }
+    if (next.phase === 'discard' && seconds !== null) {
       clock.pausedAt ??= now;
       const existing = clock.discardDeadlines ?? {};
       // Each player the game waits on for a discard has a full turn's time of their own.
@@ -1897,7 +1930,8 @@ export class Store {
     changed = this.playForAbsent(roomId) || changed;
     const firstClock = this.clock(roomId);
     if (!firstClock) return changed;
-    // At most four discards, two free roads, a robber move, a roll and an end-turn.
+    // At most six discards, two free roads, a robber move, a roll and an end-turn; anything more waits for the
+    // next tick. A Partner's phase or a build window that follows has a fresh clock of its own.
     for (let step = 0; step < 12; step++) {
       const clock = this.clock(roomId);
       if (!clock || clock.turn !== firstClock.turn) break;
@@ -2002,6 +2036,9 @@ export class Store {
     automatic: boolean | 'bot' | 'away' = false,
   ) {
     const action = parseGameAction(input);
+    // Only the clock lets a Partner's free roads lapse; a player places them (docs/RULEBOOK-BIG-TABLE.md, 9.3).
+    if (action.kind === 'endPhase' && action.expired && automatic !== true && automatic !== 'away')
+      throw new ProtocolError('ILLEGAL_ACTION', 'Place your free roads first');
     if (!automatic) this.expireRoom(seat.room_id);
     const payloadHash = hash(
       JSON.stringify({ expectedRevision, action, ...(automatic ? { automatic: true } : {}) }),

@@ -1,4 +1,12 @@
-import { CLASSIC, findRuleset, isRulesetId, targetRangeText, validTarget } from '../../rules/src/rulesets.js';
+import {
+  CLASSIC,
+  findRuleset,
+  isRulesetId,
+  isTurnStructure,
+  targetRangeText,
+  validTarget,
+} from '../../rules/src/rulesets.js';
+import type { TurnStructure } from '../../rules/src/rulesets.js';
 import { DICE_MODES } from '../../rules/src/dice.js';
 import type { DiceMode } from '../../rules/src/dice.js';
 export type { DiceMode } from '../../rules/src/dice.js';
@@ -13,6 +21,11 @@ export type RoomSettings = {
    * which a tab from before modes sends, keeps the room's mode.
    */
   mode?: string;
+  /**
+   * How turns run, in a mode whose host chooses (Big Table). Absent: the mode's default, Paired turns. A change
+   * without one, as a tab from before Big Table sends, keeps the room's.
+   */
+  turns?: TurnStructure;
 };
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = { turnTimerSeconds: 90, diceMode: 'balanced' };
 export const DEFAULT_TURN_TIMER_SECONDS: TurnTimerSeconds = 90;
@@ -21,6 +34,15 @@ export const DEFAULT_TURN_TIMER_SECONDS: TurnTimerSeconds = 90;
  * the game waits on that seat, exactly as if its time had run out (docs/TURN_CLOCK.md, "Modes without bots").
  */
 export const ABSENCE_AFTER_MS = 2 * 60 * 1000;
+/**
+ * Big Table's Partner's phase: half the room's turn time, rounded up to a whole second, and at least 30 seconds.
+ * 30, 33, 45, 58 and 70 seconds at the five timer stops (docs/TURN_CLOCK.md, "New clocks").
+ */
+export const partnerSeconds = (turnSeconds: number) => Math.max(30, Math.ceil(turnSeconds / 2));
+/** A room without a turn timer gives an absent Partner this long for their phase. */
+export const ABSENT_PARTNER_SECONDS = 45;
+/** Each between-turns build window, in every room, with or without a turn timer. */
+export const BUILD_WINDOW_SECONDS = 20;
 
 /** All timestamps use the server's epoch milliseconds. Setup has no clock. */
 export type TurnClock = {
@@ -50,6 +72,9 @@ export function parseRoomSettings(input: unknown): RoomSettings {
   )
     throw new Error(targetRangeText(rules ?? CLASSIC));
   const diceMode = (input as Record<string, unknown>).diceMode;
+  const turns = (input as Record<string, unknown>).turns;
+  if (turns !== undefined && !isTurnStructure(turns))
+    throw new Error('Choose Paired turns or Between-turns build');
   if (seconds !== null && !TURN_TIMER_STEPS.includes(seconds as TurnTimerSeconds))
     throw new Error('Turn timer must be off, 40, 65, 90, 115, or 140 seconds');
   if (diceMode !== undefined && !DICE_MODES.includes(diceMode as DiceMode))
@@ -59,5 +84,6 @@ export function parseRoomSettings(input: unknown): RoomSettings {
     turnTimerSeconds: seconds as TurnTimerSeconds | null,
     ...(diceMode === undefined ? {} : { diceMode: diceMode as DiceMode }),
     ...(mode === undefined ? {} : { mode }),
+    ...(turns === undefined ? {} : { turns }),
   };
 }
