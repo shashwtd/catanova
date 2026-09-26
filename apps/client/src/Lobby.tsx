@@ -1,10 +1,17 @@
-import { DEFAULT_VICTORY_POINTS } from '../../../packages/rules/src/victory.js';
+import {
+  CLASSIC,
+  TURN_STRUCTURES,
+  botsPlayIn,
+  findRuleset,
+  numberWord,
+} from '../../../packages/rules/src/rulesets.js';
 import {
   Bot,
   BotMark,
   Check,
   Clock3,
   Dices,
+  GameMode,
   Copy,
   DoorOpen,
   Link,
@@ -170,8 +177,9 @@ function RoomSheet({
   );
 }
 
-/** A Catan table seats four. Empty places are drawn, not hidden. */
-const SEATS = 4;
+/** How many a room's table seats: its mode's number, four in Classic. Empty places are drawn, not hidden. */
+const seatsOf = (room: Pick<RoomState, 'settings'>) =>
+  (findRuleset(room.settings?.mode) ?? CLASSIC).seats.max;
 
 /**
  * An empty place.
@@ -186,11 +194,14 @@ function OpenSeat({
   busy,
   onInvite,
   onAddBot,
+  noBots,
 }: {
   host: boolean;
   busy: boolean;
   onInvite: () => void;
   onAddBot?: () => void;
+  /** Why no bot can sit down in this room's mode, if none can. */
+  noBots?: string;
 }) {
   return (
     <div className="seat-card seat-open">
@@ -207,10 +218,10 @@ function OpenSeat({
           <button
             type="button"
             className="seat-fill is-bot"
-            disabled={busy}
+            disabled={busy || !!noBots}
             // Which of the three sits down is the room's draw, not a setting,
             // so this is one action and you meet them at the table.
-            title="Which one turns up is the luck of the draw"
+            title={noBots ?? 'Which one turns up is the luck of the draw'}
             onClick={() => onAddBot()}
           >
             <Bot size={16} />
@@ -328,6 +339,7 @@ export function Lobby({
   onKick,
   onChooseColor,
   onPreviousResults,
+  seats = seatsOf(room),
 }: {
   room: RoomState;
   me?: string;
@@ -345,6 +357,8 @@ export function Lobby({
   onKick?: (playerId: string) => Promise<void>;
   onChooseColor?: (color: PlayerColor) => void;
   onPreviousResults?: () => void;
+  /** How many the table seats: the room's mode's number unless a preview says otherwise. */
+  seats?: number;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -354,14 +368,20 @@ export function Lobby({
   const self = room.players.find((p) => p.id === me),
     hostId = roomHostId(room.players),
     host = hostId === me;
-  const canStart =
-    room.players.length >= 2 && room.players.every((p) => p.connected && (p.id === hostId || p.ready));
+  // The room's mode sets the seats, the players needed and whether bots may sit down.
+  const rules = findRuleset(room.settings?.mode) ?? CLASSIC,
+    enough = room.players.length >= rules.seats.min;
+  const canStart = enough && room.players.every((p) => p.connected && (p.id === hostId || p.ready));
   // Everyone here, then one place to fill. Four permanent slots would make a
   // game of two look short-handed, and the old alternative — a tile a quarter
   // the size of a seat, off at the end of the row — did not read as a seat at
   // all. One more place, the same size as the rest, and it goes when full.
   const places: (RoomState['players'][number] | null)[] =
-    room.players.length < SEATS ? [...room.players, null] : [...room.players];
+    room.players.length < seats ? [...room.players, null] : [...room.players];
+  // Only when there is a mode to speak of: a room not in Classic, or a host who could pick another.
+  const showMode = rules.id !== CLASSIC.id || (room.modes?.length ?? 0) > 1;
+  // How its turns run, in a mode that lets the host choose: Big Table's Paired turns unless another was picked.
+  const turns = rules.turns ? (room.settings?.turns ?? rules.turns[0]) : undefined;
   // Resolved the same way the board resolves them, so the swatch on a card and
   // the roads on the island are never two different answers.
   const colors = seatHexColors(room.players);
@@ -405,10 +425,29 @@ export function Lobby({
       <div className="lobby-center">
         <div className="lobby-caption">
           <h1>Game room</h1>
-          <div className="lobby-room-options">
+          <div className="lobby-room-options" {...(showMode ? { 'data-mode': rules.id } : {})}>
+            {showMode && (
+              <button
+                type="button"
+                className="lobby-mode"
+                onClick={onConfigure}
+                aria-label={`Game mode: ${rules.name}${turns ? `, ${TURN_STRUCTURES[turns].name}` : ''}. Room setup`}
+              >
+                <GameMode size={18} />
+                <span>
+                  {rules.name}
+                  {turns && (
+                    <>
+                      {' '}
+                      <b>{TURN_STRUCTURES[turns].short}</b>
+                    </>
+                  )}
+                </span>
+              </button>
+            )}
             <button className="lobby-goal" onClick={onConfigure} aria-label="Points to win. Room setup">
               <Trophy size={18} />
-              <span>{room.settings?.victoryPoints ?? DEFAULT_VICTORY_POINTS} points</span>
+              <span>{room.settings?.victoryPoints ?? rules.victoryPoints.default} points</span>
             </button>
             <button
               type="button"
@@ -436,6 +475,8 @@ export function Lobby({
           className="seat-row"
           aria-label="Seats at this table"
           style={{ '--places': places.length } as CSSProperties}
+          // Only five and six places are marked, for their three-column layout in room-seats.css.
+          data-places={places.length > 4 ? places.length : undefined}
         >
           {places.map((p, i) => (
             <li className="seat-place" key={p?.id ?? `open-${i}`}>
@@ -509,7 +550,13 @@ export function Lobby({
                   </span>
                 </article>
               ) : (
-                <OpenSeat host={!!host} busy={busy || !connected} onInvite={onInvite} onAddBot={onAddBot} />
+                <OpenSeat
+                  host={!!host}
+                  busy={busy || !connected}
+                  onInvite={onInvite}
+                  onAddBot={onAddBot}
+                  {...(rules.bots ? {} : { noBots: botsPlayIn() })}
+                />
               )}
             </li>
           ))}
@@ -563,8 +610,10 @@ export function Lobby({
         </div>
         <div className="lobby-launch">
           <span role="status">
-            {room.players.length < 2
-              ? 'Invite another player'
+            {!enough
+              ? rules.seats.min === 2
+                ? 'Invite another player'
+                : `${rules.name} needs ${numberWord(rules.seats.min)} players`
               : !room.players.every((p) => p.connected)
                 ? 'Waiting for reconnection'
                 : canStart
@@ -629,7 +678,7 @@ export function Lobby({
     </section>
   );
 }
-export function InviteRoster({ room }: { room: RoomPreview }) {
+export function InviteRoster({ room, seats = seatsOf(room) }: { room: RoomPreview; seats?: number }) {
   return (
     <div className="invite-roster">
       {room.players.map((p) => (
@@ -638,7 +687,10 @@ export function InviteRoster({ room }: { room: RoomPreview }) {
           <span>{p.name}</span>
         </div>
       ))}
-      <span className="invite-capacity">{room.players.length}/4</span>
+      <span className="invite-capacity">
+        {room.players.length}
+        {`/${seats}`}
+      </span>
     </div>
   );
 }

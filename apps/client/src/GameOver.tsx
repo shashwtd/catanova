@@ -4,10 +4,16 @@ import { useEffect, useId, useRef } from 'react';
 import type { GameStatistics as Statistics, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { GameIcon } from './GameIcons.js';
+import { GameIcon, SEA_ICONS } from './GameIcons.js';
 import { finalStandings, pointBreakdown } from './player-ranking.js';
 import { playerHexColor } from './player-colors.js';
 import type { CSSProperties } from 'react';
+import {
+  CLASSIC,
+  TURN_STRUCTURES,
+  findRuleset,
+  routeAwardName,
+} from '../../../packages/rules/src/rulesets.js';
 
 /**
  * Who took an award, and on what.
@@ -19,9 +25,19 @@ import type { CSSProperties } from 'react';
 function award(game: ResultGame, kind: 'longestRoad' | 'largestArmy') {
   const holder = game.players.find((p) => p.id === game[kind]);
   if (!holder) return 'Nobody claimed it';
+  // Open Sea's route counts ships too (docs/RULEBOOK-OPEN-SEA.md, 11).
+  const pieces = findRuleset(game.ruleset)?.sea ? 'roads and ships' : 'roads';
   return kind === 'longestRoad'
-    ? `${holder.name} · ${holder.roadLength} roads`
+    ? `${holder.name} · ${holder.roadLength} ${pieces}`
     : `${holder.name} · ${holder.knights} knights`;
+}
+
+/** The mode a game played, when it was not Classic: "Big Table · Paired turns", or "Open Sea". */
+function modeFact(game: ResultGame) {
+  const rules = findRuleset(game.ruleset);
+  if (!game.ruleset || game.ruleset === CLASSIC.id) return null;
+  const name = rules?.name ?? game.ruleset;
+  return game.turns ? `${name} · ${TURN_STRUCTURES[game.turns].name}` : name;
 }
 
 /** Results use the final viewer-safe snapshot; scores are revealed by the server at victory. */
@@ -189,6 +205,9 @@ export function GameOver({
                           <li key={part.key} data-part={part.key}>
                             {part.key === 'longestRoad' && <GameIcon name="road-award" size={18} />}
                             {part.key === 'largestArmy' && <GameIcon name="army-award" size={18} />}
+                            {part.key === 'islandBonus' && (
+                              <GameIcon name={SEA_ICONS.islandBonus} size={18} />
+                            )}
                             <span>{part.label}</span>
                             <b>+{part.points}</b>
                           </li>
@@ -209,12 +228,18 @@ export function GameOver({
             })}
           </div>
           <dl className="game-over-facts" aria-label="This match">
+            {modeFact(game) && (
+              <div>
+                <dt>Mode</dt>
+                <dd>{modeFact(game)}</dd>
+              </div>
+            )}
             <div>
               <dt>Turns</dt>
               <dd>{game.turn}</dd>
             </div>
             <div>
-              <dt>Longest Road</dt>
+              <dt>{routeAwardName(findRuleset(game.ruleset))}</dt>
               <dd>{award(game, 'longestRoad')}</dd>
             </div>
             <div>

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
+import { CLASSIC } from '../../../packages/rules/src/rulesets.js';
 import { ResourceIcon } from './Board.js';
 import { Plus } from './GameIcons.js';
 
@@ -23,6 +24,7 @@ export function ResourcePicker({
   value,
   onChange,
   max,
+  bank = CLASSIC.supply.bank,
   label,
   disabled = false,
   extra,
@@ -30,6 +32,8 @@ export function ResourcePicker({
   value: Hand;
   onChange: (hand: Hand) => void;
   max?: Hand;
+  /** Cards of each resource the game's bank started with, Classic's 19 unless said: no count can be higher. */
+  bank?: number;
   label: string;
   disabled?: boolean;
   extra?: ReactNode;
@@ -39,7 +43,7 @@ export function ResourcePicker({
       <legend>{label}</legend>
       <div className="picker-cards" data-has-selection={Object.values(value).some(Boolean)}>
         {RESOURCES.map((r) => {
-          const limit = max?.[r] ?? 19;
+          const limit = Math.min(max?.[r] ?? bank, bank);
           return (
             <div key={r} className={`picker-slot resource-${r} ${value[r] ? 'has-selection' : ''}`}>
               <button

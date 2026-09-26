@@ -1,0 +1,23 @@
+/*
+ * Open Sea's ships in play (ShipSite and the move marks in Board.tsx, ShipMoveTooltip in ShipMove.tsx).
+ *
+ * A ship site is a road site: the same `legal-road` group with its dashed guide along the edge, and a ship in
+ * place of the road for its preview, so the guidance rules of game-guidance.css and game-dialogs.css apply as
+ * they are. A ship that may move takes the corner guide's dashed orbit, drawn round it as the city upgrade's is
+ * round a settlement, with no fill over the ship. The rules here only give the ship what the road and the house
+ * already have: a ghost while its placement waits to be confirmed, and a lifted look while it waits to move.
+ */
+.build-ghost.ship-piece {
+  opacity: 0.8;
+  pointer-events: none;
+}
+.ship-piece[data-moving='true'] {
+  opacity: 0.45;
+}
+.ship-move-site {
+  cursor: pointer;
+  outline: none;
+}
+[data-build-site='movable'] .vertex-site-guide {
+  fill: none;
+}

@@ -602,8 +602,12 @@ function TableState({ data, now }: { data: Detail; now: number }) {
             )
           ) : data.presence.paused ? (
             'held until someone is back'
+          ) : clock.pausedAt !== undefined && game.phase === 'goldPick' ? (
+            `stopped while ${name(game.goldOwed?.[0]?.player ?? '')} picks from a gold field`
           ) : clock.pausedAt !== undefined ? (
             `stopped while ${discarding.map(name).join(', ') || 'players'} discard`
+          ) : clock.deadlineAt === undefined ? (
+            'no turn timer'
           ) : (
             <>
               {name(clock.playerId)}&rsquo;s turn ends <When at={clock.deadlineAt} now={now} />

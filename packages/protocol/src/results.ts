@@ -1,4 +1,5 @@
-import type { GameView } from '../../rules/src/game.js';
+import type { GameView, ScoreTerm } from '../../rules/src/game.js';
+import { CLASSIC } from '../../rules/src/rulesets.js';
 import type { RoomState } from './index.js';
 import { parseProfile } from './profile.js';
 import type { Profile } from './profile.js';
@@ -7,12 +8,21 @@ import type { PlayerColor } from './colors.js';
 export type ResultPlayer = Pick<
   GameView['players'][number],
   'id' | 'name' | 'points' | 'resigned' | 'pieces' | 'roadLength' | 'knights'
->;
+> & {
+  /** Where the points came from, term by term. Results saved before terms existed have none. */
+  terms?: ScoreTerm[];
+};
 export type ResultGame = Pick<
   GameView,
   'winner' | 'finishReason' | 'turn' | 'longestRoad' | 'largestArmy'
 > & {
   players: ResultPlayer[];
+  /**
+   * The mode played, when it was not Classic, and its turn structure where it had a choice. Results name some
+   * parts by the mode, such as Open Sea's Longest Route.
+   */
+  ruleset?: string;
+  turns?: GameView['turns'];
 };
 /** Public final results only. Never a saved Game or a private GameView. */
 export type MatchResults = {
@@ -32,6 +42,8 @@ export function resultsFromRoom(room: RoomState, id = `${room.roomId}:${room.rou
     game: {
       winner: game.winner,
       ...(game.finishReason ? { finishReason: game.finishReason } : {}),
+      ...(game.ruleset && game.ruleset !== CLASSIC.id ? { ruleset: game.ruleset } : {}),
+      ...(game.turns ? { turns: game.turns } : {}),
       turn: game.turn,
       longestRoad: game.longestRoad,
       largestArmy: game.largestArmy,
@@ -39,6 +51,7 @@ export function resultsFromRoom(room: RoomState, id = `${room.roomId}:${room.rou
         id: p.id,
         name: p.name,
         points: p.points,
+        ...(p.terms ? { terms: p.terms } : {}),
         ...(p.resigned ? { resigned: p.resigned } : {}),
         pieces: { roads: p.pieces.roads, settlements: p.pieces.settlements, cities: p.pieces.cities },
         roadLength: p.roadLength,

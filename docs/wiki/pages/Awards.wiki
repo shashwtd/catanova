@@ -1,4 +1,8 @@
-'''Longest Road''' and '''Largest Army''' are each worth '''two points''' to their current holder. Their badges appear with the player's profile. You may hold both; losing an award also loses its points.
+'''Longest Road''' and '''Largest Army''' are each worth '''two points''' to their current holder. Their badges appear on the holder's player card. You may hold both; losing an award also loses its points.
+
+Every player card also has a small plate under the portrait showing that player's longest road and Knights played. The holder's number is gold. You can follow both races without counting roads on the board.
+
+In [[Open Sea]], a mode still being built, ships count too, and the route award is called Longest Route.
 
 {| class="wikitable"
 ! Award !! First claim !! Taking it from the holder
@@ -31,6 +35,8 @@ Count Knights you have '''played''', not Knights waiting in your hand. Played Kn
 | Either award || 2
 |}
 
-Reach '''10 or more points during your own turn''' to win immediately. Hidden [[Development cards|Victory Point cards]] count, so the visible public score may not tell the whole story. Reaching ten during somebody else's turn is not enough: you must still have ten when your own turn arrives. There is no equalizing final round.
+Reach the room's target '''during your own turn''' to win immediately. The target is '''10 points''' unless the host chose another from 8 to 15 before the game; the '''How to play''' panel shows it. Hidden [[Development cards|Victory Point cards]] count, so the visible public score may not tell the whole story. Reaching the target during somebody else's turn is not enough: you must still have it when your own turn arrives. There is no equalizing final round.
+
+A game can also end without a points win. If every other seat resigns and one person is left, that person wins by resignation. If every person resigns, or all of them stay disconnected for three minutes, the game closes with no winner. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
 
 [[Category:Game rules]]

@@ -3,13 +3,16 @@ __NOTOC__
 |+ Catanova at a glance
 |-
 ! Players
-| 2–4 invited friends
+| 2–4 seats today, friends or bots · 5 or 6 planned in [[Big Table]]
+|-
+! Modes
+| Classic · Big Table and Open Sea being built
 |-
 ! Goal
-| 10 points on your own turn
+| 10 points on your own turn in Classic (host can set 8–15)
 |-
 ! Island
-| 19 land hexes · 5 resources
+| 19 land hexes in Classic · 5 resources
 |-
 ! Play
 | Browser · Google or guest account
@@ -30,19 +33,21 @@ Welcome to the '''Catanova Wiki''': a guide to the island, its resources, and th
 |-
 | [[Development cards]] || Knights, special actions, and hidden points
 |-
-| [[Awards]] || Longest Road, Largest Army, and the race to ten points
+| [[Awards]] || Longest Road, Largest Army, and the race to the points target
 |-
 | [[Map generation]] || How Catanova balances a new island
+|-
+| [[Game modes]] || Classic, and two modes being built: [[Big Table]], for five and six players, and [[Open Sea]]
 |}
 
 == Play together ==
-* [[Getting started]] — create a room, invite friends, and place your first buildings.
-* [[Accounts and friends]] — usernames, guest expiry, Google linking, and reconnecting.
+* [[Getting started]] — create a room, invite friends or add bots, place your first buildings, and play again.
+* [[Accounts and friends]] — usernames, your record, guest expiry, friends online, watching games, and reconnecting.
 * [[Turn timer]] — the optional clock and what happens when time runs out.
 * [[FAQ]] — quick answers to common surprises.
 
 == About these guides ==
-Catanova is an independently developed, open-source game inspired by CATAN. These are original Catanova guides, not an official CATAN publication. Three- and four-player games follow the base-game target; the [[Getting started|two-player option]], [[Map generation|balanced map preset]], and [[Turn timer|timer]] are Catanova choices. Rare development-card cases are marked where their rulings remain provisional.
+Catanova is an independently developed, open-source game inspired by CATAN. These are original Catanova guides, not an official CATAN publication. Three- and four-player games follow the base-game target; the [[Getting started|two-player option]], [[Getting started|bots]], [[Awards|points target]], [[Map generation|balanced map preset and dice]], and [[Turn timer|timer]] are Catanova choices. Rare development-card cases are marked where their rulings remain provisional. The [[Big Table]] and [[Open Sea]] pages describe planned rules for modes that are not yet playable.
 
 For the complete specification, use the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md Catanova rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes]. See [[Project:Copyrights]] for reuse of this wiki's starter text.
 

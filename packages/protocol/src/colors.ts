@@ -7,8 +7,8 @@
  * meant nothing about the choice was worth showing anywhere.
  *
  * So a seat can now ask for a colour. Two seats cannot hold the same one, and
- * a seat that has not asked still gets one automatically, so a table always
- * has four distinct colours whether anybody chose or not. Resolution is pure
+ * a seat that has not asked still gets one automatically, so every seat at a
+ * table has its own colour whether anybody chose or not. Resolution is pure
  * and deterministic — the same seats always produce the same answer on the
  * server, in the browser and in a test.
  */
@@ -46,8 +46,12 @@ export function isPlayerColor(value: unknown): value is PlayerColor {
  *
  * A chosen colour wins, and where two seats somehow hold the same one — an old
  * save, a race the server let through — the earlier seat keeps it and the
- * later seat falls back, so the result is always four different colours rather
+ * later seat falls back, so the result is always different colours rather
  * than two players who cannot tell their roads apart.
+ *
+ * Seats that have not chosen take the first four in their old order, then the
+ * rest of the palette: a fifth and sixth seat get jade and rose. Each colour is
+ * on that list once, or six seats would come round to coral and sky again.
  */
 export function seatColors(seats: readonly { color?: string | null }[]): PlayerColor[] {
   const taken = new Set<PlayerColor>();
@@ -56,7 +60,9 @@ export function seatColors(seats: readonly { color?: string | null }[]): PlayerC
     taken.add(seat.color);
     return seat.color;
   });
-  const spare = [...DEFAULT_SEAT_COLORS, ...PLAYER_COLOR_LIST].filter((color) => !taken.has(color));
+  const spare = [...new Set([...DEFAULT_SEAT_COLORS, ...PLAYER_COLOR_LIST])].filter(
+    (color) => !taken.has(color),
+  );
   let next = 0;
   return chosen.map((color) => {
     if (color) return color;

@@ -1,5 +1,7 @@
-import { roadSites, total } from '../../../packages/rules/src/game.js';
+import { partnerFollows, roadSites, total } from '../../../packages/rules/src/game.js';
 import type { Card, CardKind, GameView } from '../../../packages/rules/src/game.js';
+import { findRuleset } from '../../../packages/rules/src/rulesets.js';
+import { roadBuildingSites } from '../../../packages/rules/src/sea.js';
 export const DEVELOPMENT_ART_INDEX: Record<CardKind, number> = {
   knight: 0,
   roadBuilding: 1,
@@ -35,11 +37,28 @@ export const CARD_LORE: Record<CardKind, { title: string; story: string; effect:
     effect: 'Adds one hidden victory point automatically. Reveal it when you win; this card is never played.',
   },
 };
+/**
+ * What Open Sea's cards do differently (docs/RULEBOOK-OPEN-SEA.md, section 13): a Knight moves the robber or the
+ * pirate, and Road Building places roads or ships.
+ */
+const SEA_EFFECTS: Partial<Record<CardKind, string>> = {
+  knight:
+    'Move the robber or the pirate, and steal one random resource from a player beside it. Counts toward Largest Army.',
+  roadBuilding: 'Build up to two legal roads or ships, in any mix, without spending resources.',
+};
+/** What a card does, in the game's own mode. */
+export const cardEffect = (kind: CardKind, game: Pick<GameView, 'ruleset'>) =>
+  (findRuleset(game.ruleset)?.sea && SEA_EFFECTS[kind]) || CARD_LORE[kind].effect;
 export function cardLockReason(card: Card, game: GameView, me: string): string | null {
   if (card.kind === 'victoryPoint') return 'Already counts toward your victory points.';
   if (game.winner) return 'The game has ended.';
   if (game.legal.playableCards.includes(card.id)) {
-    if (
+    // Open Sea's Road Building needs one legal road or ship, each by its own rule and from its own supply.
+    if (card.kind === 'roadBuilding' && findRuleset(game.ruleset)?.sea) {
+      const sites = roadBuildingSites(game, me);
+      if (!sites.roads.length && !sites.ships.length)
+        return 'You need a road or ship to place and a legal place for it.';
+    } else if (
       card.kind === 'roadBuilding' &&
       ((game.players.find((p) => p.id === me)?.pieces.roads ?? 15) >= 15 || !roadSites(game, me).length)
     )
@@ -48,8 +67,18 @@ export function cardLockReason(card: Card, game: GameView, me: string): string |
     return null;
   }
   if (card.boughtTurn === game.turn) return 'You can play this on your next turn.';
-  if (game.players[game.active]?.id !== me) return 'You can play this on your turn.';
-  if (game.playedCard) return 'You have already played a development card this turn.';
+  if (game.players[game.active]?.id !== me) {
+    // Big Table: a Partner plays theirs in their own phase, after the Lead's part, while one still follows it.
+    const seat = game.players.findIndex((p) => p.id === me);
+    return game.pair?.partner === seat && partnerFollows(game)
+      ? 'You can play this in your Partner’s phase.'
+      : 'You can play this on your turn.';
+  }
+  if (game.phase === 'buildWindow') return 'No development card is played in a build window.';
+  if (game.playedCard)
+    return game.phase === 'partner' || game.returnPhase === 'partner'
+      ? 'You have already played a development card this phase.'
+      : 'You have already played a development card this turn.';
   return 'Finish the current action first.';
 }
 export const RESOURCE_DESCRIPTION = {

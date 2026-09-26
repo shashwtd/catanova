@@ -1,0 +1,23 @@
+/*
+ * The robber's lists at a table of five or six.
+ *
+ * RobberFlow marks the panel with `data-seats` only at five or six. Up to six
+ * players can owe a discard, and the waiting list stacked them in a column
+ * where each row's flex basis became 120 pixels of height, so six ran off the
+ * panel. Here they wrap in a row instead, two to a line on a phone, each only
+ * as tall as its name. The selectors match the rules they override, with the
+ * mark inside `:where()` so it adds no specificity.
+ *
+ * The victim list needs nothing: at most three buildings touch a tile, so no
+ * more than three players can be robbed at once.
+ */
+.playing :where(.robber-flow[data-seats]) .discard-waiting-list {
+  flex-direction: row;
+}
+/* A long name shortens with an ellipsis rather than taking a line of its own. */
+.playing :where(.robber-flow[data-seats]) .discard-player {
+  min-width: 0;
+}
+:where(.playing .robber-flow[data-seats]) .discard-player strong {
+  white-space: nowrap;
+}

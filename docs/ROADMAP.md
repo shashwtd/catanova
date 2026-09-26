@@ -50,4 +50,4 @@ Keep terrain instantly readable and playful. Evaluate the current flat board, co
 
 Complete compatibility review, full human games, supported-device checks, internet failure/load testing, operational monitoring/backups, self-hosting validation and naming/asset review before a stable release. Public GitHub source is already available; production hosting is a separate milestone.
 
-The current two-player option uses the same base mechanics without neutral players. Official two-player variants, expansions, bots, spectators, replay sharing and native apps remain separate future work. Public matchmaking and solo play are outside the current invited-room scope.
+The current two-player option uses the same base mechanics without neutral players. Official two-player variants, bots, spectators, replay sharing and native apps remain separate future work. Expansions are planned in [Game modes](GAME-MODES.md): Big Table, for five and six players, and Open Sea come first, each with its own rulebook. Public matchmaking and solo play are outside the current invited-room scope.

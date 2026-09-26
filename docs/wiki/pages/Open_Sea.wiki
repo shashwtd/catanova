@@ -1,0 +1,191 @@
+'''Open Sea''' is Catanova's sea [[Game modes|mode]]. Players build ships, sail to small islands, collect from gold fields and dodge a pirate. It is being built and is not yet playable. This page describes the planned rules for its first scenario, '''Outer Isles''', for three or four players. Everything works as in Classic unless this page says otherwise.
+
+{| class="wikitable"
+! !! Classic !! Open Sea
+|-
+| Players || 2–4, friends or bots || 3 or 4, people only
+|-
+| Board || One island of 19 land hexes || Outer Isles: a main island, small islands and sea
+|-
+| Route pieces || Roads || Roads and ships; ships can move
+|-
+| Production || Five resource terrains || Plus gold fields, which pay resources of your choice
+|-
+| After a seven or a Knight || Move the robber || Move the robber or the pirate
+|-
+| Route award || Longest Road || Longest Route, counting roads and ships
+|-
+| Points target || 10; host can set 8–15 || 14; host can set 10–18
+|-
+| Island bonus || None || 2 points for your first settlement on each small island
+|}
+
+The bank still holds 19 cards of each resource, and the development deck is Classic's 25 cards. Each player has 15 roads, 15 ships, 5 settlements and 4 cities.
+
+== The sea ==
+The board is a grid of land hexes and sea hexes. Sea hexes produce nothing, carry no number and never hold the robber. The outermost hexes form a ring of sea, and that ring is part of the board. Nothing is placed on the board's outer rim.
+
+{| class="wikitable"
+! Edge !! Between !! Road !! Ship
+|-
+| Land edge || Two land hexes || Yes || No
+|-
+| Coastal edge || Land and sea || Yes || Yes, but it holds one piece: a road or a ship
+|-
+| Sea edge || Two sea hexes || No || Yes
+|-
+| Outer rim || Sea and the edge of the board || No || No
+|}
+
+Settlements and cities go only on corners that touch land. The [[Buildings|distance rule]] counts every kind of edge, so two settlements facing each other across a narrow strait can still be too close.
+
+A port sits on a coastal edge, and a road or a ship may stand there. As in [[Trading and ports|Classic]], only your own settlement or city on one of the port's two corners gives you its rate. A ship beside a port gives nothing.
+
+== Ships ==
+{| class="wikitable"
+! Piece !! Cost !! Supply per player !! Points
+|-
+| '''Ship''' || 1 Timber + 1 Sheep || 15 || 0 by itself
+|}
+
+A new ship goes on an empty coastal or sea edge. It must touch one of your settlements or cities, or one of your ships. It may not:
+* attach directly to one of your roads;
+* pass through another player's settlement or city;
+* go on any edge of the pirate's hex.
+
+Ships may branch and form loops. A ship counts toward [[#Longest Route|Longest Route]].
+
+=== Where roads and ships meet ===
+Your roads and your ships join only at your own settlement or city. If a road and a ship both end at the same empty corner, they stay two separate networks there: a new road from that corner must attach to your road, and a new ship to your ship. Build a settlement on that corner and they join. If another player builds there first, they never join.
+
+=== Settling by ship ===
+A settlement may go on an empty corner touching one of your roads or one of your ships, if the distance rule allows. That is how you reach the small islands: sail a line of ships to an island's coast and build there. Roads can then grow from that settlement across the island.
+
+== Moving ships ==
+Once per turn, in your action phase, you may move one of your ships. The ship must:
+* not have been built this turn;
+* not be on an edge of the pirate's hex;
+* sit at an open end of a line of ships, or be freed by the loop and ring rules below;
+* not be part of a closed line.
+
+Pick it up and put it on any other edge where you could legally build a new ship right now, other than an edge of the pirate's hex. The move may not cut off another of your ships that was still connected to your ships or buildings; a ship that was already cut off, for example by another player's settlement, never stops a move. There is no distance limit, and a move costs nothing. After moving, you may build a settlement next to the ship's new position in the same turn, if the rules allow.
+
+=== Open ends and closed lines ===
+* A ship's end is '''open''' when the corner there has none of your settlements or cities and none of your other ships. Your own road at that corner does not close it.
+* A '''closed line''' is a line of your ships that joins two of your settlements or cities. None of its ships can move. It stays closed even if another player later builds a settlement on it.
+* Your ships do not connect through another player's settlement or city. If the settlement was there before your ships met at that corner, each of them has an open end there. If another player settles later on a corner where your ships already meet, those ships stay closed there, whether the line was closed or still open.
+* A '''loop''' leaves one of your buildings and comes back to the same one. Only the two ships touching that building may move.
+* A '''ring''' is a circle of your ships with no building of yours on it. Every ship in the ring may move, though a ship linking the ring to one of your buildings may not.
+* A loop or ring that passes through another player's settlement or city is broken there, so it is neither a loop nor a ring.
+
+These rules apply however many loops, rings and branches your ships form.
+
+Moving a ship never costs you Longest Route if your longest route afterwards is at least as long as before.
+
+For example, your settlement has three ships in a row heading out to sea. Only the third ship, whose far end touches nothing of yours, can move. Build a fourth ship branching from the second, and the third and fourth can each move. Had the line of three ended at another of your settlements, none of the three could move.
+
+=== Timing ===
+Ship moves happen only in your own action phase, after the roll has been dealt with. Never before rolling, during setup, on another player's turn, or between the two placements of a Road Building card. A ship placed during setup may move on its owner's first turn.
+
+== Gold fields ==
+When a gold field's number is rolled and the robber is not on it, each adjacent settlement earns its owner 1 resource of their choice, and each adjacent city earns 2, in any mix. Gold is not a resource: there are no gold cards to hold, trade or steal.
+
+# Ordinary hexes produce first, with the usual [[Resources|bank shortage rule]].
+# Then the players owed gold choose, one player at a time, in turn order starting with the player who rolled. Each choice must be a resource the bank still holds at that moment.
+# If the bank runs out of resource cards, any remaining picks are lost. Picks cannot be declined.
+
+Each player owed gold has one 20-second clock for all their picks, even in a room without a turn timer, and the clock of the player on turn pauses meanwhile. Picks are public: everyone sees what you took. If the clock runs out, the game takes, for each card still owed, the resource you hold fewest of among those the bank still has. Ties go in the order Timber, Clay, Sheep, Hay, Rock.
+
+Gold fields sit only on small islands and never carry a 6 or an 8. The robber can stand on a gold field and stop it producing. A second starting settlement next to a gold field would take 1 chosen resource for each such field, but on Outer Isles starting settlements are all on the main island, so this never happens there.
+
+== The pirate ==
+The pirate always stands on a sea hex. It starts on a sea hex set by the map, away from where starting settlements can go.
+
+After a rolled seven, once any discards are done, or after a Knight, you move either the robber or the pirate. Exactly one of them moves, never both.
+* '''The robber''' works as in [[Resources|Classic]], on land hexes only, on any island. It starts on the desert.
+* '''The pirate''' moves to a different sea hex. Then you take one random resource card from one other player who has a ship on an edge of that hex. If anyone does, you must rob one of them.
+
+Only ships make a player a target. A settlement on the coast of the pirate's hex does not. A player with several ships there still loses only one card.
+
+While the pirate is on a hex, no ship may be built on its six edges, moved onto them or moved off them. Ships already there stay, stay connected and still count for Longest Route. The pirate blocks no production, roads, settlements, cities or ports.
+
+== Longest Route ==
+In Open Sea the route award is called '''Longest Route''', because ships count. It is worth 2 points and needs one continuous route of at least 5 roads, ships, or both.
+* Roads join roads, and ships join ships, at any corner without another player's building.
+* A road and a ship join only through your own settlement or city.
+* Another player's settlement or city interrupts the route.
+
+Everything else follows [[Awards|Longest Road]]: you need a strictly longer route to take the award, a tie leaves it with its holder, and broken routes are handled the same way. [[Awards|Largest Army]] is unchanged.
+
+== Development cards ==
+* '''Knight:''' move the robber or the pirate. Nobody discards.
+* '''Road Building:''' place 2 roads, 2 ships, or one of each, free, one after the other. Each follows the rules for its own kind of piece. A ship placed this way cannot move in the same turn.
+* Year of Plenty, Monopoly and Victory Point cards are unchanged.
+
+== Outer Isles ==
+Outer Isles is Catanova's own scenario, not an official map. Every board has:
+* one main island, where all starting settlements go;
+* several small islands, reachable only by sea, each one sea hex from the main island and at least three from every other small island;
+* two gold fields, both on small islands but never on the same one;
+* one desert, where the robber starts;
+* two rings of sea round every coast, so the board's edge follows the islands.
+
+{| class="wikitable"
+! !! Three players !! Four players
+|-
+| Board || 92 hexes, 24 of them land || 107 hexes, 30 of them land
+|-
+| Main island || 16 land hexes, shaped like a shield || 20 land hexes, shaped like a diamond
+|-
+| Small islands || 3 islands, 8 land hexes || 4 islands, 10 land hexes
+|-
+| Ports || 8, all on the main island || 9, all on the main island
+|}
+
+On a phone the board opens zoomed on its islands, and a pinch shows the whole sea. The shape is fixed for each player count, but terrain, numbers and port types are shuffled every game under fairness rules like those of the [[Map generation|balanced island]]. No 6 or 8 borders another, ports are spaced so that no two share or neighbour a corner, and every small island stays reachable by ship even with the pirate in the way.
+
+=== Setting up ===
+Each player rolls both dice. The highest total starts, and players tied for highest roll again. Placement follows the usual snake (1, 2, 3, 3, 2, 1 with three players, 1, 2, 3, 4, 4, 3, 2, 1 with four), and both starting settlements go on the main island. After each settlement, place a road touching it or, if the settlement is on the coast, a ship instead. A starting ship may not go on an edge of the pirate's hex.
+
+== Island points and winning ==
+Your first settlement on each small island earns you '''2 bonus points''', on top of the settlement's own point.
+* Each island counts once for each player, whoever settled there first.
+* Later settlements of yours on the same island earn no bonus.
+* The bonus stays when that settlement becomes a city.
+* The main island never earns a bonus, so starting settlements never do.
+* There is no limit on how many bonuses can be paid.
+
+The target is 14 points unless the host chose another from 10 to 18. As in [[Awards#Winning|Classic]], you win as soon as you have the target during your own turn, and hidden Victory Point cards count.
+
+For example, the target is 14 and you have 12 points. You sail to a small island and build your first settlement there. It gives 1 point and the island 2 more, so you reach 15 and win at once. A second settlement on that island would have given only its own 1 point.
+
+== Clocks and disconnects ==
+{| class="wikitable"
+! What the game waits for !! Clock
+|-
+| A turn || The room's [[Turn timer|turn timer]], as in Classic
+|-
+| A discard after a seven || As in Classic
+|-
+| Gold picks || 20 seconds for each player owed gold, for all their picks, in every room
+|-
+| Setup || Untimed; the clock places for a player away 2 minutes
+|}
+
+When time runs out, the clock finishes only what must be done. If a robber-or-pirate move is still owed, it moves the robber. Road Building pieces still owed become roads where possible, otherwise ships. It never builds, buys, trades, plays a card or moves a ship for you in any other way.
+
+Open Sea has no bots. A disconnected player is shown as disconnected and the game waits for them. Once they have been offline for 2 minutes, the clock acts for them whenever the game waits on them, as if their time had run out: in setup, on their turns, their discards and their gold picks. In setup the clock places a settlement on the legal main-island corner with the most production dots, with ties broken at random, then a road touching it, or a ship if no road fits. This applies whether or not the room has a turn timer, and it stops the moment they reconnect. See [[Game modes#When a player disconnects|When a player disconnects]].
+
+== Cases settled by Catanova ==
+Some cases were left open by the official rules or by the first plan. Catanova has settled nearly all of them. Among them:
+* when a turn runs out with a robber-or-pirate move owed, the clock moves the robber;
+* the gold-pick clock runs in every room, even without a turn timer;
+* a ship move may not cut off another of your ships that was still connected, though a ship already cut off never stops a move; this can matter only where another player's building has split one of your lines;
+* when another player settles on a corner where your ships meet, those ships stay closed there, as the publisher's FAQ has it;
+* changing the mode resets the points target to the new mode's default, and a table with fewer than three players can switch to Open Sea and wait for more.
+
+Two rare development-card cases carried over from Classic remain provisional. Whether a target of 14 and a 2-point island bonus suit Outer Isles is a balance question, to be playtested after release.
+
+Later scenarios and a five-and-six-player version are listed under [[Game modes#Later|Later]]. The full specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-OPEN-SEA.md Open Sea rulebook].
+
+[[Category:Game rules]]

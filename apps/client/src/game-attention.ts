@@ -1,5 +1,8 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
+import { owedBy } from '../../../packages/rules/src/owed.js';
+import { RESOURCES } from '../../../packages/rules/src/index.js';
+import { findRuleset } from '../../../packages/rules/src/rulesets.js';
 import type { GameIconName } from './GameIcons.js';
 
 export type GameStatus = {
@@ -15,6 +18,8 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
   const active = game.players[game.active];
   const mine = active?.id === me;
   const name = active?.name ?? 'A player';
+  // Open Sea's setup piece and free pieces are roads or ships, and a seven moves the robber or the pirate.
+  const sea = !!findRuleset(game.ruleset)?.sea;
   let prompt = '',
     icon: GameIconName = 'timer',
     favicon: GameStatus['favicon'] = null;
@@ -35,13 +40,23 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
         icon = 'settlement';
         break;
       case 'setupRoad':
-        prompt = mine ? 'Place a road on a highlighted path' : `${name} is placing a road`;
+        prompt = sea
+          ? mine
+            ? 'Place a road or a ship on a highlighted path'
+            : `${name} is placing a road or a ship`
+          : mine
+            ? 'Place a road on a highlighted path'
+            : `${name} is placing a road`;
         icon = 'road';
         break;
       case 'freeRoads':
-        prompt = mine
-          ? `Place ${game.freeRoads} free road${game.freeRoads === 1 ? '' : 's'} on the highlighted paths`
-          : `${name} is placing free roads`;
+        prompt = sea
+          ? mine
+            ? `Place ${game.freeRoads} free ${game.freeRoads === 1 ? 'road or ship' : 'roads or ships'} on the highlighted paths`
+            : `${name} is placing free roads or ships`
+          : mine
+            ? `Place ${game.freeRoads} free road${game.freeRoads === 1 ? '' : 's'} on the highlighted paths`
+            : `${name} is placing free roads`;
         icon = 'road';
         break;
       case 'roll':
@@ -63,24 +78,58 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
         break;
       }
       case 'robber':
-        prompt = mine ? 'Move the robber to a highlighted tile' : `${name} is moving the robber`;
+        prompt = sea
+          ? mine
+            ? 'Move the robber or the pirate'
+            : `${name} is moving the robber or the pirate`
+          : mine
+            ? 'Move the robber to a highlighted tile'
+            : `${name} is moving the robber`;
         icon = 'robber';
         favicon = mine ? 'robber' : null;
         break;
+      // Big Table. The rest of the table sees these only in the title: on the board, the chip on the rail.
+      case 'partner':
+        prompt = mine
+          ? 'Your Partner’s phase: build, buy, trade with the bank, play one card'
+          : `${name} is taking the Partner’s phase`;
+        icon = 'trade';
+        break;
+      case 'buildWindow':
+        prompt = mine ? 'Build window: build or buy, no trading' : `${name} has a build window`;
+        icon = 'settlement';
+        break;
+      // Open Sea: the players owed gold pick one at a time, whoever is on turn.
+      case 'goldPick': {
+        const picking = game.goldOwed?.[0];
+        const count = Math.min(
+          picking?.picks ?? 0,
+          RESOURCES.reduce((n, r) => n + game.bank[r], 0),
+        );
+        prompt =
+          picking?.player === me
+            ? `Choose ${count} ${count === 1 ? 'resource' : 'resources'} from the gold field`
+            : `Waiting for ${game.players.find((p) => p.id === picking?.player)?.name ?? 'a player'} to pick from the gold field`;
+        icon = 'timer';
+        break;
+      }
     }
+  // During Open Sea's gold picks the game waits on the player picking, who may not be on turn.
+  const picker =
+    game.phase === 'goldPick' ? game.players.find((p) => p.id === game.goldOwed?.[0]?.player) : undefined;
   if (
     !game.winner &&
     game.phase !== 'finished' &&
     !room?.paused &&
-    !mine &&
+    !(picker ? picker.id === me : mine) &&
     !game.players.find((p) => p.id === me)?.resigned &&
     !((game.discards[me ?? ''] ?? 0) > 0)
   ) {
-    const seat = room?.players.find((p) => p.id === active?.id);
+    const seat = room?.players.find((p) => p.id === (picker ?? active)?.id);
     // Only while the seat is genuinely empty. Once a bot has picked it up the
     // turn is being played, so telling the table to wait would be wrong.
     if (seat && !seat.connected && !seat.standIn && seat.resignAt !== undefined) {
-      prompt = `Waiting for ${name} to reconnect`;
+      prompt = `Waiting for ${picker?.name ?? name} to reconnect`;
       icon = 'connection';
       favicon = null;
     }
@@ -88,14 +137,15 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
   return { prompt, icon, favicon, title: `${prompt} — Catanova` };
 }
 
+/**
+ * The move the game is waiting on this player for, other than the open-ended actions of their turn. A build
+ * window comes after every turn and asks nothing, so it gets no cue; the Partner's phase is a turn of its own.
+ */
 export function requiredAction(game: GameView, me?: string) {
   if (!me || game.winner || game.phase === 'finished' || game.players.find((p) => p.id === me)?.resigned)
     return null;
-  if (game.phase === 'discard' && (game.discards[me] ?? 0) > 0) return 'discard';
-  if (game.players[game.active]?.id !== me) return null;
-  return ['roll', 'setupSettlement', 'setupRoad', 'freeRoads', 'robber'].includes(game.phase)
-    ? game.phase
-    : null;
+  const owed = owedBy(game, me)?.kind;
+  return owed && owed !== 'actions' && owed !== 'buildWindow' ? owed : null;
 }
 
 /** Do not repeat a cue for presence updates, re-syncs, or a reconnect to the same obligation. */
@@ -128,6 +178,8 @@ export class AttentionTracker {
     this.action = action;
     // The house's construction sound already leads straight into its adjacent road.
     if (action === 'setupRoad' && previousAction === 'setupSettlement') return null;
-    return action === 'roll' || action === 'setupSettlement' || action === 'setupRoad' ? 'turn' : 'warning';
+    return action === 'roll' || action === 'partner' || action === 'setupSettlement' || action === 'setupRoad'
+      ? 'turn'
+      : 'warning';
   }
 }

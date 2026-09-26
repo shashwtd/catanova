@@ -32,6 +32,7 @@ import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { gameView } from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction } from '../../../packages/rules/src/timeout.js';
+import { owedMoves } from '../../../packages/rules/src/owed.js';
 import type { Store } from './store.js';
 
 /** How often the scheduler looks for work. Small, because each room decides for
@@ -435,37 +436,31 @@ export class BotDriver {
     return style ? { ...plan, archetype: STYLE_ARCHETYPE[style.style] } : plan;
   }
 
-  /** The bot that owes a move: whoever must discard first, otherwise the active
-   *  seat. Mirrors how the turn clock decides who it is waiting for. */
+  /** The bot that owes a move: the first seat the game is waiting on that a bot plays. The turn clock and
+   *  the absence rule read the same list (owedMoves). */
   private owedBy(roomId: string, game: Game): BotSeat | null {
     const bots = this.dependencies.store.botSeatsIn(roomId);
     if (!bots.length) return null;
     const byId = new Map(bots.map((b) => [b.id, b]));
-    if (game.phase === 'discard') {
-      const owing = Object.keys(game.discards).find((id) => byId.has(id));
-      if (owing) return byId.get(owing)!;
-      return null;
-    }
-    const active = game.players[game.active];
-    if (!active || active.resigned) return null;
-    return byId.get(active.id) ?? null;
+    const owing = owedMoves(game).find((move) => byId.has(move.player));
+    return owing ? byId.get(owing.player)! : null;
   }
 }
 
 /**
- * Only what the rules require of this seat, never spending anything: the turn
- * clock's own choice wherever it has one. The opening has no clock, so there it
- * is the corner with the most production and a road beside it, which is also
- * all the opening asks of anybody.
+ * Only what the rules require of this seat, never spending anything: the turn clock's own choice wherever it
+ * has one. In the opening a bot keeps its own choice, the corner with the most production and a road beside
+ * it, which is also all the opening asks of anybody.
  */
 function safeMove(game: Game, seatId: string, random: () => number): GameAction | undefined {
-  const forced = timeoutAction(game, seatId, random);
-  if (forced) return forced;
-  const legal = gameView(game, seatId).legal;
-  const corner = rankCorners(game.board, legal.settlements, 1)[0];
-  if (game.phase === 'setupSettlement' && corner !== undefined) return { kind: 'settlement', vertex: corner };
-  if (game.phase === 'setupRoad' && legal.roads.length) return { kind: 'road', edge: legal.roads[0]! };
-  return undefined;
+  if (game.phase === 'setupSettlement' || game.phase === 'setupRoad') {
+    const legal = gameView(game, seatId).legal;
+    const corner = rankCorners(game.board, legal.settlements, 1)[0];
+    if (game.phase === 'setupSettlement')
+      return corner === undefined ? undefined : { kind: 'settlement', vertex: corner };
+    return legal.roads.length ? { kind: 'road', edge: legal.roads[0]! } : undefined;
+  }
+  return timeoutAction(game, seatId, random);
 }
 
 export const newBotCommandId = () => 'bot-' + randomUUID();

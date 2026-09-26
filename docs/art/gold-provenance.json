@@ -1,0 +1,50 @@
+{
+  "subject": "Gold field terrain tile for Open Sea, one per board theme (Storybook and Classic)",
+  "date": "2026-09-26",
+  "tool": "openai-image MCP (GPT Image 2.5)",
+  "chosenBy": "The owner picked the 'Gold 1' draft (one large rock, a wide glowing seam of gold above a pool with nuggets) on 25 September 2026; these finals follow GAME-MODES.md 'Matching the existing look' (muted warm stone ground, not pasture; seam no brighter than hay; composition above the number token; calm edges).",
+  "steps": [
+    {
+      "file": "gold-storybook-draft.png",
+      "sha256": "7141f0a57b91e7283614bcce564c492b32ba6aa61de62a6fea5ea41e0dc03925",
+      "model": "gpt-image-2.5-flare",
+      "operation": "edit",
+      "inputs": ["gold-field-bold-1.png (the chosen draft)", "terrain-storybook atlas as reference"],
+      "size": "1024x1024",
+      "prompt": "Repaint the FIRST image (a gold-field terrain tile) as a new terrain cell that belongs in the SECOND image, a board-game terrain atlas (Storybook theme). Keep one large warm grey-brown rock outcrop with a wide, softly glowing seam of gold, a small calm turquoise pool, two or three nuggets. Move the composition up (top half, centred); muted warm stone and ochre ground, not pasture; gold no brighter than the hay field; no sparkles; remove edge clutter; calm, lighter edges. Match the atlas camera and gouache painting."
+    },
+    {
+      "file": "gold-storybook-final.png",
+      "sha256": "a2e8b7a2397597249a33ac4fadca56dabe6d9885886949d040026eb99801342d",
+      "model": "gpt-image-2.5-sunburst",
+      "operation": "edit",
+      "inputs": ["gold-storybook-draft.png", "terrain-storybook atlas as reference"],
+      "size": "1024x1024",
+      "prompt": "Refine the first image so it sits beside the six atlas tiles. Keep the outcrop, seam, pool and nuggets. Ground: muted warm taupe-grey stony earth with low muted olive shrubs, clearly unlike Desert, Hay, Rock or Sheep. Layout: outcrop starts about a tenth of the height below the top edge; outcrop, seam, pool and nuggets within the upper 42%, centred; calm open ground below where the number token sits. Gold rich and warm, no brighter than hay, no sparkles. Calm, slightly lighter edges. Match the atlas camera and gouache painting."
+    },
+    {
+      "file": "gold-classic-final.png",
+      "sha256": "58616994def61d771fef1a9162c88a9353ba9a70ac0f691d1d759d231f02899c",
+      "model": "gpt-image-2.5-sunburst",
+      "operation": "edit",
+      "inputs": ["gold-storybook-final.png", "terrain-fantasy (Classic theme) atlas as reference"],
+      "size": "1024x1024",
+      "prompt": "Paint the gold-field tile again in the style of the Classic theme atlas (denser, more saturated, more detailed), as its seventh tile. Same subject and layout (all features in the upper 42%, calm ground where the token sits). Small painted props allowed. Warm taupe-grey stony ground with muted olive shrubs, unlike the atlas's Desert, Hay, Rock and Sheep. Gold no brighter than hay; no sparkles. Calmer edges."
+    }
+  ],
+  "runtimeSources": [
+    {
+      "file": "gold-storybook.png",
+      "sha256": "4ec6cac646214a2bada77d5d6e92a2e54e557a7312c6dc2475a52ec0f5fce8d0",
+      "from": "gold-storybook-final.png resized to 512x512 (macOS sips)",
+      "theme": "storybook"
+    },
+    {
+      "file": "gold-classic.png",
+      "sha256": "79534c793c9380f872323dea29e3717eccf90e631e89ac465a2ef3b18f23b904",
+      "from": "gold-classic-final.png resized to 512x512 (macOS sips)",
+      "theme": "classic"
+    }
+  ],
+  "checked": "Hex-cropped at 110 and 44 pixels beside the six tiles of each atlas with a number token (compare-storybook.png, compare-classic.png): distinct from every tile, seam visible at phone size, token covers only the lower part of the pool."
+}

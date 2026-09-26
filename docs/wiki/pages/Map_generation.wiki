@@ -20,10 +20,12 @@
 * More than two connected hexes of the same resource.
 * A resource being entirely confined to one small area: each type has at least two hexes separated by three or more hex steps.
 * A 6 or 8 touching another 6 or 8.
+* Two hexes with the same number touching, so no intersection touches one number twice.
+* The 2 touching the 12.
 * An intersection exceeding eleven production dots across its adjacent hexes.
 * Resource types with average production outside the preset's range of 2.5–4 dots per hex. The lower total is rounded up when a type has three hexes.
 
-The four general ports and five specialized ports are shuffled independently over nine separated coastal edges. A corner can still touch three different resources, and some locations remain stronger than others. The [[Getting started|reverse second placement]] matters; this preset does not guarantee equal outcomes or equal seats.
+The four general ports and five specialized ports are shuffled independently over nine coastal edges. No two ports share or neighbour an intersection, and ports alternate with open sea all the way round the island. A corner can still touch three different resources, and some locations remain stronger than others. The [[Getting started|reverse second placement]] matters; this preset does not guarantee equal outcomes or equal seats.
 
 == What are production dots? ==
 {| class="wikitable"
@@ -40,9 +42,9 @@ The four general ports and five specialized ports are shuffled independently ove
 | 6 or 8 || 5 out of 36 || 5
 |}
 
-Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. New rooms use Balanced dice, which draw from a deck of the 36 dice combinations so short games stay closer to the usual curve; the host can choose Natural dice instead. Neither gives any player a catch-up bonus.
+Dots describe probability, not a production schedule. The map seed reproduces the island, but does not determine dice rolls, robber thefts, or the development deck. New rooms use Balanced dice, which draw from a deck of the 36 dice combinations so short games stay closer to the usual curve; the host can choose Natural dice instead. Neither gives any player a catch-up bonus. '''Dice statistics''' in the game menu compares the current game's roll totals with the expected average.
 
 == Preset status ==
-This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.
+This is a Catanova preset, separate from the official spiral-number setup or fixed beginner board. Those reference setups are documented but are not currently selectable in the app. The current version of the preset added the equal-number, 2-and-12, and alternating-port rules on 23 September 2026. Each lobby is dealt its island when the room opens or returns from a game, and a game already started keeps the island it was dealt. [[Big Table]] and [[Open Sea]], modes still being built, will deal their boards from presets of their own. See the [https://github.com/shashwtd/catanova/blob/main/docs/MAP_GENERATION.md generator specification] for exact constraints.
 
 [[Category:Game rules]]

@@ -11,7 +11,7 @@
  */
 import { ROOM_CODE_LEASE_MS } from '../store.js';
 import { score } from '../../../../packages/rules/src/game.js';
-import { DEFAULT_VICTORY_POINTS } from '../../../../packages/rules/src/victory.js';
+import { rulesetOf } from '../../../../packages/rules/src/rulesets.js';
 import { AdminRequestError } from './api.js';
 import type { AdminContext } from './api.js';
 import { serverErrors } from './errors.js';
@@ -84,7 +84,7 @@ export async function overview(
         status: room.status,
         turn: game.turn,
         phase: game.phase,
-        target: game.victoryPoints ?? DEFAULT_VICTORY_POINTS,
+        target: game.victoryPoints ?? rulesetOf(game).victoryPoints.default,
         startedAt: roundStartedAt(store, room.id),
         lastActivity: room.lastActivity,
         dice: game.dice ? [game.dice[0], game.dice[1]] : null,

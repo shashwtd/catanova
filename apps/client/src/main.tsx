@@ -4,6 +4,8 @@ import { GameOver } from './GameOver.js';
 import { GameStatistics } from './GameStatistics.js';
 import { LoungeBackdrop } from './LoungeBackdrop.js';
 import { PlacementConfirmation } from './PlacementConfirmation.js';
+import { MoveShipButton } from './ShipMove.js';
+import type { ShipMove } from './ShipMove.js';
 import { TurnButtonAttention } from './TurnButtonAttention.js';
 import { UtilityPanel } from './UtilityPanel.js';
 import { LiveConnectionPanel } from './ConnectionPanel.js';
@@ -13,7 +15,7 @@ import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
-import { buildShown, isBuildAction, placementValid } from './placement.js';
+import { buildShown, edgePieces, isBuildAction, placementValid } from './placement.js';
 import type { BuildAction, PlacementDraft } from './placement.js';
 import { BOARD_THEMES } from './board-theme.js';
 import { usePreferences } from './preferences.js';
@@ -25,6 +27,8 @@ import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
 import { SendFeedback, useLastMessage } from './SendFeedback.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
+import { GoldPick } from './GoldPick.js';
+import type { RobberPiece } from './RobberChoice.js';
 import { useGameAttention } from './useGameAttention.js';
 import { FantasyTransition } from './FantasyTransition.js';
 import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
@@ -55,6 +59,7 @@ import {
 import { PlayerRail } from './PlayerRail.js';
 import { friendStatus } from './social-presence.js';
 import { BoardViewport } from './BoardViewport.js';
+import { boardKey } from './scene.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
 import { initialMetrics } from './connection.js';
 import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
@@ -86,6 +91,7 @@ import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
 import { emptyHand } from '../../../packages/rules/src/game.js';
+import { CLASSIC, findRuleset, rulesets } from '../../../packages/rules/src/rulesets.js';
 import type { GameAction } from '../../../packages/rules/src/game.js';
 import { Board, ResourceIcon } from './Board.js';
 import type { BuildMode } from './Board.js';
@@ -135,6 +141,15 @@ import './landing-features.css';
 import './room-seats.css';
 import './mobile-shelf.css';
 import './table-light.css';
+import './game-mode.css';
+import './open-sea.css';
+import './ship-sites.css';
+import './placement-choice.css';
+import './gold-pick.css';
+import './six-seat-rail.css';
+import './six-seat-trade.css';
+import './six-seat-robber.css';
+import './big-table.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];
@@ -308,7 +323,11 @@ function App() {
   // Feedback can attach the last error a player saw, even after it was dismissed.
   const lastError = useLastMessage(error || auth.error);
   const [robberHex, setRobberHex] = useState<number | null>(null);
+  /** Open Sea: after a seven or a Knight, whether the robber or the pirate is moving. */
+  const [robberPiece, setRobberPiece] = useState<RobberPiece | null>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
+  /** Open Sea: a ship move under way, from the dock's Move ship or a tap on one of the player's ships. */
+  const [shipMove, setShipMove] = useState<ShipMove | null>(null);
   const [isFullscreen, setFullscreen] = useState(!!document.fullscreenElement);
 
   const g = room?.game,
@@ -381,6 +400,10 @@ function App() {
     feedback.sound.setScene(g ? 'game' : 'menu');
   }, [!!g, feedback.sound]);
   const actionPhase = myTurn && g?.phase === 'actions';
+  // Big Table: the Partner's phase, and a build window between turns, are this player's to act in too.
+  const partnerPhase = myTurn && g?.phase === 'partner',
+    windowPhase = myTurn && g?.phase === 'buildWindow',
+    buildPhase = actionPhase || partnerPhase || windowPhase;
   const networkBusy = status === 'connecting' || status === 'reconnecting';
   const invitationNotice = (
     <RoomInviteNotice
@@ -403,7 +426,9 @@ function App() {
     if (placement && (!placementValid(placement, g, room?.roomId, me) || !connected)) setPlacement(null);
   }, [placement, g, room?.roomId, me, connected]);
   useEffect(() => {
-    if (panel) setPlacement(null);
+    if (!panel) return;
+    setPlacement(null);
+    setShipMove(null);
   }, [panel]);
   useEffect(() => {
     if (!placement) return;
@@ -419,10 +444,10 @@ function App() {
   /**
    * The board is dealt once and never changes, but every state message arrives
    * as fresh JSON, so `g.board` was a new object each time and the scenery was
-   * rebuilt with it. Pinning it to the seed lets the static half of the board
-   * render once for the whole game.
+   * rebuilt with it. Pinning it to its seed and preset lets the static half of
+   * the board render once for the whole game.
    */
-  const stableBoard = useMemo(() => g?.board, [g?.board.seed]);
+  const stableBoard = useMemo(() => g?.board, [g && boardKey(g.board)]);
   /** Seat colours change only when somebody picks one, so they are derived from
    *  the seats' own colours rather than rebuilt on every render — `Board` is
    *  memoised and a fresh array each time would defeat it. */
@@ -435,12 +460,17 @@ function App() {
    * which defeats the board's memo on its own; the ref keeps the identity
    * fixed while always calling the current logic.
    */
-  const handlers = useRef({ previewPlacement: (_: GameAction) => {}, chooseRobber: (_: number) => {} });
+  const handlers = useRef({
+    previewPlacement: (_: GameAction) => {},
+    chooseRobber: (_: number) => {},
+    chooseShip: (_: number) => {},
+  });
   const onBoardAction = useCallback((action: GameAction) => handlers.current.previewPlacement(action), []);
   const onBoardRobber = useCallback((hex: number) => handlers.current.chooseRobber(hex), []);
-  // Both are hoisted declarations further down, so this reads them fresh on
+  const onBoardShip = useCallback((edge: number) => handlers.current.chooseShip(edge), []);
+  // All are hoisted declarations further down, so this reads them fresh on
   // every render while the identities the board sees never change.
-  handlers.current = { previewPlacement, chooseRobber };
+  handlers.current = { previewPlacement, chooseRobber, chooseShip };
 
   function previewPlacement(action: GameAction) {
     if (disabled || !g || !room || !me) return;
@@ -522,6 +552,8 @@ function App() {
       {
         pending,
         preloadGame: true,
+        // Every mode this build contains can be drawn by it.
+        rulesets: rulesets().map((ruleset) => ruleset.id),
         accessToken: auth.accessToken,
         onMetrics: (value) => {
           if (connection.current === c) metricsFeed.publish(value);
@@ -777,7 +809,13 @@ function App() {
   useEffect(() => {
     setMode(null);
     setRobberHex(null);
-  }, [g?.phase, g?.turn]);
+    setRobberPiece(null);
+    setShipMove(null);
+  }, [g?.phase, g?.turn, g?.active]);
+  // A ship chosen to move that no longer may, as when the pirate has come alongside, is let go.
+  useEffect(() => {
+    if (shipMove?.from != null && !g?.legal.shipMoves?.[shipMove.from]) setShipMove(null);
+  }, [shipMove, g]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), 2200);
@@ -792,6 +830,8 @@ function App() {
       await c.action(action);
       setMode(null);
       setRobberHex(null);
+      setRobberPiece(null);
+      setShipMove(null);
       return true;
     } catch (e) {
       if (connection.current === c)
@@ -908,8 +948,29 @@ function App() {
     setBusy(true);
     connect(newSession(auth.profile.name, roomId, auth.profile));
   }
+  /** Open Sea: the player chose one of their ships to move, or the same one again to choose another. */
+  function chooseShip(edge: number) {
+    if (!g || disabled || !actionPhase || !g.legal.shipMoves?.[edge]) return;
+    setPlacement(null);
+    setPanel(null);
+    setShipMove((current) => ({ from: current?.from === edge ? null : edge }));
+  }
+  /** Open Sea: where the edge being confirmed takes a road or a ship, the two, with their costs when bought. */
+  function pieceChoice(draft: PlacementDraft) {
+    const a = draft.action;
+    if (!g || (a.kind !== 'road' && a.kind !== 'ship')) return undefined;
+    const pieces = edgePieces(g, a.edge),
+      costs = findRuleset(g.ruleset)?.costs;
+    if (pieces.length < 2) return undefined;
+    return {
+      pieces,
+      ...(g.phase === 'actions' && costs?.ship ? { costs: { road: costs.road, ship: costs.ship } } : {}),
+      onChoose: (kind: 'road' | 'ship') => setPlacement({ ...draft, action: { kind, edge: a.edge } }),
+    };
+  }
   function chooseRobber(hex: number) {
-    if (!g || !me || disabled || !myTurn || g.phase !== 'robber' || hex === g.robber) return;
+    if (!g || !me || disabled || !myTurn || g.phase !== 'robber') return;
+    if (hex === (robberPiece === 'pirate' ? g.pirate : g.robber)) return;
     setRobberHex(hex);
     setPanel(null);
   }
@@ -988,17 +1049,38 @@ function App() {
     setName(canonical.name);
     setPanel(null);
   }
+  const endLabel = partnerPhase
+    ? 'End your Partner’s phase'
+    : windowPhase
+      ? 'Close your build window'
+      : actionPhase
+        ? 'Next turn'
+        : 'Roll dice';
+  // Open Sea: what the dock's Move ship is waiting for, a ship and then where it goes (section 8).
+  const shipMoveText = !shipMove
+    ? ''
+    : shipMove.from !== null
+      ? 'Choose where the ship goes'
+      : Object.keys(g?.legal.shipMoves ?? {}).length
+        ? 'Choose one of your ships to move'
+        : 'None of your ships can move now';
   const phaseText = !g
     ? ''
     : room?.spectating || player?.resigned || room?.paused
       ? (gameNotice?.prompt ?? '')
       : ['discard', 'robber'].includes(g.phase)
         ? ''
-        : mode && myTurn && g.phase === 'actions'
-          ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
-          : g.phase === 'actions'
-            ? ''
-            : (gameNotice?.prompt ?? '');
+        : shipMove && actionPhase
+          ? shipMoveText
+          : mode && buildPhase
+            ? `Choose a highlighted ${mode === 'road' ? 'path for your road' : mode === 'city' ? 'settlement to upgrade' : 'corner for your settlement'}`
+            : g.phase === 'actions'
+              ? ''
+              : // The Partner and the player in a build window are told what they may do; the rest of the table
+                // only sees their chip on the rail.
+                (g.phase === 'partner' || g.phase === 'buildWindow') && !myTurn
+                ? ''
+                : (gameNotice?.prompt ?? '');
   return (
     <main
       className={`game-world ${g ? 'playing' : room ? 'lobby' : playerHome ? 'player-home' : 'entry-world'}`}
@@ -1011,7 +1093,7 @@ function App() {
       {!g && (room || playerHome) && <LoungeBackdrop />}
       {g && (
         <div className="board-anchor">
-          <BoardViewport seed={g.board.seed} reducedMotion={reducedMotion}>
+          <BoardViewport board={stableBoard ?? g.board} reducedMotion={reducedMotion}>
             <Board
               art={BOARD_THEMES[preferences.boardTheme]}
               board={stableBoard ?? g.board}
@@ -1026,6 +1108,10 @@ function App() {
               pendingBuild={placementReady ? placement?.action : submittedBuild}
               onAction={onBoardAction}
               onRobber={onBoardRobber}
+              robberPiece={robberPiece}
+              shipMove={shipMove}
+              onShip={onBoardShip}
+              reducedMotion={reducedMotion}
             />
           </BoardViewport>
           <ReactionLayer flying={reactions.flying} />
@@ -1069,6 +1155,19 @@ function App() {
               connected={connected}
               onWarning={() => feedback.sound.play('warning')}
             />
+          }
+          goldTimer={
+            // The gold panel's own clock gives the warning; this one only counts.
+            g.phase === 'goldPick' && (
+              <TurnTimer
+                room={room}
+                me={me}
+                goldPicker={g.goldOwed?.[0]?.player}
+                offset={clockOffset}
+                connected={connected}
+                onWarning={() => {}}
+              />
+            )
           }
           friendship={
             auth.config?.mode === 'authenticated' && auth.account?.registered && !auth.account.isGuest
@@ -1241,17 +1340,23 @@ function App() {
       {g && (
         <>
           {phaseText && (
-            <div className="action-prompt" role="status" key={`${g.turn}:${g.phase}:${mode}`}>
+            <div
+              className="action-prompt"
+              role="status"
+              key={`${g.turn}:${g.phase}:${mode}${shipMove ? `:ship:${shipMove.from}` : ''}`}
+            >
               {gameNotice && (
                 <GameIcon
                   name={
-                    mode === 'city'
-                      ? 'city'
-                      : mode === 'road'
-                        ? 'road'
-                        : mode === 'settlement'
-                          ? 'settlement'
-                          : gameNotice.icon
+                    shipMove
+                      ? 'move-ship'
+                      : mode === 'city'
+                        ? 'city'
+                        : mode === 'road'
+                          ? 'road'
+                          : mode === 'settlement'
+                            ? 'settlement'
+                            : gameNotice.icon
                   }
                   size={20}
                 />
@@ -1262,6 +1367,17 @@ function App() {
                   label="Cancel placement"
                   onClick={() => {
                     setMode(null);
+                    setPlacement(null);
+                  }}
+                >
+                  <X />
+                </IconButton>
+              )}
+              {shipMove && (
+                <IconButton
+                  label="Cancel ship move"
+                  onClick={() => {
+                    setShipMove(null);
                     setPlacement(null);
                   }}
                 >
@@ -1311,7 +1427,8 @@ function App() {
                       className={`trade-action ${panel === 'trade' ? 'is-selected' : ''}`}
                       aria-label="Trade"
                       title="Trade"
-                      disabled={disabled || !actionPhase}
+                      // The Partner trades with the bank and at harbours; a build window allows no trade.
+                      disabled={disabled || !(actionPhase || partnerPhase)}
                       onClick={() => {
                         setPanel(panel === 'trade' ? null : 'trade');
                         setMode(null);
@@ -1320,17 +1437,43 @@ function App() {
                       <ArrowLeftRight size={33} />
                       <span>Trade</span>
                     </button>
+                    {actionPhase && me && findRuleset(g.ruleset)?.sea && (
+                      <MoveShipButton
+                        game={g}
+                        me={me}
+                        active={!!shipMove}
+                        disabled={disabled}
+                        onToggle={() => {
+                          setPanel(null);
+                          setMode(null);
+                          setPlacement(null);
+                          setShipMove(shipMove ? null : { from: null });
+                        }}
+                      />
+                    )}
                   </div>
                   <button
-                    className={`turn-action ${actionPhase ? 'end-turn' : 'roll-turn'}`}
-                    aria-label={actionPhase ? 'Next turn' : 'Roll dice'}
-                    title={actionPhase ? 'Next turn' : 'Roll dice'}
-                    disabled={disabled || !myTurn || !['roll', 'actions'].includes(g.phase)}
-                    onClick={() => void act({ kind: actionPhase ? 'endTurn' : 'roll' })}
+                    className={`turn-action ${buildPhase ? 'end-turn' : 'roll-turn'}`}
+                    aria-label={endLabel}
+                    title={endLabel}
+                    disabled={
+                      disabled || !myTurn || !['roll', 'actions', 'partner', 'buildWindow'].includes(g.phase)
+                    }
+                    onClick={() =>
+                      void act({
+                        kind: partnerPhase
+                          ? 'endPhase'
+                          : windowPhase
+                            ? 'endWindow'
+                            : actionPhase
+                              ? 'endTurn'
+                              : 'roll',
+                      })
+                    }
                   >
                     <TurnButtonAttention />
-                    {actionPhase ? <NextTurn size={36} /> : <Dices size={38} />}
-                    {actionPhase && <span>Next</span>}
+                    {buildPhase ? <NextTurn size={36} /> : <Dices size={38} />}
+                    {buildPhase && <span>{partnerPhase ? 'End phase' : windowPhase ? 'Done' : 'Next'}</span>}
                   </button>
                 </>
               }
@@ -1385,6 +1528,7 @@ function App() {
             <PlacementConfirmation
               action={placement.action}
               disabled={disabled || !placementReady}
+              choice={pieceChoice(placement)}
               onCancel={() => setPlacement(null)}
               onConfirm={() => {
                 if (!placementValid(placement, g, room?.roomId, me)) return;
@@ -1407,6 +1551,22 @@ function App() {
               disabled={disabled}
               connected={connected}
               offset={clockOffset}
+              onWarning={() => feedback.sound.play('warning')}
+              piece={robberPiece}
+              onPiece={(piece) => {
+                setRobberPiece(piece);
+                setRobberHex(null);
+              }}
+            />
+          )}
+          {room && !room.spectating && !feedback.presentationBusy && (
+            <GoldPick
+              room={room}
+              me={me}
+              disabled={disabled}
+              connected={connected}
+              offset={clockOffset}
+              onAction={(a) => void act(a)}
               onWarning={() => feedback.sound.play('warning')}
             />
           )}
@@ -1572,7 +1732,11 @@ function App() {
       )}
       {panel === 'rules' && (
         <Dialog side={!!g} tool="rules" title="How to play" onClose={() => setPanel(null)}>
-          <QuickRules victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints} />
+          <QuickRules
+            ruleset={findRuleset(g?.ruleset ?? room?.settings?.mode) ?? CLASSIC}
+            victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints}
+            turns={g ? g.turns : room?.settings?.turns}
+          />
         </Dialog>
       )}
     </main>

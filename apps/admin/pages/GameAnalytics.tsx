@@ -8,6 +8,7 @@
 import type { ReactNode } from 'react';
 import type { AnalyticsPlayer, Cached, GameAnalytics, GameEndReason } from '../../server/src/admin/types.js';
 import { RESOURCE_NAMES, RESOURCES } from '../../../packages/rules/src/index.js';
+import { findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 import { useApi } from '../api.js';
 import { accountLabel, count, diceLabel, duration, time } from '../format.js';
 import { Badge, Columns, Empty, Failure, LineChart, Loading, Section, Stat, Table, When } from '../ui.js';
@@ -35,7 +36,12 @@ const CARD_NAMES: Record<string, string> = {
   monopoly: 'Monopoly',
 };
 
-const TERRAIN_NAMES: Record<string, string> = { ...RESOURCE_NAMES, desert: 'Desert' };
+const TERRAIN_NAMES: Record<string, string> = {
+  ...RESOURCE_NAMES,
+  desert: 'Desert',
+  gold: 'Gold field',
+  sea: 'Sea',
+};
 
 /** A whole-number axis for turns: about five ticks. */
 function turnTicks(last: number): number[] {
@@ -170,13 +176,16 @@ function Standings({ game }: { game: GameAnalytics }) {
             <td className="num hide-phone">{player.pieces.roads}</td>
             <td className="num hide-phone">{player.knights}</td>
             <td>
-              {player.longestRoad && <Badge tone="accent">Longest Road</Badge>}
+              {player.longestRoad && <Badge tone="accent">{routeAwardName(findRuleset(game.ruleset))}</Badge>}
               {player.largestArmy && <Badge tone="accent">Largest Army</Badge>}
             </td>
             <td className="num nowrap">
               {player.turnTime.medianSeconds === null ? '—' : duration(player.turnTime.medianSeconds)}
               {player.turnTime.meanSeconds !== null && (
                 <div className="muted small">mean {duration(player.turnTime.meanSeconds)}</div>
+              )}
+              {player.partnerTime?.medianSeconds != null && (
+                <div className="muted small">as Partner {duration(player.partnerTime.medianSeconds)}</div>
               )}
             </td>
             <td className="num nowrap">
@@ -232,6 +241,8 @@ function PointsChart({ game }: { game: GameAnalytics }) {
 }
 
 function ResourceTables({ game }: { game: GameAnalytics }) {
+  // Open Sea's ships are a spend of their own; other modes have no column for them.
+  const ships = game.players.some((player) => player.resources.spent.ships !== undefined);
   const rows = (cells: (player: AnalyticsPlayer) => number[]) =>
     game.players.map((player, index) => {
       const values = cells(player);
@@ -284,6 +295,7 @@ function ResourceTables({ game }: { game: GameAnalytics }) {
           <tr>
             <th>Player</th>
             <th className="num">Roads</th>
+            {ships && <th className="num">Ships</th>}
             <th className="num">Settlements</th>
             <th className="num">Cities</th>
             <th className="num">Dev cards</th>
@@ -298,6 +310,7 @@ function ResourceTables({ game }: { game: GameAnalytics }) {
         <tbody>
           {rows(({ resources: { spent: s, lost: l } }) => [
             s.roads,
+            ...(ships ? [s.ships ?? 0] : []),
             s.settlements,
             s.cities,
             s.devCards,
@@ -395,7 +408,9 @@ function Interactions({ game }: { game: GameAnalytics }) {
                     <td className="num">{move.turn}</td>
                     <td>{name(move.playerId)}</td>
                     <td>
-                      {TERRAIN_NAMES[move.terrain] ?? move.terrain}
+                      {move.piece === 'pirate'
+                        ? 'The pirate, to the sea'
+                        : (TERRAIN_NAMES[move.terrain] ?? move.terrain)}
                       {move.number !== null && ` ${move.number}`}
                     </td>
                     <td>
@@ -434,13 +449,14 @@ function Interactions({ game }: { game: GameAnalytics }) {
 
 function Awards({ game }: { game: GameAnalytics }) {
   const name = (id: string | null) => game.players.find((player) => player.id === id)?.name ?? 'nobody';
-  if (!game.awards.length) return <Empty>Nobody held Longest Road or Largest Army.</Empty>;
+  const route = routeAwardName(findRuleset(game.ruleset));
+  if (!game.awards.length) return <Empty>Nobody held {route} or Largest Army.</Empty>;
   return (
     <ul className="plain">
       {game.awards.map((award, index) => (
         <li key={index}>
           <span className="muted">Turn {award.turn}</span> ·{' '}
-          {award.award === 'longestRoad' ? 'Longest Road' : 'Largest Army'}:{' '}
+          {award.award === 'longestRoad' ? route : 'Largest Army'}:{' '}
           {award.playerId ? (
             <>
               {name(award.playerId)} took it{award.fromId ? ` from ${name(award.fromId)}` : ''}
@@ -561,7 +577,7 @@ export function GameAnalyticsView({
         )}
       </Section>
       <div className="grid">
-        <Section title="Longest Road and Largest Army">
+        <Section title={`${routeAwardName(findRuleset(game.ruleset))} and Largest Army`}>
           <Awards game={game} />
         </Section>
         <Section title="Bots, stand-ins and the turn timer">

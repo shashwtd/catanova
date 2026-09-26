@@ -19,7 +19,14 @@ import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import type { AccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
-import { DEFAULT_ROOM_SETTINGS, parseRoomSettings } from '../../../packages/protocol/src/settings.js';
+import {
+  ABSENCE_AFTER_MS,
+  ABSENT_PARTNER_SECONDS,
+  BUILD_WINDOW_SECONDS,
+  DEFAULT_ROOM_SETTINGS,
+  parseRoomSettings,
+  partnerSeconds,
+} from '../../../packages/protocol/src/settings.js';
 import type { RoomSettings, TurnClock } from '../../../packages/protocol/src/settings.js';
 import type { Identity } from './auth.js';
 import { createHash, randomUUID, randomInt } from 'node:crypto';
@@ -27,17 +34,35 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  activePlayer,
   applyAction,
   createGame,
   gameView,
   parseGameAction,
+  partnerActing,
   resignPlayers,
   noteStandIn,
 } from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
-import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
+import { owedMoves } from '../../../packages/rules/src/owed.js';
+import { dealBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
+import { GOLD_PICK_SECONDS } from '../../../packages/rules/src/gold.js';
+import {
+  CLASSIC,
+  findRuleset,
+  numberWord,
+  playsBoard,
+  rulesetOf,
+  rulesets,
+  switchBlock,
+  targetRangeText,
+  validTarget,
+} from '../../../packages/rules/src/rulesets.js';
+import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
+import { CLASSIC_ONLY, ModeAccess } from './modes.js';
+import type { ModeSwitches } from './modes.js';
 import { PlayerRecords, parseGamesCursor } from './player-records.js';
 import { decodeState, encodeState } from './journal.js';
 import { setImmediate } from 'node:timers/promises';
@@ -64,6 +89,8 @@ export const RECONNECT_GRACE_MS = 3 * 60 * 1000;
  * game. Long enough that an ordinary reload does not hand the seat over.
  */
 export const STANDIN_AFTER_MS = 30 * 1000;
+/** How long an empty seat waits, in a mode without stand-ins, before the clock plays its forced moves. */
+export { ABSENCE_AFTER_MS };
 /** How well a stand-in plays. Not the champion — taking a seat over is meant to
  *  keep the game going, not to turn the absent player into the strongest one at
  *  the table — and not the mildest either, which would throw their game away. */
@@ -92,6 +119,17 @@ function holdFromPause(state: Presence): Presence {
       seat.resignAt = Math.max(seat.resignAt, state.pausedAt + RECONNECT_GRACE_MS);
   return state;
 }
+/**
+ * How many seconds the player acting now has, or null for no clock. A turn, and a Lead's part, run on the
+ * room's timer. Big Table's build windows always have 20 seconds, and its Partner's phase half the room's
+ * time, or 45 seconds in a room without a timer if the Partner is away (docs/TURN_CLOCK.md, "New clocks").
+ */
+function clockSeconds(game: Game, roomSeconds: number | null, away: boolean): number | null {
+  if (game.phase === 'buildWindow') return BUILD_WINDOW_SECONDS;
+  if (partnerActing(game))
+    return roomSeconds === null ? (away ? ABSENT_PARTNER_SECONDS : null) : partnerSeconds(roomSeconds);
+  return roomSeconds;
+}
 const ROOM_CODE_SPACE = ROOM_CODE_ALPHABET.length ** ROOM_CODE_LENGTH;
 function codeForSlot(slot: number): string {
   let code = '';
@@ -109,6 +147,8 @@ export class Store {
   private readonly random: () => number;
   private readonly codeRandom: (max: number) => number;
   private readonly trackPresence: boolean;
+  /** Which modes a host may pick (modes.ts): the admin console's choices over the start-up switches. */
+  readonly modes: ModeAccess;
   private readonly records: PlayerRecords;
   private connectedSeats = new Set<string>();
   /** Which bot turns up when a seat is filled. Drawn from the store's own
@@ -120,6 +160,11 @@ export class Store {
    *  They are kept separate from `connectedSeats` because a room with only bots
    *  left in it must still pause rather than play on with nobody watching. */
   private botSeats = new Set<string>();
+  /**
+   * Rooms whose saved game is in a mode this version does not know. Nothing can move them, so the clock
+   * stops asking about them rather than failing on them every tick.
+   */
+  private readonly unplayable = new Set<string>();
   private readonly pendingPresence = new Set<string>();
   private dueRoomCursor = '';
   private readonly statisticsCache = new Map<
@@ -133,6 +178,7 @@ export class Store {
       random?: () => number;
       codeRandom?: (max: number) => number;
       trackPresence?: boolean;
+      modes?: ModeSwitches;
     } = {},
   ) {
     this.now = options.now ?? Date.now;
@@ -329,6 +375,7 @@ export class Store {
       INSERT INTO game_phases(room_id, phase) SELECT room_id, json_extract(state, '$.phase') FROM games;
     `);
     this.records = new PlayerRecords(this.db);
+    this.modes = new ModeAccess(this.db, options.modes ?? CLASSIC_ONLY);
     for (const row of this.db.prepare('SELECT id FROM seats WHERE bot = 1 AND departed = 0').all())
       this.botSeats.add(row.id as string);
     if (this.trackPresence) this.initializePresence();
@@ -484,11 +531,12 @@ export class Store {
       } else if (!this.db.prepare('SELECT id FROM rooms WHERE id = ?').get(roomId!)) {
         throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
       }
+      const seats = this.seatLimit(roomId!);
       if (
         (this.db.prepare('SELECT COUNT(*) AS n FROM seats WHERE room_id = ? AND departed = 0').get(roomId!)!
-          .n as number) >= 4
+          .n as number) >= seats
       )
-        throw new ProtocolError('ROOM_FULL', 'Room already has four seats');
+        throw new ProtocolError('ROOM_FULL', `Room already has ${numberWord(seats)} seats`);
       if (this.loadGame(roomId!))
         throw new ProtocolError('GAME_STARTED', 'This game has already started; existing players can resume');
       const profile = identity
@@ -536,6 +584,11 @@ export class Store {
     const standingIn = new Set(this.standInIds(roomId));
     const roomCode = this.roomCode(roomId);
     const previousResults = !game && viewer ? this.records.previousResults(roomId, viewer) : null;
+    // Only the host picks the mode, and only in the lobby. More than Classic, or nothing to say.
+    const modes =
+      !game && viewer && viewer === roomHostId(players.map((p) => ({ id: p.id, bot: !!p.bot })))
+        ? this.modesFor(roomId)
+        : [];
     return {
       ...(previousResults ? { previousResults } : {}),
       roomId,
@@ -557,6 +610,7 @@ export class Store {
       round: this.round(roomId),
       historyRevision: this.eventHead(roomId)?.revision ?? 0,
       settings: this.settings(roomId),
+      ...(modes.length > 1 ? { modes } : {}),
       serverNow: this.now(),
       ...(this.clock(roomId) ? { turnClock: this.clock(roomId)! } : {}),
       board: this.board(roomId),
@@ -568,14 +622,43 @@ export class Store {
     if (game) return game.board;
     const saved = this.db.prepare('SELECT board FROM room_boards WHERE room_id = ?').get(roomId) as
       { board: string } | undefined;
-    if (saved) return JSON.parse(saved.board) as Board;
-    if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
+    const rules = this.lobbyRules(roomId);
+    let seed: number | undefined;
+    if (saved) {
+      // A lobby's island belongs to no game yet. One its mode does not play, such as a preset a release
+      // since rolled back dealt, is dealt again below rather than leaving a room that can never start. The
+      // lobby is read before Start and on every settings save, so neither ever meets it. A mode this version
+      // does not know cannot deal, so its lobby keeps its island; it cannot start either way.
+      const board = JSON.parse(saved.board) as Board;
+      if (!rules) return board;
+      if (playsBoard(rules, board)) {
+        if (board.players === undefined || board.players === this.templateSeats(roomId, rules)) return board;
+        // Outer Isles: the seated count moved between three and four, so the same seed is dealt on the other
+        // template. Nobody has seen the board, so this is not a settings change and leaves readiness alone.
+        seed = board.seed;
+      }
+    } else if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
       throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
-    const board = generateBoard(randomInt(0, 2 ** 32));
+    // Dealt for the room's mode: a mode change deletes the board, and this deals the new mode's.
+    const mode = rules ?? CLASSIC;
+    const board = dealBoard(seed ?? randomInt(0, 2 ** 32), mode.board, this.templateSeats(roomId, mode));
     this.db
-      .prepare('INSERT INTO room_boards(room_id, board) VALUES (?, ?)')
+      .prepare(
+        'INSERT INTO room_boards(room_id, board) VALUES (?, ?) ON CONFLICT(room_id) DO UPDATE SET board = excluded.board',
+      )
       .run(roomId, JSON.stringify(board));
     return board;
+  }
+  /**
+   * How many players the lobby's board is dealt for. Outer Isles has a template for three players and one for
+   * four: an Open Sea lobby holds the four-player one while four are seated and the three-player one otherwise
+   * (docs/RULEBOOK-OPEN-SEA.md, 15.1). Every other preset deals one island whatever the count.
+   */
+  private templateSeats(roomId: string, rules: Ruleset): number {
+    const seated = this.db
+      .prepare('SELECT COUNT(*) AS n FROM seats WHERE room_id = ? AND departed = 0')
+      .get(roomId)!.n as number;
+    return rules.sea ? (seated >= rules.seats.max ? rules.seats.max : rules.seats.min) : seated;
   }
   preview(reference: string) {
     const roomId = this.resolveRoom(reference);
@@ -589,6 +672,61 @@ export class Store {
       started: !!this.loadGame(roomId),
     };
   }
+  /**
+   * The rulesets this version plays, as a JSON array for SQL's json_each. A query that reads saved games as
+   * rows, not through loadGame, uses it to leave out games in a mode this version does not know: they are
+   * frozen until a release that knows the mode returns, and must not count as anybody's game in play.
+   */
+  private knownRulesets(): string {
+    return JSON.stringify(rulesets().map((ruleset) => ruleset.id));
+  }
+  /** The ruleset a lobby is set to play, or undefined for one this version does not know. */
+  private lobbyRules(roomId: string): Ruleset | undefined {
+    return findRuleset(this.settings(roomId).mode);
+  }
+  /**
+   * The ruleset a room plays, by id: its game's, once started, else the mode its lobby is set to. Read without
+   * loading the game, so that a room this version cannot load still says what it is.
+   */
+  roomMode(roomId: string): string {
+    const started = this.db
+      .prepare("SELECT coalesce(json_extract(state, '$.ruleset'), ?) AS ruleset FROM games WHERE room_id = ?")
+      .get(CLASSIC.id, roomId) as { ruleset: string } | undefined;
+    return started?.ruleset ?? this.settings(roomId).mode ?? CLASSIC.id;
+  }
+  /** How many seats a lobby has: its mode's, or Classic's four while its mode is one this version cannot run. */
+  seatLimit(roomId: string): number {
+    return (this.lobbyRules(roomId) ?? CLASSIC).seats.max;
+  }
+  /**
+   * The ruleset a lobby would start with, or why it cannot. Checked at Start, not only when the mode was
+   * chosen: a switch may have closed it since, or a bot may have sat down. The server asks before the loading
+   * screen too, so the host hears why at once. The island needs no check here: the lobby is dealt a new one
+   * whenever its mode does not play the one it holds (board()), and createGame refuses one it does not.
+   */
+  startingRules(roomId: string): Ruleset {
+    const mode = this.settings(roomId).mode ?? CLASSIC.id,
+      rules = findRuleset(mode);
+    if (!rules || !this.modesFor(roomId).includes(mode))
+      throw new ProtocolError(
+        'MODE_UNAVAILABLE',
+        `${rules?.name ?? 'This game mode'} is not open to this room. Choose another mode.`,
+      );
+    if (
+      !rules.bots &&
+      this.db.prepare('SELECT 1 FROM seats WHERE room_id = ? AND departed = 0 AND bot = 1').get(roomId)
+    )
+      throw new ProtocolError('MODE_BOTS', `${switchBlock(rules, [{ bot: true }])!.reason}.`);
+    return rules;
+  }
+  /** The modes the room's host may pick, Classic first: decided by the host's account (modes.ts). */
+  modesFor(roomId: string): string[] {
+    const seats = this.db
+      .prepare('SELECT id, user_id, bot FROM seats WHERE room_id = ? AND departed = 0 ORDER BY rowid')
+      .all(roomId) as { id: string; user_id: string | null; bot: number }[];
+    const host = roomHostId(seats.map((seat) => ({ id: seat.id, bot: !!seat.bot })));
+    return this.modes.modesFor(seats.find((seat) => seat.id === host)?.user_id);
+  }
   hasAccountSeat(roomId: string, userId: string) {
     return !!this.db
       .prepare('SELECT 1 FROM seats WHERE room_id = ? AND user_id = ? AND departed = 0')
@@ -598,19 +736,22 @@ export class Store {
   /**
    * The unfinished game an account is seated in, if any, so a friend can be
    * watched without asking them for a code. Only the room code is exposed:
-   * enough to watch, and nothing about what is in their hand.
+   * enough to watch, and nothing about what is in their hand. A game in a mode
+   * this version does not know cannot be watched, so it is never offered.
    */
   watchableRoomOf(userId: string): { roomId: string; roomCode?: string } | null {
     const row = this.db
       .prepare(
         `
       SELECT s.room_id FROM seats s JOIN game_phases g ON g.room_id=s.room_id
+      JOIN games gm ON gm.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0
         AND coalesce(g.phase,'')<>'finished'
+        AND coalesce(json_extract(gm.state,'$.ruleset'),?) IN (SELECT value FROM json_each(?))
       LIMIT 1
     `,
       )
-      .get(userId) as { room_id: string } | undefined;
+      .get(userId, CLASSIC.id, this.knownRulesets()) as { room_id: string } | undefined;
     if (!row) return null;
     const roomCode = this.roomCode(row.room_id);
     return { roomId: row.room_id, ...(roomCode ? { roomCode } : {}) };
@@ -659,6 +800,11 @@ export class Store {
     this.db.prepare('DELETE FROM room_boards WHERE room_id = ?').run(roomId);
     return true;
   }
+  /**
+   * One unfinished game per account. A game in a mode this version does not know does not count: after a
+   * rollback nobody can resume, leave or close it here, so counting it would lock its players out of every
+   * game until the newer release returned. They play Classic meanwhile, and find the frozen game again then.
+   */
   private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
     const conflict = this.db
       .prepare(
@@ -667,13 +813,14 @@ export class Store {
       JOIN games g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0 AND s.room_id<>?
         AND coalesce(p.phase,'')<>'finished'
+        AND coalesce(json_extract(g.state,'$.ruleset'),?) IN (SELECT value FROM json_each(?))
         AND EXISTS (SELECT 1 FROM json_each(g.state,'$.players') p
           WHERE json_extract(p.value,'$.id')=s.id
             AND coalesce(json_extract(p.value,'$.resigned'),0)=0)
       LIMIT 1
     `,
       )
-      .get(userId, roomId ?? '') as { room_id: string } | undefined;
+      .get(userId, roomId ?? '', CLASSIC.id, this.knownRulesets()) as { room_id: string } | undefined;
     if (conflict) {
       const code = this.roomCode(conflict.room_id);
       throw new ProtocolError(
@@ -698,13 +845,25 @@ export class Store {
     if (!result) throw new ProtocolError('RESULTS_NOT_FOUND', 'Results are unavailable');
     return result;
   }
+  /**
+   * A game for the account history, or undefined for one in a mode this version does not know: that game is
+   * left out of the history rather than stopping it. The release that wrote it indexes it again.
+   */
+  private recordedGame(roomId: string): Game | undefined {
+    try {
+      return this.loadGame(roomId);
+    } catch (error) {
+      if (error instanceof ProtocolError && error.code === 'VERSION_MISMATCH') return undefined;
+      throw error;
+    }
+  }
   /** Synchronous helper for maintenance/tests; HTTP uses accountGamesAsync to yield between batches. */
   accountGames(userId: string, rawCursor?: string) {
     const cursor = this.historyCursor(rawCursor);
     return this.transaction(() => {
       let afterRoomId = '';
       for (;;) {
-        const batch = this.records.backfillBatch(userId, (roomId) => this.loadGame(roomId), afterRoomId);
+        const batch = this.records.backfillBatch(userId, (roomId) => this.recordedGame(roomId), afterRoomId);
         if (batch.complete) break;
         afterRoomId = batch.afterRoomId;
       }
@@ -727,7 +886,7 @@ export class Store {
       if (options.cancelled?.())
         throw new ProtocolError('ACCOUNT_UNAVAILABLE', 'Game history request was interrupted. Please retry.');
       const result = this.transaction(() => {
-        const batch = this.records.backfillBatch(userId, (roomId) => this.loadGame(roomId), afterRoomId);
+        const batch = this.records.backfillBatch(userId, (roomId) => this.recordedGame(roomId), afterRoomId);
         return { ...batch, page: batch.complete ? this.records.page(userId, this.now(), cursor) : undefined };
       });
       if (result.page) return result.page;
@@ -948,11 +1107,21 @@ export class Store {
    */
   compactJournal(limit = 50): { scanned: number; compacted: number } {
     return this.transaction(() => {
+      // Rows of a game in a mode this version does not know are left untouched, and never looked at again,
+      // so compaction still finishes. A row that is not JSON at all is still read, to be marked below.
       const rows = this.db
         .prepare(
-          'SELECT room_id, revision, state, state_hash FROM game_events WHERE state_z IS NULL ORDER BY room_id, revision LIMIT ?',
+          `SELECT room_id, revision, state, state_hash FROM game_events WHERE state_z IS NULL
+             AND CASE WHEN json_valid(state) THEN coalesce(json_extract(state, '$.ruleset'), ?)
+               IN (SELECT value FROM json_each(?)) ELSE 1 END
+           ORDER BY room_id, revision LIMIT ?`,
         )
-        .all(limit) as { room_id: string; revision: number; state: string; state_hash: string }[];
+        .all(CLASSIC.id, this.knownRulesets(), limit) as {
+        room_id: string;
+        revision: number;
+        state: string;
+        state_hash: string;
+      }[];
       let compacted = 0;
       for (const row of rows) {
         const encoded =
@@ -1103,8 +1272,13 @@ export class Store {
           throw new ProtocolError('NOT_HOST', 'Only the host can add a bot');
         if (expectedRevision !== room.revision)
           throw new ProtocolError('STALE_STATE', 'The lobby changed; review the player list');
-        if (room.players.length >= 4)
-          throw new ProtocolError('INVALID_PLAYER', 'The room already has four seats');
+        const rules = this.lobbyRules(seat.room_id) ?? CLASSIC;
+        if (room.players.length >= rules.seats.max)
+          throw new ProtocolError(
+            'INVALID_PLAYER',
+            `The room already has ${numberWord(rules.seats.max)} seats`,
+          );
+        if (!rules.bots) throw new ProtocolError('MODE_BOTS', switchBlock(rules, [{ bot: true }])!.reason);
         // Drawn here, not asked for: the host fills a seat and finds out who
         // sat down by playing them.
         const level = this.botLevel();
@@ -1169,7 +1343,8 @@ export class Store {
          )`,
       )
       .all()
-      .map((row) => row.room_id as string);
+      .map((row) => row.room_id as string)
+      .filter((roomId) => !this.unplayable.has(roomId));
   }
   /**
    * Every seat a bot plays in one room.
@@ -1303,12 +1478,54 @@ export class Store {
         throw new ProtocolError('NOT_HOST', 'Only the host can change game settings');
       if (room.revision !== expectedRevision)
         throw new ProtocolError('STALE_STATE', 'The lobby changed; review the latest settings');
+      const previous = room.settings.mode ?? CLASSIC.id;
+      // A tab from before modes leaves the field out, which keeps the room's mode rather than resetting it.
+      const mode = settings.mode ?? previous,
+        rules = findRuleset(mode),
+        changing = mode !== previous;
+      if (!rules || (changing && !this.modesFor(seat.room_id).includes(mode)))
+        throw new ProtocolError(
+          'MODE_UNAVAILABLE',
+          rules
+            ? `${rules.name} is not open to this room`
+            : 'This room’s game mode is not available. Choose Classic.',
+        );
+      const blocked = changing ? switchBlock(rules, room.players) : undefined;
+      if (blocked)
+        throw new ProtocolError(
+          blocked.code,
+          blocked.code === 'MODE_SEATS'
+            ? `${rules.name} seats up to ${numberWord(rules.seats.max)} players. Someone must leave first.`
+            : `${blocked.reason}. Remove the bots to play ${rules.name}.`,
+        );
+      // A new mode starts from its own default target; the host sets another once the mode is in place.
+      const victoryPoints = changing ? undefined : settings.victoryPoints;
+      if (victoryPoints !== undefined && !validTarget(rules, victoryPoints))
+        throw new ProtocolError('INVALID_SETTINGS', targetRangeText(rules));
+      // The turn structure may come with the mode it belongs to. A change without one keeps the room's, as a
+      // tab from before Big Table sends it, and a new mode starts from its own default. Saved only when it is
+      // not the default, as the mode is only when it is not Classic.
+      const turns = settings.turns ?? (changing ? undefined : room.settings.turns);
+      if (turns !== undefined && !rules.turns?.includes(turns))
+        throw new ProtocolError('INVALID_SETTINGS', `${rules.name} has no turn structure to choose`);
+      const saved: RoomSettings = {
+        ...(victoryPoints === undefined ? {} : { victoryPoints }),
+        turnTimerSeconds: settings.turnTimerSeconds,
+        ...(settings.diceMode === undefined ? {} : { diceMode: settings.diceMode }),
+        ...(mode === CLASSIC.id ? {} : { mode }),
+        ...(turns === undefined || turns === rules.turns?.[0] ? {} : { turns }),
+      };
       const revision = room.revision + 1;
       this.db
         .prepare(
           'INSERT INTO room_settings(room_id, settings, revision) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET settings = excluded.settings, revision = excluded.revision',
         )
-        .run(seat.room_id, JSON.stringify(settings), revision);
+        .run(seat.room_id, JSON.stringify(saved), revision);
+      // Each mode deals its own island, so a new mode is a new board.
+      if (changing) {
+        this.db.prepare('DELETE FROM room_boards WHERE room_id = ?').run(seat.room_id);
+        this.board(seat.room_id);
+      }
       // People confirm the new settings; bots have nothing to confirm and would
       // otherwise keep Start disabled until they were removed and added again.
       this.db
@@ -1336,6 +1553,12 @@ export class Store {
       for (const row of this.db.prepare('SELECT room_id,state FROM games').all()) {
         const roomId = row.room_id as string;
         const game = JSON.parse(row.state as string) as Game;
+        // Left exactly as it is: this version cannot play it, and the release that can will want it whole.
+        // Its clock and presence may still come up due, so the scheduler is told to pass it by from the start.
+        if (!findRuleset(game.ruleset)) {
+          this.unplayable.add(roomId);
+          continue;
+        }
         if (game.phase === 'finished') {
           this.db.prepare('DELETE FROM room_presence WHERE room_id=?').run(roomId);
           this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
@@ -1371,18 +1594,23 @@ export class Store {
             disconnectedAt: now,
             resignAt: now + RECONNECT_GRACE_MS,
           };
-        this.writePresence(roomId, holdFromPause(state));
+        this.writePresence(roomId, holdFromPause(state), game);
       }
     });
   }
-  private writePresence(roomId: string, state: Presence) {
+  private writePresence(roomId: string, state: Presence, game: Game) {
     // Two deadlines matter for an absent seat: the short one, after which a bot
     // picks it up, and the long one, after which a table nobody is sitting at
     // is finally abandoned. A seat a bot already holds has only the second one
-    // left, so the room stops coming up due every tick.
+    // left, so the room stops coming up due every tick. In a mode without
+    // stand-ins the short one is when the clock starts making the seat's forced
+    // moves, and it counts only while the game is waiting on that seat.
+    const standIns = rulesetOf(game).standIns;
     const standing = new Set(this.standInIds(roomId));
+    const owed = new Set(owedMoves(game).map((move) => move.player));
     const deadlines = Object.entries(state.seats).flatMap(([id, seat]) => {
       if (state.pausedAt !== undefined) return [seat.resignAt];
+      if (!standIns) return owed.has(id) ? [seat.disconnectedAt + ABSENCE_AFTER_MS] : [];
       // Covered seats have no expiry while humans remain. An expired resignation
       // deadline here would otherwise wake this room on every scheduler tick.
       if (standing.has(id)) return [];
@@ -1418,12 +1646,23 @@ export class Store {
           resignAt: now + RECONNECT_GRACE_MS,
         };
       }
-    this.writePresence(roomId, holdFromPause(state));
+    this.writePresence(roomId, holdFromPause(state), game);
     if (resumed) {
-      // Nobody owes an immediate automatic move for time when nobody could see the game.
+      // Nobody owes an immediate automatic move for time when nobody could see the game, so the clock under way
+      // starts again with its full time. An absent Partner's clock is one of them even when the Partner is the
+      // one back: once started it runs to the end of the phase (docs/RULEBOOK-BIG-TABLE.md, 9.4 and 9.5).
+      const saved = this.clock(roomId);
+      const partnerClock =
+        !!saved &&
+        partnerActing(game) &&
+        saved.turn === game.turn &&
+        saved.playerId === activePlayer(game).id;
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
-      this.updateClock(roomId, game);
-    }
+      this.updateClock(roomId, game, connected, partnerClock);
+    } else if (!paused && partnerActing(game) && !connected.has(activePlayer(game).id) && !this.clock(roomId))
+      // A room without a turn timer gives the Partner's phase a clock only once the Partner is away, and it then
+      // runs to the end of the phase even if they come back.
+      this.updateClock(roomId, game, connected);
   }
   /** Call only for admitted sockets, after replacement checks. A returning resigned seat can watch. */
   setConnected(seat: Seat, connected: boolean) {
@@ -1487,13 +1726,15 @@ export class Store {
     // A seat that has been empty for half a minute is picked up by a bot, so
     // one person's dropped connection does not stop the game for everyone else.
     // Only while somebody is still at the table: a paused room has nobody to
-    // keep playing for, and a bot playing to an empty room is just noise.
-    const takeOver =
+    // keep playing for, and a bot playing to an empty room is just noise. Only
+    // in a mode with stand-ins: elsewhere the clock's absence rule covers them.
+    const due =
       presence.pausedAt !== undefined
         ? []
         : absent
             .filter(([id, absence]) => !holding.has(id) && absence.disconnectedAt + STANDIN_AFTER_MS <= now)
             .map(([id]) => id);
+    const takeOver = due.length && findRuleset(this.roomMode(roomId))?.standIns ? due : [];
     // Resignation is now only for a table nobody is sitting at. While anyone is
     // still watching, an absent player keeps their pieces, their points and
     // their place, and a bot plays their turns until they come back.
@@ -1644,35 +1885,74 @@ export class Store {
       { state: string } | undefined;
     return row ? (JSON.parse(row.state) as TurnClock) : undefined;
   }
-  private updateClock(roomId: string, next: Game) {
-    const seconds = this.settings(roomId).turnTimerSeconds;
-    if (seconds === null || next.turn === 0 || next.phase === 'finished') {
+  /** `partnerClock`: a Partner's clock was already running in this phase, so it runs on whoever is here. */
+  private updateClock(roomId: string, next: Game, connected = this.connectedSeats, partnerClock = false) {
+    // Open Sea's gold picks have a clock in every room, timer or not, even in setup (docs/TURN_CLOCK.md).
+    const picker = owedMoves(next).find((move) => move.kind === 'goldPick')?.player;
+    if (next.phase === 'finished' || (next.turn === 0 && !picker)) {
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
       return;
     }
     const now = this.now();
     const playerId = next.players[next.active]!.id;
+    // A turn or a Lead's part runs on the room's timer; Big Table's Partner's phase and build windows have
+    // clocks of their own, which may run in a room without one (docs/TURN_CLOCK.md, "New clocks"). Setup has
+    // no turn clock: only its gold picks are timed.
+    const seconds =
+      next.turn === 0
+        ? null
+        : clockSeconds(
+            next,
+            this.settings(roomId).turnTimerSeconds,
+            partnerClock || !connected.has(playerId),
+          );
     let clock = this.clock(roomId);
-    if (!clock || clock.turn !== next.turn || clock.playerId !== playerId)
-      clock = { playerId, turn: next.turn, startedAt: now, deadlineAt: now + seconds * 1000 };
-    if (next.phase === 'discard') {
+    if (!clock || clock.turn !== next.turn || clock.playerId !== playerId) {
+      if (seconds === null && !picker) {
+        this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
+        return;
+      }
+      clock = {
+        playerId,
+        turn: next.turn,
+        startedAt: now,
+        ...(seconds === null ? {} : { deadlineAt: now + seconds * 1000 }),
+      };
+    }
+    if (next.phase === 'discard' && seconds !== null) {
       clock.pausedAt ??= now;
       const existing = clock.discardDeadlines ?? {};
+      // Each player the game waits on for a discard has a full turn's time of their own.
       clock.discardDeadlines = Object.fromEntries(
-        Object.keys(next.discards).map((id) => [id, existing[id] ?? now + seconds * 1000]),
+        owedMoves(next)
+          .filter((move) => move.kind === 'discard')
+          .map(({ player }) => [player, existing[player] ?? now + seconds! * 1000]),
       );
+    } else if (picker) {
+      // The player on turn waits while the picks are made, one player at a time, each with 20 seconds.
+      clock.pausedAt ??= now;
+      clock.goldDeadlines = { [picker]: clock.goldDeadlines?.[picker] ?? now + GOLD_PICK_SECONDS * 1000 };
     } else if (clock.pausedAt !== undefined) {
-      clock.deadlineAt += Math.max(0, now - clock.pausedAt);
+      if (clock.deadlineAt !== undefined) clock.deadlineAt += Math.max(0, now - clock.pausedAt);
       delete clock.pausedAt;
       delete clock.discardDeadlines;
+      delete clock.goldDeadlines;
+    }
+    // A room without a turn timer keeps a clock only while it times something: gold picks, a Partner's phase
+    // or a build window.
+    if (clock.deadlineAt === undefined && clock.pausedAt === undefined) {
+      this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
+      return;
     }
     const nextDeadline =
-      clock.pausedAt === undefined ? clock.deadlineAt : Math.min(...Object.values(clock.discardDeadlines!));
+      clock.pausedAt === undefined
+        ? clock.deadlineAt
+        : Math.min(...Object.values({ ...clock.discardDeadlines, ...clock.goldDeadlines }));
     this.db
       .prepare(
         'INSERT INTO turn_clocks(room_id, state, next_deadline) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET state = excluded.state, next_deadline = excluded.next_deadline',
       )
-      .run(roomId, JSON.stringify(clock), nextDeadline);
+      .run(roomId, JSON.stringify(clock), nextDeadline ?? null);
   }
   dueRooms(): string[] {
     // Reserve at least half the batch for saved deadlines. Rotate both queues even if a
@@ -1704,7 +1984,7 @@ export class Store {
       this.pendingPresence.delete(roomId);
       this.pendingPresence.add(roomId);
     }
-    return [...new Set([...due, ...pending])];
+    return [...new Set([...due, ...pending])].filter((roomId) => !this.unplayable.has(roomId));
   }
   /** Each chosen action commits independently, so a crash resumes from the last saved mandatory choice. */
   expireRoom(roomId: string): boolean {
@@ -1730,20 +2010,23 @@ export class Store {
     let changed = this.expireAbsences(roomId) || presenceRecovered;
     if (this.trackPresence && (!this.presence(roomId) || this.presence(roomId)?.pausedAt !== undefined))
       return changed;
+    changed = this.playForAbsent(roomId) || changed;
     const firstClock = this.clock(roomId);
     if (!firstClock) return changed;
-    // At most four discards, two free roads, a robber move, a roll and an end-turn.
+    // At most six discards, two free roads, a robber move, a roll and an end-turn, or a roll, four players' gold
+    // picks and an end-turn; anything more waits for the next tick. A Partner's phase or a build window that
+    // follows has a fresh clock of its own.
     for (let step = 0; step < 12; step++) {
       const clock = this.clock(roomId);
       if (!clock || clock.turn !== firstClock.turn) break;
       let playerId = clock.playerId;
       if (clock.pausedAt !== undefined) {
-        const due = Object.entries(clock.discardDeadlines ?? {}).find(
+        const due = Object.entries({ ...clock.discardDeadlines, ...clock.goldDeadlines }).find(
           ([, deadline]) => deadline <= this.now(),
         );
         if (!due) break;
         playerId = due[0];
-      } else if (clock.deadlineAt > this.now()) break;
+      } else if (clock.deadlineAt === undefined || clock.deadlineAt > this.now()) break;
       const game = this.loadGame(roomId);
       if (!game || game.phase === 'finished') break;
       const action = timeoutAction(game, playerId, this.random);
@@ -1763,6 +2046,54 @@ export class Store {
     }
     return changed;
   }
+  /**
+   * The absence rule of modes without stand-ins (docs/TURN_CLOCK.md, "Modes without bots"). Once a player has
+   * been offline for two minutes, the clock makes every move the game waits on them for, exactly as when
+   * their time runs out, with or without a turn timer, until they reconnect. Only while somebody is at the
+   * table: the caller has already stopped for a paused room.
+   */
+  private playForAbsent(roomId: string): boolean {
+    let changed = false;
+    // A lap of a six-seat table at most, each seat rolling, settling a seven and ending its turn; anything
+    // left waits for the next tick.
+    for (let step = 0; step < 24; step++) {
+      const presence = this.presence(roomId);
+      if (!presence || presence.pausedAt !== undefined) break;
+      const game = this.loadGame(roomId);
+      if (!game || game.phase === 'finished' || rulesetOf(game).standIns) break;
+      const now = this.now();
+      const owed = owedMoves(game).find(({ player }) => {
+        const absence = presence.seats[player];
+        return (
+          !!absence && !this.connectedSeats.has(player) && absence.disconnectedAt + ABSENCE_AFTER_MS <= now
+        );
+      });
+      if (!owed) break;
+      const action = timeoutAction(game, owed.player, this.random);
+      if (!action)
+        throw new ProtocolError(
+          'CLOCK_STATE',
+          'The turn clock needs recovery before automatic play can continue',
+        );
+      const player = game.players.find((p) => p.id === owed.player)!;
+      const revision = this.db.prepare('SELECT revision FROM rooms WHERE id = ?').get(roomId)!
+        .revision as number;
+      const commandId =
+        'away-' +
+        hash(
+          JSON.stringify({ roomId, playerId: owed.player, revision, turn: game.turn, phase: game.phase }),
+        ).slice(0, 48);
+      this.action(
+        { id: owed.player, name: player.name, room_id: roomId },
+        commandId,
+        revision,
+        action,
+        'away',
+      );
+      changed = true;
+    }
+    return changed;
+  }
   loadGame(roomId: string): Game | undefined {
     const row = this.db.prepare('SELECT state FROM games WHERE room_id = ?').get(roomId) as
       { state: string } | undefined;
@@ -1772,8 +2103,12 @@ export class Store {
       throw new ProtocolError('STATE_INTEGRITY', 'Saved game needs recovery; no moves were discarded');
     if (!row) return undefined;
     const game = JSON.parse(row.state) as Game;
-    if (game.schema !== 1)
+    // A game in a mode this version does not know is refused, never misplayed: a rollback may leave games
+    // from a newer release behind. Rulesets change the rules, so the schema alone cannot tell them apart.
+    if (game.schema !== 1 || !findRuleset(game.ruleset)) {
+      this.unplayable.add(roomId);
       throw new ProtocolError('VERSION_MISMATCH', 'This saved game needs a compatible server version');
+    }
     return game;
   }
   action(
@@ -1781,9 +2116,13 @@ export class Store {
     commandId: string,
     expectedRevision: number,
     input: GameAction,
-    automatic: boolean | 'bot' = false,
+    // true: the turn clock ran out; 'away': the absence rule moved for a player gone too long; 'bot': a bot.
+    automatic: boolean | 'bot' | 'away' = false,
   ) {
     const action = parseGameAction(input);
+    // Only the clock lets a Partner's free roads lapse; a player places them (docs/RULEBOOK-BIG-TABLE.md, 9.3).
+    if (action.kind === 'endPhase' && action.expired && automatic !== true && automatic !== 'away')
+      throw new ProtocolError('ILLEGAL_ACTION', 'Place your free roads first');
     if (!automatic) this.expireRoom(seat.room_id);
     const payloadHash = hash(
       JSON.stringify({ expectedRevision, action, ...(automatic ? { automatic: true } : {}) }),
@@ -1910,6 +2249,8 @@ export class Store {
           .prepare('SELECT user_id,name FROM seats WHERE room_id=? AND departed=0 AND user_id IS NOT NULL')
           .all(seat.room_id) as { user_id: string; name: string }[])
           this.assertAccountAvailable(member.user_id, seat.room_id, member.name);
+        const settings = this.settings(seat.room_id),
+          rules = this.startingRules(seat.room_id);
         next = createGame(
           shuffle(
             room.players.map((p) => ({ id: p.id, name: p.name })),
@@ -1917,17 +2258,21 @@ export class Store {
           ),
           room.board.seed,
           this.random,
-          // The island the lobby has been showing, exactly as dealt.
-          { ...this.settings(seat.room_id), board: room.board },
+          // The island the lobby has been showing, exactly as dealt, and the mode frozen into the game.
+          { ...settings, board: room.board, ruleset: rules.id },
         );
       } else {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');
         next = applyAction(current, seat.id, action, this.random);
       }
-      if (automatic === true) {
+      if (automatic === true || automatic === 'away') {
+        const description = timeoutDescription(action, current?.phase);
         next.log.push({
           id: next.nextLog++,
-          text: `${seat.name}'s timer expired; ${timeoutDescription(action)}.`,
+          text:
+            automatic === 'away'
+              ? `${seat.name} is away; ${description}.`
+              : `${seat.name}'s timer expired; ${description}.`,
         });
         if (next.log.length > 80) next.log.shift();
       }
@@ -1955,7 +2300,7 @@ export class Store {
         next,
         next.log.filter((e) => e.id >= (current?.nextLog ?? 0)).map((e) => e.text),
         action.kind,
-        automatic === true,
+        automatic === true || automatic === 'away',
         automatic === 'bot' ? 'bot' : automatic ? 'timer' : 'human',
       );
       this.db

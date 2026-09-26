@@ -4,6 +4,7 @@ import { canPay, emptyHand, total } from '../../../packages/rules/src/game.js';
 import type { GameAction, GameView, Hand } from '../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
+import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
 import { ArrowLeftRight, LightCheck as Check, Exchange, GameIcon, Users, X } from './GameIcons.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -113,12 +114,13 @@ export function BankTrade({ game, me, disabled, onAction }: Props) {
   const [bankReceive, setBankReceive] = useState<Resource | null>(null);
   const player = game.players.find((p) => p.id === me),
     hand = player?.hand ?? emptyHand();
+  // Big Table's Partner trades with the bank and at harbours in their phase, as in a turn's actions.
   const locked =
     disabled ||
     command.pending ||
     !!player?.resigned ||
     game.players[game.active]?.id !== me ||
-    game.phase !== 'actions';
+    (game.phase !== 'actions' && game.phase !== 'partner');
   const give = bankGive ? { ...emptyHand(), [bankGive]: game.legal.rates[bankGive] } : emptyHand(),
     get = bankReceive ? { ...emptyHand(), [bankReceive]: 1 } : emptyHand();
   const [reviewed, setReviewed] = useState('');
@@ -223,7 +225,9 @@ export function TradePanel({
     return () => window.removeEventListener('keydown', escape);
   }, []);
   const command = useTradeAction(disabled, onAction);
-  const [tab, setTab] = useState<'players' | 'bank'>('players');
+  // The Partner may trade only with the bank, so their panel opens there.
+  const partnerPhase = game.phase === 'partner' && game.players[game.active]?.id === me;
+  const [tab, setTab] = useState<'players' | 'bank'>(partnerPhase ? 'bank' : 'players');
   const [give, setGive] = useState<Hand>(emptyHand),
     [want, setWant] = useState<Hand>(emptyHand);
   const [open, setOpen] = useState(false),
@@ -246,7 +250,9 @@ export function TradePanel({
       !trade.declinedBy?.includes(p.player),
   );
   const partner = chosen && game.players.find((p) => p.id === chosen.player && !p.resigned);
-  const requestLimit = Object.fromEntries(RESOURCES.map((r) => [r, give[r] ? 0 : 19])) as Hand;
+  // Nobody can hold more of one resource than the game's bank started with.
+  const bank = (findRuleset(game.ruleset) ?? CLASSIC).supply.bank;
+  const requestLimit = Object.fromEntries(RESOURCES.map((r) => [r, give[r] ? 0 : bank])) as Hand;
   return (
     <aside className="game-panel floating-panel trade-panel" role="dialog" aria-label="Trade">
       <header className="trade-header">
@@ -272,6 +278,9 @@ export function TradePanel({
           <BankTrade game={game} me={me} disabled={disabled || command.pending} onAction={onAction} />
         ) : (
           <div role="tabpanel" aria-label="Player trade">
+            {partnerPhase && (
+              <p className="quiet-note trade-lock">No trades with players in the Partner’s phase</p>
+            )}
             {trade ? (
               <section className="live-offer" aria-label="Your current offer">
                 <TradeExchange give={trade.give} get={trade.open ? (chosen?.give ?? null) : trade.want} />
@@ -286,7 +295,13 @@ export function TradePanel({
                     </span>
                   </div>
                 ) : (
-                  <div className="trade-partners" role="group" aria-label="Choose a trading partner">
+                  <div
+                    className="trade-partners"
+                    role="group"
+                    aria-label="Choose a trading partner"
+                    // Four or five partners, only at a table of five or six, wrap in six-seat-trade.css.
+                    data-partners={opponents.length > 3 ? opponents.length : undefined}
+                  >
                     {game.players.map((other, index) => {
                       if (other.id === me || other.resigned) return null;
                       const response = trade.proposals?.find((p) => p.player === other.id),
@@ -368,6 +383,7 @@ export function TradePanel({
                   get={open ? null : want}
                   getControl={
                     <ResourcePicker
+                      bank={bank}
                       label="You get"
                       value={open ? emptyHand() : want}
                       max={requestLimit}
@@ -392,6 +408,7 @@ export function TradePanel({
                   }
                   giveControl={
                     <ResourcePicker
+                      bank={bank}
                       label="You give"
                       value={give}
                       max={hand}
@@ -470,7 +487,14 @@ export function IncomingTrade({ game, me, disabled, onAction, roomPlayers }: Pro
         get={trade.give}
         giveControl={
           trade.open && !proposal ? (
-            <ResourcePicker label="You give" value={give} onChange={setGive} max={limits} disabled={locked} />
+            <ResourcePicker
+              bank={(findRuleset(game.ruleset) ?? CLASSIC).supply.bank}
+              label="You give"
+              value={give}
+              onChange={setGive}
+              max={limits}
+              disabled={locked}
+            />
           ) : undefined
         }
       />

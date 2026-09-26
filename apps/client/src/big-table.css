@@ -1,0 +1,56 @@
+/*
+ * Big Table: its turn style in Room setup, the Partner's locked player trades, and on a phone's small cards the
+ * Lead's and Partner's labelled turn chips and the engraving of the cards on turn.
+ *
+ * All of them are built from existing parts, so almost everything comes from the rules they share. The turn style
+ * is two more of the Game mode fieldset's option cards, so today's selected, hover and disabled states apply,
+ * opened by the accordion (`.t-acc`) while Big Table is the mode picked. This sheet only indents them to the text
+ * of Big Table's card, the card's 10-pixel padding, its radio and the 10-pixel gap, so they read as belonging to
+ * it. The Partner's trade panel says why player trades are off in the panel's own muted note. The chips are the
+ * rail's own `.profile-turn`, labelled with its unused `.profile-turn-label`.
+ */
+.game-world .settings-menu .settings-turns {
+  margin-inline-start: 38px;
+}
+.playing .trade-panel .trade-lock {
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+/* The Lead's and the Partner's turn chips carry their marker's label. On a phone the cards of five and six are
+   small, so a labelled chip keeps to its own card: it starts at the card's edge rather than centring on the
+   portrait, and drops its phase icon, since the label says whose part it is. The selectors are the ones they
+   override, with the seat count and the label inside `:where()`, so they win on order alone. */
+@media (max-width: 700px) and (orientation: portrait),
+  (max-width: 1000px) and (max-height: 600px) and (orientation: landscape) {
+  .playing :where(.player-rail[data-seats]) .player-profile .profile-turn:where(:has(> .profile-turn-label)) {
+    left: 0;
+    transform: none;
+    gap: 3px;
+  }
+  .playing
+    :where(.player-rail[data-seats])
+    .player-profile
+    .profile-turn:where(:has(> .profile-turn-label))
+    > .game-icon {
+    display: none;
+  }
+  :where(.playing .player-rail[data-seats]) .profile-turn-label {
+    font-size: 8px;
+  }
+}
+
+/* The engraving on a turn card's empty end (`lounge-controls.css`) reaches 40 pixels past the card, where a
+   phone's cloth stops at 3, or at 2 on the narrowest. On a rail of four the next portrait covers the rest; a rail
+   of five leaves the last card no neighbour, and a paired turn engraves two cards, so on these rails the
+   engraving stops where the cloth does. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing :where(.player-rail[data-seats]) .player-profile.active::after {
+    clip-path: inset(0 calc(40px - 3px) 0 0);
+  }
+}
+@media (max-width: 380px) and (orientation: portrait) {
+  .playing :where(.player-rail[data-seats]) .player-profile.active::after {
+    clip-path: inset(0 calc(40px - 2px) 0 0);
+  }
+}

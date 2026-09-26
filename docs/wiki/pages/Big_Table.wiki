@@ -1,0 +1,183 @@
+'''Big Table''', for five and six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
+
+{| class="wikitable"
+! !! Classic !! Big Table
+|-
+| Players || 2–4, friends or bots || 5 or 6, people only
+|-
+| Island || 19 land hexes in rows of 3-4-5-4-3 || 30 land hexes in rows of 3-4-5-6-5-4-3
+|-
+| Bank || 19 of each resource || 24 of each resource
+|-
+| Development deck || 25 cards || 34 cards
+|-
+| Ports || 9 || 11
+|-
+| Turns || One player at a time || Paired turns (default) or Between-turns build
+|-
+| Absent player || A bot plays the seat after about 30 seconds || The clock makes forced moves only, after 2 minutes
+|}
+
+== The island ==
+Thirty land hexes make a longer island whose widest row has six hexes. Two of them are deserts.
+
+{| class="wikitable"
+! Terrain !! Produces !! Hexes
+|-
+| Forest || Timber || 6
+|-
+| Pasture || Sheep || 6
+|-
+| Fields || Hay || 6
+|-
+| Hills || Clay || 5
+|-
+| Mountains || Rock || 5
+|-
+| Desert || Nothing || 2
+|}
+
+The 28 producing hexes carry 28 number tokens: two each of 2 and 12, and three each of 3, 4, 5, 6, 8, 9, 10 and 11.
+
+Every Big Table island comes from Catanova's balanced generator, adapted to 30 hexes. It is our own preset and the only board for now. It keeps the [[Map generation|Classic balance rules]] with bounds set for the larger island, and adds one more: the two deserts never touch. There is no fixed beginner layout.
+
+There is still one robber. It starts on one of the two deserts, chosen at random from the map seed, and can later move to any other land hex, the other desert included.
+
+=== Ports ===
+There are 11 ports: five general 3:1 ports, two Sheep 2:1 ports, and one 2:1 port each for Timber, Clay, Hay and Rock. The generator spreads them round the coast so that no two share a corner or sit on neighbouring corners, and shuffles their types. They work exactly as described in [[Trading and ports]].
+
+== Supply ==
+{| class="wikitable"
+! Item !! Big Table
+|-
+| Resource cards || 24 of each, 120 in total
+|-
+| Development cards || 34: 20 Knights, 3 Road Building, 3 Year of Plenty, 3 Monopoly, 5 Victory Point
+|-
+| Pieces for each player || 15 roads, 5 settlements, 4 cities, as in Classic
+|-
+| Awards || Longest Road and Largest Army, 2 points each, as in Classic
+|}
+
+The [[Resources|bank shortage rule]] works as in Classic, now with 24 cards of each resource. The development deck is never refilled.
+
+== Setting up ==
+Before the game, the host chooses the turn structure, the points target (10 by default, any whole number from 8 to 15), the dice and the [[Turn timer|turn timer]]. Changing the mode resets the target to the new mode's default. These settings lock when the game starts.
+
+Each player rolls both dice. The highest total starts, and players tied for highest roll again. Placement then follows the usual snake:
+
+{| class="wikitable"
+! Players !! Placement order
+|-
+| 5 || 1, 2, 3, 4, 5, 5, 4, 3, 2, 1
+|-
+| 6 || 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1
+|}
+
+Everything else is as in [[Getting started#Place your first pieces|Classic setup]]. Setup is untimed. If the draft reaches a player who has been offline for 2 minutes, the clock places for them: a settlement on the legal corner with the most production dots, with ties broken at random, then a road on a random edge touching it.
+
+== Two turn structures ==
+{| class="wikitable"
+! !! Paired turns !! Between-turns build
+|-
+| Status || The default; the current official way to play a table this size || A classic option; Room setup labels it as the older official rule
+|-
+| Who acts || The Lead plays a full turn, then the Partner has one action phase || One player takes a full turn, then every other player gets a build window
+|-
+| Second player may || Trade with the bank and ports, build, buy, play one card || Build and buy with the cards in hand only
+|-
+| Second player may not || Roll, or trade with other players || Trade in any way, or play a card
+|-
+| Winning || Lead or Partner, at once, during the paired turn || Only during your own turn
+|}
+
+== Paired turns ==
+=== Lead and Partner ===
+Each paired turn has two roles, shown by markers.
+* The '''Lead''' is the player on turn. The first Lead is the starting player.
+* The '''Partner''' is the third player to the Lead's left, counting only players still in the game. With six players, the Partner sits directly opposite the Lead. With five, the Partner sits two seats to the Lead's right.
+
+A paired turn has three steps:
+# The Lead plays a full Classic turn: an optional card before the roll, the roll, then trading with any willing player (the Partner included), trading with the bank and ports, building, buying and one card.
+# '''The Partner's phase.''' The Partner never rolls. In any order, and as often as they can pay, the Partner may trade with the bank and at their own ports, build roads, settlements and cities, buy development cards, and play one development card. A Knight moves the robber and robs as usual, and the Lead can be its victim. The Partner may not trade with any player.
+# Both markers pass one seat to the left, counting only players still in the game.
+
+Over a round, everyone is Lead once and Partner once, never both in the same paired turn.
+
+=== Everyone else ===
+Players holding neither marker are not on turn. They collect production, discard on a seven, can be robbed, and may trade with the Lead during the Lead's action phase. During the Partner's phase, nobody trades with another player.
+
+Only the Lead rolls, so only the Lead's roll can bring a seven. The Partner discards on it like anyone else. The robber can move up to three times in one paired turn: for the seven, for the Lead's Knight and for the Partner's Knight.
+
+=== Development cards ===
+The Lead may play one development card in their part, and the Partner one in their phase. A card cannot be played in the part in which it was bought. A card bought as Lead may be played later as Partner, and the other way round. Victory Point cards count without being played, as in [[Development cards|Classic]].
+
+=== Winning ===
+The Lead and the Partner are both on turn for the whole paired turn. After every action, the game checks both of them:
+* If exactly one of them has at least the target, that player wins at once.
+* If both do, the Lead wins.
+* The same check is made as a paired turn begins. A marker holder who already has the target wins before anyone acts.
+
+A resignation counts as a move here: if it hands Longest Road or Largest Army to the Lead or the Partner, the check is made at once.
+
+A player holding neither marker cannot win during that paired turn, even if someone else's move puts them at the target. They win when a later paired turn begins in which they hold the Lead or Partner marker, if they still have the target then. A new Partner can therefore win before the Lead rolls.
+
+For example, with a target of 10, the Partner has 9 points. During the Lead's part, the Lead builds a settlement that cuts a third player's road, and Longest Road passes to the Partner. Its 2 points bring the Partner to 11, and the Partner wins at once, before their own phase begins.
+
+The official rules cover a Lead or Partner winning with their own action. The other cases are settled by Catanova.
+
+=== When fewer than five remain ===
+If resignations leave fewer than five players in the game, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes. Under Between-turns build, the windows carry on at any player count.
+
+== Between-turns build ==
+Each turn is an ordinary Classic turn for one player. After it, every other player gets one build window, one at a time, starting with the player to the left of the one who just finished. That player is also the next to take a turn.
+
+In a window, using only the resource cards already in hand, a player may build roads, settlements and cities and buy development cards. They may not trade with players, trade with the bank or at a port, or play a development card.
+
+Nobody wins during a window. A player who reaches the target there, by building or because an award moves to them, wins at the start of their next turn, before rolling, if they still have the target. A card bought in a window can be played from the buyer's next turn onward, even if that turn comes straight after the window.
+
+Windows follow every turn, but not setup. Every window is optional, and you can end yours at once. The game never skips a window for you, even when you cannot afford anything, because skipping would give away something about your hand.
+
+== Clocks ==
+{| class="wikitable"
+! What the game waits for !! Clock
+|-
+| A turn, or the Lead's part || The room's [[Turn timer|turn timer]], as in Classic
+|-
+| A discard after a seven || As in Classic: each player who must discard gets the full room time
+|-
+| The Partner's phase || Half the room's turn time, rounded up to a whole second, at least 30 seconds
+|-
+| A build window || 20 seconds, with or without a turn timer
+|}
+
+{| class="wikitable"
+! Room turn timer !! 40 s !! 65 s !! 90 s !! 115 s !! 140 s !! Off
+|-
+| Partner's phase || 30 s || 33 s || 45 s || 58 s || 70 s || No clock unless the Partner is away during the phase; then 45 s, which keeps running if they come back
+|}
+
+Only the acting player's clock is shown prominently. When the Lead's clock runs out, the usual [[Turn timer#When time runs out|Classic defaults]] finish the turn, and the Partner's phase begins. When the Partner's clock or a build window's clock runs out, that phase simply ends. Nothing is bought, built or traded, and no card is played. If the Partner played Road Building, any free roads not yet placed are lost. If they played a Knight and have not moved the robber yet, the clock moves it for them.
+
+With the timer off, an absent Partner's 45 seconds start when the phase begins with the Partner away, or when they drop out during it, and keep running if they come back.
+
+== Disconnects ==
+Big Table has no bots, so nobody takes over an absent player's seat. The player is shown as disconnected and the game waits for them. Once they have been offline for 2 minutes, the clock acts for them whenever the game waits on them, exactly as if their time had run out: in setup, on their turns, their Partner's phases, their build windows and any discard they owe. This applies whether or not the room has a turn timer, and it stops the moment they reconnect.
+
+Leaving, resigning and pausing work as in Classic. A resigned player's pieces stay on the island but stop producing, and turns, Partner's phases and build windows skip them. See [[Game modes#When a player disconnects|When a player disconnects]] for a side-by-side comparison with Classic.
+
+== What stays Classic ==
+Building costs and placement, production, the bank shortage rule, sevens and discards, the robber, trading, development-card effects, [[Awards|Longest Road and Largest Army]], and what each player can see. Who holds the Lead and Partner markers, and whose build window is running, are public.
+
+== Cases settled by Catanova ==
+Some cases were left open by the official rules or by the first plan. Catanova has settled each of them. Among them:
+* the half-second Partner's clocks round up, to 33 and 58 seconds;
+* if the Lead resigns during their part, the Partner's phase still follows while five or more players remain;
+* build windows carry on when fewer than five players remain;
+* changing the mode resets the points target to the new mode's default.
+
+One thing is left to measure rather than decide. The balanced generator keeps its limit of eleven production dots per intersection, and the mode opens only once the generator is fast enough on 30 hexes, or runs in the background with a longer time limit.
+
+The full specification is the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-BIG-TABLE.md Big Table rulebook].
+
+[[Category:Game rules]]

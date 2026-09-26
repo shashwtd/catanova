@@ -37,7 +37,19 @@ import { fileURLToPath } from 'node:url';
 import { Store } from '../apps/server/src/store.js';
 import { applyAction, pieces, roadSites, settlementSites, total } from '../packages/rules/src/game.js';
 import type { CardKind, Game, GameAction, Phase } from '../packages/rules/src/game.js';
-import { DEVELOPMENT_DECK, RESOURCES, SUPPLY } from '../packages/rules/src/index.js';
+import { RESOURCES } from '../packages/rules/src/index.js';
+import { isLand } from '../packages/rules/src/board.js';
+import { CLASSIC, findRuleset } from '../packages/rules/src/rulesets.js';
+import type { Ruleset } from '../packages/rules/src/rulesets.js';
+import {
+  MAIN_ISLAND,
+  edgeKind,
+  isLandIntersection,
+  takesRoad,
+  takesShip,
+  vertexIsland,
+} from '../packages/rules/src/sea.js';
+import { owedMoves } from '../packages/rules/src/owed.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 
 export const REPORT_SCHEMA = 1;
@@ -49,10 +61,11 @@ const PHASES: Phase[] = [
   'discard',
   'robber',
   'freeRoads',
+  'partner',
+  'buildWindow',
+  'goldPick',
   'finished',
 ];
-const CARD_KINDS = Object.keys(DEVELOPMENT_DECK) as CardKind[];
-const DECK_SIZE = CARD_KINDS.reduce((sum, kind) => sum + DEVELOPMENT_DECK[kind], 0);
 const MISSING_JOURNAL_CHECK =
   "this release's Store has no verifyJournal, so the journal hash chain cannot be checked";
 
@@ -61,6 +74,8 @@ type JournalStore = Store & { verifyJournal?: (roomId: string) => JournalCheck }
 export type RoomReport = {
   roomId: string;
   status: 'verified' | 'failed' | 'no-game';
+  /** The game's ruleset, when it is not Classic. */
+  ruleset?: string;
   phase?: Phase;
   turn?: number;
   players?: number;
@@ -99,20 +114,30 @@ const message = (error: unknown) =>
 const isCount = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
+/** Why this release cannot check a game in a mode it does not know, said plainly. */
+export const unknownRuleset = (ruleset: unknown) =>
+  `the game plays ruleset ${String(ruleset)}, which this release does not know, so it was not checked; verify it with the release that wrote it`;
+
 /**
  * Rules invariants every saved game satisfies, as short sentences. Only facts derivable from
- * the rules engine are asserted, so a legitimately played game never produces one.
+ * the rules engine are asserted, so a legitimately played game never produces one. Seats,
+ * the bank, the deck and the pieces are the game's own ruleset's.
  */
 export function gameInvariantProblems(game: Game): string[] {
   const problems: string[] = [];
+  const rules = findRuleset(game.ruleset);
+  if (!rules) return [unknownRuleset(game.ruleset)];
+  const { bank: bankSize, deck: deckCounts, pieces: supply } = rules.supply;
+  const CARD_KINDS = Object.keys(deckCounts) as CardKind[];
+  const DECK_SIZE = CARD_KINDS.reduce((sum, kind) => sum + deckCounts[kind], 0);
   try {
     const players = Array.isArray(game.players) ? game.players : [];
     const ids = new Set(players.map((p) => p.id));
-    if (players.length < 2 || players.length > 4)
-      problems.push(`${players.length} players; a game seats 2 to 4`);
+    if (players.length < rules.seats.min || players.length > rules.seats.max)
+      problems.push(`${players.length} players; a game seats ${rules.seats.min} to ${rules.seats.max}`);
     if (ids.size !== players.length) problems.push('two players share one seat id');
 
-    // Every resource card is either in the bank or in a hand: 19 of each type.
+    // Every resource card is either in the bank or in a hand: the ruleset's count of each type.
     for (const resource of RESOURCES) {
       const bank = game.bank?.[resource];
       const hands = players.map((p) => p.hand?.[resource]);
@@ -121,14 +146,12 @@ export function gameInvariantProblems(game: Game): string[] {
         continue;
       }
       const held = sum(hands);
-      if (bank + held !== SUPPLY.resourcesPerType)
-        problems.push(
-          `${resource}: bank ${bank} + hands ${held} = ${bank + held}, expected ${SUPPLY.resourcesPerType}`,
-        );
+      if (bank + held !== bankSize)
+        problems.push(`${resource}: bank ${bank} + hands ${held} = ${bank + held}, expected ${bankSize}`);
     }
 
     // Development cards: each purchase pops the deck and numbers the card, so deck + bought is
-    // exactly 25. Played knights are counted; other played cards leave no trace, and a resigning
+    // exactly the deck's size (25 in Classic). Played knights are counted; other played cards leave no trace, and a resigning
     // player's cards are discarded, so held + played can only be bounded above.
     const deck = Array.isArray(game.deck) ? game.deck : [];
     const held = players.flatMap((p) => (Array.isArray(p.cards) ? p.cards : []));
@@ -157,8 +180,8 @@ export function gameInvariantProblems(game: Game): string[] {
         deck.filter((card) => card === kind).length +
         held.filter((card) => card.kind === kind).length +
         (kind === 'knight' ? played : 0);
-      if (count > DEVELOPMENT_DECK[kind])
-        problems.push(`${kind} cards: ${count} accounted for, but only ${DEVELOPMENT_DECK[kind]} exist`);
+      if (count > deckCounts[kind])
+        problems.push(`${kind} cards: ${count} accounted for, but only ${deckCounts[kind]} exist`);
     }
     const cardIds = new Set<string>();
     for (const card of held) {
@@ -196,15 +219,16 @@ export function gameInvariantProblems(game: Game): string[] {
     }
     for (const player of players) {
       const owned = pieces(game, player.id);
-      if (owned.roads > SUPPLY.roads)
-        problems.push(`a player has ${owned.roads} roads; the supply is ${SUPPLY.roads}`);
-      if (owned.settlements > SUPPLY.settlements)
-        problems.push(`a player has ${owned.settlements} settlements; the supply is ${SUPPLY.settlements}`);
-      if (owned.cities > SUPPLY.cities)
-        problems.push(`a player has ${owned.cities} cities; the supply is ${SUPPLY.cities}`);
+      if (owned.roads > supply.roads)
+        problems.push(`a player has ${owned.roads} roads; the supply is ${supply.roads}`);
+      if (owned.settlements > supply.settlements)
+        problems.push(`a player has ${owned.settlements} settlements; the supply is ${supply.settlements}`);
+      if (owned.cities > supply.cities)
+        problems.push(`a player has ${owned.cities} cities; the supply is ${supply.cities}`);
     }
     if (!Number.isInteger(game.robber) || game.robber < 0 || game.robber >= game.board.hexes.length)
       problems.push(`the robber stands on missing tile ${String(game.robber)}`);
+    if (rules.sea) problems.push(...seaProblems(game, rules, ids));
 
     // Phase and the player to move.
     const active = players[game.active];
@@ -219,8 +243,8 @@ export function gameInvariantProblems(game: Game): string[] {
         problems.push('a finished game without a winner must have been abandoned');
     } else {
       if (game.winner !== null) problems.push('a game in progress already has a winner');
-      // During discards the active seat may have resigned; others still discard first.
-      if (game.phase !== 'discard' && active?.resigned)
+      // During discards and gold picks the active seat may have resigned; others still discard or pick first.
+      if (game.phase !== 'discard' && game.phase !== 'goldPick' && active?.resigned)
         problems.push(`the active player has resigned during ${game.phase}`);
       const setup = game.phase === 'setupSettlement' || game.phase === 'setupRoad';
       if (setup && game.turn !== 0) problems.push(`setup is still running on turn ${game.turn}`);
@@ -242,10 +266,148 @@ export function gameInvariantProblems(game: Game): string[] {
         problems.push('the free-road phase has no free road left');
       if (game.trade && (game.phase !== 'actions' || game.trade.player !== active?.id))
         problems.push("an open trade is not the active player's, during their actions");
+      problems.push(...turnStructureProblems(game, rules.turns));
     }
   } catch (error) {
     problems.push(`the saved game is malformed: ${message(error)}`);
   }
+  return problems;
+}
+
+/**
+ * Big Table's turn structures (docs/RULEBOOK-BIG-TABLE.md, sections 6 and 7): the structure is one the mode
+ * offers, the markers of a paired turn and the build windows point at real seats, and the player acting is the
+ * one the phase belongs to. A game in progress only.
+ */
+function turnStructureProblems(game: Game, offered: readonly string[] | undefined): string[] {
+  const problems: string[] = [];
+  const seat = (index: unknown) => Number.isInteger(index) && !!game.players[index as number];
+  if (offered ? !game.turns || !offered.includes(game.turns) : game.turns !== undefined)
+    problems.push(`the turn structure ${String(game.turns)} is not one this mode offers`);
+  const setup = game.phase === 'setupSettlement' || game.phase === 'setupRoad';
+  if (game.pair) {
+    if (game.turns !== 'paired' || setup) problems.push('a paired turn is under way outside paired turns');
+    else if (!seat(game.pair.lead) || !seat(game.pair.partner) || game.pair.lead === game.pair.partner)
+      problems.push('the Lead and Partner markers are not on two seats of the game');
+    else if (game.active !== game.pair.lead && game.active !== game.pair.partner)
+      problems.push('a player holding neither marker is acting in a paired turn');
+  }
+  const partner = !!game.pair && game.active === game.pair.partner;
+  if ((game.phase === 'partner' || game.returnPhase === 'partner') && !partner)
+    problems.push("the Partner's phase is under way without its Partner acting");
+  if (game.windows) {
+    if (game.turns !== 'betweenTurnsBuild')
+      problems.push('build windows are open outside Between-turns build');
+    else if (!seat(game.windows.after) || game.windows.after === game.active)
+      problems.push("a build window follows no other seat's turn");
+    if (game.phase !== 'buildWindow') problems.push(`build windows are open during ${game.phase}`);
+  } else if (game.phase === 'buildWindow') problems.push('a build window is open with no turn before it');
+  return problems;
+}
+
+/**
+ * Open Sea's own invariants (docs/RULEBOOK-OPEN-SEA.md): every ship a seated player's, on an edge that takes a ship
+ * and holds no road, no more than the supply, and the ship records of section 8.7 only for ships on the board; the
+ * pirate on a sea hex and the robber on land; buildings on land, only on the main island during setup, and on a
+ * small island only with its bonus earned; gold picks owed exactly while the game waits for them, in turn order
+ * from the player on turn, one entry per playing seat, and never from an empty bank.
+ */
+function seaProblems(game: Game, rules: Ruleset, ids: Set<string>): string[] {
+  const problems: string[] = [];
+  const { board } = game;
+  const ships = game.ships ?? {};
+  const fleet = new Map<string, number>();
+  for (const [key, owner] of Object.entries(ships)) {
+    const edge = Number(key);
+    if (!Number.isInteger(edge) || edge < 0 || edge >= board.edges.length) {
+      problems.push(`a ship lies on missing edge ${key}`);
+      continue;
+    }
+    if (!ids.has(owner)) problems.push(`the ship on edge ${key} belongs to no player`);
+    if (!takesShip(edgeKind(board, edge)))
+      problems.push(`the ship on edge ${key} is on an edge no ship takes`);
+    if (game.roads[edge]) problems.push(`edge ${key} holds a road and a ship`);
+    fleet.set(owner, (fleet.get(owner) ?? 0) + 1);
+  }
+  for (const count of fleet.values())
+    if (count > rules.supply.pieces.ships!)
+      problems.push(`a player has ${count} ships; the supply is ${rules.supply.pieces.ships}`);
+  // A locked ship never moves, and a closed end is dropped with its ship's move, so each record has its ship.
+  for (const edge of game.lockedShips ?? [])
+    if (!ships[edge]) problems.push(`a ship is locked on edge ${edge}, which holds no ship`);
+  for (const [key, ends] of Object.entries(game.closedShipEnds ?? {})) {
+    const edge = board.edges[Number(key)],
+      owner = ships[Number(key)];
+    if (!edge || !owner) {
+      problems.push(`a closed ship end is recorded on edge ${key}, which holds no ship`);
+      continue;
+    }
+    for (const v of ends)
+      if ((v !== edge.a && v !== edge.b) || !game.buildings[v] || game.buildings[v]!.player === owner)
+        problems.push(
+          `the ship on edge ${key} has an end recorded as closed at corner ${v}, where nobody else built`,
+        );
+  }
+  // Only the player on turn builds, so every ship built this turn is theirs; the next turn starts the list afresh.
+  const onTurn = game.players[game.active]?.id;
+  for (const edge of game.shipsBuiltThisTurn ?? [])
+    if (!ships[edge] || ships[edge] !== onTurn)
+      problems.push(`the ship built this turn on edge ${edge} is not a ship of the player on turn`);
+  for (const key of Object.keys(game.roads))
+    if (board.edges[Number(key)] && !takesRoad(edgeKind(board, Number(key))))
+      problems.push(`the road on edge ${key} is on an edge no road takes`);
+  const pirate = game.pirate;
+  if (pirate === undefined || !board.hexes[pirate] || isLand(board.hexes[pirate]!))
+    problems.push(`the pirate is not on a sea hex (${String(pirate)})`);
+  if (board.hexes[game.robber] && !isLand(board.hexes[game.robber]!))
+    problems.push(`the robber stands on the sea (tile ${game.robber})`);
+  // Buildings: on land, only on the main island in setup, and never on a small island without its bonus, which a
+  // player's first settlement there always earns.
+  for (const [key, building] of Object.entries(game.buildings)) {
+    const vertex = Number(key);
+    if (!board.vertices[vertex]) continue;
+    const island = vertexIsland(board, vertex);
+    if (!isLandIntersection(board, vertex)) problems.push(`the building at corner ${key} stands at sea`);
+    else if (game.turn === 0 && island !== MAIN_ISLAND)
+      problems.push(`the starting settlement at corner ${key} is off the main island`);
+    else if (island && island !== MAIN_ISLAND && !game.islandBonuses?.[building.player]?.includes(island))
+      problems.push(
+        `the building at corner ${key} is on island ${island}, whose bonus its player never earned`,
+      );
+  }
+  for (const [player, islands] of Object.entries(game.islandBonuses ?? {})) {
+    if (new Set(islands).size !== islands.length) problems.push('an island bonus is recorded twice');
+    for (const island of islands)
+      if (
+        island === MAIN_ISLAND ||
+        !Object.entries(game.buildings).some(
+          ([vertex, building]) =>
+            building.player === player && vertexIsland(board, Number(vertex)) === island,
+        )
+      )
+        problems.push(`an island bonus for ${island} has no building of its player there`);
+  }
+  const owed = game.goldOwed ?? [];
+  if ((game.phase === 'goldPick') !== owed.length > 0)
+    problems.push(`gold picks are ${owed.length ? '' : 'not '}owed during ${game.phase}`);
+  for (const entry of owed) {
+    const player = game.players.find((p) => p.id === entry.player);
+    if (!player || player.resigned) problems.push('a gold pick is owed by a seat that is not playing');
+    if (!Number.isInteger(entry.picks) || entry.picks < 1)
+      problems.push(`a gold pick of ${entry.picks} is owed`);
+  }
+  if (new Set(owed.map((entry) => entry.player)).size !== owed.length)
+    problems.push('a player is owed gold picks twice');
+  // In turn order, starting with the player on turn: each seat further round the table than the one before.
+  const seats = game.players.length;
+  const round = owed.map(
+    (entry) => (game.players.findIndex((p) => p.id === entry.player) - game.active + seats) % seats,
+  );
+  if (round.some((place, i) => i > 0 && place <= round[i - 1]!))
+    problems.push('gold picks are owed out of turn order');
+  // The picks lapse once the bank is empty, so none is ever owed from an empty bank.
+  if (owed.length && RESOURCES.every((r) => !game.bank[r]))
+    problems.push('gold picks are owed from an empty bank');
   return problems;
 }
 
@@ -269,11 +431,17 @@ export function continueGame(game: Game, seed: string): { move: string | null; p
   if (game.phase === 'finished') return { move: null, problems: [] };
   const random = seededRandom(seed);
   const actor =
-    game.phase === 'discard' ? Object.keys(game.discards).sort()[0] : game.players[game.active]?.id;
+    game.phase === 'discard'
+      ? Object.keys(game.discards).sort()[0]
+      : game.phase === 'goldPick'
+        ? owedMoves(game)[0]?.player
+        : game.players[game.active]?.id;
   if (!actor) return { move: null, problems: ['no player is due to move'] };
   let action: GameAction | undefined;
   try {
-    if (game.phase === 'setupSettlement') {
+    // Open Sea's setup follows its own placement rules, which the clock's setup moves already keep.
+    if (findRuleset(game.ruleset)?.sea) action = timeoutAction(game, actor, random);
+    else if (game.phase === 'setupSettlement') {
       const vertex = settlementSites(game, actor, true)[0];
       action = vertex === undefined ? undefined : { kind: 'settlement', vertex };
     } else if (game.phase === 'setupRoad') {
@@ -328,6 +496,11 @@ export function verifyRoom(store: Store, roomId: string, options: VerifyOptions 
   const problems: string[] = [];
   const report: RoomReport = { roomId, status: 'failed', problems };
   let game: Game | undefined;
+  // Asked of the saved row, since loadGame refuses a game in a mode this release does not know.
+  const saved = !!store.db.prepare('SELECT 1 FROM games WHERE room_id = ?').get(roomId);
+  const ruleset = saved ? store.roomMode(roomId) : undefined;
+  if (ruleset && ruleset !== CLASSIC.id) report.ruleset = ruleset;
+  if (ruleset && !findRuleset(ruleset)) problems.push(unknownRuleset(ruleset));
   try {
     game = store.loadGame(roomId);
   } catch (error) {
@@ -466,12 +639,14 @@ export function formatReport(source: string, bytes: number, report: Verification
   for (const room of report.details) {
     if (room.status === 'no-game') continue;
     const facts = room.phase
-      ? `${room.players} players, turn ${room.turn}, ${room.phase}, revision ${room.revision ?? '?'}, ${
+      ? `${room.ruleset ? `${room.ruleset}, ` : ''}${room.players} players, turn ${room.turn}, ${room.phase}, revision ${room.revision ?? '?'}, ${
           room.historyEntries ?? 0
         } history entries${room.journalEvents === undefined ? '' : `, ${room.journalEvents} journal rows`}; ${
           room.continuedWith ? `continues with ${room.continuedWith}` : 'finished'
         }`
-      : 'no loadable game';
+      : room.ruleset
+        ? `a ${room.ruleset} game this release cannot load`
+        : 'no loadable game';
     lines.push(`  ${room.status === 'verified' ? 'PASS' : 'FAIL'} ${room.roomId}  ${facts}`);
     for (const problem of room.problems) lines.push(`       - ${problem}`);
   }

@@ -1,7 +1,7 @@
 /**
- * The admin API. Reads are GET; ending a game, resolving feedback and
- * generating a report are POST and pass the listener's origin and CSRF checks
- * first.
+ * The admin API. Reads are GET; ending a game, resolving feedback, generating
+ * a report and changing who may pick a game mode are POST and pass the
+ * listener's origin and CSRF checks first.
  */
 import { AdminRequestError } from './api.js';
 import type { AdminContext, ApiRoute } from './api.js';
@@ -21,6 +21,7 @@ import {
 } from './rooms.js';
 import { listPlayers, playerDetail } from './players.js';
 import { feedbackRoutes } from './feedback.js';
+import { modeRoutes } from './modes.js';
 import { RETENTION_DAYS } from './analysis-runner.js';
 import type { Analysis } from './analysis-runner.js';
 import type { RoomIndex } from './room-index.js';
@@ -41,6 +42,7 @@ export function coreRoutes(
   const room = (suffix = '') => new RegExp(`^/api/admin/games/${ROOM_PARAM}${suffix}$`);
   return [
     ...feedbackRoutes(context),
+    ...modeRoutes(context),
     {
       method: 'GET',
       path: /^\/api\/admin\/overview$/,

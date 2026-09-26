@@ -12,4 +12,8 @@ export const ART_REDIRECTS: Readonly<Record<string, string>> = {
   '/art/title-landscape.png': '/art/optimized/title-landscape.05db8101ac33.webp',
   '/art/guide-game.png': '/art/optimized/guide-game.796f79200bc4.webp',
   '/art/guide-players.png': '/art/optimized/guide-players.07d025acd09f.webp',
+  '/art/gold-storybook.png': '/art/optimized/gold-storybook.017351263200.webp',
+  '/art/gold-classic.png': '/art/optimized/gold-classic.5a9996f0725b.webp',
+  '/art/ship-painted.png': '/art/optimized/ship-painted.8c31ede90b16.webp',
+  '/art/ship-sail-mask.png': '/art/optimized/ship-sail-mask.49ba6ca51b30.webp',
 };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { applyAction, createGame, gameView } from '../packages/rules/src/game.js';
-import { finalStandings, playerStandings } from '../apps/client/src/player-ranking.js';
+import { finalStandings, playerStandings, pointBreakdown } from '../apps/client/src/player-ranking.js';
 import { GameOver } from '../apps/client/src/GameOver.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { PLAYER_COLORS } from '../apps/client/src/Board.js';
@@ -237,4 +237,49 @@ test('the declared winner leads resignation results and equal-score rivals share
       ['p2', 4],
     ],
   );
+});
+
+test('results name each part of a score from the server’s terms, and results saved before terms still add up', () => {
+  const game = setup();
+  game.phase = 'finished';
+  game.winner = 'p1';
+  game.longestRoad = 'p1';
+  Object.values(game.buildings).find((b) => b.player === 'p1')!.kind = 'city';
+  game.players[1]!.cards = [0, 1].map((i) => ({ id: `vp${i}`, kind: 'victoryPoint', boughtTurn: 0 }));
+  const view = gameView(game, 'p0');
+  const winner = view.players[1]!;
+  const named = pointBreakdown(view, winner);
+  assert.deepEqual(named, [
+    { key: 'settlements', label: '1 settlement', points: 1, count: 1 },
+    { key: 'cities', label: '1 city', points: 2, count: 1 },
+    { key: 'longestRoad', label: 'Longest Road', points: 2 },
+    { key: 'cards', label: '2 victory point cards', points: 2, count: 2 },
+  ]);
+  // A saved result from before the terms: the same parts, worked out from the board and the awards.
+  const { terms: _terms, ...older } = winner;
+  assert.deepEqual(pointBreakdown(view, older), named);
+  // A term the old reasoning could not explain is named, not passed off as a victory point card.
+  const bonus = {
+    ...winner,
+    points: winner.points + 2,
+    terms: [...winner.terms, { id: 'islands', points: 2, count: 1 }],
+  };
+  const parts = pointBreakdown(view, bonus as typeof winner);
+  assert.equal(parts.at(-1)?.label, 'Other points');
+  assert.equal(parts.find((part) => part.key === 'cards')?.label, '2 victory point cards');
+  assert.equal(
+    parts.reduce((n, part) => n + part.points, 0),
+    bonus.points,
+  );
+  const html = renderToStaticMarkup(
+    createElement(GameOver, {
+      room: { roomId: 'results-room', revision: 0, counter: 0, players: seats, game: view },
+      busy: false,
+      canReturn: true,
+      onReturn() {},
+      onQuit() {},
+    }),
+  );
+  assert.match(html, /data-part="cities"[^]*?<span>1 city<\/span><b>\+2<\/b>/);
+  assert.match(html, /<span>2 victory point cards<\/span><b>\+2<\/b>/);
 });
