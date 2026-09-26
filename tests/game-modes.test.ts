@@ -75,6 +75,10 @@ test('the switches: Classic always, open modes for every host, every mode for te
   const testers = readModeSwitches({ CATANOVA_MODE_TESTERS: 'acct-1' }, log);
   assert.deepEqual(modesFor(testers, 'acct-1'), [CLASSIC.id, TEST]);
   assert.deepEqual(modesFor(testers, 'acct-9'), [CLASSIC.id]);
+  // An account id matches whatever its case, as copied from wherever it was shown.
+  const copied = readModeSwitches({ CATANOVA_MODE_TESTERS: ' 0A1B2C3D-0000-4000-8000-00000000000F ,' }, log);
+  assert.deepEqual(modesFor(copied, '0a1b2c3d-0000-4000-8000-00000000000f'), [CLASSIC.id, TEST]);
+  assert.deepEqual(modesFor(testers, 'ACCT-1'), [CLASSIC.id, TEST]);
   // Local playtest mode has no accounts, so CATANOVA_MODES alone decides.
   assert.deepEqual(modesFor(testers, undefined), [CLASSIC.id]);
   assert.deepEqual(modesFor(switches, undefined), [CLASSIC.id, TEST]);
