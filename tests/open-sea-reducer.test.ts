@@ -1168,6 +1168,19 @@ test('§9.2 and §12.3 a resignation during gold picks that hands the player on 
   );
 });
 
+test('§9.2 a pick is never empty, even in a state that owes one from an empty bank', () => {
+  const g = afterSetup(3, 41);
+  Object.assign(g, { phase: 'goldPick', goldOwed: [{ player: 'blue', picks: 1 }] });
+  for (const r of RESOURCES) {
+    g.players[1]!.hand[r] += g.bank[r];
+    g.bank[r] = 0;
+  }
+  assert.throws(
+    () => applyAction(g, 'blue', { kind: 'goldPick', resources: hand() }, () => 0.5),
+    rule('Choose at least one resource'),
+  );
+});
+
 test('§15.6 the last player left, offline, starts a turn with no ship built or moved in it', () => {
   const g = afterSetup(3, 1);
   Object.assign(g, { phase: 'actions', dice: [2, 3] });

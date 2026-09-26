@@ -1419,6 +1419,8 @@ function pickGold(g: Game, player: string, picks: Hand) {
   requireRule(g.phase === 'goldPick', 'Nobody is picking from a gold field now');
   const issue = goldPickIssue(g, player, picks);
   requireRule(!issue, issue ?? '');
+  // A pick is at least one card: the queue lapses once the bank is empty (9.2), so nobody is ever owed none.
+  requireRule(total(picks) > 0, 'Choose at least one resource');
   const name = g.players.find((other) => other.id === player)!.name,
     waiting = g.goldOwed!.length - 1;
   Object.assign(g, applyGoldPick(g, player, picks));
