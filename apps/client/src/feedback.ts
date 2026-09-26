@@ -19,7 +19,8 @@ export type FeedbackEvent = {
   /** Stable committed roll identity, independent of later room/presence revisions. */
   diceId?: string;
   notices: string[];
-  cardPlay?: { kind: Exclude<CardKind, 'victoryPoint'>; playerName: string };
+  /** A card played, and whether in Open Sea, where a Knight and Road Building do more. */
+  cardPlay?: { kind: Exclude<CardKind, 'victoryPoint'>; playerName: string; sea?: true };
   sounds: SoundCue[];
   flights: FlightIntent[];
   glowHexes: number[];
@@ -368,7 +369,11 @@ export function deriveFeedback(
     for (const player of g.players)
       for (const kind of ['knight', 'roadBuilding', 'yearOfPlenty', 'monopoly'] as const)
         if (line === `${player.name} played ${CARD_NAMES[kind]}.`)
-          event.cardPlay = { kind, playerName: player.name };
+          event.cardPlay = {
+            kind,
+            playerName: player.name,
+            ...(findRuleset(g.ruleset)?.sea ? { sea: true as const } : {}),
+          };
   event.notices = lines
     .filter((s) => !s.endsWith("'s turn.") && !before.players.some((player) => rollFaces(s, player.name)))
     .filter(

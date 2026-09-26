@@ -7,7 +7,7 @@ import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js'
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { ResourceIcon } from './Board.js';
 import { CardTooltip } from './CardTooltip.js';
-import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardLockReason } from './cards.js';
+import { CARD_LORE, DEVELOPMENT_ART_INDEX, cardEffect, cardLockReason } from './cards.js';
 import { GamePopover } from './GamePopover.js';
 const ART_COLUMNS = [0, 418, 836, 1254],
   ART_ROWS = [0, 627, 1254];
@@ -168,7 +168,7 @@ export function DevelopmentCards({
                           </span>
                         )}
                         <em>{lore.story}</em>
-                        <span>{lore.effect}</span>
+                        <span>{cardEffect(c.kind, game)}</span>
                         {lock && <b className="card-lock-message">{lock}</b>}
                       </>
                     }
@@ -237,7 +237,7 @@ export function DevelopmentCards({
                   </button>
                   <div className="development-explanation">
                     <h3>{CARD_NAMES[card.kind]}</h3>
-                    <p>{CARD_LORE[card.kind].effect}</p>
+                    <p>{cardEffect(card.kind, game)}</p>
                     {reason && (
                       <div className="card-unavailable">
                         <LockKeyhole size={14} />

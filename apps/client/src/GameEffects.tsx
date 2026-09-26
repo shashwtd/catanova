@@ -272,6 +272,11 @@ const CARD_PLAY_CAPTIONS = {
   yearOfPlenty: 'Two resources from the bank.',
   monopoly: 'One resource, gathered from every rival.',
 };
+/** Open Sea's Knight moves the robber or the pirate, and its Road Building places roads or ships. */
+const SEA_CAPTIONS: Partial<typeof CARD_PLAY_CAPTIONS> = {
+  knight: 'The watch rides out. Move the robber or the pirate.',
+  roadBuilding: 'Two roads or ships, ready to build.',
+};
 function CardPlayToast({
   card,
   reducedMotion,
@@ -294,7 +299,7 @@ function CardPlayToast({
         <div className="card-play-copy">
           <span>{card.playerName} played</span>
           <strong>{CARD_NAMES[card.kind]}</strong>
-          <p>{CARD_PLAY_CAPTIONS[card.kind]}</p>
+          <p>{(card.sea && SEA_CAPTIONS[card.kind]) || CARD_PLAY_CAPTIONS[card.kind]}</p>
         </div>
       </div>
     </div>

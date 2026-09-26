@@ -2,7 +2,18 @@ import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CLASSIC } from '../../../packages/rules/src/rulesets.js';
 import type { Ruleset } from '../../../packages/rules/src/rulesets.js';
-import { Castle, Dices, House, Route, ScrollText, Shield, Trophy, Robber, NextTurn } from './GameIcons.js';
+import {
+  Castle,
+  Dices,
+  House,
+  Route,
+  Sailboat,
+  ScrollText,
+  Shield,
+  Trophy,
+  Robber,
+  NextTurn,
+} from './GameIcons.js';
 import { ResourceSummary } from './ResourcePicker.js';
 
 function GuideSection({
@@ -47,7 +58,9 @@ export function QuickRules({
   ruleset?: Ruleset;
   victoryPoints?: number;
 }) {
-  const [section, setSection] = useState<string | null>('build');
+  // Open Sea opens on what it changes (docs/RULEBOOK-OPEN-SEA.md); the rest of the guide is Classic's.
+  const sea = !!ruleset.sea;
+  const [section, setSection] = useState<string | null>(sea ? 'sea' : 'build');
   const disclosure = (key: string) => ({
     open: section === key,
     onToggle: () => setSection(section === key ? null : key),
@@ -75,13 +88,28 @@ export function QuickRules({
             <b>Next.</b> Pass the dice when you’re finished.
           </li>
         </ol>
-        <p>At the start, place 2 settlements and 2 roads. The game highlights each required placement.</p>
+        <p>
+          {sea
+            ? 'At the start, place 2 settlements on the main island, each with a road or a ship. The game highlights each required placement.'
+            : 'At the start, place 2 settlements and 2 roads. The game highlights each required placement.'}
+        </p>
       </GuideSection>
       <GuideSection title="Build & buy" icon={<House />} {...disclosure('build')}>
         <dl className="guide-costs">
-          {(['road', 'settlement', 'city', 'developmentCard'] as const).map((kind) => {
+          {(ruleset.costs.ship
+            ? (['road', 'ship', 'settlement', 'city', 'developmentCard'] as const)
+            : (['road', 'settlement', 'city', 'developmentCard'] as const)
+          ).map((kind) => {
             const Icon =
-              kind === 'road' ? Route : kind === 'settlement' ? House : kind === 'city' ? Castle : ScrollText;
+              kind === 'road'
+                ? Route
+                : kind === 'ship'
+                  ? Sailboat
+                  : kind === 'settlement'
+                    ? House
+                    : kind === 'city'
+                      ? Castle
+                      : ScrollText;
             const label =
               kind === 'developmentCard'
                 ? 'Development card'
@@ -89,7 +117,9 @@ export function QuickRules({
                   ? 'City upgrade'
                   : kind === 'road'
                     ? 'Road'
-                    : 'Settlement';
+                    : kind === 'ship'
+                      ? 'Ship'
+                      : 'Settlement';
             return (
               <div key={kind} className="guide-recipe">
                 <dt>
@@ -98,16 +128,23 @@ export function QuickRules({
                 </dt>
                 <dd>
                   <span className="recipe-pay">Pay</span>
-                  <ResourceSummary hand={ruleset.costs[kind]} />
+                  <ResourceSummary hand={kind === 'ship' ? ruleset.costs.ship! : ruleset.costs[kind]} />
                 </dd>
               </div>
             );
           })}
         </dl>
-        <p>
-          Extend roads from your network. Settlements need a connected road and an empty intersection between
-          buildings. Upgrade your own settlement to a city.
-        </p>
+        {sea ? (
+          <p>
+            Extend roads and ships from your network. Settlements need a connected road or ship and an empty
+            intersection between buildings. Upgrade your own settlement to a city.
+          </p>
+        ) : (
+          <p>
+            Extend roads from your network. Settlements need a connected road and an empty intersection
+            between buildings. Upgrade your own settlement to a city.
+          </p>
+        )}
       </GuideSection>
       <GuideSection title="Points & awards" icon={<Trophy />} {...disclosure('points')}>
         <dl className="guide-points">
@@ -123,13 +160,28 @@ export function QuickRules({
             <dt>Victory Point card</dt>
             <dd>1 point</dd>
           </div>
+          {sea && (
+            <div>
+              <dt>Island bonus</dt>
+              <dd>2 points</dd>
+            </div>
+          )}
         </dl>
-        <p className="guide-award">
-          <Route />
-          <span>
-            <b>Longest Road · +2 points</b>Longest continuous route, at least 5 roads.
-          </span>
-        </p>
+        {sea ? (
+          <p className="guide-award">
+            <Route />
+            <span>
+              <b>Longest Route · +2 points</b>Longest continuous route, at least 5 roads and ships.
+            </span>
+          </p>
+        ) : (
+          <p className="guide-award">
+            <Route />
+            <span>
+              <b>Longest Road · +2 points</b>Longest continuous route, at least 5 roads.
+            </span>
+          </p>
+        )}
         <p className="guide-award">
           <Shield />
           <span>
@@ -140,10 +192,18 @@ export function QuickRules({
       </GuideSection>
       <GuideSection title="When a 7 is rolled" icon={<Robber />} {...disclosure('robber')}>
         <p>Anyone holding over 7 resources discards half, rounded down. No tiles produce.</p>
-        <p>
-          The player who rolled moves the robber to another tile and steals 1 random resource from an opponent
-          with a settlement or city beside it.
-        </p>
+        {sea ? (
+          <p>
+            The player who rolled moves the robber to another tile, or the pirate to another sea hex, and
+            steals 1 random resource from an opponent beside it: a settlement or city for the robber, a ship
+            for the pirate.
+          </p>
+        ) : (
+          <p>
+            The player who rolled moves the robber to another tile and steals 1 random resource from an
+            opponent with a settlement or city beside it.
+          </p>
+        )}
       </GuideSection>
       <GuideSection title="Development cards" icon={<ScrollText />} {...disclosure('cards')}>
         <p>
@@ -155,9 +215,40 @@ export function QuickRules({
           one-card allowance.
         </p>
       </GuideSection>
+      {/* Last, so that Classic's sections keep their places, and with them their ids (useId). */}
+      {sea && (
+        <GuideSection title="Open Sea" icon={<Sailboat />} {...disclosure('sea')}>
+          <p>
+            <b>Ships.</b> A ship costs 1 Timber and 1 Sheep. Build it on an edge beside the sea, touching your
+            settlement, city or another of your ships. Roads and ships join only at your own settlements and
+            cities.
+          </p>
+          <p>
+            <b>Moving a ship.</b> Once a turn, after the roll, you may move one ship at the open end of a line
+            to anywhere a new ship could go. A ship built this turn stays put, and so does a line joining two
+            of your buildings.
+          </p>
+          <p>
+            <b>Gold fields.</b> A gold field pays the resource you choose: 1 for a settlement, 2 for a city.
+            Players pick one at a time, with 20 seconds each.
+          </p>
+          <p>
+            <b>The pirate.</b> After a 7 or a Knight, move the robber or the pirate. The pirate sits on a sea
+            hex, where no ship can be built or moved on its edges, and steals 1 resource from a player with a
+            ship beside it.
+          </p>
+          <p>
+            <b>Island bonus.</b> Your first settlement on each small island is worth 2 extra points.
+          </p>
+          <p>
+            <b>Winning.</b> Open Sea plays to {ruleset.victoryPoints.default} points unless the host chose
+            another target. Longest Route counts roads and ships.
+          </p>
+        </GuideSection>
+      )}
       <a
         className="guide-rulebook-link"
-        href="https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md"
+        href={`https://github.com/shashwtd/catanova/blob/main/docs/${sea ? 'RULEBOOK-OPEN-SEA.md' : 'RULEBOOK.md'}`}
         target="_blank"
         rel="noreferrer"
       >

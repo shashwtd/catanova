@@ -25,10 +25,14 @@ import { GoldPick } from '../apps/client/src/GoldPick.js';
 import { TurnTimer } from '../apps/client/src/TurnTimer.js';
 import { SEA_ICONS } from '../apps/client/src/GameIcons.js';
 import { ICON_ATLAS, PAINTED_ICONS } from '../apps/client/src/painted-icons.js';
-import { deriveAwardCelebrations } from '../apps/client/src/feedback.js';
-import { AwardToast } from '../apps/client/src/GameEffects.js';
+import { deriveAwardCelebrations, deriveFeedback } from '../apps/client/src/feedback.js';
+import { AwardToast, GameEffects } from '../apps/client/src/GameEffects.js';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { GameOver } from '../apps/client/src/GameOver.js';
+import { QuickRules } from '../apps/client/src/QuickRules.js';
+import { CARD_LORE, cardEffect, cardLockReason } from '../apps/client/src/cards.js';
+import { gameStatus } from '../apps/client/src/game-attention.js';
+import { MoveHistory, historyTokens } from '../apps/client/src/MoveHistory.js';
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
@@ -477,6 +481,137 @@ test('an island bonus is celebrated once, named in the score’s tooltip, and li
     ),
     /Mode/,
   );
+});
+
+test('Open Sea’s words: the guide’s section and costs, the cards, the prompts and the move history', () => {
+  const guide = renderToStaticMarkup(createElement(QuickRules, { ruleset: OPEN_SEA }));
+  assert.match(
+    guide,
+    /<section class="guide-section t-acc" data-open="true"><button class="t-acc-head" aria-expanded="true"[^>]*>[^]*?<span>Open Sea<\/span>/,
+  );
+  for (const words of [
+    'A ship costs 1 Timber and 1 Sheep.',
+    'Once a turn, after the roll, you may move one ship',
+    'A gold field pays the resource you choose',
+    'After a 7 or a Knight, move the robber or the pirate.',
+    'Your first settlement on each small island is worth 2 extra points.',
+    'Open Sea plays to 14 points unless the host chose another target.',
+    'Longest Route · +2 points',
+  ])
+    assert.ok(guide.includes(words), words);
+  assert.match(
+    guide,
+    /<span>Ship<\/span><\/dt><dd><span class="recipe-pay">Pay<\/span><span class="resource-summary"><span role="img" aria-label="1 Timber"[^]*?aria-label="1 Sheep"/,
+  );
+  assert.match(guide, /<dt>Island bonus<\/dt><dd>2 points<\/dd>/);
+  assert.match(
+    guide,
+    /href="https:\/\/github.com\/shashwtd\/catanova\/blob\/main\/docs\/RULEBOOK-OPEN-SEA.md"/,
+  );
+  const classic = renderToStaticMarkup(createElement(QuickRules, { ruleset: CLASSIC }));
+  assert.doesNotMatch(classic, /Open Sea|pirate|Ship|Longest Route/);
+  // Cards in Open Sea, and Road Building when only a ship can be placed.
+  const g = blueToAct();
+  g.players[0]!.cards = [{ id: 'rb', kind: 'roadBuilding', boughtTurn: 0 }];
+  for (
+    let e = 0;
+    e < g.board.edges.length && Object.values(g.roads).filter((p) => p === 'blue').length < 15;
+    e++
+  )
+    if (!g.roads[e] && !g.ships![e]) g.roads[e] = 'blue';
+  const view = gameView(g, 'blue');
+  assert.equal(cardLockReason(view.players[0]!.cards![0]!, view, 'blue'), null, 'a ship will do');
+  assert.match(cardEffect('knight', view), /robber or the pirate/);
+  assert.match(cardEffect('roadBuilding', view), /roads or ships/);
+  assert.equal(cardEffect('knight', { ruleset: CLASSIC.id }), CARD_LORE.knight.effect);
+  assert.equal(cardEffect('monopoly', view), CARD_LORE.monopoly.effect);
+  const played = structuredClone(g);
+  played.log.push({ id: played.nextLog++, text: 'Blue played Knight.' });
+  const event = deriveFeedback(
+    room(gameView(g, 'red')),
+    room(gameView(played, 'red'), { revision: 13 }),
+    'red',
+  )!;
+  assert.deepEqual(event.cardPlay, { kind: 'knight', playerName: 'Blue', sea: true });
+  assert.match(
+    renderToStaticMarkup(
+      createElement(GameEffects, { event, reducedMotion: true, activity: true, lastDice: null }),
+    ),
+    /<p>The watch rides out. Move the robber or the pirate.<\/p>/,
+  );
+  // The prompts.
+  for (const [phase, freeRoads, mine, others] of [
+    ['setupRoad', 0, 'Place a road or a ship on a highlighted path', 'Blue is placing a road or a ship'],
+    [
+      'freeRoads',
+      2,
+      'Place 2 free roads or ships on the highlighted paths',
+      'Blue is placing free roads or ships',
+    ],
+    [
+      'freeRoads',
+      1,
+      'Place 1 free road or ship on the highlighted paths',
+      'Blue is placing free roads or ships',
+    ],
+    ['robber', 0, 'Move the robber or the pirate', 'Blue is moving the robber or the pirate'],
+  ] as const) {
+    const state = { ...view, phase, freeRoads };
+    assert.equal(gameStatus(state, 'blue').prompt, mine);
+    assert.equal(gameStatus(state, 'red').prompt, others);
+  }
+  // The move history: names, words and icons.
+  const names = ['Blue', 'Red', 'Green'];
+  const line = (text: string) =>
+    renderToStaticMarkup(createElement('p', null, ...historyTokens(text, names)));
+  assert.match(
+    line('Blue moved the pirate and stole a card from Red.'),
+    /^<p><strong class="journal-person">Blue<\/strong> moved the <span class="journal-item" role="img" aria-label="pirate"><svg[^]*?<span>pirate<\/span><\/span> and stole a card from <strong class="journal-person">Red<\/strong>/,
+  );
+  assert.match(
+    line('Blue moved the pirate. Red had no resource cards.'),
+    /<strong class="journal-person">Red<\/strong> had no/,
+  );
+  const island = line('Blue settled a new island (+2 points).');
+  assert.match(
+    island,
+    /^<p><strong class="journal-person">Blue<\/strong> settled a <span class="journal-item" role="img" aria-label="new island">/,
+  );
+  assert.ok(island.includes(painted(SEA_ICONS.islandBonus)));
+  const ship = line('Blue built a ship on edge 5.');
+  assert.match(
+    ship,
+    /<span class="journal-item" role="img" aria-label="ship"><svg[^]*?<\/svg><span><\/span><\/span> on edge 5\./,
+  );
+  assert.ok(ship.includes(painted('boat')));
+  assert.match(
+    line('Blue moved a ship from edge 4 to edge 9.'),
+    /aria-label="ship"[^]*from edge 4 to edge 9\./,
+  );
+  const gold = line('Blue took 1 Timber, 1 Rock from the bank for gold.');
+  assert.match(
+    gold,
+    /aria-label="1 Timber"[^]*aria-label="1 Rock"[^]*aria-label="gold"><svg[^]*<span>gold<\/span>/,
+  );
+  const history = renderToStaticMarkup(
+    createElement(MoveHistory, {
+      entries: ['ship', 'moveShip', 'pirate', 'goldPick'].map((kind, i) => ({
+        revision: 20 - i,
+        actor: 'blue',
+        kind,
+        turn: 4,
+        at: '2026-09-26T12:00:00Z',
+        lines: ['Blue built a ship on edge 5.'],
+      })),
+      game: view,
+      hasMore: false,
+      onEarlier: noop,
+    }),
+  );
+  const actions = history.match(/<span class="journal-action">[^]*?<\/span>/g)!;
+  assert.equal(actions.length, 4);
+  for (const [i, icon] of (['boat', 'boat', SEA_ICONS.pirate, SEA_ICONS.gold] as const).entries())
+    assert.ok(actions[i]!.includes(painted(icon)), icon);
 });
 
 test('each new component has one stylesheet, loaded last, in the house’s selector shapes', () => {
