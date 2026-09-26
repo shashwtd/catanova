@@ -44,6 +44,7 @@ import {
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
+const PAINTED_BOAT = PAINTED_ICONS[SEA_ICONS.pirate];
 /** An Open Sea game for three after setup, every player on a coastal corner with a starting ship out to sea. */
 function afterSetup(seed = 5): Game {
   let g = createGame(SEATS.slice(0, 3), seed, () => 0.5, { ruleset: OPEN_SEA.id });
@@ -340,6 +341,9 @@ test('after a seven, Open Sea offers the robber and the pirate, then only the ch
   const victims = flow({ piece: 'pirate', selectedHex: hex });
   assert.match(victims, /<h2 aria-live="polite">Choose who to steal from<\/h2>/);
   assert.match(victims, /<strong>Red<\/strong>/);
+  // The victim's button shows the pirate, not the robber.
+  const red = victims.match(/<button type="button" class="robber-victim"[^]*?<\/button>/)![0];
+  assert.ok(red.includes(`x="-${PAINTED_BOAT[0]}" y="-${PAINTED_BOAT[1]}"`));
   assert.ok(hexEdges(g.board, hex).includes(redShip));
   assert.match(victims, />Choose another sea hex<\/button>/);
   // Everyone else waits, told it may be either.
