@@ -43,7 +43,9 @@ export function startingResources(board: SeaBoard, vertex: number): { resources:
 /**
  * The picks a roll pays from gold fields (sections 9.1 and 9.2): each settlement on a gold field with that number
  * earns its owner 1, each city 2, unless the robber is on the field; resigned players' buildings pay nothing. The
- * players pick in turn order, starting with the player on turn, `active` being their seat.
+ * players pick in turn order, starting with the player on turn, `active` being their seat. `bank` is the bank once
+ * ordinary production is done: if it holds no cards, every pick lapses at once, so no game waits on a pick nobody
+ * could make.
  */
 export function goldOwedForRoll(
   g: {
@@ -52,9 +54,11 @@ export function goldOwedForRoll(
     robber: number;
     players: readonly Seat[];
     active: number;
+    bank: Hand;
   },
   roll: number,
 ): GoldOwed[] {
+  if (!cards(g.bank)) return [];
   const owed = new Map<string, number>();
   for (const hex of g.board.hexes)
     if (hex.terrain === 'gold' && hex.number === roll && hex.id !== g.robber)

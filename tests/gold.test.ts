@@ -73,7 +73,7 @@ test('§9.1 a gold field pays each settlement 1 pick and each city 2, unless the
     [corner(board, gold, 'sw')]: { player: 'green', kind: 'settlement' },
   };
   const players = [{ id: 'red' }, { id: 'blue' }, { id: 'green' }];
-  const g = { board, buildings, robber: -1, players, active: 0 };
+  const g = { board, buildings, robber: -1, players, active: 0, bank: full() };
   assert.deepEqual(goldOwedForRoll(g, 10), [
     { player: 'red', picks: 1 },
     { player: 'blue', picks: 2 },
@@ -108,7 +108,10 @@ test('§9.2 players pick in turn order from the player on turn, each all at once
   let g = {
     bank: hand({ wood: 3, ore: 1 }),
     players,
-    goldOwed: goldOwedForRoll({ board, buildings, robber: -1, players, active: 2 }, 10),
+    goldOwed: goldOwedForRoll(
+      { board, buildings, robber: -1, players, active: 2, bank: hand({ wood: 3, ore: 1 }) },
+      10,
+    ),
   };
   assert.deepEqual(
     g.goldOwed.map((o) => o.player),
@@ -148,7 +151,7 @@ test('§9.2 the example: short of Rock, the mountains pay nobody, then gold pick
   assert.equal(bank.ore, 2);
   for (const p of players) assert.equal(total(received.get(p)!), 0);
   // Nothing owed from gold counted toward the shortage, and green's pick comes from the 2 Rock left.
-  const goldOwed = goldOwedForRoll({ ...table, players: players.map((id) => ({ id })), active: 1 }, 10);
+  const goldOwed = goldOwedForRoll({ ...table, bank, players: players.map((id) => ({ id })), active: 1 }, 10);
   assert.deepEqual(goldOwed, [{ player: 'green', picks: 1 }]);
   const after = applyGoldPick({ bank, goldOwed, players: seats(...players) }, 'green', hand({ ore: 1 }));
   assert.equal(after.bank.ore, 1);
@@ -174,6 +177,14 @@ test('§9.2 picks from an empty bank lapse and are not owed later, and picks can
   assert.deepEqual(g.goldOwed, [], 'red’s third pick and blue’s pick lapse with the bank empty');
   assert.deepEqual(remainingGoldOwed([{ player: 'blue', picks: 1 }], emptyHand(), players), []);
   assert.match(goldPickIssue(g, 'blue', hand({ wood: 1 }))!, /not your turn/);
+  // A roll that pays gold when the bank is already empty owes nothing, so nobody waits on an impossible pick.
+  const { board, gold } = goldBoard();
+  const city = { [corner(board, gold, 'n')]: { player: 'blue', kind: 'city' as const } };
+  const table = { board, buildings: city, robber: -1, players, active: 0 };
+  assert.deepEqual(goldOwedForRoll({ ...table, bank: emptyHand() }, 10), []);
+  assert.deepEqual(goldOwedForRoll({ ...table, bank: hand({ sheep: 1 }) }, 10), [
+    { player: 'blue', picks: 2 },
+  ]);
 });
 
 test('§9.2 a player who resigns before picking loses their picks; the rest pick from the bank as it stands', () => {
