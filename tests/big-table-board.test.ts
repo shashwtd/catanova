@@ -76,7 +76,7 @@ test('the Big Table island is the 30 hexes of the docs, numbered row by row', ()
     ['0,-4', '3,-4', '-4,0', '3,0', '-4,4', '-1,4'],
   );
   assert.equal([...facing.values()].filter((edges) => edges === 2).length, 16);
-  assert.ok(coastWalk(coast), 'the coast is one loop');
+  assert.ok(coastWalk(board, coast), 'the coast is one loop');
 });
 
 test('a Big Table board deals exactly its tiles, tokens and harbours', () => {
@@ -131,7 +131,8 @@ const largestGroup = (board: Board, tiles: Hex[]) => {
 };
 
 test('500 Big Table boards keep every rule, harbour rule and robber start, quickly', () => {
-  const rotations = harbourRotations(deal(0), coastWalk(coastOf(deal(0)))!, preset.harbours.slots);
+  const board0 = deal(0);
+  const rotations = harbourRotations(board0, coastWalk(board0, coastOf(board0))!, preset.harbours.slots);
   assert.ok(
     rotations.every((rotation) => rotation.corners),
     'the spacing alone keeps intersections apart',

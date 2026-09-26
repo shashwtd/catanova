@@ -524,8 +524,8 @@ function outerIsles(
 export const OUTER_ISLES_V1: Readonly<Record<3 | 4, BoardPreset>> = {
   3: outerIsles(
     rectangle(-4, 4, -7, 8),
-    // Eight harbours round the main island's 36 coastal edges, spaced 4, 5, 4, 5, 4, 5, 4 and 5 edges apart.
-    { slots: [0, 4, 9, 13, 18, 22, 27, 31], trades: ['any', 'any', 'any', ...RESOURCES] },
+    // Eight harbours round the main island's 36 coastal edges, spaced 4, 4, 4, 4, 5, 5, 5 and 5 edges apart.
+    { slots: [0, 4, 8, 12, 16, 21, 26, 31], trades: ['any', 'any', 'any', ...RESOURCES] },
     {
       players: 3,
       // A shield with its point to the south, in rows of 5, 5, 3, 2 and 1.
@@ -549,8 +549,9 @@ export const OUTER_ISLES_V1: Readonly<Record<3 | 4, BoardPreset>> = {
   ),
   4: outerIsles(
     rectangle(-4, 4, -8, 8),
-    // Nine harbours round the main island's 40 coastal edges, spaced 4, 4, 5, 4, 5, 4, 5, 4, 5 edges apart.
-    { slots: [0, 4, 8, 13, 17, 22, 26, 31, 35], trades: ['any', 'any', 'any', 'any', ...RESOURCES] },
+    // Nine harbours round the main island's 40 coastal edges, spaced 4, 4, 4, 5, 4, 4, 5, 5 and 5 edges
+    // apart counting clockwise, the way the coast is walked; counted the other way they lay out differently.
+    { slots: [0, 4, 8, 12, 17, 21, 25, 30, 35], trades: ['any', 'any', 'any', 'any', ...RESOURCES] },
     {
       players: 4,
       // A diamond in rows of 2, 4, 7, 4, 2 and 1.
