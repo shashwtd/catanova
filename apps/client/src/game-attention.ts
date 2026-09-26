@@ -1,6 +1,7 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import type { GameView } from '../../../packages/rules/src/game.js';
 import { owedBy } from '../../../packages/rules/src/owed.js';
+import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { GameIconName } from './GameIcons.js';
 
 export type GameStatus = {
@@ -68,20 +69,37 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
         icon = 'robber';
         favicon = mine ? 'robber' : null;
         break;
+      // Open Sea: the players owed gold pick one at a time, whoever is on turn.
+      case 'goldPick': {
+        const picking = game.goldOwed?.[0];
+        const count = Math.min(
+          picking?.picks ?? 0,
+          RESOURCES.reduce((n, r) => n + game.bank[r], 0),
+        );
+        prompt =
+          picking?.player === me
+            ? `Choose ${count} ${count === 1 ? 'resource' : 'resources'} from the gold field`
+            : `Waiting for ${game.players.find((p) => p.id === picking?.player)?.name ?? 'a player'} to pick from the gold field`;
+        icon = 'timer';
+        break;
+      }
     }
+  // During Open Sea's gold picks the game waits on the player picking, who may not be on turn.
+  const picker =
+    game.phase === 'goldPick' ? game.players.find((p) => p.id === game.goldOwed?.[0]?.player) : undefined;
   if (
     !game.winner &&
     game.phase !== 'finished' &&
     !room?.paused &&
-    !mine &&
+    !(picker ? picker.id === me : mine) &&
     !game.players.find((p) => p.id === me)?.resigned &&
     !((game.discards[me ?? ''] ?? 0) > 0)
   ) {
-    const seat = room?.players.find((p) => p.id === active?.id);
+    const seat = room?.players.find((p) => p.id === (picker ?? active)?.id);
     // Only while the seat is genuinely empty. Once a bot has picked it up the
     // turn is being played, so telling the table to wait would be wrong.
     if (seat && !seat.connected && !seat.standIn && seat.resignAt !== undefined) {
-      prompt = `Waiting for ${name} to reconnect`;
+      prompt = `Waiting for ${picker?.name ?? name} to reconnect`;
       icon = 'connection';
       favicon = null;
     }

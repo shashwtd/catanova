@@ -1,5 +1,6 @@
 import type { GameView } from '../../../packages/rules/src/game.js';
 import { findRuleset } from '../../../packages/rules/src/rulesets.js';
+import { RESOURCES } from '../../../packages/rules/src/index.js';
 import type { GameIconName } from './GameIcons.js';
 
 export type TurnActivity = { icon: GameIconName; label: string };
@@ -16,8 +17,16 @@ export function playerTurnActivity(game: GameView, playerId: string): TurnActivi
     return { icon: 'discard', label: `Discard ${count} resource ${count === 1 ? 'card' : 'cards'}` };
   }
   const picking = game.phase === 'goldPick' ? game.goldOwed?.[0] : undefined;
-  if (picking?.player === playerId)
-    return { icon: 'spark', label: `Pick ${picking.picks} from a gold field` };
+  if (picking?.player === playerId) {
+    const picks = Math.min(
+      picking.picks,
+      RESOURCES.reduce((n, r) => n + game.bank[r], 0),
+    );
+    return {
+      icon: 'spark',
+      label: `Pick ${picks} ${picks === 1 ? 'resource' : 'resources'} from a gold field`,
+    };
+  }
   if (game.players[game.active]?.id !== playerId) return null;
   const sea = !!findRuleset(game.ruleset)?.sea;
   switch (game.phase) {

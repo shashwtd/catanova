@@ -46,6 +46,8 @@ export function TurnTimer({
     }
   }, [remaining, mine, paused, connected, room.roomId, clock?.turn, deadline]);
   if (!clock || !deadline || !room.game || room.game.winner || room.paused) return null;
+  // Open Sea's gold picks pause the turn as discards do; their own 20 seconds are the picker's.
+  const picking = room.game.phase === 'goldPick';
   return (
     <span
       className={`turn-timer ${remaining <= 10 && !paused ? 'running-low' : ''} ${paused ? 'paused' : ''}`}
@@ -53,7 +55,9 @@ export function TurnTimer({
         !connected
           ? 'Reconnecting; the server clock continues'
           : paused
-            ? 'Turn clock paused while players discard'
+            ? picking
+              ? 'Turn clock paused while players pick from a gold field'
+              : 'Turn clock paused while players discard'
             : mine
               ? 'Your remaining time'
               : 'Active player’s remaining time'
@@ -61,7 +65,7 @@ export function TurnTimer({
     >
       {paused ? <Pause size={13} /> : <Clock3 size={13} />}
       <b>{remaining}s</b>
-      {paused && <small>Discards</small>}
+      {paused && <small>{picking ? 'Gold picks' : 'Discards'}</small>}
     </span>
   );
 }
