@@ -392,9 +392,10 @@ export type AwardCelebration = {
   id: string;
   /** The snapshot that earned it; the celebration waits until the board shows that move. */
   revision: number;
-  kind: 'longestRoad' | 'largestArmy';
+  /** The two awards, or Open Sea's island bonus, celebrated the same way once for each island. */
+  kind: 'longestRoad' | 'largestArmy' | 'islandBonus';
   /** Open Sea calls the route award Longest Route. */
-  name: 'Longest Road' | 'Longest Route' | 'Largest Army';
+  name: 'Longest Road' | 'Longest Route' | 'Largest Army' | 'Island bonus';
   playerId: string;
   playerName: string;
   previousPlayerName?: string;
@@ -407,7 +408,7 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
     return [];
   const before = previous.game,
     game = next.game;
-  return (['longestRoad', 'largestArmy'] as const).flatMap((kind) => {
+  const awards = (['longestRoad', 'largestArmy'] as const).flatMap((kind): AwardCelebration[] => {
     const owner = game[kind];
     if (!owner || owner === before[kind]) return [];
     const player = game.players.find((p) => p.id === owner);
@@ -426,6 +427,25 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
       },
     ];
   });
+  // Open Sea: a player's first settlement on a small island, whoever settled it before (section 12.2).
+  const islands = game.players.flatMap((player): AwardCelebration[] => {
+    const count = game.islandBonuses?.[player.id]?.length ?? 0;
+    return count > (before.islandBonuses?.[player.id]?.length ?? 0)
+      ? [
+          {
+            id: `${next.roomId}:${next.revision}:islandBonus:${player.id}`,
+            revision: next.revision,
+            kind: 'islandBonus',
+            name: 'Island bonus',
+            playerId: player.id,
+            playerName: player.name,
+            count,
+            minimum: 1,
+          },
+        ]
+      : [];
+  });
+  return islands.length ? [...awards, ...islands] : awards;
 }
 /** Separate from coalesced card effects: a fast move cannot erase an award or its later transfer. */
 export class AwardPresentationQueue {

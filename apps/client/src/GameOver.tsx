@@ -4,10 +4,10 @@ import { useEffect, useId, useRef } from 'react';
 import type { GameStatistics as Statistics, RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { Avatar } from './Profile.js';
-import { GameIcon } from './GameIcons.js';
+import { GameIcon, SEA_ICONS } from './GameIcons.js';
 import { finalStandings, pointBreakdown } from './player-ranking.js';
 import { playerHexColor } from './player-colors.js';
-import { findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
+import { CLASSIC, findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 import type { CSSProperties } from 'react';
 
 /**
@@ -51,6 +51,8 @@ export function GameOver({
 }) {
   const summary = results ?? resultsFromRoom(room!);
   const game = summary.game;
+  // The mode, where it is not Classic: Open Sea, and Big Table when it comes.
+  const mode = game.ruleset && game.ruleset !== CLASSIC.id ? findRuleset(game.ruleset) : undefined;
   const grainId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const winner = game.players.find((p) => p.id === game.winner);
@@ -192,6 +194,9 @@ export function GameOver({
                           <li key={part.key} data-part={part.key}>
                             {part.key === 'longestRoad' && <GameIcon name="road-award" size={18} />}
                             {part.key === 'largestArmy' && <GameIcon name="army-award" size={18} />}
+                            {part.key === 'islandBonus' && (
+                              <GameIcon name={SEA_ICONS.islandBonus} size={18} />
+                            )}
                             <span>{part.label}</span>
                             <b>+{part.points}</b>
                           </li>
@@ -212,6 +217,12 @@ export function GameOver({
             })}
           </div>
           <dl className="game-over-facts" aria-label="This match">
+            {mode && (
+              <div>
+                <dt>Mode</dt>
+                <dd>{mode.name}</dd>
+              </div>
+            )}
             <div>
               <dt>Turns</dt>
               <dd>{game.turn}</dd>

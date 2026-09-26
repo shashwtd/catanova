@@ -11,7 +11,7 @@ import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { applyAction, createGame, gameView } from '../packages/rules/src/game.js';
 import type { Game, GameAction, GameView } from '../packages/rules/src/game.js';
-import { OPEN_SEA } from '../packages/rules/src/rulesets.js';
+import { CLASSIC, OPEN_SEA } from '../packages/rules/src/rulesets.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
 import { SHIP_MOVE_BLOCKS, edgeKind, hexEdges, isCoastalIntersection } from '../packages/rules/src/sea.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
@@ -24,6 +24,11 @@ import { RobberFlow } from '../apps/client/src/RobberFlow.js';
 import { GoldPick } from '../apps/client/src/GoldPick.js';
 import { TurnTimer } from '../apps/client/src/TurnTimer.js';
 import { SEA_ICONS } from '../apps/client/src/GameIcons.js';
+import { ICON_ATLAS, PAINTED_ICONS } from '../apps/client/src/painted-icons.js';
+import { deriveAwardCelebrations } from '../apps/client/src/feedback.js';
+import { AwardToast } from '../apps/client/src/GameEffects.js';
+import { PlayerRail } from '../apps/client/src/PlayerRail.js';
+import { GameOver } from '../apps/client/src/GameOver.js';
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
@@ -395,6 +400,83 @@ test('a gold pick is made with Year of Plenty’s buttons, only from what the ba
 test('the stand-in icons for the pirate, gold and the island bonus are painted icons, named in one place', () => {
   const painted = readFileSync('apps/client/src/painted-icons.ts', 'utf8');
   for (const name of Object.values(SEA_ICONS)) assert.match(painted, new RegExp(`^  '?${name}'?: \\[`, 'm'));
+});
+
+/** A painted icon's cell in the atlas, as GameIcon draws it. */
+const painted = (name: keyof typeof PAINTED_ICONS) =>
+  `<image href="${ICON_ATLAS}" x="${-PAINTED_ICONS[name][0]}" y="${-PAINTED_ICONS[name][1]}"`;
+
+test('an island bonus is celebrated once, named in the score’s tooltip, and listed with its icon in the results', () => {
+  const g = blueToAct();
+  const before = gameView(g, 'red');
+  g.islandBonuses = { blue: ['a'] };
+  const after = gameView(g, 'red');
+  const [award] = deriveAwardCelebrations(room(before), room(after, { revision: 13 }));
+  assert.deepEqual(award, {
+    id: 'ROOM:13:islandBonus:blue',
+    revision: 13,
+    kind: 'islandBonus',
+    name: 'Island bonus',
+    playerId: 'blue',
+    playerName: 'Blue',
+    count: 1,
+    minimum: 1,
+  });
+  assert.deepEqual(deriveAwardCelebrations(room(after), room(after, { revision: 14 })), [], 'once');
+  const toast = renderToStaticMarkup(createElement(AwardToast, { award: award!, reducedMotion: true }));
+  assert.match(toast, /data-award="islandBonus"/);
+  assert.ok(toast.includes(painted(SEA_ICONS.islandBonus)));
+  assert.match(
+    toast,
+    /<span class="award-recipient">Blue earns<\/span><h2>Island bonus<\/h2><p><b>1<\/b> island settled<\/p>/,
+  );
+  assert.match(toast, /<small>A first settlement on a new island<\/small>/);
+  assert.match(toast, /<b>\+2<\/b><span>points<\/span>/);
+  // The rail's score says where the points came from.
+  g.islandBonuses = { blue: ['a', 'b'] };
+  const rail = renderToStaticMarkup(
+    createElement(PlayerRail, { room: room(gameView(g, 'red')), game: gameView(g, 'red'), me: 'red' }),
+  );
+  assert.match(rail, /title="6 victory points · Island bonus × 2 \+4"/);
+  assert.match(
+    rail,
+    /title="2 victory points" aria-label="2 victory points"/,
+    'a player without one keeps the plain score',
+  );
+  // The results: the mode, and the bonus with its icon.
+  g.phase = 'finished';
+  g.winner = 'blue';
+  const results = renderToStaticMarkup(
+    createElement(GameOver, {
+      room: { ...room(gameView(g, 'blue')), round: 1 },
+      busy: false,
+      canReturn: true,
+      onReturn: noop,
+      onQuit: noop,
+    }),
+  );
+  assert.match(
+    results,
+    /<dl class="game-over-facts" aria-label="This match"><div><dt>Mode<\/dt><dd>Open Sea<\/dd><\/div><div><dt>Turns<\/dt>/,
+  );
+  const part = results.match(/<li data-part="islandBonus">[^]*?<\/li>/)![0];
+  assert.ok(part.includes(painted(SEA_ICONS.islandBonus)));
+  assert.match(part, /<span>Island bonus × 2<\/span><b>\+4<\/b>/);
+  // Classic's results have no Mode.
+  const classic = createGame(SEATS.slice(0, 3), 481, () => 0.5);
+  Object.assign(classic, { phase: 'finished', winner: 'blue', turn: 9 });
+  assert.doesNotMatch(
+    renderToStaticMarkup(
+      createElement(GameOver, {
+        room: { ...room(gameView(classic, 'blue')), round: 1 },
+        busy: false,
+        canReturn: true,
+        onReturn: noop,
+        onQuit: noop,
+      }),
+    ),
+    /Mode/,
+  );
 });
 
 test('each new component has one stylesheet, loaded last, in the house’s selector shapes', () => {
