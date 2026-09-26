@@ -272,7 +272,7 @@ export const SEA_EDGE_WAVES = [
  * blur, rgb(14 19 14 / 45%)) in world units, falling from the outer edge of the island's beach. A board with sea
  * takes it off the stage, where it would trace the sea's edge on the table, and gives it to the islands.
  */
-export const ISLAND_SHADOW = { offset: 10, blur: 13, opacity: 0.45, colour: [14, 19, 14], edge: 6 } as const;
+export const ISLAND_SHADOW = { offset: 10, blur: 13, opacity: 0.45, color: [14, 19, 14], edge: 6 } as const;
 /** How far out from the frame's smooth outline the sea reaches at a point, with its waves. */
 export function seaWidth(x: number, y: number) {
   return SEA_EDGE_WAVES.reduce(

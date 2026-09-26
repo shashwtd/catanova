@@ -321,8 +321,8 @@ const BoardScenery = memo(function BoardScenery({
         {sea && (
           <g
             className="island-shadow"
-            fill={`rgb(${ISLAND_SHADOW.colour.join(' ')})`}
-            stroke={`rgb(${ISLAND_SHADOW.colour.join(' ')})`}
+            fill={`rgb(${ISLAND_SHADOW.color.join(' ')})`}
+            stroke={`rgb(${ISLAND_SHADOW.color.join(' ')})`}
             strokeWidth={ISLAND_SHADOW.edge * 2}
             strokeLinejoin="round"
             opacity={ISLAND_SHADOW.opacity}
@@ -613,7 +613,7 @@ export const Board = memo(function Board({
         {board.hexes.map((h) => {
           const x = h.x * SIZE,
             y = h.y * SIZE;
-          // The robber never goes to sea: sea hexes are targets only for the pirate.
+          // The robber never goes to sea. Sea hexes keep their targets for the pirate's moves.
           const canMoveRobber = robberMode && h.id !== game?.robber && !disabled && isLand(h);
           const name = TERRAIN_NAME[h.terrain];
           return (

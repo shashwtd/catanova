@@ -26,7 +26,7 @@ import {
  * with room to spare in the 224 uniform vectors every WebGL 2 fragment shader is guaranteed.
  */
 export const MAX_TERRAIN_HEXES = 128;
-/** The most sea hexes the sea shader takes besides them, two to a uniform vector. */
+/** The most sea hexes the sea shader takes besides its land hexes, packed two to a uniform vector. */
 export const MAX_SEA_HEXES = 128;
 /**
  * What the terrain shader is given for a board: each land hex's centre and tile, how many there are, the box. On
@@ -174,7 +174,7 @@ void main(){
   float foam=(1.0-smoothstep(0.4,1.7,abs(land+rough-11.0)))*(0.35+noise(p*0.09)*0.4);
   color=mix(color,vec3(0.87,0.96,0.86),foam);
   // Each island casts the stage's drop shadow onto the water round it, so the sea's own edge needs none.
-  color=mix(color,vec3(${ISLAND_SHADOW.colour.map((c) => (c / 255).toFixed(4)).join(',')}),${ISLAND_SHADOW.opacity.toFixed(2)}*(1.0-smoothstep(${glsl(ISLAND_SHADOW.edge - ISLAND_SHADOW.blur)},${glsl(ISLAND_SHADOW.edge + ISLAND_SHADOW.blur)},shade)));
+  color=mix(color,vec3(${ISLAND_SHADOW.color.map((c) => (c / 255).toFixed(4)).join(',')}),${ISLAND_SHADOW.opacity.toFixed(2)}*(1.0-smoothstep(${glsl(ISLAND_SHADOW.edge - ISLAND_SHADOW.blur)},${glsl(ISLAND_SHADOW.edge + ISLAND_SHADOW.blur)},shade)));
   vec3 sand=environment((p+vec2(600))/145.0,vec2(0,1));
   float coast=1.0-smoothstep(4.0,7.5,land+rough);
   float bankShade=mix(0.68,1.03,1.0-smoothstep(-2.0,6.0,land+rough));
