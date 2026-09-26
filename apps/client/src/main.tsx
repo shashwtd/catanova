@@ -1137,6 +1137,19 @@ function App() {
               onWarning={() => feedback.sound.play('warning')}
             />
           }
+          goldTimer={
+            // The gold panel's own clock gives the warning; this one only counts.
+            g.phase === 'goldPick' && (
+              <TurnTimer
+                room={room}
+                me={me}
+                goldPicker={g.goldOwed?.[0]?.player}
+                offset={clockOffset}
+                connected={connected}
+                onWarning={() => {}}
+              />
+            )
+          }
           friendship={
             auth.config?.mode === 'authenticated' && auth.account?.registered && !auth.account.isGuest
               ? {

@@ -412,6 +412,33 @@ test('a gold pick is made with Year of Plenty’s buttons, only from what the ba
     }),
   );
   assert.match(paused, /<small>Gold picks<\/small>/);
+  // On the rail: the picker's card counts their own 20 seconds, and the card of the player on turn keeps the paused
+  // turn clock, which says what it waits for.
+  g.goldOwed = [{ player: 'green', picks: 1 }];
+  const turn = { ...clock, deadlineAt: 1_050_000, goldDeadlines: { green: 1_012_000 } };
+  const railFor = (me: string) => {
+    const state = room(gameView(g, me), { turnClock: turn });
+    const timer = (goldPicker?: string) =>
+      createElement(TurnTimer, { room: state, me, goldPicker, connected: true, onWarning: noop });
+    return renderToStaticMarkup(
+      createElement(PlayerRail, {
+        room: state,
+        game: state.game!,
+        me,
+        timer: timer(),
+        goldTimer: timer('green'),
+      }),
+    );
+  };
+  const card = (html: string, id: string) =>
+    html.match(new RegExp(`<article data-player-profile="${id}"[^]*?</article>`))![0];
+  for (const viewer of ['red', 'green']) {
+    const rail = railFor(viewer);
+    assert.match(card(rail, 'green'), /<span class="turn-timer[^"]*"[^>]*><svg[^]*?<b>12s<\/b><\/span>/);
+    assert.doesNotMatch(card(rail, 'green'), /Gold picks/);
+    assert.match(card(rail, 'blue'), /<b>60s<\/b><small>Gold picks<\/small>/);
+  }
+  assert.match(card(railFor('green'), 'green'), /title="Your time to pick from the gold field"/);
 });
 
 test('the stand-in icons for the pirate, gold and the island bonus are painted icons, named in one place', () => {
