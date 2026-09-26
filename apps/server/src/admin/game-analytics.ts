@@ -23,6 +23,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { journalReader } from '../journal.js';
 import type { JournalRow } from '../journal.js';
 import { score } from '../../../../packages/rules/src/game.js';
+import { findRuleset } from '../../../../packages/rules/src/rulesets.js';
 import type { Game, Player } from '../../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../../packages/rules/src/index.js';
 import { DEFAULT_VICTORY_POINTS } from '../../../../packages/rules/src/victory.js';
@@ -215,6 +216,9 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       action = {};
     }
     if (!first) {
+      // A mode this version does not know is refused rather than read by rules it does not follow.
+      if (!findRuleset(game.ruleset))
+        throw new Error(`This game plays ${game.ruleset}, a mode this version cannot read`);
       first = game;
       legacy = entry.kind === 'legacy';
       startedAt = at;

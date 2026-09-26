@@ -44,6 +44,7 @@ import {
   findRuleset,
   numberWord,
   playsBoard,
+  rulesets,
   switchBlock,
   targetRangeText,
   validTarget,
@@ -135,6 +136,11 @@ export class Store {
    *  They are kept separate from `connectedSeats` because a room with only bots
    *  left in it must still pause rather than play on with nobody watching. */
   private botSeats = new Set<string>();
+  /**
+   * Rooms whose saved game is in a mode this version does not know. Nothing can move them, so the clock
+   * stops asking about them rather than failing on them every tick.
+   */
+  private readonly unplayable = new Set<string>();
   private readonly pendingPresence = new Set<string>();
   private dueRoomCursor = '';
   private readonly statisticsCache = new Map<
@@ -749,13 +755,25 @@ export class Store {
     if (!result) throw new ProtocolError('RESULTS_NOT_FOUND', 'Results are unavailable');
     return result;
   }
+  /**
+   * A game for the account history, or undefined for one in a mode this version does not know: that game is
+   * left out of the history rather than stopping it. The release that wrote it indexes it again.
+   */
+  private recordedGame(roomId: string): Game | undefined {
+    try {
+      return this.loadGame(roomId);
+    } catch (error) {
+      if (error instanceof ProtocolError && error.code === 'VERSION_MISMATCH') return undefined;
+      throw error;
+    }
+  }
   /** Synchronous helper for maintenance/tests; HTTP uses accountGamesAsync to yield between batches. */
   accountGames(userId: string, rawCursor?: string) {
     const cursor = this.historyCursor(rawCursor);
     return this.transaction(() => {
       let afterRoomId = '';
       for (;;) {
-        const batch = this.records.backfillBatch(userId, (roomId) => this.loadGame(roomId), afterRoomId);
+        const batch = this.records.backfillBatch(userId, (roomId) => this.recordedGame(roomId), afterRoomId);
         if (batch.complete) break;
         afterRoomId = batch.afterRoomId;
       }
@@ -778,7 +796,7 @@ export class Store {
       if (options.cancelled?.())
         throw new ProtocolError('ACCOUNT_UNAVAILABLE', 'Game history request was interrupted. Please retry.');
       const result = this.transaction(() => {
-        const batch = this.records.backfillBatch(userId, (roomId) => this.loadGame(roomId), afterRoomId);
+        const batch = this.records.backfillBatch(userId, (roomId) => this.recordedGame(roomId), afterRoomId);
         return { ...batch, page: batch.complete ? this.records.page(userId, this.now(), cursor) : undefined };
       });
       if (result.page) return result.page;
@@ -999,11 +1017,21 @@ export class Store {
    */
   compactJournal(limit = 50): { scanned: number; compacted: number } {
     return this.transaction(() => {
+      // Rows of a game in a mode this version does not know are left untouched, and never looked at again,
+      // so compaction still finishes. A row that is not JSON at all is still read, to be marked below.
       const rows = this.db
         .prepare(
-          'SELECT room_id, revision, state, state_hash FROM game_events WHERE state_z IS NULL ORDER BY room_id, revision LIMIT ?',
+          `SELECT room_id, revision, state, state_hash FROM game_events WHERE state_z IS NULL
+             AND CASE WHEN json_valid(state) THEN coalesce(json_extract(state, '$.ruleset'), ?)
+               IN (SELECT value FROM json_each(?)) ELSE 1 END
+           ORDER BY room_id, revision LIMIT ?`,
         )
-        .all(limit) as { room_id: string; revision: number; state: string; state_hash: string }[];
+        .all(CLASSIC.id, JSON.stringify(rulesets().map((ruleset) => ruleset.id)), limit) as {
+        room_id: string;
+        revision: number;
+        state: string;
+        state_hash: string;
+      }[];
       let compacted = 0;
       for (const row of rows) {
         const encoded =
@@ -1427,6 +1455,8 @@ export class Store {
       for (const row of this.db.prepare('SELECT room_id,state FROM games').all()) {
         const roomId = row.room_id as string;
         const game = JSON.parse(row.state as string) as Game;
+        // Left exactly as it is: this version cannot play it, and the release that can will want it whole.
+        if (!findRuleset(game.ruleset)) continue;
         if (game.phase === 'finished') {
           this.db.prepare('DELETE FROM room_presence WHERE room_id=?').run(roomId);
           this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
@@ -1795,7 +1825,7 @@ export class Store {
       this.pendingPresence.delete(roomId);
       this.pendingPresence.add(roomId);
     }
-    return [...new Set([...due, ...pending])];
+    return [...new Set([...due, ...pending])].filter((roomId) => !this.unplayable.has(roomId));
   }
   /** Each chosen action commits independently, so a crash resumes from the last saved mandatory choice. */
   expireRoom(roomId: string): boolean {
@@ -1863,8 +1893,12 @@ export class Store {
       throw new ProtocolError('STATE_INTEGRITY', 'Saved game needs recovery; no moves were discarded');
     if (!row) return undefined;
     const game = JSON.parse(row.state) as Game;
-    if (game.schema !== 1)
+    // A game in a mode this version does not know is refused, never misplayed: a rollback may leave games
+    // from a newer release behind. Rulesets change the rules, so the schema alone cannot tell them apart.
+    if (game.schema !== 1 || !findRuleset(game.ruleset)) {
+      this.unplayable.add(roomId);
       throw new ProtocolError('VERSION_MISMATCH', 'This saved game needs a compatible server version');
+    }
     return game;
   }
   action(

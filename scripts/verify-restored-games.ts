@@ -37,7 +37,8 @@ import { fileURLToPath } from 'node:url';
 import { Store } from '../apps/server/src/store.js';
 import { applyAction, pieces, roadSites, settlementSites, total } from '../packages/rules/src/game.js';
 import type { CardKind, Game, GameAction, Phase } from '../packages/rules/src/game.js';
-import { DEVELOPMENT_DECK, RESOURCES, SUPPLY } from '../packages/rules/src/index.js';
+import { RESOURCES } from '../packages/rules/src/index.js';
+import { CLASSIC, findRuleset } from '../packages/rules/src/rulesets.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 
 export const REPORT_SCHEMA = 1;
@@ -51,8 +52,6 @@ const PHASES: Phase[] = [
   'freeRoads',
   'finished',
 ];
-const CARD_KINDS = Object.keys(DEVELOPMENT_DECK) as CardKind[];
-const DECK_SIZE = CARD_KINDS.reduce((sum, kind) => sum + DEVELOPMENT_DECK[kind], 0);
 const MISSING_JOURNAL_CHECK =
   "this release's Store has no verifyJournal, so the journal hash chain cannot be checked";
 
@@ -61,6 +60,8 @@ type JournalStore = Store & { verifyJournal?: (roomId: string) => JournalCheck }
 export type RoomReport = {
   roomId: string;
   status: 'verified' | 'failed' | 'no-game';
+  /** The game's ruleset, when it is not Classic. */
+  ruleset?: string;
   phase?: Phase;
   turn?: number;
   players?: number;
@@ -99,20 +100,30 @@ const message = (error: unknown) =>
 const isCount = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0;
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 
+/** Why this release cannot check a game in a mode it does not know, said plainly. */
+export const unknownRuleset = (ruleset: unknown) =>
+  `the game plays ruleset ${String(ruleset)}, which this release does not know, so it was not checked; verify it with the release that wrote it`;
+
 /**
  * Rules invariants every saved game satisfies, as short sentences. Only facts derivable from
- * the rules engine are asserted, so a legitimately played game never produces one.
+ * the rules engine are asserted, so a legitimately played game never produces one. Seats,
+ * the bank, the deck and the pieces are the game's own ruleset's.
  */
 export function gameInvariantProblems(game: Game): string[] {
   const problems: string[] = [];
+  const rules = findRuleset(game.ruleset);
+  if (!rules) return [unknownRuleset(game.ruleset)];
+  const { bank: bankSize, deck: deckCounts, pieces: supply } = rules.supply;
+  const CARD_KINDS = Object.keys(deckCounts) as CardKind[];
+  const DECK_SIZE = CARD_KINDS.reduce((sum, kind) => sum + deckCounts[kind], 0);
   try {
     const players = Array.isArray(game.players) ? game.players : [];
     const ids = new Set(players.map((p) => p.id));
-    if (players.length < 2 || players.length > 4)
-      problems.push(`${players.length} players; a game seats 2 to 4`);
+    if (players.length < rules.seats.min || players.length > rules.seats.max)
+      problems.push(`${players.length} players; a game seats ${rules.seats.min} to ${rules.seats.max}`);
     if (ids.size !== players.length) problems.push('two players share one seat id');
 
-    // Every resource card is either in the bank or in a hand: 19 of each type.
+    // Every resource card is either in the bank or in a hand: the ruleset's count of each type.
     for (const resource of RESOURCES) {
       const bank = game.bank?.[resource];
       const hands = players.map((p) => p.hand?.[resource]);
@@ -121,14 +132,12 @@ export function gameInvariantProblems(game: Game): string[] {
         continue;
       }
       const held = sum(hands);
-      if (bank + held !== SUPPLY.resourcesPerType)
-        problems.push(
-          `${resource}: bank ${bank} + hands ${held} = ${bank + held}, expected ${SUPPLY.resourcesPerType}`,
-        );
+      if (bank + held !== bankSize)
+        problems.push(`${resource}: bank ${bank} + hands ${held} = ${bank + held}, expected ${bankSize}`);
     }
 
     // Development cards: each purchase pops the deck and numbers the card, so deck + bought is
-    // exactly 25. Played knights are counted; other played cards leave no trace, and a resigning
+    // exactly the deck's size (25 in Classic). Played knights are counted; other played cards leave no trace, and a resigning
     // player's cards are discarded, so held + played can only be bounded above.
     const deck = Array.isArray(game.deck) ? game.deck : [];
     const held = players.flatMap((p) => (Array.isArray(p.cards) ? p.cards : []));
@@ -157,8 +166,8 @@ export function gameInvariantProblems(game: Game): string[] {
         deck.filter((card) => card === kind).length +
         held.filter((card) => card.kind === kind).length +
         (kind === 'knight' ? played : 0);
-      if (count > DEVELOPMENT_DECK[kind])
-        problems.push(`${kind} cards: ${count} accounted for, but only ${DEVELOPMENT_DECK[kind]} exist`);
+      if (count > deckCounts[kind])
+        problems.push(`${kind} cards: ${count} accounted for, but only ${deckCounts[kind]} exist`);
     }
     const cardIds = new Set<string>();
     for (const card of held) {
@@ -196,12 +205,12 @@ export function gameInvariantProblems(game: Game): string[] {
     }
     for (const player of players) {
       const owned = pieces(game, player.id);
-      if (owned.roads > SUPPLY.roads)
-        problems.push(`a player has ${owned.roads} roads; the supply is ${SUPPLY.roads}`);
-      if (owned.settlements > SUPPLY.settlements)
-        problems.push(`a player has ${owned.settlements} settlements; the supply is ${SUPPLY.settlements}`);
-      if (owned.cities > SUPPLY.cities)
-        problems.push(`a player has ${owned.cities} cities; the supply is ${SUPPLY.cities}`);
+      if (owned.roads > supply.roads)
+        problems.push(`a player has ${owned.roads} roads; the supply is ${supply.roads}`);
+      if (owned.settlements > supply.settlements)
+        problems.push(`a player has ${owned.settlements} settlements; the supply is ${supply.settlements}`);
+      if (owned.cities > supply.cities)
+        problems.push(`a player has ${owned.cities} cities; the supply is ${supply.cities}`);
     }
     if (!Number.isInteger(game.robber) || game.robber < 0 || game.robber >= game.board.hexes.length)
       problems.push(`the robber stands on missing tile ${String(game.robber)}`);
@@ -328,6 +337,11 @@ export function verifyRoom(store: Store, roomId: string, options: VerifyOptions 
   const problems: string[] = [];
   const report: RoomReport = { roomId, status: 'failed', problems };
   let game: Game | undefined;
+  // Asked of the saved row, since loadGame refuses a game in a mode this release does not know.
+  const saved = !!store.db.prepare('SELECT 1 FROM games WHERE room_id = ?').get(roomId);
+  const ruleset = saved ? store.roomMode(roomId) : undefined;
+  if (ruleset && ruleset !== CLASSIC.id) report.ruleset = ruleset;
+  if (ruleset && !findRuleset(ruleset)) problems.push(unknownRuleset(ruleset));
   try {
     game = store.loadGame(roomId);
   } catch (error) {
@@ -466,12 +480,14 @@ export function formatReport(source: string, bytes: number, report: Verification
   for (const room of report.details) {
     if (room.status === 'no-game') continue;
     const facts = room.phase
-      ? `${room.players} players, turn ${room.turn}, ${room.phase}, revision ${room.revision ?? '?'}, ${
+      ? `${room.ruleset ? `${room.ruleset}, ` : ''}${room.players} players, turn ${room.turn}, ${room.phase}, revision ${room.revision ?? '?'}, ${
           room.historyEntries ?? 0
         } history entries${room.journalEvents === undefined ? '' : `, ${room.journalEvents} journal rows`}; ${
           room.continuedWith ? `continues with ${room.continuedWith}` : 'finished'
         }`
-      : 'no loadable game';
+      : room.ruleset
+        ? `a ${room.ruleset} game this release cannot load`
+        : 'no loadable game';
     lines.push(`  ${room.status === 'verified' ? 'PASS' : 'FAIL'} ${room.roomId}  ${facts}`);
     for (const problem of room.problems) lines.push(`       - ${problem}`);
   }

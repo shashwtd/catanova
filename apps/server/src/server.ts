@@ -446,9 +446,12 @@ export async function startServer(
   /** The rulesets each tab said it can draw. A tab from before modes said nothing, and draws Classic alone. */
   const drawable = new WeakMap<WebSocket, ReadonlySet<string>>();
   const canDraw = (ws: WebSocket, mode: string) => mode === CLASSIC.id || !!drawable.get(ws)?.has(mode);
-  /** Keep a tab out of a room in a mode it cannot draw, and tell its player how to fix that. */
+  /**
+   * Keep a tab out of a room in a mode it cannot draw, and tell its player how to fix that. A mode this
+   * server does not know is not the tab's to fix: loading the room refuses it (VERSION_MISMATCH).
+   */
   const requireDrawable = (rulesets: readonly string[] | undefined, mode: string) => {
-    if (mode !== CLASSIC.id && !rulesets?.includes(mode))
+    if (mode !== CLASSIC.id && findRuleset(mode) && !rulesets?.includes(mode))
       throw new ProtocolError(
         'CLIENT_UPDATE_REQUIRED',
         `Refresh to play ${findRuleset(mode)?.name ?? 'this game'}`,

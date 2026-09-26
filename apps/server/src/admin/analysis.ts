@@ -14,6 +14,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { inflateGame, wholeRow } from '../journal.js';
 import type { JournalRow } from '../journal.js';
+import { findRuleset } from '../../../../packages/rules/src/rulesets.js';
 import { readMatches, summarize } from '../../../../scripts/reporting/retention.js';
 import { renderCsv } from '../../../../scripts/reporting/render.js';
 import type { AdminStats, DiceSummary, RetentionReport } from './types.js';
@@ -179,14 +180,18 @@ export function diceSummary(
   };
 }
 
-/** A saved game's dice mode, from a journal row in either form, without reading its board. */
-function rowDiceMode(row: JournalRow): string {
+/**
+ * A saved game's dice mode, from a journal row in either form, without reading its board. Null for a game in
+ * a mode this version does not know: its rolls are left out rather than counted by rules it does not follow.
+ */
+function rowDiceMode(row: JournalRow): string | null {
   try {
     const game = wholeRow(row)
-      ? (JSON.parse(row.state) as { diceMode?: unknown })
+      ? (JSON.parse(row.state) as { diceMode?: unknown; ruleset?: string })
       : row.state_z?.length
         ? inflateGame(row.state_z)
         : undefined;
+    if (game && !findRuleset(game.ruleset)) return null;
     return typeof game?.diceMode === 'string' ? game.diceMode : 'classic';
   } catch {
     return 'classic';
@@ -345,6 +350,7 @@ export function computeStats(db: DatabaseSync, now: number): AdminStats {
       while (game + 1 < games.length && games[game + 1]!.revision <= row.revision) game++;
       if (row.total < 2 || row.total > 12) continue;
       const mode = game >= 0 ? games[game]!.mode : (settings.get(roomId) ?? 'classic');
+      if (mode === null) continue;
       const pair = rollPair(row.entry, row.total);
       for (const counted of [overall, byMode.get(mode) ?? byMode.set(mode, tally()).get(mode)!]) {
         counted.counts[row.total - 2]!++;
