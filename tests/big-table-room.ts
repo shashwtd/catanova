@@ -10,7 +10,7 @@ import { newSession } from '../apps/client/src/connection.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
-import { seededRandom } from '../packages/rules/src/board.js';
+import { BIG_TABLE_BALANCED_V1, generateBoard, seededRandom } from '../packages/rules/src/board.js';
 import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import type { TurnStructure } from '../packages/rules/src/rulesets.js';
 import type { TurnTimerSeconds } from '../packages/protocol/src/settings.js';
@@ -27,6 +27,8 @@ export type RoomOptions = {
   clock?: { now: number };
   /** The store's private randomness: its dice, steals, seat order and clock moves. */
   random?: () => number;
+  /** The island's seed. The store deals a lobby's island from the server's own randomness, so a test sets it. */
+  boardSeed?: number;
 };
 
 /**
@@ -64,6 +66,10 @@ export function bigTableRoom(options: RoomOptions = {}) {
     store.setConnected(seat, true);
     seats.push(seat);
   }
+  // The same island every run, so that a game plays the same way every time.
+  store.db
+    .prepare('UPDATE room_boards SET board = ? WHERE room_id = ?')
+    .run(JSON.stringify(generateBoard(options.boardSeed ?? 4242, BIG_TABLE_BALANCED_V1)), roomId);
   for (const seat of seats.slice(1)) store.lobby(seat, `ready-${seat.id}`, revision(), true);
   store.action(host, 'start', revision(), { kind: 'start' });
   const game = () => store.loadGame(roomId)!;

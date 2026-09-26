@@ -166,6 +166,7 @@ function playGame(
     timer: options.timer,
     victoryPoints: 8,
     random: seededRandom(options.seed),
+    boardSeed: options.seed,
   });
   const rng = seededRandom(options.seed * 7 + 1);
   const leaves: { revision: number; player: string; eligible: string[] }[] = [];
