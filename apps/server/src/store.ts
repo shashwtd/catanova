@@ -628,6 +628,14 @@ export class Store {
       started: !!this.loadGame(roomId),
     };
   }
+  /**
+   * The rulesets this version plays, as a JSON array for SQL's json_each. A query that reads saved games as
+   * rows, not through loadGame, uses it to leave out games in a mode this version does not know: they are
+   * frozen until a release that knows the mode returns, and must not count as anybody's game in play.
+   */
+  private knownRulesets(): string {
+    return JSON.stringify(rulesets().map((ruleset) => ruleset.id));
+  }
   /** The ruleset a lobby is set to play, or undefined for one this version does not know. */
   private lobbyRules(roomId: string): Ruleset | undefined {
     return findRuleset(this.settings(roomId).mode);
@@ -688,19 +696,22 @@ export class Store {
   /**
    * The unfinished game an account is seated in, if any, so a friend can be
    * watched without asking them for a code. Only the room code is exposed:
-   * enough to watch, and nothing about what is in their hand.
+   * enough to watch, and nothing about what is in their hand. A game in a mode
+   * this version does not know cannot be watched, so it is never offered.
    */
   watchableRoomOf(userId: string): { roomId: string; roomCode?: string } | null {
     const row = this.db
       .prepare(
         `
       SELECT s.room_id FROM seats s JOIN game_phases g ON g.room_id=s.room_id
+      JOIN games gm ON gm.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0
         AND coalesce(g.phase,'')<>'finished'
+        AND coalesce(json_extract(gm.state,'$.ruleset'),?) IN (SELECT value FROM json_each(?))
       LIMIT 1
     `,
       )
-      .get(userId) as { room_id: string } | undefined;
+      .get(userId, CLASSIC.id, this.knownRulesets()) as { room_id: string } | undefined;
     if (!row) return null;
     const roomCode = this.roomCode(row.room_id);
     return { roomId: row.room_id, ...(roomCode ? { roomCode } : {}) };
@@ -749,6 +760,11 @@ export class Store {
     this.db.prepare('DELETE FROM room_boards WHERE room_id = ?').run(roomId);
     return true;
   }
+  /**
+   * One unfinished game per account. A game in a mode this version does not know does not count: after a
+   * rollback nobody can resume, leave or close it here, so counting it would lock its players out of every
+   * game until the newer release returned. They play Classic meanwhile, and find the frozen game again then.
+   */
   private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
     const conflict = this.db
       .prepare(
@@ -757,13 +773,14 @@ export class Store {
       JOIN games g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0 AND s.room_id<>?
         AND coalesce(p.phase,'')<>'finished'
+        AND coalesce(json_extract(g.state,'$.ruleset'),?) IN (SELECT value FROM json_each(?))
         AND EXISTS (SELECT 1 FROM json_each(g.state,'$.players') p
           WHERE json_extract(p.value,'$.id')=s.id
             AND coalesce(json_extract(p.value,'$.resigned'),0)=0)
       LIMIT 1
     `,
       )
-      .get(userId, roomId ?? '') as { room_id: string } | undefined;
+      .get(userId, roomId ?? '', CLASSIC.id, this.knownRulesets()) as { room_id: string } | undefined;
     if (conflict) {
       const code = this.roomCode(conflict.room_id);
       throw new ProtocolError(
@@ -1059,7 +1076,7 @@ export class Store {
                IN (SELECT value FROM json_each(?)) ELSE 1 END
            ORDER BY room_id, revision LIMIT ?`,
         )
-        .all(CLASSIC.id, JSON.stringify(rulesets().map((ruleset) => ruleset.id)), limit) as {
+        .all(CLASSIC.id, this.knownRulesets(), limit) as {
         room_id: string;
         revision: number;
         state: string;

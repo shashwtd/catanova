@@ -817,7 +817,8 @@ cannot read.
    - a manual restore drill (`systemctl start catanova-drill.service`) that
      verifies the Big Table games;
    - locally, Release A on a copy of a database with Big Table games: it must
-     refuse those games, not misplay them.
+     refuse those games, not misplay them, and their players must still be
+     able to create, join and play Classic rooms.
 4. **Opening to everyone.** Add `big-table-v1` to `CATANOVA_MODES` and recreate
    the container. In the same window, ship the release that changes the copy
    saying "two to four" or "2–4". The public pages are prerendered when the

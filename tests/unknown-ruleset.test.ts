@@ -23,12 +23,16 @@ import { timeoutAction } from '../packages/rules/src/timeout.js';
 
 const NEWER = 'big-table-v1';
 let commands = 0;
-/** A two-player Classic game played through setup and a few turns, every move through Store.action. */
-function played(store: Store, turns: number) {
+const identity = (id: string) => ({ id, name: 'Account', expiresAt: Date.now() + 3_600_000 });
+/**
+ * A two-player Classic game played through setup and a few turns, every move through Store.action. With
+ * `accounts`, both seats are signed in, as every seat is in production.
+ */
+function played(store: Store, turns: number, accounts?: [string, string]) {
   const host = newSession('Host'),
     guest = newSession('Guest');
-  const a = store.enter('create', host.token, host.name);
-  const b = store.enter('join', guest.token, guest.name, a.room_id);
+  const a = store.enter('create', host.token, host.name, undefined, accounts && identity(accounts[0]));
+  const b = store.enter('join', guest.token, guest.name, a.room_id, accounts && identity(accounts[1]));
   const roomId = a.room_id;
   store.setConnected(a, true);
   store.setConnected(b, true);
@@ -42,7 +46,7 @@ function played(store: Store, turns: number) {
     const seat: Seat = { id: actor, name: actor, room_id: roomId };
     store.action(seat, `move-${++commands}`, store.snapshot(roomId).revision, action);
   }
-  return { roomId, seats: [a, b] };
+  return { roomId, seats: [a, b], sessions: [host, guest] };
 }
 
 /**
@@ -158,6 +162,47 @@ test('a game in a mode this version does not know is refused on load and left un
   } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('players of a game in an unknown mode still play Classic, and nobody is offered it to watch', () => {
+  const store = new Store(':memory:', { trackPresence: true });
+  try {
+    const newer = played(store, 2, ['acct-ann', 'acct-ben']);
+    // Before the rollback, that game is Ann's one game in play, and friends may watch it.
+    const elsewhere = store.enter('create', newSession('Dan').token, 'Dan', undefined, identity('acct-dan'));
+    assert.throws(
+      () => store.enter('join', newSession('Ann').token, 'Ann', elsewhere.room_id, identity('acct-ann')),
+      /already have a game/,
+    );
+    assert.equal(store.watchableRoomOf('acct-ann')?.roomId, newer.roomId);
+    fromNewerRelease(store, newer.roomId);
+    // After it: nobody can resume, watch, leave or close that game here, so it counts as nobody's game.
+    assert.equal(store.watchableRoomOf('acct-ann'), null, 'no Watch link that would only fail');
+    const room = store.enter('create', newSession('Ann').token, 'Ann', undefined, identity('acct-ann'));
+    const cat = store.enter('join', newSession('Cat').token, 'Cat', room.room_id, identity('acct-cat'));
+    store.setConnected(room, true);
+    store.setConnected(cat, true);
+    store.lobby(cat, 'cat-ready', store.snapshot(room.room_id).revision, true);
+    // Start checks every member's account again; the frozen game does not stop Ann here either.
+    store.action(room, 'classic-start', store.snapshot(room.room_id).revision, { kind: 'start' });
+    assert.equal(store.loadGame(room.room_id)!.ruleset, 'base-3-4-v1');
+    assert.equal(store.watchableRoomOf('acct-ann')?.roomId, room.room_id);
+    // The Classic game counts, as ever: Ann cannot sit down at a third.
+    assert.throws(
+      () => store.enter('join', newSession('Ann').token, 'Ann', elsewhere.room_id, identity('acct-ann')),
+      /already have a game/,
+    );
+    // The account history lists the Classic game and skips the frozen one, even when it must read that
+    // game afresh: a seat without its participant row sends the history to the saved game itself.
+    store.db.prepare('DELETE FROM match_participants WHERE room_id = ?').run(newer.roomId);
+    const history = store.accountGames('acct-ann');
+    assert.deepEqual(
+      history.games.map((game) => game.roomId),
+      [room.room_id],
+    );
+  } finally {
+    store.close();
   }
 });
 
