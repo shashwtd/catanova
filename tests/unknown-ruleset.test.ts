@@ -16,19 +16,25 @@ import { computeStats } from '../apps/server/src/admin/analysis.js';
 import { openGame } from '../apps/server/src/admin/rooms.js';
 import { readMatches } from '../scripts/reporting/retention.js';
 import { formatReport, gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
-import { newSession } from '../apps/client/src/connection.js';
+import { Connection, newSession } from '../apps/client/src/connection.js';
+import type { Session } from '../packages/protocol/src/index.js';
+import { startServer } from '../apps/server/src/server.js';
 import { activePlayer } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 
 const NEWER = 'big-table-v1';
 let commands = 0;
-/** A two-player Classic game played through setup and a few turns, every move through Store.action. */
-function played(store: Store, turns: number) {
+const identity = (id: string) => ({ id, name: 'Account', expiresAt: Date.now() + 3_600_000 });
+/**
+ * A two-player Classic game played through setup and a few turns, every move through Store.action. With
+ * `accounts`, both seats are signed in, as every seat is in production.
+ */
+function played(store: Store, turns: number, accounts?: [string, string]) {
   const host = newSession('Host'),
     guest = newSession('Guest');
-  const a = store.enter('create', host.token, host.name);
-  const b = store.enter('join', guest.token, guest.name, a.room_id);
+  const a = store.enter('create', host.token, host.name, undefined, accounts && identity(accounts[0]));
+  const b = store.enter('join', guest.token, guest.name, a.room_id, accounts && identity(accounts[1]));
   const roomId = a.room_id;
   store.setConnected(a, true);
   store.setConnected(b, true);
@@ -42,7 +48,7 @@ function played(store: Store, turns: number) {
     const seat: Seat = { id: actor, name: actor, room_id: roomId };
     store.action(seat, `move-${++commands}`, store.snapshot(roomId).revision, action);
   }
-  return { roomId, seats: [a, b] };
+  return { roomId, seats: [a, b], sessions: [host, guest] };
 }
 
 /**
@@ -125,6 +131,15 @@ test('a game in a mode this version does not know is refused on load and left un
     );
     assert.equal(store.roomMode(newer.roomId), NEWER, 'the room still says what it is');
     assert.ok(store.loadGame(classic.roomId));
+    // Its turn clock and presence come up due, as a game left running by a newer release's server would,
+    // and a bot sits at it, as one may in a later release whose mode has bots.
+    store.db.prepare('UPDATE turn_clocks SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
+    store.db.prepare('UPDATE room_presence SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
+    store.db
+      .prepare(
+        "INSERT INTO seats(id, room_id, token_hash, name, ready, bot, bot_level) VALUES ('later-bot', ?, 'no-token', 'Anchor', 1, 1, 'steady')",
+      )
+      .run(newer.roomId);
     // A restart rewrites the presence of the games it can play, and leaves this one exactly as it was.
     const before = rowsOf(store, newer.roomId);
     const classicPresence = store.db
@@ -138,7 +153,11 @@ test('a game in a mode this version does not know is refused on load and left un
       classicPresence,
       'a Classic game at the same restart gets its recovery grace',
     );
-    // Neither a player nor the clock can move it, and the clock stops asking.
+    // The clock and the bots never ask about it, from the first tick on: nothing tries to load it, and
+    // nothing is logged.
+    assert.ok(!store.dueRooms().includes(newer.roomId));
+    assert.ok(!store.botRooms().includes(newer.roomId));
+    // Neither a player nor the clock can move it.
     // Joining, resuming and watching all read the room's snapshot, which refuses it.
     assert.throws(
       () => store.snapshot(newer.roomId, newer.seats[0]!.id),
@@ -148,16 +167,54 @@ test('a game in a mode this version does not know is refused on load and left un
       () => store.expireRoom(newer.roomId),
       (error: Error & { code?: string }) => error.code === 'VERSION_MISMATCH',
     );
-    store.db.prepare('UPDATE turn_clocks SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
     assert.ok(!store.dueRooms().includes(newer.roomId));
     // The admin console shows the refusal instead of the game.
     assert.deepEqual(openGame(store, newer.roomId), { error: 'VERSION_MISMATCH' });
     assert.ok(openGame(store, classic.roomId).game);
-    // The account history skips it rather than failing.
-    assert.doesNotThrow(() => store.accountGames('nobody'));
   } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('players of a game in an unknown mode still play Classic, and nobody is offered it to watch', () => {
+  const store = new Store(':memory:', { trackPresence: true });
+  try {
+    const newer = played(store, 2, ['acct-ann', 'acct-ben']);
+    // Before the rollback, that game is Ann's one game in play, and friends may watch it.
+    const elsewhere = store.enter('create', newSession('Dan').token, 'Dan', undefined, identity('acct-dan'));
+    assert.throws(
+      () => store.enter('join', newSession('Ann').token, 'Ann', elsewhere.room_id, identity('acct-ann')),
+      /already have a game/,
+    );
+    assert.equal(store.watchableRoomOf('acct-ann')?.roomId, newer.roomId);
+    fromNewerRelease(store, newer.roomId);
+    // After it: nobody can resume, watch, leave or close that game here, so it counts as nobody's game.
+    assert.equal(store.watchableRoomOf('acct-ann'), null, 'no Watch link that would only fail');
+    const room = store.enter('create', newSession('Ann').token, 'Ann', undefined, identity('acct-ann'));
+    const cat = store.enter('join', newSession('Cat').token, 'Cat', room.room_id, identity('acct-cat'));
+    store.setConnected(room, true);
+    store.setConnected(cat, true);
+    store.lobby(cat, 'cat-ready', store.snapshot(room.room_id).revision, true);
+    // Start checks every member's account again; the frozen game does not stop Ann here either.
+    store.action(room, 'classic-start', store.snapshot(room.room_id).revision, { kind: 'start' });
+    assert.equal(store.loadGame(room.room_id)!.ruleset, 'base-3-4-v1');
+    assert.equal(store.watchableRoomOf('acct-ann')?.roomId, room.room_id);
+    // The Classic game counts, as ever: Ann cannot sit down at a third.
+    assert.throws(
+      () => store.enter('join', newSession('Ann').token, 'Ann', elsewhere.room_id, identity('acct-ann')),
+      /already have a game/,
+    );
+    // The account history lists the Classic game and skips the frozen one, even when it must read that
+    // game afresh: a seat without its participant row sends the history to the saved game itself.
+    store.db.prepare('DELETE FROM match_participants WHERE room_id = ?').run(newer.roomId);
+    const history = store.accountGames('acct-ann');
+    assert.deepEqual(
+      history.games.map((game) => game.roomId),
+      [room.room_id],
+    );
+  } finally {
+    store.close();
   }
 });
 
@@ -265,4 +322,42 @@ test('the restore verifier and the admin reads name a newer mode’s game instea
   } finally {
     store.close();
   }
+});
+
+test('over the wire, a game in an unknown mode is a version mismatch, which refreshing would not fix', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'catanova-unknown-ruleset-wire-'));
+  const path = join(directory, 'game.sqlite');
+  const seeded = new Store(path, { trackPresence: true });
+  const newer = played(seeded, 2);
+  fromNewerRelease(seeded, newer.roomId);
+  seeded.close();
+  const server = await startServer({ port: 0, databasePath: path, auth: null });
+  const clients: Connection[] = [];
+  t.after(async () => {
+    clients.forEach((client) => client.stop());
+    await server.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  /** A current tab, one that can draw every mode this build contains, asks to come in; its first error. */
+  const attempt = async (session: Session) => {
+    const client = new Connection(server.url, session, {
+      minRetryMs: 30,
+      maxRetryMs: 100,
+      rulesets: ['base-3-4-v1'],
+    });
+    clients.push(client);
+    const error = new Promise<string>((resolve) =>
+      client.subscribe((message) => {
+        if (message.type === 'error') resolve(`${message.code}: ${message.message}`);
+      }),
+    );
+    client.start();
+    return error;
+  };
+  const mismatch = 'VERSION_MISMATCH: This saved game needs a compatible server version';
+  // Not CLIENT_UPDATE_REQUIRED: that asks the player to refresh, which cannot help with a mode the server
+  // itself does not know.
+  assert.equal(await attempt(newSession('Newcomer', newer.roomId)), mismatch);
+  assert.equal(await attempt({ ...newer.sessions[0]!, roomId: newer.roomId, joined: true }), mismatch);
+  assert.equal(await attempt({ ...newSession('Watcher', newer.roomId), spectating: true }), mismatch);
 });

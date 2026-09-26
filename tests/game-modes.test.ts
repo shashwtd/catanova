@@ -75,6 +75,10 @@ test('the switches: Classic always, open modes for every host, every mode for te
   const testers = readModeSwitches({ CATANOVA_MODE_TESTERS: 'acct-1' }, log);
   assert.deepEqual(modesFor(testers, 'acct-1'), [CLASSIC.id, OPEN_SEA.id, TEST]);
   assert.deepEqual(modesFor(testers, 'acct-9'), [CLASSIC.id]);
+  // An account id matches whatever its case, as copied from wherever it was shown.
+  const copied = readModeSwitches({ CATANOVA_MODE_TESTERS: ' 0A1B2C3D-0000-4000-8000-00000000000F ,' }, log);
+  assert.deepEqual(modesFor(copied, '0a1b2c3d-0000-4000-8000-00000000000f'), [CLASSIC.id, OPEN_SEA.id, TEST]);
+  assert.deepEqual(modesFor(testers, 'ACCT-1'), [CLASSIC.id, OPEN_SEA.id, TEST]);
   // Local playtest mode has no accounts, so CATANOVA_MODES alone decides.
   assert.deepEqual(modesFor(testers, undefined), [CLASSIC.id]);
   assert.deepEqual(modesFor(switches, undefined), [CLASSIC.id, TEST]);
@@ -324,7 +328,7 @@ test('the seat caps read the mode: joining, bots, invitations and the loading sc
   }
 });
 
-test('Start plays the mode frozen in: its minimum seats, its board, and a switch that may have closed', () => {
+test('Start plays the mode frozen in: its minimum seats, no bots, and a switch that may have closed', () => {
   const directory = mkdtempSync(join(tmpdir(), 'catanova-modes-start-'));
   const path = join(directory, 'game.sqlite');
   let store = new Store(path, { modes: OPEN });
@@ -337,18 +341,18 @@ test('Start plays the mode frozen in: its minimum seats, its board, and a switch
     );
     const table = lobby(store, 3);
     store.configureSettings(table.host, 'to-test', table.revision(), { turnTimerSeconds: 90, mode: TEST });
-    // A lobby's island must be one its mode plays; an older Classic deal is refused, not played.
     const board = store.board(table.roomId);
+    // A bot seated some other way, by an older release or a race, still cannot start a mode without bots.
     store.db
-      .prepare('UPDATE room_boards SET board = ? WHERE room_id = ?')
-      .run(JSON.stringify({ ...generateBoard(board.seed), preset: 'balanced-v1' }), table.roomId);
+      .prepare(
+        "INSERT INTO seats(id, room_id, token_hash, name, profile, ready, bot, bot_level) VALUES ('bot-seat', ?, 'no-token', 'Anchor', NULL, 1, 1, 'steady')",
+      )
+      .run(table.roomId);
     assert.throws(
-      () => store.action(table.host, 'start-old-board', ready(store, table.roomId), { kind: 'start' }),
-      code('BOARD_MISMATCH'),
+      () => store.action(table.host, 'start-with-bot', ready(store, table.roomId), { kind: 'start' }),
+      (error: Error) => code('MODE_BOTS')(error) && /Bots play Classic only/.test(error.message),
     );
-    store.db
-      .prepare('UPDATE room_boards SET board = ? WHERE room_id = ?')
-      .run(JSON.stringify(board), table.roomId);
+    store.db.prepare("UPDATE seats SET departed = 1 WHERE id = 'bot-seat'").run();
     // The kill switch: the server restarts with the mode closed, and a lobby already set to it cannot start.
     store.close();
     store = new Store(path);
@@ -392,5 +396,54 @@ test('Start plays the mode frozen in: its minimum seats, its board, and a switch
   } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a lobby whose mode does not play its island is dealt a new one, and never left unable to start', () => {
+  const store = new Store(':memory:', { modes: OPEN });
+  try {
+    const plant = (roomId: string, board: object) =>
+      store.db
+        .prepare('UPDATE room_boards SET board = ? WHERE room_id = ?')
+        .run(JSON.stringify(board), roomId);
+    const stored = (roomId: string) =>
+      JSON.parse(
+        (store.db.prepare('SELECT board FROM room_boards WHERE room_id = ?').get(roomId) as { board: string })
+          .board,
+      ) as { preset: string };
+    // A Classic lobby holding an island from a preset this release does not know, as a release since rolled
+    // back would leave it. A lobby's island belongs to no game yet, so it is simply dealt again.
+    const classic = lobby(store, 2);
+    const later = { ...store.board(classic.roomId), preset: 'balanced-v3' };
+    plant(classic.roomId, later);
+    const revision = classic.revision();
+    const fresh = store.snapshot(classic.roomId, classic.host.id).board;
+    assert.equal(fresh.preset, 'balanced-v2');
+    assert.deepEqual(store.board(classic.roomId), fresh, 'dealt once, then kept');
+    assert.equal(classic.revision(), revision, 'a new island is no change to confirm: Ready stands');
+    // A settings save deals one too, with no mode section in sight for a Classic-only host.
+    plant(classic.roomId, later);
+    store.configureSettings(classic.host, 'timer', classic.revision(), { turnTimerSeconds: 40 });
+    assert.equal(stored(classic.roomId).preset, 'balanced-v2');
+    // And so does Start, which plays the new one.
+    const start = ready(store, classic.roomId);
+    plant(classic.roomId, later);
+    store.action(classic.host, 'start-later-board', start, { kind: 'start' });
+    assert.equal(store.loadGame(classic.roomId)!.board.preset, 'balanced-v2');
+    // Classic still plays the balanced-v1 islands its older lobbies hold, exactly as dealt.
+    const older = lobby(store, 2);
+    const v1 = { ...generateBoard(store.board(older.roomId).seed), preset: 'balanced-v1' };
+    plant(older.roomId, v1);
+    store.action(older.host, 'start-v1', ready(store, older.roomId), { kind: 'start' });
+    assert.deepEqual(store.loadGame(older.roomId)!.board, v1);
+    // The test mode plays balanced-v2 alone, so an older Classic island in its lobby is dealt again too.
+    const test = lobby(store, 3);
+    store.configureSettings(test.host, 'to-test', test.revision(), { turnTimerSeconds: 90, mode: TEST });
+    const testStart = ready(store, test.roomId);
+    plant(test.roomId, { ...store.board(test.roomId), preset: 'balanced-v1' });
+    store.action(test.host, 'start-test', testStart, { kind: 'start' });
+    assert.equal(store.loadGame(test.roomId)!.board.preset, TEST_TABLE.board);
+  } finally {
+    store.close();
   }
 });
