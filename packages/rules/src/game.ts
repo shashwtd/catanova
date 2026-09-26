@@ -348,19 +348,37 @@ export function longestTrail(g: BoardState, player: string): number {
   for (const v of g.board.vertices) if (v.edges.some((e) => g.roads[e] === player)) walk(v.id, new Set());
   return longest;
 }
-export function score(
-  g: Pick<Game, 'buildings' | 'longestRoad' | 'largestArmy'>,
-  p: Pick<Player, 'id' | 'cards'>,
-  hidden = true,
-): number {
-  return (
-    Object.values(g.buildings)
-      .filter((b) => b.player === p.id)
-      .reduce((n, b) => n + (b.kind === 'city' ? 2 : 1), 0) +
-    (g.longestRoad === p.id ? 2 : 0) +
-    (g.largestArmy === p.id ? 2 : 0) +
-    (hidden ? p.cards.filter((c) => c.kind === 'victoryPoint').length : 0)
-  );
+/** One part of a player's points, named so that a results screen can say where each point came from. */
+export type ScoreTerm = { id: ScoreTermId; points: number; count: number };
+/**
+ * The buildings (a point per settlement, two per city), the two awards and victory point cards. A mode that
+ * scores something new adds its term here, read from its own part of the game (Open Sea's island bonuses),
+ * and every reader of score() counts it: the game view, the win check, player records and the admin views.
+ */
+export type ScoreTermId = 'settlements' | 'cities' | 'longestRoad' | 'largestArmy' | 'cards';
+type Scored = Pick<Game, 'buildings' | 'longestRoad' | 'largestArmy'>;
+/**
+ * Where a player's points come from, in the order results list them, leaving out the terms worth nothing.
+ * `hidden` counts victory point cards, which only their holder sees until someone wins.
+ */
+export function scoreTerms(g: Scored, p: Pick<Player, 'id' | 'cards'>, hidden = true): ScoreTerm[] {
+  const buildings = Object.values(g.buildings).filter((b) => b.player === p.id);
+  const cities = buildings.filter((b) => b.kind === 'city').length,
+    settlements = buildings.length - cities,
+    cards = hidden ? p.cards.filter((c) => c.kind === 'victoryPoint').length : 0;
+  const award = (holder: string | null) => (holder === p.id ? 1 : 0);
+  const terms: ScoreTerm[] = [
+    { id: 'settlements', points: settlements, count: settlements },
+    { id: 'cities', points: cities * 2, count: cities },
+    { id: 'longestRoad', points: award(g.longestRoad) * 2, count: award(g.longestRoad) },
+    { id: 'largestArmy', points: award(g.largestArmy) * 2, count: award(g.largestArmy) },
+    { id: 'cards', points: cards, count: cards },
+  ];
+  return terms.filter((term) => term.points > 0);
+}
+/** A player's points: the sum of their score terms. */
+export function score(g: Scored, p: Pick<Player, 'id' | 'cards'>, hidden = true): number {
+  return scoreTerms(g, p, hidden).reduce((n, term) => n + term.points, 0);
 }
 function updateAwards(g: Game) {
   for (const [key, minimum, values] of [
@@ -994,6 +1012,8 @@ export type PlayerView = {
   cardCount: number;
   knights: number;
   points: number;
+  /** Where `points` come from, with the same cards hidden. */
+  terms: ScoreTerm[];
   roadLength: number;
   pieces: ReturnType<typeof pieces>;
   hand?: Hand;
@@ -1041,6 +1061,7 @@ export function gameView(g: Game, viewer: string): GameView {
       cardCount: p.cards.length,
       knights: p.knights,
       points: score(g, p, p.id === viewer || !!g.winner),
+      terms: scoreTerms(g, p, p.id === viewer || !!g.winner),
       roadLength: longestTrail(g, p.id),
       pieces: pieces(g, p.id),
       ...(p.id === viewer ? { hand: { ...p.hand }, cards: structuredClone(p.cards) } : {}),
