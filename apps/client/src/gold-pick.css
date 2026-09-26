@@ -3,8 +3,9 @@
  * Plenty's resource buttons.
  *
  * Those buttons take their parchment colours from a card's details in game-dialogs.css, under the same selectors'
- * shapes; without these rules they would keep the dark ones meant for the old card panel (polish.css). The one
- * thing the discard list's rows did not have is a word for each player's place in the order.
+ * shapes; without these rules they would keep the dark ones meant for the old card panel (polish.css). The discard
+ * list's rows gain a word for each player's place in the order, and keep to their own height: the list runs in a
+ * column (game-guidance.css), where the rows' 120-pixel basis (match-followups.css) would make each that tall.
  */
 .playing .gold-pick :is(.development-resources button, .plenty-picked button) {
   color: #55432d;
@@ -21,4 +22,7 @@
   font:
     500 12px Barlow,
     sans-serif;
+}
+.gold-pick .discard-player {
+  flex: none;
 }

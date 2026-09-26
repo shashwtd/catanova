@@ -160,6 +160,7 @@ export function PlayerRail({
   game,
   me,
   timer,
+  goldTimer,
   clockOffset,
   friendship,
 }: {
@@ -167,10 +168,13 @@ export function PlayerRail({
   game: GameView;
   me?: string;
   timer?: ReactNode;
+  /** Open Sea: the gold picker's own 20 seconds, on their card while they pick (docs/RULEBOOK-OPEN-SEA.md, 9.5). */
+  goldTimer?: ReactNode;
   clockOffset?: number;
   friendship?: RailFriendship;
 }) {
   const ranked = playerStandings(game);
+  const goldPicker = game.phase === 'goldPick' ? game.goldOwed?.[0]?.player : undefined;
   // Keyed by player, not by seat number: the game shuffles the order when it
   // starts, so the rail's third portrait is not the room's third seat.
   const colors = seatColorMap(room.players);
@@ -299,7 +303,7 @@ export function PlayerRail({
                 >
                   <GameIcon name={activity.icon} size={20} />
                   {activity.marker && <span className="profile-turn-label">{activity.marker}</span>}
-                  {acting && timer}
+                  {p.id === goldPicker ? goldTimer : acting && timer}
                 </span>
               )}
               <DisconnectStatus

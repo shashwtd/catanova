@@ -145,7 +145,6 @@ import './game-mode.css';
 import './open-sea.css';
 import './ship-sites.css';
 import './placement-choice.css';
-import './robber-choice.css';
 import './gold-pick.css';
 import './six-seat-rail.css';
 import './six-seat-trade.css';
@@ -1156,6 +1155,19 @@ function App() {
               connected={connected}
               onWarning={() => feedback.sound.play('warning')}
             />
+          }
+          goldTimer={
+            // The gold panel's own clock gives the warning; this one only counts.
+            g.phase === 'goldPick' && (
+              <TurnTimer
+                room={room}
+                me={me}
+                goldPicker={g.goldOwed?.[0]?.player}
+                offset={clockOffset}
+                connected={connected}
+                onWarning={() => {}}
+              />
+            )
           }
           friendship={
             auth.config?.mode === 'authenticated' && auth.account?.registered && !auth.account.isGuest

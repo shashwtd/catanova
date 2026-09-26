@@ -283,7 +283,7 @@ export function RobberFlow({
                           <strong>{target.name}</strong>
                           <small>{target.resourceCount ? 'Steal 1 card' : 'No cards to steal'}</small>
                         </span>
-                        <GameIcon name="robber" size={22} />
+                        <GameIcon name={moving === 'pirate' ? SEA_ICONS.pirate : 'robber'} size={22} />
                       </button>
                     );
                   })}

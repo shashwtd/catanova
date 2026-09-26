@@ -44,6 +44,7 @@ import {
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
+const PAINTED_BOAT = PAINTED_ICONS[SEA_ICONS.pirate];
 /** An Open Sea game for three after setup, every player on a coastal corner with a starting ship out to sea. */
 function afterSetup(seed = 5): Game {
   let g = createGame(SEATS.slice(0, 3), seed, () => 0.5, { ruleset: OPEN_SEA.id });
@@ -321,15 +322,16 @@ test('after a seven, Open Sea offers the robber and the pirate, then only the ch
   const noSea = flow({}, { ...view, legal: { ...view.legal, pirateHexes: [] } });
   assert.equal(count(noSea, /class="robber-victim"/g), 1);
   assert.doesNotMatch(noSea, /Pirate/);
-  // Before the choice no hex is a target; after it, only that piece's hexes, land or sea, never both.
-  assert.doesNotMatch(board(view), /robber-target|pirate-target/);
+  // Before the choice no hex is a target; after it, only that piece's hexes, land or sea, never both. Both are
+  // marked as the robber's tiles are.
+  assert.doesNotMatch(board(view), /robber-target/);
   const pirate = board(view, { robberPiece: 'pirate' });
-  assert.equal(count(pirate, /class="terrain-hit pirate-target"/g), view.legal.pirateHexes!.length);
-  assert.doesNotMatch(pirate, /robber-target/);
-  assert.match(pirate, /aria-label="Sea. Move pirate here"/);
+  assert.equal(count(pirate, /class="terrain-hit robber-target"/g), view.legal.pirateHexes!.length);
+  assert.equal(count(pirate, /aria-label="Sea. Move pirate here"/g), view.legal.pirateHexes!.length);
+  assert.doesNotMatch(pirate, /Move robber here/);
   const robber = board(view, { robberPiece: 'robber' });
   assert.equal(count(robber, /class="terrain-hit robber-target"/g), view.legal.robberHexes!.length);
-  assert.doesNotMatch(robber, /pirate-target/);
+  assert.doesNotMatch(robber, /Move pirate here|aria-label="Sea\. Move/);
   // The pirate chosen: the sea hexes, and a way back to the robber.
   const sailing = flow({ piece: 'pirate' });
   assert.match(sailing, /<h2 aria-live="polite">Move the pirate<\/h2>/);
@@ -339,6 +341,9 @@ test('after a seven, Open Sea offers the robber and the pirate, then only the ch
   const victims = flow({ piece: 'pirate', selectedHex: hex });
   assert.match(victims, /<h2 aria-live="polite">Choose who to steal from<\/h2>/);
   assert.match(victims, /<strong>Red<\/strong>/);
+  // The victim's button shows the pirate, not the robber.
+  const red = victims.match(/<button type="button" class="robber-victim"[^]*?<\/button>/)![0];
+  assert.ok(red.includes(`x="-${PAINTED_BOAT[0]}" y="-${PAINTED_BOAT[1]}"`));
   assert.ok(hexEdges(g.board, hex).includes(redShip));
   assert.match(victims, />Choose another sea hex<\/button>/);
   // Everyone else waits, told it may be either.
@@ -407,6 +412,33 @@ test('a gold pick is made with Year of Plenty’s buttons, only from what the ba
     }),
   );
   assert.match(paused, /<small>Gold picks<\/small>/);
+  // On the rail: the picker's card counts their own 20 seconds, and the card of the player on turn keeps the paused
+  // turn clock, which says what it waits for.
+  g.goldOwed = [{ player: 'green', picks: 1 }];
+  const turn = { ...clock, deadlineAt: 1_050_000, goldDeadlines: { green: 1_012_000 } };
+  const railFor = (me: string) => {
+    const state = room(gameView(g, me), { turnClock: turn });
+    const timer = (goldPicker?: string) =>
+      createElement(TurnTimer, { room: state, me, goldPicker, connected: true, onWarning: noop });
+    return renderToStaticMarkup(
+      createElement(PlayerRail, {
+        room: state,
+        game: state.game!,
+        me,
+        timer: timer(),
+        goldTimer: timer('green'),
+      }),
+    );
+  };
+  const card = (html: string, id: string) =>
+    html.match(new RegExp(`<article data-player-profile="${id}"[^]*?</article>`))![0];
+  for (const viewer of ['red', 'green']) {
+    const rail = railFor(viewer);
+    assert.match(card(rail, 'green'), /<span class="turn-timer[^"]*"[^>]*><svg[^]*?<b>12s<\/b><\/span>/);
+    assert.doesNotMatch(card(rail, 'green'), /Gold picks/);
+    assert.match(card(rail, 'blue'), /<b>60s<\/b><small>Gold picks<\/small>/);
+  }
+  assert.match(card(railFor('green'), 'green'), /title="Your time to pick from the gold field"/);
 });
 
 test('the stand-in icons for the pirate, gold and the island bonus are painted icons, named in one place', () => {
@@ -654,13 +686,12 @@ test('each new component has one stylesheet, loaded after the layered ones, in t
   // With open-sea.css, after table-light.css, the last layered sheet; Big Table's own sheets follow them.
   const sea = sheets.indexOf('open-sea.css');
   assert.ok(sea > sheets.indexOf('table-light.css'));
-  assert.deepEqual(sheets.slice(sea + 1, sea + 5), [
+  assert.deepEqual(sheets.slice(sea + 1, sea + 4), [
     'ship-sites.css',
     'placement-choice.css',
-    'robber-choice.css',
     'gold-pick.css',
   ]);
-  for (const sheet of ['ship-sites.css', 'placement-choice.css', 'robber-choice.css', 'gold-pick.css']) {
+  for (const sheet of ['ship-sites.css', 'placement-choice.css', 'gold-pick.css']) {
     const css = readFileSync(`apps/client/src/${sheet}`, 'utf8');
     assert.doesNotMatch(css, /!important|#[\w-]+[\s{:.[]|:not\(|@keyframes|animation/, sheet);
     // Barlow only, never a new family or weight.

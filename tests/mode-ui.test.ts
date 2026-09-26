@@ -182,7 +182,6 @@ test('the mode stylesheet loads after every layered sheet and adds only the bloc
     'open-sea.css',
     'ship-sites.css',
     'placement-choice.css',
-    'robber-choice.css',
     'gold-pick.css',
     'six-seat-rail.css',
     'six-seat-trade.css',

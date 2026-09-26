@@ -740,7 +740,7 @@ export const Board = memo(function Board({
           return (
             <g
               key={h.id}
-              className={`terrain-hit ${canMoveRobber ? `${piece}-target` : ''}`}
+              className={`terrain-hit ${canMoveRobber ? 'robber-target' : ''}`}
               data-robber-selected={canMoveRobber && h.id === selectedRobberHex}
               aria-pressed={canMoveRobber ? h.id === selectedRobberHex : undefined}
               role={canMoveRobber ? 'button' : undefined}
