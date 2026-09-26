@@ -254,7 +254,7 @@ The destination must be an edge where you could build a new ship at that moment,
 - not an edge of the pirate's hex; and
 - touching one of your settlements or cities, or another of your ships that connects there. The ship cannot use its own former position as its connection.
 
-A move must also not detach another of your ships. Call a ship attached when it touches one of your buildings, or another of your ships that connects to it. Every other ship of yours that was attached before the move must still be attached after it. A ship that was already cut off before the move, for example by an opponent's settlement, never stops a move. Catanova decision: this second check is how Catanova reads the rule that ships attach to your ships or buildings, so a move may not detach another of your ships. It matters only where an opponent's building has split one of your lines.
+A move must also not detach another of your ships. Call a ship attached when it touches one of your buildings, or another of your ships that connects to it. Every other ship of yours that was attached before the move must still be attached after it. A ship that was already cut off before the move, for example by an opponent's settlement, never stops a move. Catanova decision: this second check is how Catanova reads the rule that ships attach to your ships or buildings, so a move may not detach another of your ships. It matters only where an opponent's building has split one of your lines. Catanova decision, 26 September 2026: ships cut off together by another player's building still count as attached to each other, so moving one of them may not leave its partner detached.
 
 ### 8.6 Longest Route after a move
 
