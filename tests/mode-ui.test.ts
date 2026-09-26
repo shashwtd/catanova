@@ -182,6 +182,7 @@ test('the mode stylesheet loads after every layered sheet and adds only the bloc
     'open-sea.css',
     'ship-sites.css',
     'placement-choice.css',
+    'robber-choice.css',
   ]);
   const css = readFileSync(new URL('../apps/client/src/game-mode.css', import.meta.url), 'utf8');
   assert.ok(!css.includes('!important'));

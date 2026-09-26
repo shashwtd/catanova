@@ -78,7 +78,13 @@ export function gameStatus(game: GameView, me?: string, room?: RoomState): GameS
         break;
       }
       case 'robber':
-        prompt = mine ? 'Move the robber to a highlighted tile' : `${name} is moving the robber`;
+        prompt = sea
+          ? mine
+            ? 'Move the robber or the pirate'
+            : `${name} is moving the robber or the pirate`
+          : mine
+            ? 'Move the robber to a highlighted tile'
+            : `${name} is moving the robber`;
         icon = 'robber';
         favicon = mine ? 'robber' : null;
         break;

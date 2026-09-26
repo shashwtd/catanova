@@ -27,6 +27,7 @@ import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
 import { SendFeedback, useLastMessage } from './SendFeedback.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
+import type { RobberPiece } from './RobberChoice.js';
 import { useGameAttention } from './useGameAttention.js';
 import { FantasyTransition } from './FantasyTransition.js';
 import type { RoomSettings } from '../../../packages/protocol/src/settings.js';
@@ -143,6 +144,7 @@ import './game-mode.css';
 import './open-sea.css';
 import './ship-sites.css';
 import './placement-choice.css';
+import './robber-choice.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];
@@ -316,6 +318,8 @@ function App() {
   // Feedback can attach the last error a player saw, even after it was dismissed.
   const lastError = useLastMessage(error || auth.error);
   const [robberHex, setRobberHex] = useState<number | null>(null);
+  /** Open Sea: after a seven or a Knight, whether the robber or the pirate is moving. */
+  const [robberPiece, setRobberPiece] = useState<RobberPiece | null>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
   /** Open Sea: a ship move under way, from the dock's Move ship or a tap on one of the player's ships. */
   const [shipMove, setShipMove] = useState<ShipMove | null>(null);
@@ -796,6 +800,7 @@ function App() {
   useEffect(() => {
     setMode(null);
     setRobberHex(null);
+    setRobberPiece(null);
     setShipMove(null);
   }, [g?.phase, g?.turn]);
   // A ship chosen to move that no longer may, as when the pirate has come alongside, is let go.
@@ -816,6 +821,7 @@ function App() {
       await c.action(action);
       setMode(null);
       setRobberHex(null);
+      setRobberPiece(null);
       setShipMove(null);
       return true;
     } catch (e) {
@@ -954,7 +960,8 @@ function App() {
     };
   }
   function chooseRobber(hex: number) {
-    if (!g || !me || disabled || !myTurn || g.phase !== 'robber' || hex === g.robber) return;
+    if (!g || !me || disabled || !myTurn || g.phase !== 'robber') return;
+    if (hex === (robberPiece === 'pirate' ? g.pirate : g.robber)) return;
     setRobberHex(hex);
     setPanel(null);
   }
@@ -1081,6 +1088,7 @@ function App() {
               pendingBuild={placementReady ? placement?.action : submittedBuild}
               onAction={onBoardAction}
               onRobber={onBoardRobber}
+              robberPiece={robberPiece}
               shipMove={shipMove}
               onShip={onBoardShip}
               reducedMotion={reducedMotion}
@@ -1498,6 +1506,11 @@ function App() {
               connected={connected}
               offset={clockOffset}
               onWarning={() => feedback.sound.play('warning')}
+              piece={robberPiece}
+              onPiece={(piece) => {
+                setRobberPiece(piece);
+                setRobberHex(null);
+              }}
             />
           )}
         </>

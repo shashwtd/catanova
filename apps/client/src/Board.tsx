@@ -590,6 +590,7 @@ export const Board = memo(function Board({
   art,
   ships,
   pirate,
+  robberPiece = null,
   shipMove = null,
   onShip,
   reducedMotion = false,
@@ -613,6 +614,8 @@ export const Board = memo(function Board({
   ships?: Record<number, string>;
   /** The pirate's sea hex. Without it the board reads `pirate` off the game, or before a game its board's start. */
   pirate?: number;
+  /** Open Sea: which of the two the player chose to move after a seven or a Knight, whose hexes are then targets. */
+  robberPiece?: 'robber' | 'pirate' | null;
   /** Open Sea: a ship move under way, which hides the build sites and marks the ships that may move. */
   shipMove?: ShipMove | null;
   /** Open Sea: the player chose one of their ships to move. */
@@ -648,6 +651,15 @@ export const Board = memo(function Board({
     setupRoad = game?.phase === 'setupRoad',
     actions = game?.phase === 'actions';
   const robberMode = interactive && game?.phase === 'robber';
+  // Open Sea: after a seven or a Knight, the hexes of whichever the player chose to move, the robber's land or the
+  // pirate's sea, never both at once (docs/RULEBOOK-OPEN-SEA.md, section 10). Nothing until they choose.
+  const pieceTargets =
+    game?.legal.robberHexes &&
+    (robberPiece === 'robber'
+      ? game.legal.robberHexes
+      : robberPiece === 'pirate'
+        ? game.legal.pirateHexes
+        : []);
   // While a ship is being moved, nothing is built.
   const building = interactive && !shipMove;
   // The server's legal lists already include affordability, supply, and connection rules.
@@ -716,17 +728,20 @@ export const Board = memo(function Board({
           const x = h.x * SIZE,
             y = h.y * SIZE;
           // The robber never goes to sea. Sea hexes keep their targets for the pirate's moves.
-          const canMoveRobber = robberMode && h.id !== game?.robber && !disabled && isLand(h);
+          const canMoveRobber = pieceTargets
+            ? robberMode && !disabled && pieceTargets.includes(h.id)
+            : robberMode && h.id !== game?.robber && !disabled && isLand(h);
+          const piece = robberPiece === 'pirate' ? 'pirate' : 'robber';
           const name = TERRAIN_NAME[h.terrain];
           return (
             <g
               key={h.id}
-              className={`terrain-hit ${canMoveRobber ? 'robber-target' : ''}`}
+              className={`terrain-hit ${canMoveRobber ? `${piece}-target` : ''}`}
               data-robber-selected={canMoveRobber && h.id === selectedRobberHex}
               aria-pressed={canMoveRobber ? h.id === selectedRobberHex : undefined}
               role={canMoveRobber ? 'button' : undefined}
               tabIndex={canMoveRobber ? 0 : undefined}
-              aria-label={`${name}${h.number ? `, ${h.number}${game?.diceMode === 'flat' ? ', one chance in eleven' : `, ${pips(h.number)} production pips`}` : ''}${canMoveRobber ? '. Move robber here' : ''}`}
+              aria-label={`${name}${h.number ? `, ${h.number}${game?.diceMode === 'flat' ? ', one chance in eleven' : `, ${pips(h.number)} production pips`}` : ''}${canMoveRobber ? `. Move ${piece} here` : ''}`}
               onClick={() => canMoveRobber && onRobber(h.id)}
               onKeyDown={(e) =>
                 keyActivate(e, () => {

@@ -5,6 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -12,13 +13,15 @@ import { applyAction, createGame, gameView } from '../packages/rules/src/game.js
 import type { Game, GameAction, GameView } from '../packages/rules/src/game.js';
 import { OPEN_SEA } from '../packages/rules/src/rulesets.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
-import { SHIP_MOVE_BLOCKS, edgeKind, isCoastalIntersection } from '../packages/rules/src/sea.js';
+import { SHIP_MOVE_BLOCKS, edgeKind, hexEdges, isCoastalIntersection } from '../packages/rules/src/sea.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 import { Board } from '../apps/client/src/Board.js';
 import { PlacementConfirmation, placementSelector } from '../apps/client/src/PlacementConfirmation.js';
 import { buildShown, edgePieces, isBuildAction, placementValid } from '../apps/client/src/placement.js';
 import type { BuildAction } from '../apps/client/src/placement.js';
 import { MoveShipButton, shipMoveUnavailable } from '../apps/client/src/ShipMove.js';
+import { RobberFlow } from '../apps/client/src/RobberFlow.js';
+import { SEA_ICONS } from '../apps/client/src/GameIcons.js';
 import { SEATS, giveCards } from './open-sea-game.js';
 
 const noop = () => {};
@@ -257,4 +260,73 @@ test('a ship that may move takes the orbit and a chosen one shows where it may g
     button({ ...busy, ships: {} }),
     /title="Move ship · You have no ships on the board" disabled=""/,
   );
+});
+
+test('after a seven, Open Sea offers the robber and the pirate, then only the chosen one’s hexes, then its victims', () => {
+  const g = blueToAct();
+  // Red's ship lies on a sea hex away from the pirate: the pirate's victim there.
+  const redShip = Number(Object.entries(g.ships!).find(([, owner]) => owner === 'red')![0]);
+  const hex = g.board.edges[redShip]!.hexes.find(
+    (h) => h !== g.pirate && g.board.hexes[h]!.terrain === 'sea',
+  )!;
+  g.phase = 'robber';
+  const view = gameView(g, 'blue');
+  assert.ok(view.legal.robberHexes!.length && view.legal.pirateHexes!.includes(hex));
+  const flow = (props: Partial<ComponentProps<typeof RobberFlow>> = {}, state = view) =>
+    renderToStaticMarkup(
+      createElement(RobberFlow, {
+        room: room(state),
+        me: 'blue',
+        selectedHex: null,
+        onSelectHex: noop,
+        onAction: noop,
+        disabled: false,
+        connected: true,
+        onWarning: noop,
+        ...props,
+      }),
+    );
+  const choice = flow();
+  assert.match(choice, /<h2 aria-live="polite">Move the robber or the pirate<\/h2>/);
+  const buttons = choice.match(/<button type="button" class="robber-victim"[^]*?<\/button>/g)!;
+  assert.equal(buttons.length, 2);
+  assert.match(
+    buttons[0]!,
+    /<strong>Robber<\/strong><small>Block a land tile, and rob a building beside it<\/small>/,
+  );
+  assert.match(
+    buttons[1]!,
+    /<strong>Pirate<\/strong><small>Block a sea hex, and rob a ship beside it<\/small>/,
+  );
+  // Only what is legal is offered.
+  const noSea = flow({}, { ...view, legal: { ...view.legal, pirateHexes: [] } });
+  assert.equal(count(noSea, /class="robber-victim"/g), 1);
+  assert.doesNotMatch(noSea, /Pirate/);
+  // Before the choice no hex is a target; after it, only that piece's hexes, land or sea, never both.
+  assert.doesNotMatch(board(view), /robber-target|pirate-target/);
+  const pirate = board(view, { robberPiece: 'pirate' });
+  assert.equal(count(pirate, /class="terrain-hit pirate-target"/g), view.legal.pirateHexes!.length);
+  assert.doesNotMatch(pirate, /robber-target/);
+  assert.match(pirate, /aria-label="Sea. Move pirate here"/);
+  const robber = board(view, { robberPiece: 'robber' });
+  assert.equal(count(robber, /class="terrain-hit robber-target"/g), view.legal.robberHexes!.length);
+  assert.doesNotMatch(robber, /pirate-target/);
+  // The pirate chosen: the sea hexes, and a way back to the robber.
+  const sailing = flow({ piece: 'pirate' });
+  assert.match(sailing, /<h2 aria-live="polite">Move the pirate<\/h2>/);
+  assert.match(sailing, /Choose a sea hex, then a player with a ship beside it to steal from\./);
+  assert.match(sailing, />Move the robber instead<\/button>/);
+  // A sea hex chosen: whoever has a ship on its edges, never a building's owner, and one action with the victim.
+  const victims = flow({ piece: 'pirate', selectedHex: hex });
+  assert.match(victims, /<h2 aria-live="polite">Choose who to steal from<\/h2>/);
+  assert.match(victims, /<strong>Red<\/strong>/);
+  assert.ok(hexEdges(g.board, hex).includes(redShip));
+  assert.match(victims, />Choose another sea hex<\/button>/);
+  // Everyone else waits, told it may be either.
+  assert.match(flow({ me: 'red' }, gameView(g, 'red')), /Blue is moving the robber or the pirate/);
+});
+
+test('the stand-in icons for the pirate, gold and the island bonus are painted icons, named in one place', () => {
+  const painted = readFileSync('apps/client/src/painted-icons.ts', 'utf8');
+  for (const name of Object.values(SEA_ICONS)) assert.match(painted, new RegExp(`^  '?${name}'?: \\[`, 'm'));
 });

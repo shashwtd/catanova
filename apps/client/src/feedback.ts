@@ -344,7 +344,7 @@ export function deriveFeedback(
     }
   if (event.flights.some((f) => !f.spending && f.resource !== 'any')) event.sounds.push('gain');
   if (event.flights.some((f) => f.spending)) event.sounds.push('spend');
-  if (before.robber !== g.robber) event.sounds.push('robber');
+  if (before.robber !== g.robber || before.pirate !== g.pirate) event.sounds.push('robber');
   const resignation = g.players.some(
     (p) => p.resigned && !before.players.find((q) => q.id === p.id)?.resigned,
   );

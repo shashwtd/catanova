@@ -50,6 +50,15 @@ const CONTROL_PATHS = {
   'move-ship': 'M3 15.5h12.5l-2 4H5z M9.5 15.5V4 M9.5 5l5 8h-5 M17 9.5h4.5 m-2-2 2 2-2 2',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
+/**
+ * Open Sea's own symbols, until their painted icons are made (docs/GAME-MODES.md, "New icons"): existing painted
+ * icons stand in for them, named here once so that each swap is one line.
+ */
+export const SEA_ICONS = {
+  pirate: 'boat',
+  gold: 'spark',
+  islandBonus: 'trophy',
+} as const satisfies Record<string, GameIconName>;
 export const GAME_ICON_NAMES = [
   ...new Set([...Object.keys(PAINTED_ICONS), ...Object.keys(CONTROL_PATHS)]),
 ] as GameIconName[];
