@@ -356,6 +356,38 @@ offered: a five- or six-player game with no second actor would be a house rule.
 Then paired turns, which is when Big Table opens. Then the classic option, which
 reuses the second-actor work.
 
+**Status on 26 September 2026.** Built on `feature/big-table/2026-09-26`, with
+the board presets and the six-seat layouts merged in, and not yet released. The
+three steps above landed together, so Big Table ships whole: the board, seats
+and supply with both turn structures. What the list above asked for:
+
+- `Phase` gained `partner` and `buildWindow`. `active` is always the player
+  acting, the Partner in their phase and the player in a build window, so every
+  check that reads it works for them; `pair` (the Lead's and Partner's seats)
+  and `windows` (whose turn the windows follow) say who holds the turn.
+- The card allowance is one per part: it resets when the Partner's phase
+  begins, and a card bought in one part is never playable in it. `returnPhase`
+  can be `partner`, so a Partner's Knight or Road Building returns to their
+  phase.
+- The Partner trades with the bank and at harbours; player offers stay with the
+  Lead's part.
+- The win check reads both marker holders, the Lead first, after every action,
+  a resignation included, and as each paired turn begins. Nobody wins in a
+  build window.
+- The clock follows whoever acts: the Partner's phase has half the room's
+  time, rounded up and at least 30 seconds, or 45 seconds for an absent
+  Partner in a room without a timer, and each build window 20 seconds in every
+  room. `timeoutAction` ends a phase or window with nothing bought, and a
+  Partner's phase lets its free roads lapse. The clock loop's comment now
+  counts six discards.
+- `owedMoves` has the kinds `partner` and `buildWindow`, so the absence rule
+  covers both with no change to the store.
+- The client reads "my move" from `active` and `owedBy` as before; the rail
+  marks both marker holders, and the dock's end button reads "End phase" or
+  "Done".
+- Game analytics times the Partner's phase for the Partner (`partnerTime`)
+  and leaves build windows out of turn times.
+
 ## Phase 2 — Open Sea core
 
 The big one. Four new systems, and a renderer that has to learn to draw an

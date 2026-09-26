@@ -6,7 +6,7 @@ Big Table, for five and six players, is Catanova's mode for larger groups. It ai
 
 This book is a companion to the [Classic rulebook](RULEBOOK.md) (ruleset `base-3-4-v1`). Everything in the Classic rulebook applies unless this book changes it, and this book says exactly what changes. Where the official texts leave a gap, or where Catanova departs from them, the rule is marked as a Catanova decision. Section 11 lists the points that the official texts and the first decisions left open, and says where each is now settled.
 
-This is the rules target for the mode. The engine does not implement it yet.
+This is the rules target for the mode. Since 26 September 2026 the engine implements it as ruleset `big-table-v1`, which is not yet open to players; the tests that check each rule name the section they check.
 
 ## 1. Scope
 
@@ -245,6 +245,8 @@ The paired turn is defined only for five and six players. Catanova decision: whe
 
 Once turns are single, only the player on turn acts, so a player wins only during their own turn, as in Classic section 1. While five or six players remain, the Partner is recounted over the players still in the game, so a resigned player is never Lead or Partner.
 
+Catanova decision, made on 26 September 2026 while building the mode: when the count drops below five during the Lead's part, no Partner's phase begins, but the paired turn keeps its markers until the Lead's part ends. The Partner, if still in the game, stays on turn until then and can still win in it (section 6.7, rule 1). Single turns begin with the next turn.
+
 ## 7. Between-turns build
 
 This is the older official rule, offered as a labelled option. Since 2021 the official rules have used paired turns instead, first printed in the base game's 5–6 rulebooks in their 2022 revisions. The 2025 edition has no build phase.
@@ -327,7 +329,7 @@ Only the acting player's clock is shown prominently: the Lead's during the Lead'
 ### 9.3 When a clock runs out
 
 - A turn, or the Lead's part: the Classic defaults apply. The server rolls if the player has not rolled, moves a pending robber to a random different hex and picks a legal victim, places any free roads still owed from a Road Building card already played on random legal sites, then ends the turn or part and withdraws any open trade offer. Under Paired turns, the Partner's phase then begins.
-- The Partner's phase: the phase simply ends and the next paired turn begins (Catanova decision). Nothing is bought, built or traded, and no card is played. Catanova decision on card effects left unfinished: free roads still owed from a Road Building card played in the phase stay unplaced, unlike at the end of a Classic turn. If the Partner has already played a Knight and not yet moved the robber, the server completes that move as in Classic, because a played Knight must move the robber.
+- The Partner's phase: the phase simply ends and the next paired turn begins (Catanova decision). Nothing is bought, built or traded, and no card is played. Catanova decision on card effects left unfinished: free roads still owed from a Road Building card played in the phase stay unplaced, unlike at the end of a Classic turn. If the Partner has already played a Knight and not yet moved the robber, the server completes that move as in Classic, because a played Knight must move the robber. Only the clock leaves free roads unplaced: a Partner who is still at the table places them before ending the phase, as a Classic player must.
 - A build window: the window ends, and the next window or turn begins. Nothing is built or bought.
 - A discard: as in Classic, the server discards the required number of cards at random from the player's hand.
 
@@ -375,7 +377,7 @@ The first decisions and the turn clock document do not say what happens when a p
 4. Another player resigns during a Partner's phase and fewer than five remain. The phase under way finishes. Single turns begin with the next turn.
 5. A robber move owed by a resigned player is made by the next player to act, reading "the next remaining player" in the turn clock document's Classic rule that way. When the Lead resigns and a Partner's phase follows, that is the Partner, at the start of their phase. In every other case it is the next Lead, or the next player on turn, before they roll.
 6. As in Classic, discards owed by a resigned player disappear with their hand, and free roads still owed from their Road Building card are abandoned.
-7. Under Between-turns build, windows continue at any player count: after each turn, every other remaining player still gets one. A turn ended by a resignation is followed by windows as usual. A player who resigns during their window loses it, and the next window begins.
+7. Under Between-turns build, windows continue at any player count: after each turn, every other remaining player still gets one. A turn ended by a resignation is followed by windows as usual. A player who resigns during their window loses it, and the next window begins. Catanova decision, made on 26 September 2026 while building the mode: a robber move left owing by the player whose turn ended is made after the windows, by the next player on turn before they roll (rule 5), since the robber never moves in a window (section 7.3).
 
 ## 10. What is not included
 
