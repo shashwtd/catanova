@@ -291,7 +291,8 @@ export function Terrain({
       const { world } = uniforms;
       gl.uniform4f(gl.getUniformLocation(program, 'uWorld'), world.x, world.y, world.width, world.height);
       if (sea) {
-        gl.uniform1i(gl.getUniformLocation(program, 'uGold'), 2);
+        // Without a gold field the gold sampler is never read; it points at the atlas so no unit is left empty.
+        gl.uniform1i(gl.getUniformLocation(program, 'uGold'), gold ? 2 : 0);
         gl.uniform4fv(gl.getUniformLocation(program, 'uSea[0]'), uniforms.sea);
         gl.uniform1i(gl.getUniformLocation(program, 'uSeaCount'), uniforms.seaCount);
       }
