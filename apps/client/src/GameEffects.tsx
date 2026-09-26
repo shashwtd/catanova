@@ -360,7 +360,11 @@ export function AwardToast({
           <h2>{award.name}</h2>
           <p>
             <b>{award.count}</b>{' '}
-            {award.kind === 'longestRoad' ? 'roads in one continuous route' : 'Knights played'}
+            {award.kind === 'largestArmy'
+              ? 'Knights played'
+              : award.name === 'Longest Route'
+                ? 'roads and ships in one continuous route'
+                : 'roads in one continuous route'}
           </p>
           <small>
             {award.kind === 'longestRoad' ? 'Longest route' : 'Most Knights played'} · minimum {award.minimum}

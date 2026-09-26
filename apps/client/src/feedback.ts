@@ -1,6 +1,6 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
-import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
+import { CLASSIC, findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { CARD_NAMES, emptyHand, total } from '../../../packages/rules/src/game.js';
 import { producedResource } from '../../../packages/rules/src/sea.js';
@@ -368,7 +368,7 @@ export function deriveFeedback(
     .filter(
       (s) =>
         !g.players.some((player) =>
-          ['Longest Road', 'Largest Army'].some(
+          ['Longest Road', 'Longest Route', 'Largest Army'].some(
             (award) => s === `${player.name} claimed ${award} (+2 points).`,
           ),
         ),
@@ -387,7 +387,8 @@ export type AwardCelebration = {
   /** The snapshot that earned it; the celebration waits until the board shows that move. */
   revision: number;
   kind: 'longestRoad' | 'largestArmy';
-  name: 'Longest Road' | 'Largest Army';
+  /** Open Sea calls the route award Longest Route. */
+  name: 'Longest Road' | 'Longest Route' | 'Largest Army';
   playerId: string;
   playerName: string;
   previousPlayerName?: string;
@@ -410,7 +411,7 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
         id: `${next.roomId}:${next.revision}:${kind}`,
         revision: next.revision,
         kind,
-        name: kind === 'longestRoad' ? 'Longest Road' : 'Largest Army',
+        name: kind === 'longestRoad' ? routeAwardName(findRuleset(game.ruleset)) : 'Largest Army',
         playerId: owner,
         playerName: player.name,
         previousPlayerName: before.players.find((p) => p.id === before[kind])?.name,

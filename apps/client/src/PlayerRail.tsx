@@ -5,7 +5,7 @@ import type { GameView, PlayerView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { ABSENCE_AFTER_MS } from '../../../packages/protocol/src/settings.js';
-import { findRuleset } from '../../../packages/rules/src/rulesets.js';
+import { findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 import { Avatar } from './Profile.js';
 import { seatColorMap } from './player-colors.js';
 import { playerTurnActivity } from './turn-activity.js';
@@ -33,8 +33,21 @@ function InventoryCount({ kind, count }: { kind: 'resource' | 'development'; cou
  * on a small plate at the foot of the portrait so the name and the counters
  * beside it keep their room. The holder's number is gilded like the medal.
  */
-function AwardCounts({ player, road, army }: { player: PlayerView; road: boolean; army: boolean }) {
-  const roads = `Longest road: ${player.roadLength}${road ? ', holds Longest Road' : ''}`;
+function AwardCounts({
+  player,
+  road,
+  army,
+  sea,
+}: {
+  player: PlayerView;
+  road: boolean;
+  army: boolean;
+  sea: boolean;
+}) {
+  // Open Sea counts ships too, and calls the award Longest Route (docs/RULEBOOK-OPEN-SEA.md, 11.1).
+  const roads = sea
+    ? `Longest route: ${player.roadLength}${road ? ', holds Longest Route' : ''}`
+    : `Longest road: ${player.roadLength}${road ? ', holds Longest Road' : ''}`;
   const knights = `Knights played: ${player.knights}${army ? ', holds Largest Army' : ''}`;
   return (
     <span className="profile-award-counts">
@@ -111,13 +124,20 @@ function FriendButton({
 
 export function AwardStandings({ game, kind }: { game: GameView; kind: 'longestRoad' | 'largestArmy' }) {
   const field = kind === 'longestRoad' ? 'roadLength' : 'knights';
+  const sea = !!findRuleset(game.ruleset)?.sea;
   const players = game.players
     .map((player, seat) => ({ player, seat }))
     .sort((a, b) => b.player[field] - a.player[field] || a.seat - b.seat);
   return (
     <span className="award-standings">
-      <strong>{kind === 'longestRoad' ? 'Longest Road' : 'Largest Army'}</strong>
-      <small>{kind === 'longestRoad' ? 'Connected roads · minimum 5' : 'Knights played · minimum 3'}</small>
+      <strong>{kind === 'longestRoad' ? routeAwardName(findRuleset(game.ruleset)) : 'Largest Army'}</strong>
+      <small>
+        {kind === 'largestArmy'
+          ? 'Knights played · minimum 3'
+          : sea
+            ? 'Connected roads and ships · minimum 5'
+            : 'Connected roads · minimum 5'}
+      </small>
       <span role="list" aria-label="Award standings">
         {players.map(({ player }) => (
           <span
@@ -215,7 +235,8 @@ export function PlayerRail({
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
           activity = playerTurnActivity(game, p.id),
           road = game.longestRoad === p.id,
-          army = game.largestArmy === p.id;
+          army = game.largestArmy === p.id,
+          sea = !!findRuleset(game.ruleset)?.sea;
         return (
           <article
             key={p.id}
@@ -263,7 +284,7 @@ export function PlayerRail({
                   ? { forcedMovesAt: seat.disconnectedAt + ABSENCE_AFTER_MS }
                   : {})}
               />
-              <AwardCounts player={p} road={road} army={army} />
+              <AwardCounts player={p} road={road} army={army} sea={sea} />
               {friendship && seat?.accountId && seat.accountId !== friendship.self && (
                 <FriendButton name={p.name} accountId={seat.accountId} friendship={friendship} />
               )}
@@ -300,7 +321,11 @@ export function PlayerRail({
                   <CardTooltip disabledMotion content={<AwardStandings game={game} kind="longestRoad" />}>
                     <span
                       className="profile-medal road-award"
-                      aria-label={`Longest Road, plus 2 victory points, ${p.roadLength} connected roads`}
+                      aria-label={
+                        sea
+                          ? `Longest Route, plus 2 victory points, ${p.roadLength} connected roads and ships`
+                          : `Longest Road, plus 2 victory points, ${p.roadLength} connected roads`
+                      }
                     >
                       <GameIcon name="road-award" size={30} />
                     </span>

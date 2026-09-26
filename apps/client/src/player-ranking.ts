@@ -1,5 +1,6 @@
 import type { ResultGame, ResultPlayer } from '../../../packages/protocol/src/results.js';
 import type { ScoreTermId } from '../../../packages/rules/src/game.js';
+import { findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 
 /** Rank the scores in this viewer's server projection: their own VP cards are
  * already counted once, while opponents' hidden points are still excluded. */
@@ -67,7 +68,10 @@ export function pointBreakdown(game: ResultGame, player: ResultPlayer): PointPar
     return player.terms.map(({ id, points, count }) => ({
       key: id,
       label:
-        (TERM_LABELS as Partial<Record<string, (count: number) => string>>)[id]?.(count) ?? 'Other points',
+        id === 'longestRoad'
+          ? routeAwardName(findRuleset(game.ruleset))
+          : ((TERM_LABELS as Partial<Record<string, (count: number) => string>>)[id]?.(count) ??
+            'Other points'),
       points,
       ...(COUNTED.has(id) ? { count } : {}),
     }));

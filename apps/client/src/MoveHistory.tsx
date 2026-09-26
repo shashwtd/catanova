@@ -55,7 +55,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
   }
   const resourceNames = Object.values(RESOURCE_NAMES);
   const pattern = new RegExp(
-    `\\b(\\d+) (${resourceNames.map(escaped).join('|')})\\b|\\b(Longest Road|Largest Army|settlement|city|road|development card)\\b`,
+    `\\b(\\d+) (${resourceNames.map(escaped).join('|')})\\b|\\b(Longest Road|Longest Route|Largest Army|settlement|city|road|development card)\\b`,
     'g',
   );
   const parts: ReactNode[] = [];
@@ -86,7 +86,7 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
               ? House
               : word === 'city'
                 ? Castle
-                : word === 'road' || word === 'Longest Road'
+                : word === 'road' || word === 'Longest Road' || word === 'Longest Route'
                   ? Route
                   : word === 'Largest Army'
                     ? Shield
@@ -94,7 +94,9 @@ export function historyTokens(line: string, names: readonly string[]): ReactNode
         parts.push(
           <span key={offset + at} className="journal-item" role="img" aria-label={word}>
             <Icon />
-            <span>{word === 'Longest Road' || word === 'Largest Army' ? word : null}</span>
+            <span>
+              {word === 'Longest Road' || word === 'Longest Route' || word === 'Largest Army' ? word : null}
+            </span>
           </span>,
         );
       }
