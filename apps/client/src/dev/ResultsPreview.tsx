@@ -40,6 +40,12 @@ const results: MatchResults = {
         id: players[0]!.id,
         name: 'Captain',
         points: 10,
+        // Named by the server, as every result is now; results saved before terms leave them out.
+        terms: [
+          { id: 'settlements', points: 2, count: 2 },
+          { id: 'cities', points: 6, count: 3 },
+          { id: 'longestRoad', points: 2, count: 1 },
+        ],
         pieces: { roads: 12, settlements: 2, cities: 3 },
         roadLength: 9,
         knights: 1,
@@ -48,6 +54,12 @@ const results: MatchResults = {
         id: players[1]!.id,
         name: 'Fern',
         points: 8,
+        terms: [
+          { id: 'settlements', points: 3, count: 3 },
+          { id: 'cities', points: 2, count: 1 },
+          { id: 'largestArmy', points: 2, count: 1 },
+          { id: 'cards', points: 1, count: 1 },
+        ],
         pieces: { roads: 7, settlements: 3, cities: 1 },
         roadLength: 5,
         knights: 3,

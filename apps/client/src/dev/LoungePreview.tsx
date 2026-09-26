@@ -28,7 +28,7 @@ import { Lobby } from '../Lobby.js';
 import { FriendsDrawer } from '../FriendsDrawer.js';
 import { RoomInviteNotice } from '../RoomInvitePanel.js';
 import type { RoomInvitesController } from '../useRoomInvites.js';
-import { GameSettings } from '../GameSettings.js';
+import { GameSettings, RoomConfiguration } from '../GameSettings.js';
 import { usePreferences } from '../preferences.js';
 import { Board, type BuildMode } from '../Board.js';
 import { BoardViewport } from '../BoardViewport.js';
@@ -47,9 +47,32 @@ import {
 import { defaultProfile, emptyFriends } from '../../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../../packages/protocol/src/profile.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
+import type { RoomSettings } from '../../../../packages/protocol/src/settings.js';
+import { CLASSIC, registerRuleset } from '../../../../packages/rules/src/rulesets.js';
+import type { Ruleset } from '../../../../packages/rules/src/rulesets.js';
 import type { PlayerGameState } from '../MatchHistory.js';
 import './preview.css';
 const noop = () => {};
+/**
+ * A mode for looking at the mode screens here, and nowhere else: Classic's island with other seats, target and
+ * supply, and no bots, like the tests' own test mode. It is registered only when the preview asks for it, and
+ * this module is left out of the production bundle (see README.md).
+ */
+const PREVIEW_MODE: Ruleset = {
+  ...CLASSIC,
+  id: 'preview-table-v1',
+  name: 'Test Table',
+  summary: 'A mode for tests, for three to five players.',
+  earlierBoards: [],
+  seats: { min: 3, max: 5 },
+  victoryPoints: { default: 11, min: 9, max: 13 },
+  supply: { ...CLASSIC.supply, bank: 24 },
+  bots: false,
+  standIns: false,
+};
+let previewModeRegistered = false;
+/** What the preview pretends the server said: Classic only, a host offered the test mode, or a room in it. */
+type ModesPreview = 'classic' | 'offer' | 'test';
 const names = ['FernCaptain', 'Mossling', 'CopperFox', 'Juniper'];
 const seats = names.map((name, i) => ({
   id: `sample-${i}`,
@@ -140,17 +163,24 @@ function PreviewModal({
   title,
   children,
   onClose,
+  compact = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     ref.current?.showModal();
   }, []);
   return (
-    <dialog ref={ref} className="game-dialog" aria-label={title} onCancel={onClose}>
+    <dialog
+      ref={ref}
+      className={compact ? 'game-dialog compact' : 'game-dialog'}
+      aria-label={title}
+      onCancel={onClose}
+    >
       <div className="dialog-surface">
         <div className="panel-heading">
           <h2>{title}</h2>
@@ -165,9 +195,9 @@ function PreviewModal({
 }
 export function LoungePreview() {
   const [screen, setScreen] = useState<'hub' | 'lobby' | 'game'>('hub');
-  const [panel, setPanel] = useState<'profile' | 'editProfile' | 'friends' | 'trade' | GameToolPanel | null>(
-    null,
-  );
+  const [panel, setPanel] = useState<
+    'profile' | 'editProfile' | 'friends' | 'trade' | 'configure' | GameToolPanel | null
+  >(null);
   const [showAwards, setShowAwards] = useState(false);
   /** Local friendships for the rail's friend button: one sample player has asked already. */
   const [friendships, setFriendships] = useState<Record<string, FriendStatus>>({
@@ -192,6 +222,22 @@ export function LoungePreview() {
   const [profile, setProfile] = useState<Profile>(seats[0]!.profile);
   const [removedPlayers, setRemovedPlayers] = useState<string[]>([]);
   const [settings, setSettings] = useState(room.settings);
+  const [modesPreview, setModesPreview] = useState<ModesPreview>('classic');
+  const [botSeated, setBotSeated] = useState(false);
+  const [playerAway, setPlayerAway] = useState(false);
+  /** The server's rules for a settings change: a new mode resets the target, and Classic is never written. */
+  function applySettings(next: RoomSettings) {
+    setSettings((current) => {
+      const before = current?.mode ?? CLASSIC.id,
+        after = next.mode ?? before;
+      const { victoryPoints, mode: _mode, ...rest } = next;
+      return {
+        ...(after === before && victoryPoints !== undefined ? { victoryPoints } : {}),
+        ...rest,
+        ...(after === CLASSIC.id ? {} : { mode: after }),
+      };
+    });
+  }
   const { preferences, update, reducedMotion } = usePreferences();
   const feedback = useFeedback(preferences, reducedMotion);
   useEffect(() => {
@@ -270,6 +316,8 @@ export function LoungePreview() {
     ...game,
     diceMode: settings?.diceMode ?? 'classic',
     victoryPoints: simulation?.victoryPoints ?? settings?.victoryPoints ?? 10,
+    // A room set to the test mode plays it, so the rail shows how that mode covers an absent seat.
+    ...(modesPreview === 'test' ? { ruleset: PREVIEW_MODE.id } : {}),
   };
   const displayedGame =
     showAwards && !simulation
@@ -285,12 +333,22 @@ export function LoungePreview() {
           })),
         }
       : previewGame;
+  const now = Date.now();
   const currentRoom = {
     ...room,
     settings,
+    ...(modesPreview === 'classic' ? {} : { modes: [CLASSIC.id, PREVIEW_MODE.id] }),
     players: [
       { ...seats[0]!, name: profile.name, profile },
-      ...seats.slice(1).filter((p) => !removedPlayers.includes(p.id)),
+      ...seats
+        .slice(1)
+        .filter((p) => !removedPlayers.includes(p.id))
+        .map((p) => (botSeated && p.id === seats[3]!.id ? { ...p, bot: true, botLevel: 'steady' } : p))
+        .map((p) =>
+          playerAway && p.id === seats[2]!.id
+            ? { ...p, connected: false, disconnectedAt: now - 28_000, resignAt: now + 152_000 }
+            : p,
+        ),
     ],
   };
   function snapshot(state: Game, rev: number): RoomState {
@@ -401,6 +459,7 @@ export function LoungePreview() {
           busy={false}
           connected
           onReady={noop}
+          onAddBot={noop}
           onKick={async (id) => setRemovedPlayers((current) => [...current, id])}
           onStart={() => setScreen('game')}
           onInvite={() => setPanel('friends')}
@@ -635,14 +694,28 @@ export function LoungePreview() {
             room={screen === 'lobby' ? currentRoom : null}
             me={me}
             busy={false}
-            save={async (next) => setSettings(next)}
+            save={async (next) => applySettings(next)}
             previewSound={() => feedback.sound.play('settlement')}
           />
         </PreviewDialog>
       )}
+      {panel === 'configure' && (
+        // Room setup as the lobby's footer opens it in the real app: the room's rules alone, in a compact dialog.
+        <PreviewModal compact title="Room setup" onClose={() => setPanel(null)}>
+          <RoomConfiguration
+            room={currentRoom}
+            me={me}
+            busy={false}
+            save={async (next) => applySettings(next)}
+          />
+        </PreviewModal>
+      )}
       {panel === 'rules' && (
         <PreviewDialog side={screen === 'game'} title="How to play" onClose={() => setPanel(null)}>
-          <QuickRules victoryPoints={settings?.victoryPoints} />
+          <QuickRules
+            {...(settings?.mode === PREVIEW_MODE.id ? { ruleset: PREVIEW_MODE } : {})}
+            victoryPoints={settings?.victoryPoints}
+          />
         </PreviewDialog>
       )}
       {panel === 'journal' && (
@@ -761,6 +834,42 @@ export function LoungePreview() {
               <option value="waiting">Waiting for someone</option>
               <option value="robber">Move & steal</option>
             </select>
+          </label>
+          <button
+            onClick={() => {
+              setScreen('lobby');
+              setPanel('configure');
+            }}
+          >
+            Room setup
+          </button>
+          <label>
+            Game modes
+            <select
+              aria-label="Preview game modes"
+              value={modesPreview}
+              onChange={(e) => {
+                const next = e.target.value as ModesPreview;
+                if (next !== 'classic' && !previewModeRegistered) {
+                  registerRuleset(PREVIEW_MODE);
+                  previewModeRegistered = true;
+                }
+                setModesPreview(next);
+                applySettings({ ...room.settings!, mode: next === 'test' ? PREVIEW_MODE.id : CLASSIC.id });
+              }}
+            >
+              <option value="classic">Classic only</option>
+              <option value="offer">Host may pick the test mode</option>
+              <option value="test">Room in the test mode</option>
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" checked={botSeated} onChange={(e) => setBotSeated(e.target.checked)} />{' '}
+            Seat a bot
+          </label>
+          <label>
+            <input type="checkbox" checked={playerAway} onChange={(e) => setPlayerAway(e.target.checked)} /> A
+            player is away
           </label>
           {robberPreview === 'waiting' && game.phase === 'discard' && (
             <button
