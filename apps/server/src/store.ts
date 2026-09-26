@@ -41,11 +41,11 @@ import {
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
 import { owedMoves } from '../../../packages/rules/src/owed.js';
-import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
+import { dealBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
+import { GOLD_PICK_SECONDS } from '../../../packages/rules/src/gold.js';
 import {
   CLASSIC,
-  boardPresetOf,
   findRuleset,
   numberWord,
   playsBoard,
@@ -606,11 +606,28 @@ export class Store {
     if (game) return game.board;
     const saved = this.db.prepare('SELECT board FROM room_boards WHERE room_id = ?').get(roomId) as
       { board: string } | undefined;
-    if (saved) return JSON.parse(saved.board) as Board;
-    if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
+    if (!saved && !this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
       throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
+    const rules = this.lobbyRules(roomId) ?? CLASSIC;
+    // Outer Isles has a template for three players and one for four. An Open Sea lobby holds the four-player
+    // one while four are seated and the three-player one otherwise (docs/RULEBOOK-OPEN-SEA.md, 15.1).
+    const seated = this.db
+      .prepare('SELECT COUNT(*) AS n FROM seats WHERE room_id = ? AND departed = 0')
+      .get(roomId)!.n as number;
+    const players = rules.sea ? (seated >= rules.seats.max ? rules.seats.max : rules.seats.min) : seated;
+    if (saved) {
+      const board = JSON.parse(saved.board) as Board;
+      if (!rules.sea || board.preset !== rules.board || board.players === players) return board;
+      // The seated count moved between three and four: the same seed, dealt on the other template. Nobody has
+      // seen the board, so this is not a settings change and leaves everyone's readiness alone.
+      const redealt = dealBoard(board.seed, rules.board, players);
+      this.db
+        .prepare('UPDATE room_boards SET board = ? WHERE room_id = ?')
+        .run(JSON.stringify(redealt), roomId);
+      return redealt;
+    }
     // Dealt for the room's mode: a mode change deletes the board, and this deals the new mode's.
-    const board = generateBoard(randomInt(0, 2 ** 32), boardPresetOf(this.lobbyRules(roomId) ?? CLASSIC));
+    const board = dealBoard(randomInt(0, 2 ** 32), rules.board, players);
     this.db
       .prepare('INSERT INTO room_boards(room_id, board) VALUES (?, ?)')
       .run(roomId, JSON.stringify(board));
@@ -664,10 +681,26 @@ export class Store {
       this.db.prepare('SELECT 1 FROM seats WHERE room_id = ? AND departed = 0 AND bot = 1').get(roomId)
     )
       throw new ProtocolError('MODE_BOTS', `${switchBlock(rules, [{ bot: true }])!.reason}.`);
-    if (!playsBoard(rules, this.board(roomId)))
+    const board = this.board(roomId);
+    if (!playsBoard(rules, board))
       throw new ProtocolError(
         'BOARD_MISMATCH',
         'This island was dealt for another game mode. Change the mode to deal a new one.',
+      );
+    // Outer Isles: the template must be the one for the players seated (docs/RULEBOOK-OPEN-SEA.md, 15.1). Too
+    // few or too many players is the loading screen's to say, in its own words.
+    const seated = this.db
+      .prepare('SELECT COUNT(*) AS n FROM seats WHERE room_id = ? AND departed = 0')
+      .get(roomId)!.n as number;
+    if (
+      board.players !== undefined &&
+      board.players !== seated &&
+      seated >= rules.seats.min &&
+      seated <= rules.seats.max
+    )
+      throw new ProtocolError(
+        'BOARD_MISMATCH',
+        'This island was dealt for another number of players. Change the mode to deal a new one.',
       );
     return rules;
   }
@@ -1807,7 +1840,10 @@ export class Store {
   }
   private updateClock(roomId: string, next: Game) {
     const seconds = this.settings(roomId).turnTimerSeconds;
-    if (seconds === null || next.turn === 0 || next.phase === 'finished') {
+    // Open Sea's gold picks have a clock in every room, timer or not, even in setup (docs/TURN_CLOCK.md).
+    const picker = owedMoves(next).find((move) => move.kind === 'goldPick')?.player;
+    const timed = seconds !== null && next.turn > 0;
+    if (next.phase === 'finished' || (!timed && !picker)) {
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id = ?').run(roomId);
       return;
     }
@@ -1815,7 +1851,12 @@ export class Store {
     const playerId = next.players[next.active]!.id;
     let clock = this.clock(roomId);
     if (!clock || clock.turn !== next.turn || clock.playerId !== playerId)
-      clock = { playerId, turn: next.turn, startedAt: now, deadlineAt: now + seconds * 1000 };
+      clock = {
+        playerId,
+        turn: next.turn,
+        startedAt: now,
+        ...(timed ? { deadlineAt: now + seconds * 1000 } : {}),
+      };
     if (next.phase === 'discard') {
       clock.pausedAt ??= now;
       const existing = clock.discardDeadlines ?? {};
@@ -1823,20 +1864,27 @@ export class Store {
       clock.discardDeadlines = Object.fromEntries(
         owedMoves(next)
           .filter((move) => move.kind === 'discard')
-          .map(({ player }) => [player, existing[player] ?? now + seconds * 1000]),
+          .map(({ player }) => [player, existing[player] ?? now + seconds! * 1000]),
       );
+    } else if (picker) {
+      // The player on turn waits while the picks are made, one player at a time, each with 20 seconds.
+      clock.pausedAt ??= now;
+      clock.goldDeadlines = { [picker]: clock.goldDeadlines?.[picker] ?? now + GOLD_PICK_SECONDS * 1000 };
     } else if (clock.pausedAt !== undefined) {
-      clock.deadlineAt += Math.max(0, now - clock.pausedAt);
+      if (clock.deadlineAt !== undefined) clock.deadlineAt += Math.max(0, now - clock.pausedAt);
       delete clock.pausedAt;
       delete clock.discardDeadlines;
+      delete clock.goldDeadlines;
     }
     const nextDeadline =
-      clock.pausedAt === undefined ? clock.deadlineAt : Math.min(...Object.values(clock.discardDeadlines!));
+      clock.pausedAt === undefined
+        ? clock.deadlineAt
+        : Math.min(...Object.values({ ...clock.discardDeadlines, ...clock.goldDeadlines }));
     this.db
       .prepare(
         'INSERT INTO turn_clocks(room_id, state, next_deadline) VALUES (?, ?, ?) ON CONFLICT(room_id) DO UPDATE SET state = excluded.state, next_deadline = excluded.next_deadline',
       )
-      .run(roomId, JSON.stringify(clock), nextDeadline);
+      .run(roomId, JSON.stringify(clock), nextDeadline ?? null);
   }
   dueRooms(): string[] {
     // Reserve at least half the batch for saved deadlines. Rotate both queues even if a
@@ -1897,18 +1945,19 @@ export class Store {
     changed = this.playForAbsent(roomId) || changed;
     const firstClock = this.clock(roomId);
     if (!firstClock) return changed;
-    // At most four discards, two free roads, a robber move, a roll and an end-turn.
+    // At most four discards, two free roads, a robber move, a roll and an end-turn; or a roll, four players'
+    // gold picks and an end-turn.
     for (let step = 0; step < 12; step++) {
       const clock = this.clock(roomId);
       if (!clock || clock.turn !== firstClock.turn) break;
       let playerId = clock.playerId;
       if (clock.pausedAt !== undefined) {
-        const due = Object.entries(clock.discardDeadlines ?? {}).find(
+        const due = Object.entries({ ...clock.discardDeadlines, ...clock.goldDeadlines }).find(
           ([, deadline]) => deadline <= this.now(),
         );
         if (!due) break;
         playerId = due[0];
-      } else if (clock.deadlineAt > this.now()) break;
+      } else if (clock.deadlineAt === undefined || clock.deadlineAt > this.now()) break;
       const game = this.loadGame(roomId);
       if (!game || game.phase === 'finished') break;
       const action = timeoutAction(game, playerId, this.random);

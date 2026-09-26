@@ -22,15 +22,24 @@ export const DEFAULT_TURN_TIMER_SECONDS: TurnTimerSeconds = 90;
  */
 export const ABSENCE_AFTER_MS = 2 * 60 * 1000;
 
-/** All timestamps use the server's epoch milliseconds. Setup has no clock. */
+/** All timestamps use the server's epoch milliseconds. Setup has no clock, but for Open Sea's gold picks. */
 export type TurnClock = {
   playerId: string;
   turn: number;
   startedAt: number;
-  deadlineAt: number;
-  /** The active clock pauses while every required player makes their discard. */
+  /**
+   * When the active player's time runs out. Absent in a room without a turn timer: there the clock exists only
+   * while Open Sea's gold picks are made, to time them.
+   */
+  deadlineAt?: number;
+  /** The active clock pauses while every required player makes their discard, and while gold picks are made. */
   pausedAt?: number;
   discardDeadlines?: Record<string, number>;
+  /**
+   * Open Sea: when the player picking from a gold field now runs out of time, by their id. Picks go one player
+   * at a time, each with 20 seconds for all their picks, in every room (docs/TURN_CLOCK.md, "New clocks").
+   */
+  goldDeadlines?: Record<string, number>;
 };
 
 export function parseRoomSettings(input: unknown): RoomSettings {
