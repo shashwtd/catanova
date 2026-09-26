@@ -5,7 +5,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PlayerRail } from '../apps/client/src/PlayerRail.js';
 import { InviteRoster, Lobby } from '../apps/client/src/Lobby.js';
-import { createGame, gameView } from '../packages/rules/src/game.js';
+import { TradePanel } from '../apps/client/src/TradePanel.js';
+import { createGame, emptyHand, gameView } from '../packages/rules/src/game.js';
 import type { RoomState } from '../packages/protocol/src/index.js';
 
 const seated = (size: number) =>
@@ -89,6 +90,31 @@ test('an invitation counts against the seats the table has', () => {
   assert.match(roster(5, 6), /<span class="invite-capacity">5\/6<\/span>/);
 });
 
+test('a trade row is marked only with more than three partners to wrap', () => {
+  const partners = (size: number, resigned = 0) => {
+    const { room, game } = table(size);
+    game.players.slice(1, 1 + resigned).forEach((player) => (player.resigned = true));
+    game.phase = 'actions';
+    game.trade = { id: 1, player: 'p0', give: { ...emptyHand(), wood: 1 }, want: emptyHand(), open: true };
+    const html = renderToStaticMarkup(
+      createElement(TradePanel, {
+        game,
+        me: 'p0',
+        disabled: false,
+        onAction() {},
+        roomPlayers: room.players,
+      }),
+    );
+    return html.match(/<div class="trade-partners"[^>]*>/)![0];
+  };
+  assert.ok(!partners(3).includes('data-partners'));
+  assert.ok(!partners(4).includes('data-partners'));
+  assert.match(partners(5), /data-partners="4"/);
+  assert.match(partners(6), /data-partners="5"/);
+  // Two of six resigned leaves three, who fit one row as at a table of four.
+  assert.ok(!partners(6, 2).includes('data-partners'));
+});
+
 /** Every selector in a six-seat stylesheet, from `after` on, comments and at-rules aside. */
 function selectors(file: string, after = '') {
   const source = readFileSync(new URL(`../apps/client/src/${file}`, import.meta.url), 'utf8');
@@ -99,17 +125,17 @@ function selectors(file: string, after = '') {
     .flatMap((selector) => selector.split(/,(?![^()]*\))/).map((part) => part.trim()));
 }
 
-test('every six-seat rule is reached only through the seat count, at no extra specificity', () => {
-  const css = readFileSync(new URL('../apps/client/src/six-seat-rail.css', import.meta.url), 'utf8');
-  assert.ok(!css.includes('!important'));
-  const found = selectors('six-seat-rail.css');
-  assert.ok(found.length > 20);
-  for (const selector of found)
-    assert.match(
-      selector,
-      /:where\([^)]*\[data-seats(='[56]')?\]/,
-      `${selector} must hang off the rail's seat count inside :where()`,
-    );
+test('every six-seat rule is reached only through its mark, at no extra specificity', () => {
+  for (const [file, mark] of [
+    ['six-seat-rail.css', /:where\([^)]*\[data-seats(='[56]')?\]/],
+    ['six-seat-trade.css', /:where\([^)]*\[data-partners(='[45]')?\]/],
+  ] as const) {
+    const css = readFileSync(new URL(`../apps/client/src/${file}`, import.meta.url), 'utf8');
+    assert.ok(!css.includes('!important'), file);
+    const found = selectors(file);
+    assert.ok(found.length > 2, file);
+    for (const selector of found) assert.match(selector, mark, `${file}: ${selector} must hang off its mark`);
+  }
 });
 
 test('the seat card at five and six places is reached only through their mark', () => {
@@ -119,8 +145,8 @@ test('the seat card at five and six places is reached only through their mark', 
     assert.match(selector, /\[data-places(='[56]')?\]/, `${selector} must hang off the seat row's places`);
 });
 
-test('the six-seat stylesheet loads after every other one', () => {
+test('the six-seat stylesheets load after every other one', () => {
   const main = readFileSync(new URL('../apps/client/src/main.tsx', import.meta.url), 'utf8');
   const sheets = [...main.matchAll(/^import '\.\/([\w-]+\.css)';$/gm)].map((match) => match[1]);
-  assert.equal(sheets.at(-1), 'six-seat-rail.css');
+  assert.deepEqual(sheets.slice(-3), ['table-light.css', 'six-seat-rail.css', 'six-seat-trade.css']);
 });
