@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { generateBoard, isLand } from '../packages/rules/src/board.js';
 import type { Board as Island } from '../packages/rules/src/board.js';
 import { gameView } from '../packages/rules/src/game.js';
-import { edgeCentre, HEX_SIZE, seaOutline, WATER_FEATHER } from '../apps/client/src/scene.js';
+import { edgeCentre, HEX_SIZE, seaOutline, WATER_FEATHER, worldBox } from '../apps/client/src/scene.js';
 import { Board, PirateShape, ShipShape } from '../apps/client/src/Board.js';
 import { BOARD_THEMES } from '../apps/client/src/board-theme.js';
 import { loungeGame } from './board-fixtures.js';
@@ -99,6 +99,25 @@ test('ships and the pirate are flat pieces in the house style, drawn on their ed
     /aria-label="Pirate"/,
   );
   assert.doesNotMatch(render({ board: generateBoard(481), game: view }), /pirate-piece|ship-piece/);
+});
+
+test('a ship on any edge a ship may take, and the pirate on any sea hex, stay inside the scene', () => {
+  const board = dealtOuterIsles4(),
+    world = worldBox(board);
+  // The ship's outline and plinth, and the pirate's at its scale and offset, as Board.tsx draws them.
+  const inside = (x: number, y: number, [left, top, right, bottom]: number[]) =>
+    x + left! >= world.x &&
+    x + right! <= world.x + world.width &&
+    y + top! >= world.y &&
+    y + bottom! <= world.y + world.height;
+  for (const edge of board.edges.filter(
+    (e) => e.hexes.length === 2 && e.hexes.some((h) => !isLand(board.hexes[h]!)),
+  )) {
+    const { x, y } = edgeCentre(board, edge.id);
+    assert.ok(inside(x, y, [-18.9, -24, 18.9, 15]), `edge ${edge.id}`);
+  }
+  for (const h of board.hexes.filter((h) => !isLand(h)))
+    assert.ok(inside(h.x * HEX_SIZE, h.y * HEX_SIZE + 6, [-21, -26.5, 21, 12]), `hex ${h.id}`);
 });
 
 test('the Open Sea stylesheet gives the pieces the house contour and the robber’s colours, and loads last', () => {
