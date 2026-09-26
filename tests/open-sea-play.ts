@@ -149,13 +149,18 @@ function turnAction(
   const legal = view.legal;
   const me = g.players.find((p) => p.id === player)!;
   const distance = seaDistances(g, player);
-  // A settlement on a small island first, then anywhere; then a city.
+  // A settlement on a small island first, then anywhere, beside a gold field where one can; then a city.
+  const gold = (v: number) =>
+    g.board.vertices[v]!.hexes.filter((h) => g.board.hexes[h]!.terrain === 'gold').length;
   const islands = legal.settlements.filter((v) => {
     const island = vertexIsland(g.board, v);
     return island && island !== MAIN_ISLAND && !g.islandBonuses?.[player]?.includes(island);
   });
-  if (islands.length) return { kind: 'settlement', vertex: islands[0]! };
-  if (legal.settlements.length) return { kind: 'settlement', vertex: pick(legal.settlements, random)! };
+  if (islands.length)
+    return { kind: 'settlement', vertex: [...islands].sort((a, b) => gold(b) - gold(a))[0]! };
+  const golden = legal.settlements.filter((v) => gold(v) > 0);
+  if (legal.settlements.length)
+    return { kind: 'settlement', vertex: pick(golden.length ? golden : legal.settlements, random)! };
   if (legal.cities.length) return { kind: 'city', vertex: pick(legal.cities, random)! };
   // A ship move, now and then, to the edge nearest an island the player has not settled.
   const moves = Object.entries(legal.shipMoves ?? {});
