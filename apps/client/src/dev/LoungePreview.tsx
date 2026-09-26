@@ -8,6 +8,7 @@ import { TradePanel, IncomingTrade } from '../TradePanel.js';
 import {
   PREVIEW_EVENTS,
   previewEvent,
+  previewOpenTrade,
   previewRobber,
   previewTrade,
   type PreviewEvent,
@@ -35,12 +36,15 @@ import { BoardViewport } from '../BoardViewport.js';
 import { ResourceHand } from '../ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from '../DevelopmentCards.js';
 import { PlayerRail } from '../PlayerRail.js';
+import { TurnTimer } from '../TurnTimer.js';
+import { seatColorMap } from '../player-colors.js';
 import type { FriendStatus } from '../social-presence.js';
 import { Dices, ArrowLeftRight, NextTurn, X, Settings2, House, Route, Castle } from '../GameIcons.js';
 import {
   createGame,
   gameView,
   applyAction,
+  emptyHand,
   roadSites,
   settlementSites,
 } from '../../../../packages/rules/src/game.js';
@@ -82,6 +86,22 @@ const seats = names.map((name, i) => ({
   profile: { ...defaultProfile(name), avatar: i + 3 },
   accountId: `preview-account-${i}`,
 }));
+/** A fifth and sixth chair for Big Table: a name as long as a username can be, and a short one. */
+const bigTableSeats = ['Thistledown_Wayfarer', 'Pip'].map((name, i) => ({
+  id: `sample-${i + 4}`,
+  name,
+  ready: true,
+  connected: true,
+  profile: { ...defaultProfile(name), avatar: i + 7 },
+  accountId: `preview-account-${i + 4}`,
+}));
+type TableSize = 4 | 5 | 6;
+/** Juniper is away at a table of five or six, so the smaller cards show the absence mark. */
+const juniperAway = { connected: false, resignAt: Date.now() + 100_000 };
+function tableSeats(size: TableSize) {
+  if (size === 4) return seats;
+  return [...seats.slice(0, 3), { ...seats[3]!, ...juniperAway }, ...bigTableSeats.slice(0, size - 4)];
+}
 const me = seats[0]!.id;
 const room: RoomState = {
   roomId: 'preview-room',
@@ -122,6 +142,56 @@ function sampleGame() {
   return game;
 }
 const sample = sampleGame();
+/** The best of `options` by `score`, the first on a tie. */
+function best<T>(options: T[], score: (option: T) => number) {
+  return options.reduce((top, option) => (score(option) > score(top) ? option : top));
+}
+/**
+ * The sample at a table of five or six.
+ *
+ * The rules deal two to four players, so the extra seats join after setup with
+ * two houses and two roads each, where their colours have to read: jade on
+ * forest, pasture and the coast, and rose beside coral. The fifth seat holds
+ * Largest Army, so a medal sits on the longest name.
+ */
+function bigTableGame(size: 5 | 6) {
+  const game = structuredClone(sample);
+  const { hexes, vertices, edges } = game.board;
+  const touches = (vertex: number, terrain: string) =>
+    vertices[vertex]!.hexes.some((hex) => hexes[hex]!.terrain === terrain);
+  const coastal = (vertex: number) => vertices[vertex]!.hexes.length < 3;
+  const coral = seats[0]!.id;
+  /** A road on this edge would meet one of coral's end to end. */
+  const besideCoral = (edge: number) =>
+    +[edges[edge]!.a, edges[edge]!.b].some((v) => vertices[v]!.edges.some((e) => game.roads[e] === coral));
+  const nearCoral = (vertex: number) => Math.max(...vertices[vertex]!.edges.map(besideCoral));
+  const settle = (player: string, site: (vertex: number) => number, road: (edge: number) => number) => {
+    const vertex = best(settlementSites(game, player, true), site);
+    game.buildings[vertex] = { player, kind: 'settlement' };
+    game.roads[best(roadSites(game, player, vertex), road)] = player;
+  };
+  const [jade, rose] = bigTableSeats as [(typeof bigTableSeats)[number], (typeof bigTableSeats)[number]];
+  const hand = { wood: 1, brick: 0, sheep: 2, wheat: 1, ore: 1 };
+  game.players.push({ id: jade.id, name: jade.name, hand, cards: [], knights: 3 });
+  const wooded = (vertex: number) => 2 * +touches(vertex, 'wood') + +coastal(vertex);
+  const shore = (edge: number) => +(edges[edge]!.hexes.length === 1);
+  settle(jade.id, (v) => wooded(v) + 2 * +touches(v, 'sheep'), shore);
+  settle(jade.id, wooded, shore);
+  game.largestArmy = jade.id;
+  if (size === 6) {
+    game.players.push({
+      id: rose.id,
+      name: rose.name,
+      hand: { ...emptyHand(), brick: 2, sheep: 1 },
+      cards: [],
+      knights: 0,
+    });
+    settle(rose.id, nearCoral, besideCoral);
+    settle(rose.id, (v) => 2 * +touches(v, 'sheep') + +coastal(v), shore);
+  }
+  return game;
+}
+const samples: Record<TableSize, Game> = { 4: sample, 5: bigTableGame(5), 6: bigTableGame(6) };
 const friends = seats
   .slice(1)
   .map((seat) => ({ id: seat.id, username: seat.name, profile: seat.profile, isGuest: false, online: true }));
@@ -199,6 +269,9 @@ export function LoungePreview() {
     'profile' | 'editProfile' | 'friends' | 'trade' | 'configure' | GameToolPanel | null
   >(null);
   const [showAwards, setShowAwards] = useState(false);
+  const [tableSize, setTableSize] = useState<TableSize>(4);
+  const [clockStart, setClockStart] = useState(Date.now);
+  const colors = useMemo(() => seatColorMap(tableSeats(tableSize)), [tableSize]);
   /** Local friendships for the rail's friend button: one sample player has asked already. */
   const [friendships, setFriendships] = useState<Record<string, FriendStatus>>({
     [seats[2]!.accountId]: 'received',
@@ -300,7 +373,7 @@ export function LoungePreview() {
     />
   );
   const previewState = useMemo(() => {
-    const state = structuredClone(simulation ?? sample);
+    const state = structuredClone(simulation ?? samples[tableSize]);
     state.players[0]!.name = profile.name;
     if (!simulation) {
       if (!availableBuilds) state.players[0]!.hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
@@ -310,7 +383,7 @@ export function LoungePreview() {
       }
     }
     return state;
-  }, [simulation, availableBuilds, previewLeader, profile.name]);
+  }, [simulation, tableSize, availableBuilds, previewLeader, profile.name]);
   const game = useMemo(() => gameView(previewState, me), [previewState]);
   const previewGame = {
     ...game,
@@ -329,7 +402,7 @@ export function LoungePreview() {
             ...p,
             roadLength: i === 0 ? 7 : p.roadLength,
             knights: i === 1 ? 3 : p.knights,
-            points: p.points + (i < 2 ? 2 : 0),
+            points: p.points + (i < 2 ? 2 : 0) - (p.id === game.largestArmy ? 2 : 0),
           })),
         }
       : previewGame;
@@ -340,7 +413,7 @@ export function LoungePreview() {
     ...(modesPreview === 'classic' ? {} : { modes: [CLASSIC.id, PREVIEW_MODE.id] }),
     players: [
       { ...seats[0]!, name: profile.name, profile },
-      ...seats
+      ...tableSeats(tableSize)
         .slice(1)
         .filter((p) => !removedPlayers.includes(p.id))
         .map((p) => (botSeated && p.id === seats[3]!.id ? { ...p, bot: true, botLevel: 'steady' } : p))
@@ -351,6 +424,25 @@ export function LoungePreview() {
         ),
     ],
   };
+  /** A turn clock on your own card at a table of five or six, so the chip is checked with a live timer. */
+  const clock =
+    tableSize > 4 ? (
+      <TurnTimer
+        room={{
+          ...currentRoom,
+          game: displayedGame,
+          turnClock: {
+            playerId: me,
+            turn: game.turn,
+            startedAt: clockStart,
+            deadlineAt: clockStart + 90_000,
+          },
+        }}
+        me={me}
+        connected
+        onWarning={noop}
+      />
+    ) : undefined;
   function snapshot(state: Game, rev: number): RoomState {
     return { ...currentRoom, revision: rev, game: gameView(state, me) };
   }
@@ -387,7 +479,7 @@ export function LoungePreview() {
     });
   }
   function namedSample() {
-    const base = structuredClone(sample);
+    const base = structuredClone(samples[tableSize]);
     base.players.find((player) => player.id === me)!.name = profile.name;
     return base;
   }
@@ -459,14 +551,16 @@ export function LoungePreview() {
           busy={false}
           connected
           onReady={noop}
-          onAddBot={noop}
           onKick={async (id) => setRemovedPlayers((current) => [...current, id])}
+          onAddBot={noop}
+          onChooseColor={noop}
           onStart={() => setScreen('game')}
           onInvite={() => setPanel('friends')}
           onFriends={() => setPanel('friends')}
           onLeave={() => setScreen('hub')}
           onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
+          seats={tableSize > 4 ? 6 : undefined}
         />
       )}
       {screen === 'game' && (
@@ -486,6 +580,7 @@ export function LoungePreview() {
                 pendingBuild={placementReady ? placement?.action : null}
                 onAction={previewPlacement}
                 onRobber={setRobberHex}
+                colors={colors}
               />
             </BoardViewport>
           </div>
@@ -505,6 +600,7 @@ export function LoungePreview() {
             room={currentRoom}
             game={displayedGame}
             me={me}
+            timer={clock}
             friendship={{
               self: seats[0]!.accountId,
               status: (id) => friendships[id] ?? 'none',
@@ -645,6 +741,7 @@ export function LoungePreview() {
       )}
       {panel === 'trade' && (
         <TradePanel
+          roomPlayers={currentRoom.players}
           game={game}
           me={me}
           disabled={false}
@@ -771,6 +868,23 @@ export function LoungePreview() {
               {value}
             </button>
           ))}
+          <label>
+            Players
+            <select
+              aria-label="Preview players"
+              value={tableSize}
+              onChange={(e) => {
+                resetPreview();
+                setRemovedPlayers([]);
+                setTableSize(Number(e.target.value) as TableSize);
+                setClockStart(Date.now());
+              }}
+            >
+              <option value={4}>Four</option>
+              <option value={5}>Five (Big Table)</option>
+              <option value={6}>Six (Big Table)</option>
+            </select>
+          </label>
           <button
             onClick={() => {
               setScreen('hub');
@@ -826,7 +940,7 @@ export function LoungePreview() {
                 const mode = e.target.value as RobberPreview;
                 setRobberPreview(mode);
                 if (mode === 'off') resetPreview();
-                else showScenario(previewRobber(namedSample(), me, mode));
+                else showScenario(previewRobber(namedSample(), me, mode, tableSize > 4));
               }}
             >
               <option value="off">Off</option>
@@ -929,6 +1043,16 @@ export function LoungePreview() {
           >
             Incoming trade
           </button>
+          <button
+            onClick={() => {
+              setRobberPreview('off');
+              showScenario(previewOpenTrade(namedSample(), me));
+              setPanel('trade');
+            }}
+          >
+            Open offer, mixed answers
+          </button>
+          <button onClick={() => location.assign(`/dev/results?players=${tableSize}`)}>Results screen</button>
           <button onClick={resetPreview}>Reset game preview</button>
         </nav>
       </details>

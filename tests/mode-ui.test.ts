@@ -172,10 +172,11 @@ test('one resource is capped at the game’s bank in the trade pickers', () => {
   assert.doesNotMatch(picker(24), /disabled="" aria-label="Add Timber to You get; 19 selected"/);
 });
 
-test('the mode stylesheet loads last and adds only the blocked state and the phone chip layout', () => {
+test('the mode stylesheet loads after the layered ones and adds only the blocked state and the phone chip layout', () => {
   const main = readFileSync(new URL('../apps/client/src/main.tsx', import.meta.url), 'utf8');
   const imports = [...main.matchAll(/^import '\.\/([\w-]+\.css)';$/gm)].map((match) => match[1]);
-  assert.equal(imports.at(-1), 'game-mode.css');
+  // Each component's own sheet comes after table-light.css, the last of the layered ones.
+  assert.ok(imports.indexOf('game-mode.css') > imports.indexOf('table-light.css'));
   const css = readFileSync(new URL('../apps/client/src/game-mode.css', import.meta.url), 'utf8');
   assert.ok(!css.includes('!important'));
   for (const rule of css.match(/^[^\s/*@}][^{]*\{/gm) ?? [])

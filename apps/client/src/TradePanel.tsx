@@ -289,7 +289,13 @@ export function TradePanel({
                     </span>
                   </div>
                 ) : (
-                  <div className="trade-partners" role="group" aria-label="Choose a trading partner">
+                  <div
+                    className="trade-partners"
+                    role="group"
+                    aria-label="Choose a trading partner"
+                    // Four or five partners, only at a table of five or six, wrap in six-seat-trade.css.
+                    data-partners={opponents.length > 3 ? opponents.length : undefined}
+                  >
                     {game.players.map((other, index) => {
                       if (other.id === me || other.resigned) return null;
                       const response = trade.proposals?.find((p) => p.player === other.id),

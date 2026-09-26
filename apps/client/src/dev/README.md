@@ -10,8 +10,11 @@ The real app is at `/play` and still uses the existing `/api` and `/ws` proxies 
 
 The collapsed **Preview** menu at the top switches between Hub, Lobby and Game. Enable **Concept terrain & ocean** to compare the simpler atlas on the same island; disable it to return to current production art. **Show sample awards** puts both award badges on sample profiles for inspection. These are visual fixtures, not a live rules simulation.
 
+**Players** seats five or six at the sample table, as Big Table will, so the lobby, the player rail, the trade panel, the robber's lists and the results can be checked without a server. The fifth seat has a long name and holds Largest Army, the sixth a short one, Juniper is away, and your card shows a live turn timer. The extra seats join after setup, because the rules still deal four at most. **Open offer, mixed answers** fills the trade panel with proposals, a refusal and a wait, and **Results screen** opens the results with the same number of players.
+
 The game preview uses the shared GameTools menu: History and Connection remain visible, while help, game rules, sound, fullscreen and leaving are grouped under Menu. Preview history and ping values are sample data. Lobby leaving uses the same confirmation sheet as real rooms.
 
-Open <http://127.0.0.1:5173/dev/results> to inspect the game-over screen immediately.
+Open <http://127.0.0.1:5173/dev/results> to inspect the game-over screen immediately
+(`?players=5` or `?players=6` for a Big Table's results).
 It uses sample standings and the real results/lobby components. Return to lobby
 shows the sample room; Previous results reopens the screen. No live match is created.

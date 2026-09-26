@@ -333,6 +333,7 @@ export function Lobby({
   onKick,
   onChooseColor,
   onPreviousResults,
+  seats = seatsOf(room),
 }: {
   room: RoomState;
   me?: string;
@@ -350,6 +351,8 @@ export function Lobby({
   onKick?: (playerId: string) => Promise<void>;
   onChooseColor?: (color: PlayerColor) => void;
   onPreviousResults?: () => void;
+  /** How many the table seats: the room's mode's number unless a preview says otherwise. */
+  seats?: number;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -368,7 +371,7 @@ export function Lobby({
   // the size of a seat, off at the end of the row — did not read as a seat at
   // all. One more place, the same size as the rest, and it goes when full.
   const places: (RoomState['players'][number] | null)[] =
-    room.players.length < seatsOf(room) ? [...room.players, null] : [...room.players];
+    room.players.length < seats ? [...room.players, null] : [...room.players];
   // Only when there is a mode to speak of: a room not in Classic, or a host who could pick another.
   const showMode = rules.id !== CLASSIC.id || (room.modes?.length ?? 0) > 1;
   // Resolved the same way the board resolves them, so the swatch on a card and
@@ -456,6 +459,8 @@ export function Lobby({
           className="seat-row"
           aria-label="Seats at this table"
           style={{ '--places': places.length } as CSSProperties}
+          // Only five and six places are marked, for their three-column layout in room-seats.css.
+          data-places={places.length > 4 ? places.length : undefined}
         >
           {places.map((p, i) => (
             <li className="seat-place" key={p?.id ?? `open-${i}`}>
@@ -657,7 +662,7 @@ export function Lobby({
     </section>
   );
 }
-export function InviteRoster({ room }: { room: RoomPreview }) {
+export function InviteRoster({ room, seats = seatsOf(room) }: { room: RoomPreview; seats?: number }) {
   return (
     <div className="invite-roster">
       {room.players.map((p) => (
@@ -668,7 +673,7 @@ export function InviteRoster({ room }: { room: RoomPreview }) {
       ))}
       <span className="invite-capacity">
         {room.players.length}
-        {`/${seatsOf(room)}`}
+        {`/${seats}`}
       </span>
     </div>
   );

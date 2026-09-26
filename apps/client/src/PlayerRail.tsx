@@ -154,6 +154,13 @@ export function PlayerRail({
   // Keyed by player, not by seat number: the game shuffles the order when it
   // starts, so the rail's third portrait is not the room's third seat.
   const colors = seatColorMap(room.players);
+  /**
+   * Five and six players get smaller cards (`six-seat-rail.css`). Only then is
+   * the seat count written on the rail, so a table of four renders exactly as
+   * it did. Their award counts also join the score, since a phone's small
+   * portrait has no room for them at its foot; the stylesheet shows one copy.
+   */
+  const seats = game.players.length > 4 ? game.players.length : undefined;
   const tied = ranked.filter((p) => p.leading).length > 1;
   const rail = useRef<HTMLElement>(null);
   /**
@@ -209,7 +216,7 @@ export function PlayerRail({
     };
   }, [counting]);
   return (
-    <aside className="player-rail" aria-label="Players" ref={rail}>
+    <aside className="player-rail" aria-label="Players" ref={rail} data-seats={seats}>
       {ranked.map(({ player: p, seatIndex: i, points, leading }) => {
         const seat = room.players.find((s) => s.id === p.id),
           active = game.players[game.active]?.id === p.id && game.phase !== 'finished' && !p.resigned,
@@ -285,6 +292,7 @@ export function PlayerRail({
                     <Trophy size={23} />
                     <b>{p.points}</b>
                   </span>
+                  {seats && <AwardCounts player={p} road={road} army={army} />}
                 </div>
                 <div className="profile-detail-grid">
                   <div className="profile-inventories">

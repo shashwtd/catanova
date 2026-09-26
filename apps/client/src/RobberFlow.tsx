@@ -160,7 +160,12 @@ export function RobberFlow({
           : 'Move the robber'
         : `${active.name} is moving the robber`;
   return (
-    <aside className={`robber-flow ${required || mine ? 'needs-you' : 'waiting'}`} aria-label="Robber status">
+    <aside
+      className={`robber-flow ${required || mine ? 'needs-you' : 'waiting'}`}
+      aria-label="Robber status"
+      // A table of five or six lists its discards compactly, in six-seat-robber.css.
+      data-seats={game.players.length > 4 ? game.players.length : undefined}
+    >
       <div className="robber-flow-heading">
         <GameIcon name="robber" size={29} />
         <h2 aria-live="polite">{headline}</h2>
