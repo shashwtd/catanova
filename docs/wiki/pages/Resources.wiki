@@ -22,9 +22,9 @@ When the dice total matches a hex's number, every adjacent settlement receives o
 If the bank cannot cover a resource's production for several players, nobody receives that resource from the roll. If only one player is entitled to it, that player receives as many as remain, up to their entitlement. Other resource types still produce normally. Missing cards are not owed later.
 
 == Seven and the robber ==
-A seven produces no resources. Each player with '''more than seven resource cards''' discards half, rounded down. With eleven, discard five; with seven, discard none. Development cards do not count. There is no permanent seven-card hand limit.
+A seven produces no resources. Each player with '''more than seven resource cards''' discards half, rounded down. With eleven, discard five; with seven, discard none. Development cards do not count. There is no permanent seven-card hand limit. Discards go back to the bank in view, so the move history names them.
 
-After every required discard, the roller moves the robber to a '''different land hex''', then chooses one adjacent opponent and steals one random resource. An empty-handed adjacent opponent is a legal choice, but yields nothing. No adjacent opponent means no theft. The robber cannot steal development cards.
+After every required discard, the roller moves the robber to a '''different land hex''', then chooses one adjacent opponent and steals one random resource. An empty-handed adjacent opponent is a legal choice, but yields nothing. No adjacent opponent means no theft. The robber cannot steal development cards. Only the thief and the victim learn which resource was taken.
 
 The robber blocks its hex's future production. It does not prevent building, trading, using ports, or producing from other hexes. A [[Development cards|Knight]] moves and steals in the same way, without causing discards.
 
