@@ -1,7 +1,7 @@
 import { NUMBER_SPIRAL, RESOURCES } from './index.js';
 import type { Resource } from './index.js';
 
-export type Terrain = Resource | 'desert';
+export type Terrain = Resource | 'desert' | 'gold' | 'sea';
 export type Hex = {
   id: number;
   q: number;
@@ -141,9 +141,9 @@ export function topology(shape: BoardShape = CLASSIC_SHAPE): Omit<Board, 'seed' 
 }
 
 /**
- * Whether a hex is land. Every hex is, for now: Open Sea makes the sea out of hexes of its own terrain
- * (docs/BIGGER-MAPS-AND-MODES.md, Phase 2). Whatever looks for the coast asks this, rather than counting an
- * edge's hexes, because once the sea is hexes too every inland-looking edge touches two of them.
+ * Whether a hex is land. Classic and Big Table boards are all land; Open Sea makes the sea out of hexes of
+ * its own terrain (docs/BIGGER-MAPS-AND-MODES.md, Phase 2). Whatever looks for the coast asks this, rather
+ * than counting an edge's hexes, because once the sea is hexes too every inland-looking edge touches two.
  */
 export const isLand = (hex: { terrain: string }) => hex.terrain !== 'sea';
 /**
@@ -293,8 +293,12 @@ function harbourLayouts(
     .filter((edges) => edges.every((e, i) => edges.slice(i + 1).every((f) => apart(e, f))));
 }
 
+/** How many hexes of each terrain a preset deals. Gold and sea are Open Sea's; others leave them out. */
+export type TerrainCounts = Readonly<
+  Record<Resource | 'desert', number> & Partial<Record<'gold' | 'sea', number>>
+>;
 /** The order a preset's terrain counts are laid out in before they are shuffled. */
-const TERRAINS: readonly Terrain[] = ['desert', ...RESOURCES];
+const TERRAINS: readonly (Resource | 'desert')[] = ['desert', ...RESOURCES];
 /**
  * One way to deal a board: its shape, the tiles, numbers and harbours dealt onto it, and the rules a deal must
  * pass. Every board records the id of the preset that dealt it, since a seed reproduces a board only under the
@@ -303,8 +307,8 @@ const TERRAINS: readonly Terrain[] = ['desert', ...RESOURCES];
 export type BoardPreset = {
   id: Board['preset'];
   shape: BoardShape;
-  /** How many land hexes of each terrain; together, every land hex in the shape. */
-  terrain: Readonly<Record<Terrain, number>>;
+  /** How many hexes of each terrain; together, every hex in the shape. Only an Open Sea shape has sea. */
+  terrain: TerrainCounts;
   /** The number tokens, one for each land hex that is not desert. */
   numbers: readonly number[];
   harbours: {

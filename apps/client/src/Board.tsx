@@ -265,7 +265,7 @@ const BoardScenery = memo(function BoardScenery({
               <polygon
                 className="terrain-base"
                 points={hexPoints(h.x * SIZE, h.y * SIZE, 63)}
-                fill={TERRAIN_BASE[h.terrain]}
+                fill={TERRAIN_BASE[h.terrain as keyof typeof TERRAIN_BASE]}
               />
               <text
                 className="terrain-base-label"
@@ -277,7 +277,7 @@ const BoardScenery = memo(function BoardScenery({
                 fontWeight="600"
                 fill="#172d25"
               >
-                {h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain]}
+                {h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain as Resource]}
               </text>
               <svg
                 x={h.x * SIZE - SIZE}
@@ -494,7 +494,7 @@ export const Board = memo(function Board({
           const x = h.x * SIZE,
             y = h.y * SIZE;
           const canMoveRobber = robberMode && h.id !== game?.robber && !disabled;
-          const name = h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain];
+          const name = h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain as Resource];
           return (
             <g
               key={h.id}

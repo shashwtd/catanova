@@ -43,14 +43,14 @@ export const MATERIAL_QUADRANTS = [
   { x: 0, y: 2, sx: 1, sy: -1 },
   { x: 2, y: 2, sx: -1, sy: -1 },
 ] as const;
-export const TERRAIN_INDEX: Record<Terrain, number> = {
+export const TERRAIN_INDEX = {
   wood: 0,
   brick: 1,
   sheep: 2,
   wheat: 3,
   ore: 4,
   desert: 5,
-};
+} as Record<Terrain, number>;
 export const SPRITE_INDEX = {
   wood: 0,
   brick: 1,
