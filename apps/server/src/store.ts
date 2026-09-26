@@ -622,13 +622,22 @@ export class Store {
     if (game) return game.board;
     const saved = this.db.prepare('SELECT board FROM room_boards WHERE room_id = ?').get(roomId) as
       { board: string } | undefined;
-    if (saved) return JSON.parse(saved.board) as Board;
-    if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
+    const rules = this.lobbyRules(roomId);
+    if (saved) {
+      // A lobby's island belongs to no game yet. One its mode does not play, such as a preset a release
+      // since rolled back dealt, is dealt again below rather than leaving a room that can never start. The
+      // lobby is read before Start and on every settings save, so neither ever meets it. A mode this version
+      // does not know cannot deal, so its lobby keeps its island; it cannot start either way.
+      const board = JSON.parse(saved.board) as Board;
+      if (!rules || playsBoard(rules, board)) return board;
+    } else if (!this.db.prepare('SELECT 1 FROM rooms WHERE id = ?').get(roomId))
       throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
     // Dealt for the room's mode: a mode change deletes the board, and this deals the new mode's.
-    const board = generateBoard(randomInt(0, 2 ** 32), boardPresetOf(this.lobbyRules(roomId) ?? CLASSIC));
+    const board = generateBoard(randomInt(0, 2 ** 32), boardPresetOf(rules ?? CLASSIC));
     this.db
-      .prepare('INSERT INTO room_boards(room_id, board) VALUES (?, ?)')
+      .prepare(
+        'INSERT INTO room_boards(room_id, board) VALUES (?, ?) ON CONFLICT(room_id) DO UPDATE SET board = excluded.board',
+      )
       .run(roomId, JSON.stringify(board));
     return board;
   }
@@ -643,6 +652,14 @@ export class Store {
       settings: state.settings,
       started: !!this.loadGame(roomId),
     };
+  }
+  /**
+   * The rulesets this version plays, as a JSON array for SQL's json_each. A query that reads saved games as
+   * rows, not through loadGame, uses it to leave out games in a mode this version does not know: they are
+   * frozen until a release that knows the mode returns, and must not count as anybody's game in play.
+   */
+  private knownRulesets(): string {
+    return JSON.stringify(rulesets().map((ruleset) => ruleset.id));
   }
   /** The ruleset a lobby is set to play, or undefined for one this version does not know. */
   private lobbyRules(roomId: string): Ruleset | undefined {
@@ -664,8 +681,9 @@ export class Store {
   }
   /**
    * The ruleset a lobby would start with, or why it cannot. Checked at Start, not only when the mode was
-   * chosen: a switch may have closed it since, a bot may have sat down, or the lobby may hold an older island.
-   * The server asks before the loading screen too, so the host hears why at once.
+   * chosen: a switch may have closed it since, or a bot may have sat down. The server asks before the loading
+   * screen too, so the host hears why at once. The island needs no check here: the lobby is dealt a new one
+   * whenever its mode does not play the one it holds (board()), and createGame refuses one it does not.
    */
   startingRules(roomId: string): Ruleset {
     const mode = this.settings(roomId).mode ?? CLASSIC.id,
@@ -680,11 +698,6 @@ export class Store {
       this.db.prepare('SELECT 1 FROM seats WHERE room_id = ? AND departed = 0 AND bot = 1').get(roomId)
     )
       throw new ProtocolError('MODE_BOTS', `${switchBlock(rules, [{ bot: true }])!.reason}.`);
-    if (!playsBoard(rules, this.board(roomId)))
-      throw new ProtocolError(
-        'BOARD_MISMATCH',
-        'This island was dealt for another game mode. Change the mode to deal a new one.',
-      );
     return rules;
   }
   /** The modes the room's host may pick, Classic first: decided by the host's account (modes.ts). */
@@ -704,19 +717,22 @@ export class Store {
   /**
    * The unfinished game an account is seated in, if any, so a friend can be
    * watched without asking them for a code. Only the room code is exposed:
-   * enough to watch, and nothing about what is in their hand.
+   * enough to watch, and nothing about what is in their hand. A game in a mode
+   * this version does not know cannot be watched, so it is never offered.
    */
   watchableRoomOf(userId: string): { roomId: string; roomCode?: string } | null {
     const row = this.db
       .prepare(
         `
       SELECT s.room_id FROM seats s JOIN game_phases g ON g.room_id=s.room_id
+      JOIN games gm ON gm.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0
         AND coalesce(g.phase,'')<>'finished'
+        AND coalesce(json_extract(gm.state,'$.ruleset'),?) IN (SELECT value FROM json_each(?))
       LIMIT 1
     `,
       )
-      .get(userId) as { room_id: string } | undefined;
+      .get(userId, CLASSIC.id, this.knownRulesets()) as { room_id: string } | undefined;
     if (!row) return null;
     const roomCode = this.roomCode(row.room_id);
     return { roomId: row.room_id, ...(roomCode ? { roomCode } : {}) };
@@ -765,6 +781,11 @@ export class Store {
     this.db.prepare('DELETE FROM room_boards WHERE room_id = ?').run(roomId);
     return true;
   }
+  /**
+   * One unfinished game per account. A game in a mode this version does not know does not count: after a
+   * rollback nobody can resume, leave or close it here, so counting it would lock its players out of every
+   * game until the newer release returned. They play Classic meanwhile, and find the frozen game again then.
+   */
   private assertAccountAvailable(userId: string, roomId?: string, name = 'You') {
     const conflict = this.db
       .prepare(
@@ -773,13 +794,14 @@ export class Store {
       JOIN games g ON g.room_id=s.room_id
       WHERE s.user_id=? AND s.departed=0 AND s.room_id<>?
         AND coalesce(p.phase,'')<>'finished'
+        AND coalesce(json_extract(g.state,'$.ruleset'),?) IN (SELECT value FROM json_each(?))
         AND EXISTS (SELECT 1 FROM json_each(g.state,'$.players') p
           WHERE json_extract(p.value,'$.id')=s.id
             AND coalesce(json_extract(p.value,'$.resigned'),0)=0)
       LIMIT 1
     `,
       )
-      .get(userId, roomId ?? '') as { room_id: string } | undefined;
+      .get(userId, roomId ?? '', CLASSIC.id, this.knownRulesets()) as { room_id: string } | undefined;
     if (conflict) {
       const code = this.roomCode(conflict.room_id);
       throw new ProtocolError(
@@ -1075,7 +1097,7 @@ export class Store {
                IN (SELECT value FROM json_each(?)) ELSE 1 END
            ORDER BY room_id, revision LIMIT ?`,
         )
-        .all(CLASSIC.id, JSON.stringify(rulesets().map((ruleset) => ruleset.id)), limit) as {
+        .all(CLASSIC.id, this.knownRulesets(), limit) as {
         room_id: string;
         revision: number;
         state: string;
@@ -1302,7 +1324,8 @@ export class Store {
          )`,
       )
       .all()
-      .map((row) => row.room_id as string);
+      .map((row) => row.room_id as string)
+      .filter((roomId) => !this.unplayable.has(roomId));
   }
   /**
    * Every seat a bot plays in one room.
@@ -1512,7 +1535,11 @@ export class Store {
         const roomId = row.room_id as string;
         const game = JSON.parse(row.state as string) as Game;
         // Left exactly as it is: this version cannot play it, and the release that can will want it whole.
-        if (!findRuleset(game.ruleset)) continue;
+        // Its clock and presence may still come up due, so the scheduler is told to pass it by from the start.
+        if (!findRuleset(game.ruleset)) {
+          this.unplayable.add(roomId);
+          continue;
+        }
         if (game.phase === 'finished') {
           this.db.prepare('DELETE FROM room_presence WHERE room_id=?').run(roomId);
           this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);

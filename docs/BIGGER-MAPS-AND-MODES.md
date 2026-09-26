@@ -142,7 +142,8 @@ review found, and where the mode system (Release A, step 1 of
   rematch, never re-deals it when settings change, and Start hands it to
   `createGame`, which checks only the seed. A mode change must re-deal, and
   Start must check that the board's preset matches the ruleset. Both do since
-  Release A, and a room deals each board with its mode's preset.
+  Release A, and a room deals each board with its mode's preset. A lobby
+  holding a board its mode does not play is simply dealt a new one.
 - **Stand-in bots.** Any disconnected player is covered by a stand-in after 30
   seconds. Big Table and Open Sea allow no bots, so stand-ins are off there and
   the absence rule in [Turn clock](TURN_CLOCK.md#modes-without-bots) takes their

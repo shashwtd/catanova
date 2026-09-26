@@ -65,26 +65,28 @@ test('the test mode is picked, started, played through a seven, replayed, verifi
     random: () => (queue.length ? queue.shift()! : seeded()),
   });
   try {
-    // A tester's room: only testers may pick a mode no host has been opened to.
-    const sessions = ['Host', 'Second', 'Third'].map((name) => newSession(name));
+    // A tester's room: only testers may pick a mode no host has been opened to. Five sit down, which Classic
+    // cannot seat, so everything that counted seats has to read the mode's own limits.
+    const sessions = ['Host', 'Second', 'Third', 'Fourth', 'Fifth'].map((name) => newSession(name));
     const host = store.enter('create', sessions[0]!.token, 'Host', undefined, {
       id: 'tester',
       name: 'Host',
       expiresAt: Date.now() + 3_600_000,
     });
     const roomId = host.room_id;
-    const seats: Seat[] = [
-      host,
-      ...sessions.slice(1).map((s) => store.enter('join', s.token, s.name, roomId)),
-    ];
-    for (const seat of seats) store.setConnected(seat, true);
     const revision = () => store.snapshot(roomId).revision;
+    // The host picks the mode alone: too few players never blocks a mode, and a Classic room seats four.
     assert.deepEqual(store.snapshot(roomId, host.id).modes, [CLASSIC.id, BIG_TABLE.id, TEST_TABLE.id]);
     store.configureSettings(host, 'pick-test-mode', revision(), {
       turnTimerSeconds: null,
       diceMode: 'classic',
       mode: TEST_TABLE.id,
     });
+    const seats: Seat[] = [
+      host,
+      ...sessions.slice(1).map((s) => store.enter('join', s.token, s.name, roomId)),
+    ];
+    for (const seat of seats) store.setConnected(seat, true);
     for (const seat of seats.slice(1)) store.lobby(seat, `ready-${seat.id}`, revision(), true);
     store.action(host, 'start', revision(), { kind: 'start' });
     const game = () => store.loadGame(roomId)!;
@@ -156,7 +158,7 @@ test('the test mode is picked, started, played through a seven, replayed, verifi
     assert.ok(log.some((text) => / discarded /.test(text)));
     assert.ok(log.some((text) => / moved the robber/.test(text)));
     // A few more rounds that spend: roads, settlements and cards at the test mode's prices and supply.
-    for (let turn = 0; turn < 9; turn++) {
+    for (let turn = 0; turn < 15; turn++) {
       const actor = activePlayer(game()).id;
       move(actor, { kind: 'roll' });
       settle();
@@ -175,8 +177,8 @@ test('the test mode is picked, started, played through a seven, replayed, verifi
       if (game().phase === 'actions') move(actor, { kind: 'endTurn' });
       if (game().phase === 'finished') break;
     }
-    // At least four rounds of three turns, one of them with the seven.
-    assert.ok(game().turn >= 12, `several rounds were played (turn ${game().turn})`);
+    // At least four rounds of the five seats, one of them with the seven.
+    assert.ok(game().turn >= 20, `several rounds were played (turn ${game().turn})`);
 
     // Replay the journal: every row reads back, satisfies the test mode's invariants, and follows from the one
     // before by its recorded action.
@@ -212,12 +214,12 @@ test('the test mode is picked, started, played through a seven, replayed, verifi
     const room = report.details.find((detail) => detail.roomId === roomId)!;
     assert.equal(room.status, 'verified', room.problems.join('; '));
     assert.equal(room.ruleset, TEST_TABLE.id);
-    assert.equal(room.players, 3);
+    assert.equal(room.players, 5);
 
     // The admin's game analytics reads it back, the seven and the robber included.
     const head = rows.at(-1)!.revision;
     const analytics = computeGameAnalytics(store.db, { roomId, archiveId: null, toRevision: head });
-    assert.equal(analytics.players.length, 3);
+    assert.equal(analytics.players.length, 5);
     assert.equal(analytics.victoryPoints, 11);
     assert.ok(analytics.dice.sevens >= 1);
     assert.equal(analytics.dice.sevens, store.statistics(roomId).diceCounts[7 - 2]);

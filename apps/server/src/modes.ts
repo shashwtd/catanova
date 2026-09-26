@@ -28,11 +28,12 @@ export function readModeSwitches(
   for (const id of list(env.CATANOVA_MODES))
     if (!findRuleset(id)) log({ event: 'mode_unavailable', variable: 'CATANOVA_MODES', mode: id });
     else if (!open.includes(id)) open.push(id);
-  return { open, testers: new Set(list(env.CATANOVA_MODE_TESTERS)) };
+  // Account ids are matched whatever their case, as they may be copied from wherever they were shown.
+  return { open, testers: new Set(list(env.CATANOVA_MODE_TESTERS).map((id) => id.toLowerCase())) };
 }
 
 /** The modes a room whose host has this account may pick, Classic first. */
 export function modesFor(switches: ModeSwitches, account: string | null | undefined): string[] {
-  if (account && switches.testers.has(account)) return rulesets().map((ruleset) => ruleset.id);
+  if (account && switches.testers.has(account.toLowerCase())) return rulesets().map((ruleset) => ruleset.id);
   return switches.open.filter((id) => findRuleset(id));
 }

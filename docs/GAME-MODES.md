@@ -416,9 +416,12 @@ In the lobby (built in Release A):
 - Start requires the mode's minimum (five for Big Table, three for Open Sea),
   checks again that the host may pick the mode and that no bot is seated in a
   mode without them, and freezes the ruleset into the game;
-- the room deals its board when it is created, so a mode change re-deals it, and
-  Start refuses a board whose preset does not match the ruleset
-  (`BOARD_MISMATCH`). A rematch keeps the mode and deals a board for it.
+- the room deals its board when it is created, so a mode change re-deals it. A
+  lobby's board belongs to no game yet, so one the mode does not play (from a
+  preset a later release dealt, left behind by a rollback) is dealt again
+  whenever the lobby is read, which includes every settings save and Start;
+  nothing is refused. `createGame` still refuses such a board. A rematch keeps
+  the mode and deals a board for it.
 
 Built with Big Table: its turn structure is `turns` in `RoomSettings`. A change
 without it, as a tab from before Big Table sends, keeps the room's; a mode
@@ -786,7 +789,9 @@ cannot read.
      at start-up, the journal compactor, the restore verifier and the admin
      reads. Start-up and the compactor leave such a game untouched;
    - stand-in bots that depend on the ruleset: none in a mode without bots;
-   - a check at Start that the board's preset matches the ruleset;
+   - a check at Start that the board's preset matches the ruleset. As built, a
+     lobby holding a board its mode does not play is dealt a new one instead,
+     since the board belongs to no game yet;
    - a restore verifier that reads seats and supply from the ruleset;
    - a capability flag in the join message, like `preloadGame`. The server
      refuses to start, join or watch a non-Classic room from a tab without it,
@@ -815,9 +820,12 @@ cannot read.
      lists the modes they may pick (`RoomState.modes`), and only when that is
      more than Classic;
    - the capability is `rulesets` in the join message: the ruleset ids the
-     tab's build contains. A game in a mode this server does not know is
-     refused with `VERSION_MISMATCH`, not `CLIENT_UPDATE_REQUIRED`, since
-     refreshing cannot help;
+     tab's build contains. The field never costs a tab its handshake, so a
+     later client can always reconnect after a rollback: the server drops
+     anything that is not a ruleset id and any repeat, keeps at most 32, and
+     ignores a value that is not a list. A game in a mode this server does not
+     know is refused with `VERSION_MISMATCH`, not `CLIENT_UPDATE_REQUIRED`,
+     since refreshing cannot help;
    - start-up and the compactor leave a game in an unknown mode exactly as it
      is, the account history skips it, and the clock stops asking about it. Game
      analytics refuses it, the dice statistics leave its rolls out and the
@@ -857,7 +865,8 @@ cannot read.
    - a manual restore drill (`systemctl start catanova-drill.service`) that
      verifies the Big Table games;
    - locally, Release A on a copy of a database with Big Table games: it must
-     refuse those games, not misplay them.
+     refuse those games, not misplay them, and their players must still be
+     able to create, join and play Classic rooms.
 3. **Opening to everyone.** Add `big-table-v1` to `CATANOVA_MODES` and recreate
    the container. In the same window, ship the release that changes the copy
    saying "two to four" or "2–4". The public pages are prerendered when the
