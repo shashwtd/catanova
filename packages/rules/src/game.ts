@@ -994,11 +994,11 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     // Open Sea's Road Building places ships too (section 13.2), and a free ship counts as built this turn.
     requireRule(sea && canPlaceShip(g, p.id, a.edge, 'roadBuilding'), 'Choose a legal edge for the ship');
     Object.assign(g, placeShip(g, p.id, a.edge, 'roadBuilding'));
+    log(g, SEA_LOG.freeShip(p.name, a.edge));
     g.freeRoads--;
     finishFreeRoads(g);
     updateAwards(g);
     checkWin(g);
-    log(g, SEA_LOG.freeShip(p.name, a.edge));
     return g;
   }
   if (a.kind === 'road' && g.phase === 'freeRoads') {
@@ -1009,11 +1009,12 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       'Choose a legal road site',
     );
     g.roads[a.edge] = p.id;
+    // The piece is logged before any award or win it brings, as a bought one is.
+    log(g, `${p.name} built a free road on edge ${a.edge + 1}.`);
     g.freeRoads--;
     finishFreeRoads(g);
     updateAwards(g);
     checkWin(g);
-    log(g, `${p.name} built a free road on edge ${a.edge + 1}.`);
     return g;
   }
   if (a.kind === 'playCard') {

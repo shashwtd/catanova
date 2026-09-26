@@ -1181,6 +1181,41 @@ test('§9.2 a pick is never empty, even in a state that owes one from an empty b
   );
 });
 
+test('§13.2 a free ship that makes the longest route claims it at once, and a win with it; the log says so in order', () => {
+  // Blue's cities on the north coast and at the west end, and four ships from the first, across the strait and
+  // round the north isle's west end.
+  const [west] = south(LANDING, 40);
+  const out = board.vertices[40]!.edges.find((e) => edgeKind(board, e) === 'sea')!;
+  const tip = other(out, 40);
+  const onward = board.vertices[tip]!.edges.find((e) => e !== out && takesShip(edgeKind(board, e)))!;
+  const layout = { cities: { blue: [NORTH_COAST, 52] }, ships: { blue: [STRAIT, west!, out, onward] } };
+  const table = (target: number, cards: number) => {
+    const g = seaGame(sea, layout);
+    g.victoryPoints = target;
+    dealCards(g, 'blue', 'roadBuilding', 1);
+    dealCards(g, 'blue', 'victoryPoint', cards);
+    return applyAction(g, 'blue', { kind: 'playCard', cardId: g.players[0]!.cards[0]!.id }, () => 0.5);
+  };
+  const end = other(onward, tip);
+  // With 4 points and a long way to go: the first free ship claims Longest Route before the second is placed.
+  const played = table(14, 0);
+  assert.equal(longestRoute(played, 'blue').length, 4);
+  const ship = gameView(played, 'blue').legal.ships!.find((e) =>
+    [board.edges[e]!.a, board.edges[e]!.b].includes(end),
+  )!;
+  const claimed = applyAction(played, 'blue', { kind: 'ship', edge: ship }, () => 0.5);
+  assert.deepEqual([claimed.phase, claimed.freeRoads, claimed.longestRoad], ['freeRoads', 1, 'blue']);
+  // With 8 of 10, the same ship wins before the second piece; the ship is logged first, as a bought one is.
+  const winning = table(10, 4);
+  const won = applyAction(winning, 'blue', { kind: 'ship', edge: ship }, () => 0.5);
+  assert.deepEqual([won.phase, won.winner], ['finished', 'blue']);
+  assert.deepEqual(newLines(winning, won), [
+    `Blue built a free ship on edge ${ship + 1}.`,
+    'Blue claimed Longest Route (+2 points).',
+    'Blue wins with 10 points!',
+  ]);
+});
+
 test('§15.6 the last player left, offline, starts a turn with no ship built or moved in it', () => {
   const g = afterSetup(3, 1);
   Object.assign(g, { phase: 'actions', dice: [2, 3] });
