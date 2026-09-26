@@ -255,6 +255,20 @@ test('§9.2 with a turn timer the player on turn waits while the picks are made,
     // Picks took 8 seconds; the player on turn gets them back.
     assert.deepEqual(t.store.clock(t.roomId), { ...turnClock, deadlineAt: turnClock.deadlineAt! + 8_000 });
     assert.equal(game(t).phase, 'actions');
+    // In the admin's analytics the 8 seconds are the pickers', not the turn's: a 20-second turn counts 12.
+    t.clock.now += 2_000;
+    play(t, { player: roller, action: { kind: 'endTurn' } });
+    const analytics = computeGameAnalytics(t.store.db, {
+      roomId: t.roomId,
+      archiveId: null,
+      toRevision: t.store.snapshot(t.roomId).historyRevision,
+    });
+    assert.deepEqual(analytics.players.find((player) => player.id === roller)!.turnTime, {
+      turns: 1,
+      meanSeconds: 12,
+      medianSeconds: 12,
+      botTurns: 0,
+    });
   } finally {
     t.store.close();
   }

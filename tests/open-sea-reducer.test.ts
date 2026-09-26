@@ -43,6 +43,7 @@ import {
 import { owedMoves } from '../packages/rules/src/owed.js';
 import { timeoutAction, timeoutDescription } from '../packages/rules/src/timeout.js';
 import { requiredAction } from '../apps/client/src/game-attention.js';
+import { parseClientMessage } from '../packages/protocol/src/index.js';
 import { outerIslesThree, sketch } from './sea-boards.js';
 import { SEATS, accountedFor, dice, giveCards, hand, newLines, seaGame } from './open-sea-game.js';
 
@@ -1100,6 +1101,18 @@ test('the new moves are parsed like the others, and a Classic game refuses each 
     { kind: 'goldPick' },
   ])
     assert.throws(() => parseGameAction(bad), RuleError, JSON.stringify(bad));
+  // The socket's message parser takes them as it takes every other move.
+  const message = (action: unknown) =>
+    parseClientMessage(
+      JSON.stringify({ type: 'action', commandId: 'command-1', expectedRevision: 3, action }),
+    );
+  assert.deepEqual(message({ kind: 'moveShip', from: 5, to: 9 }), {
+    type: 'action',
+    commandId: 'command-1',
+    expectedRevision: 3,
+    action: { kind: 'moveShip', from: 5, to: 9 },
+  });
+  assert.throws(() => message({ kind: 'moveShip', from: 5 }), RuleError);
   const classic = createGame(SEATS.slice(0, 3), 5, () => 0.5);
   Object.assign(classic, { turn: 1, phase: 'actions', setupIndex: 6 });
   assert.throws(
