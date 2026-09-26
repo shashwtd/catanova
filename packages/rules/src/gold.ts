@@ -2,9 +2,9 @@
  * Open Sea's gold fields (section 9 of docs/RULEBOOK-OPEN-SEA.md): the picks a roll or a starting settlement is
  * owed, the order they are made in, and the default the clock makes. Pure functions, as in sea.ts.
  *
- * A gold field takes no part in ordinary production: producedResource gives it none, so the Classic shortage rule
- * runs as before and nothing owed from gold counts toward it. The picks come after, from whatever the bank then
- * holds (section 9.2).
+ * A gold field takes no part in ordinary production. producedResource, which production is to ask what a hex
+ * pays, gives it nothing, so the Classic shortage rule runs as before and nothing owed from gold counts toward it.
+ * The picks come after, from whatever the bank then holds (section 9.2).
  */
 import { RESOURCES, RESOURCE_NAMES } from './index.js';
 import type { Resource } from './index.js';
