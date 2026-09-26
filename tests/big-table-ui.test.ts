@@ -105,17 +105,23 @@ test('Room setup shows Big Table’s turn style under its card, open while Big T
   const read = setup(guest, 'p1');
   assert.match(read, /<fieldset class="settings-dice settings-mode" disabled="">/);
   assert.match(read, /checked="" value="betweenTurnsBuild"/);
-  // The sheet that indents it loads last and only adds what the turn style and the trade lock need.
+  // The sheet that indents it loads last, and every rule in it, media queries included, reaches only Big
+  // Table's parts: the turn style, the trade lock and the rail of five or six.
   const main = readFileSync(new URL('../apps/client/src/main.tsx', import.meta.url), 'utf8');
   const sheets = [...main.matchAll(/^import '\.\/([\w-]+\.css)';$/gm)].map((match) => match[1]);
   assert.equal(sheets.at(-1), 'big-table.css');
   const css = readFileSync(new URL('../apps/client/src/big-table.css', import.meta.url), 'utf8');
   assert.ok(!css.includes('!important'));
-  for (const rule of css.match(/^[^\s/*@}][^{]*\{/gm) ?? [])
+  const selectors = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{};]+)\{/g)]
+    .map((match) => match[1]!.trim())
+    .filter((selector) => !selector.startsWith('@'))
+    .flatMap((selector) => selector.split(/,(?![^()]*\))/).map((part) => part.trim()));
+  assert.ok(selectors.length >= 6);
+  for (const selector of selectors)
     assert.match(
-      rule,
-      /settings-turns|trade-lock|player-rail\[data-seats\]/,
-      `every rule is scoped to Big Table's parts: ${rule}`,
+      selector,
+      /settings-turns|trade-lock|:where\([^)]*player-rail\[data-seats\]/,
+      `every rule is scoped to Big Table's parts: ${selector}`,
     );
 });
 
