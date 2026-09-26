@@ -31,7 +31,7 @@ The following host commands run in that root shell. Define this helper again in 
 
 ```sh
 catanova_compose() {
-  env -u CATANOVA_DOMAIN -u CATANOVA_REVISION \
+  env -u CATANOVA_DOMAIN -u CATANOVA_REVISION -u CATANOVA_MODES -u CATANOVA_MODE_TESTERS \
     -u SUPABASE_URL -u SUPABASE_PUBLISHABLE_KEY -u TURNSTILE_SITE_KEY \
     -u TUNNEL_TOKEN -u ADMIN_ACCESS_TEAM_DOMAIN -u ADMIN_ACCESS_AUD -u ADMIN_EMAILS -u ADMIN_ORIGIN \
     docker compose \
