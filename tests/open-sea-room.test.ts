@@ -14,7 +14,7 @@ import { computeGameAnalytics } from '../apps/server/src/admin/game-analytics.js
 import { newSession } from '../apps/client/src/connection.js';
 import { gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
 import { dealBoard, isLand, pips, seededRandom } from '../packages/rules/src/board.js';
-import { RuleError, activePlayer, applyAction, total } from '../packages/rules/src/game.js';
+import { RuleError, activePlayer, applyAction, gameView, total } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { owedMoves } from '../packages/rules/src/owed.js';
@@ -343,6 +343,53 @@ test('§15.5 a player offline for 2 minutes has their gold picks made at once; o
     assert.equal(activePlayer(game(t)).id, roller);
     assert.deepEqual(accountedFor(game(t)), []);
     assert.deepEqual(gameInvariantProblems(game(t)), []);
+  } finally {
+    t.store.close();
+  }
+});
+
+test('§5.5, §9.3 and §9.5 a second settlement’s gold picks have their 20 seconds in setup too, without a turn timer', () => {
+  const t = started(3, null, { goldOnMain: true });
+  try {
+    // The first settlements keep clear of the gold field; the first of the second round goes beside it.
+    const gold = game(t).board.hexes.find((h) => h.terrain === 'gold' && h.island === 'main')!;
+    const near = new Set(gold.vertices.flatMap((v) => [v, ...game(t).board.vertices[v]!.neighbors]));
+    while (game(t).phase !== 'goldPick') {
+      const g = game(t),
+        [owed] = owedMoves(g);
+      assert.equal(g.turn, 0, 'still in setup');
+      const second = g.setupIndex >= g.players.length;
+      const sites = gameView(g, owed!.player).legal.settlements.filter((v) =>
+        second ? gold.vertices.includes(v) : !near.has(v),
+      );
+      play(
+        t,
+        owed!.kind === 'setupSettlement'
+          ? { player: owed!.player, action: { kind: 'settlement', vertex: sites[0]! } }
+          : undefined,
+      );
+    }
+    const g = game(t),
+      picker = g.goldOwed![0]!.player;
+    assert.deepEqual(g.goldOwed, [{ player: picker, picks: 1 }]);
+    const now = t.clock.now;
+    assert.deepEqual(t.store.clock(t.roomId), {
+      playerId: picker,
+      turn: 0,
+      startedAt: now,
+      pausedAt: now,
+      goldDeadlines: { [picker]: now + 20_000 },
+    });
+    t.clock.now += 20_000;
+    assert.ok(t.store.dueRooms().includes(t.roomId));
+    assert.equal(t.store.expireRoom(t.roomId), true);
+    assert.deepEqual(lines(t, / timer expired; /), [
+      `${seatOf(t, picker).name}'s timer expired; gold picks made automatically.`,
+    ]);
+    // Then the road or ship after that settlement, untimed as setup is.
+    assert.deepEqual([game(t).phase, game(t).turn], ['setupRoad', 0]);
+    assert.equal(t.store.clock(t.roomId), undefined);
+    assert.deepEqual(accountedFor(game(t)), []);
   } finally {
     t.store.close();
   }

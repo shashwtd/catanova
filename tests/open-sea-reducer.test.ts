@@ -1168,6 +1168,32 @@ test('§9.2 and §12.3 a resignation during gold picks that hands the player on 
   );
 });
 
+test('§9.2 the last player owed gold resigning ends the picks, and the turn goes on or passes', () => {
+  const layout = { players: 4, numbers: { [GOLD_NORTH]: 5 }, phase: 'roll' as const };
+  // Red, not on turn, is the only one owed: once Red leaves, Blue's action phase begins.
+  const red = applyAction(
+    seaGame(sea, { ...layout, settlements: { red: [GOLD_N!] } }),
+    'blue',
+    { kind: 'roll' },
+    dice(2, 3),
+  );
+  assert.deepEqual(red.goldOwed, [{ player: 'red', picks: 1 }]);
+  const redLeft = resignPlayers(red, ['red'], { reason: 'leave' });
+  assert.deepEqual([redLeft.phase, redLeft.goldOwed], ['actions', []]);
+  assert.deepEqual(owedMoves(redLeft), [{ player: 'blue', kind: 'actions' }]);
+  // Blue, on turn, is the only one owed: once Blue leaves, the turn passes to Red.
+  const blue = applyAction(
+    seaGame(sea, { ...layout, settlements: { blue: [GOLD_N!] } }),
+    'blue',
+    { kind: 'roll' },
+    dice(2, 3),
+  );
+  assert.deepEqual(blue.goldOwed, [{ player: 'blue', picks: 1 }]);
+  const blueLeft = resignPlayers(blue, ['blue'], { reason: 'leave' });
+  assert.deepEqual([blueLeft.phase, blueLeft.active, blueLeft.turn, blueLeft.goldOwed], ['roll', 1, 2, []]);
+  assert.deepEqual(owedMoves(blueLeft), [{ player: 'red', kind: 'roll' }]);
+});
+
 test('§9.2 a pick is never empty, even in a state that owes one from an empty bank', () => {
   const g = afterSetup(3, 41);
   Object.assign(g, { phase: 'goldPick', goldOwed: [{ player: 'blue', picks: 1 }] });
@@ -1179,6 +1205,33 @@ test('§9.2 a pick is never empty, even in a state that owes one from an empty b
     () => applyAction(g, 'blue', { kind: 'goldPick', resources: hand() }, () => 0.5),
     rule('Choose at least one resource'),
   );
+});
+
+test('§10.2, §10.3 and §10.5 the pirate moves only after a seven or a Knight', () => {
+  for (const phase of ['actions', 'roll'] as const) {
+    const g = seaGame(sea, { phase, ships: { red: [STRAIT] }, hands: { red: { wood: 1 } } });
+    assert.throws(
+      () => applyAction(g, 'blue', { kind: 'pirate', hex: STRAIT_HEX, victim: 'red' }, () => 0.5),
+      rule('Move the pirate only after a seven or a Knight'),
+      phase,
+    );
+  }
+});
+
+test('§5.4 a second starting ship must touch the new settlement, not the first one', () => {
+  // Blue's first settlement is on the north coast, the second at the west end of the island.
+  const west = 52;
+  const g = seaGame(sea, { phase: 'setupRoad', settlements: { blue: [NORTH_COAST, west] } });
+  Object.assign(g, { turn: 0, setupIndex: 5, setupVertex: west, active: 0 });
+  const legal = gameView(g, 'blue').legal;
+  assert.ok(!legal.ships!.includes(STRAIT), 'the strait is by the first settlement');
+  assert.ok(legal.ships!.every((e) => [board.edges[e]!.a, board.edges[e]!.b].includes(west)));
+  assert.throws(
+    () => applyAction(g, 'blue', { kind: 'ship', edge: STRAIT }, () => 0.5),
+    rule('Place a ship touching your new settlement'),
+  );
+  const placed = applyAction(g, 'blue', { kind: 'ship', edge: legal.ships![0]! }, () => 0.5);
+  assert.equal(placed.ships![legal.ships![0]!], 'blue');
 });
 
 test('§13.2 a free ship that makes the longest route claims it at once, and a win with it; the log says so in order', () => {
@@ -1214,6 +1267,26 @@ test('§13.2 a free ship that makes the longest route claims it at once, and a w
     'Blue claimed Longest Route (+2 points).',
     'Blue wins with 10 points!',
   ]);
+});
+
+test('§13.2 Road Building ends as soon as no road or ship can go anywhere', () => {
+  // Red's roads hold Blue's coastal edges and Red's ships the north isle's coast beyond the strait, so Blue has
+  // one place for a piece: a ship across the strait. After it, the card ends with one piece unplaced.
+  const coastal = board.vertices[NORTH_COAST]!.edges.filter((e) => edgeKind(board, e) === 'coastal');
+  const beyond = board.vertices[LANDING]!.edges.filter((e) => e !== STRAIT);
+  const g = seaGame(sea, {
+    settlements: { blue: [NORTH_COAST] },
+    roads: { red: coastal },
+    ships: { red: beyond },
+  });
+  dealCards(g, 'blue', 'roadBuilding', 1);
+  const played = applyAction(g, 'blue', { kind: 'playCard', cardId: g.players[0]!.cards[0]!.id }, () => 0.5);
+  assert.deepEqual(gameView(played, 'blue').legal.roads, []);
+  assert.deepEqual(gameView(played, 'blue').legal.ships, [STRAIT]);
+  assert.equal(played.freeRoads, 2);
+  const placed = applyAction(played, 'blue', { kind: 'ship', edge: STRAIT }, () => 0.5);
+  assert.deepEqual([placed.phase, placed.freeRoads], ['actions', 0]);
+  assert.deepEqual(owedMoves(placed), [{ player: 'blue', kind: 'actions' }]);
 });
 
 test('§15.6 the last player left, offline, starts a turn with no ship built or moved in it', () => {
