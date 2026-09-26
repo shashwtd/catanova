@@ -375,6 +375,29 @@ test('§8.5 a move may not detach another of your ships, but a ship already cut 
   );
 });
 
+test('§8.5 a ship stranded by a move is attached again only where nobody else has built', () => {
+  const sk = strait(),
+    { board } = sk;
+  const H = corner(board, sk.hex('1'), 'nw');
+  const [, north, u1, v] = walk(board, H, 'nw', 'sw', 'nw') as [number, number, number, number];
+  const [, u, w] = walk(board, v, 'n', 'nw') as [number, number, number];
+  const [, redRoad] = walk(board, v, 'sw');
+  // Red settled at v first. Your pair v–u and u–w, beside it, attach only to each other.
+  const [vu, uw] = edgesAlong(board, [v, u, w]) as [number, number];
+  const g = state(sk, {
+    settlements: { blue: [H], red: [v] },
+    roads: { red: [edgeBetween(board, v, redRoad!)] },
+    ships: { blue: [...edgesAlong(board, [H, north, u1]), vu, uw] },
+  });
+  assert.deepEqual(openEnds(g, 'blue', uw), [w], 'u–w may move');
+  // Lifted, it strands v–u. A ship could be built on v–u1, beside your line at u1, but a ship there would not meet
+  // v–u at red's settlement, so the only place u–w may go is beside v–u at u.
+  const besideRed = edgeBetween(board, v, u1);
+  assert.ok(shipSites(g, 'blue', 'build').includes(besideRed));
+  const [, onward] = walk(board, u, 'ne');
+  assert.deepEqual(legalShipDestinations(g, 'blue', uw), [edgeBetween(board, u, onward!)]);
+});
+
 test('§8.2 other players’ pieces never close an open end; a lone ship’s end at a new settlement stays open', () => {
   const { sk, board, H, a, b, c, along } = bayLine();
   const [Ha, ab, bc] = along(H, a, b, c);

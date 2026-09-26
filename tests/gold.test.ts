@@ -21,7 +21,6 @@ import {
 } from '../packages/rules/src/gold.js';
 import type { GoldOwed } from '../packages/rules/src/gold.js';
 import { pirateHexes, producedResource, robberHexes } from '../packages/rules/src/sea.js';
-import type { SeaBoard } from '../packages/rules/src/sea.js';
 import { corner, sketch } from './sea-boards.js';
 
 const hand = (cards: Partial<Hand> = {}): Hand => ({ ...emptyHand(), ...cards });
@@ -36,35 +35,6 @@ function goldBoard() {
   return { board: sk.board, mountains: mountains!.id, gold: gold!.id, gold2: gold2!.id };
 }
 const seats = (...ids: string[]) => ids.map((id) => ({ id, hand: emptyHand() }));
-/** Classic section 5, as game.ts's produce applies it, with producedResource saying what each hex pays. */
-function ordinaryProduction(
-  g: { board: SeaBoard; buildings: Record<number, Building>; robber: number; bank: Hand },
-  players: string[],
-  roll: number,
-) {
-  const owed = new Map(players.map((p) => [p, emptyHand()]));
-  for (const hex of g.board.hexes) {
-    const resource = producedResource(hex);
-    if (hex.number !== roll || hex.id === g.robber || !resource) continue;
-    for (const v of hex.vertices) {
-      const building = g.buildings[v];
-      if (building) owed.get(building.player)![resource] += building.kind === 'city' ? 2 : 1;
-    }
-  }
-  const bank = { ...g.bank },
-    received = new Map(players.map((p) => [p, emptyHand()]));
-  for (const r of RESOURCES) {
-    const takers = players.filter((p) => owed.get(p)![r]);
-    if (takers.reduce((n, p) => n + owed.get(p)![r], 0) > bank[r] && takers.length > 1) continue;
-    for (const p of takers) {
-      const n = Math.min(owed.get(p)![r], bank[r]);
-      received.get(p)![r] += n;
-      bank[r] -= n;
-    }
-  }
-  return { bank, received };
-}
-
 test('§9.1 a gold field pays each settlement 1 pick and each city 2, unless the robber is on it', () => {
   const { board, gold, gold2 } = goldBoard();
   const buildings: Record<number, Building> = {
@@ -89,6 +59,15 @@ test('§9.1 a gold field pays each settlement 1 pick and each city 2, unless the
     ],
     'a resigned player’s buildings stop producing',
   );
+  // One player's buildings on a field are paid together: a settlement and a city owe 3 picks.
+  const both = {
+    ...g,
+    buildings: {
+      [corner(board, gold, 'n')]: { player: 'blue', kind: 'settlement' as const },
+      [corner(board, gold, 's')]: { player: 'blue', kind: 'city' as const },
+    },
+  };
+  assert.deepEqual(goldOwedForRoll(both, 10), [{ player: 'blue', picks: 3 }]);
   // Red's settlement also touches the second gold field; its number pays red alone.
   assert.ok(board.hexes[gold2]!.vertices.includes(corner(board, gold, 'se')));
   assert.deepEqual(goldOwedForRoll(g, 4), [{ player: 'red', picks: 1 }]);
@@ -137,21 +116,25 @@ test('§9.2 players pick in turn order from the player on turn, each all at once
   assert.throws(() => applyGoldPick(g, 'blue', hand({ wood: 1 })), /not your turn/);
 });
 
-test('§9.2 the example: short of Rock, the mountains pay nobody, then gold picks from what is left', () => {
+test('§9.2 producedResource keeps gold out of production, and the book’s example picks from what is left', () => {
   const { board, mountains, gold } = goldBoard();
+  // Ordinary production is the reducer's, by Classic section 5, asking producedResource what each hex pays: Rock
+  // from the mountains and nothing from the gold field, so nothing owed from gold counts toward a shortage.
+  assert.equal(producedResource(board.hexes[mountains]!), 'ore');
+  assert.equal(producedResource(board.hexes[gold]!), null);
+  // The book's example: blue's city and red's settlement are owed 3 Rock with 2 in the bank, so production pays no
+  // Rock, and the bank still holds 2 when green's pick comes.
   const buildings: Record<number, Building> = {
     [corner(board, mountains, 'n')]: { player: 'blue', kind: 'city' },
     [corner(board, mountains, 's')]: { player: 'red', kind: 'settlement' },
     [corner(board, gold, 'n')]: { player: 'green', kind: 'settlement' },
   };
-  const players = ['red', 'blue', 'green'];
-  const table = { board, buildings, robber: -1, bank: { ...full(), ore: 2 } };
-  // Ordinary hexes first: 3 Rock owed, 2 in the bank, so nobody receives Rock. Gold takes no part.
-  const { bank, received } = ordinaryProduction(table, players, 10);
-  assert.equal(bank.ore, 2);
-  for (const p of players) assert.equal(total(received.get(p)!), 0);
-  // Nothing owed from gold counted toward the shortage, and green's pick comes from the 2 Rock left.
-  const goldOwed = goldOwedForRoll({ ...table, bank, players: players.map((id) => ({ id })), active: 1 }, 10);
+  const players = ['red', 'blue', 'green'],
+    bank = { ...full(), ore: 2 };
+  const goldOwed = goldOwedForRoll(
+    { board, buildings, robber: -1, bank, players: players.map((id) => ({ id })), active: 1 },
+    10,
+  );
   assert.deepEqual(goldOwed, [{ player: 'green', picks: 1 }]);
   const after = applyGoldPick({ bank, goldOwed, players: seats(...players) }, 'green', hand({ ore: 1 }));
   assert.equal(after.bank.ore, 1);
@@ -222,6 +205,12 @@ test('§9.3 and §5.5 a second starting settlement takes a card per producing he
     board.vertices[v]!.hexes.some((h) => board.hexes[h]!.terrain === 'desert'),
   )!;
   assert.deepEqual(startingResources(board, shared), { resources: hand({ ore: 1 }), goldPicks: 0 });
+  // Each producing hex pays its own card: between two forests, 2 Timber.
+  const woods = sketch(' . . . .', '. T T .', ' . . . .').board;
+  const between2 = woods.vertices.find(
+    (v) => v.hexes.filter((h) => woods.hexes[h]!.terrain === 'wood').length === 2,
+  )!;
+  assert.deepEqual(startingResources(woods, between2.id), { resources: hand({ wood: 2 }), goldPicks: 0 });
 });
 
 test('§9.4 the robber stops a gold field like any land, and the pirate never stands on one', () => {
