@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { pips } from '../../../packages/rules/src/board.js';
+import { isLand, pips } from '../../../packages/rules/src/board.js';
 import type { Board as Island } from '../../../packages/rules/src/board.js';
 import { RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
@@ -14,10 +14,15 @@ import type { BuildAction } from './placement.js';
 import {
   boardKey,
   coastline,
+  GOLD_TILE,
+  hasSea,
   HEX_SIZE as SIZE,
+  ISLAND_SHADOW,
   MATERIAL_GUTTER,
   MATERIAL_QUADRANTS,
   hexPoints,
+  seaBadge,
+  seaOutline,
   waterOutline,
   portPlacement,
   SPRITE_INDEX,
@@ -27,21 +32,34 @@ import {
   WATER_FEATHER,
   worldBox,
 } from './scene.js';
-import type { WorldBox } from './scene.js';
+import type { SceneTerrain, WorldBox } from './scene.js';
+import { GOLD_ART } from './game-assets.js';
 
 /** The seat colours a board falls back to when nothing tells it otherwise —
  *  a preview, or the first frame before the room arrives. A real table passes
  *  its own through `colors`, because seats can choose. */
 export { DEFAULT_SEAT_HEX as PLAYER_COLORS } from './player-colors.js';
 // Visible immediately, underneath the artwork, even when a texture is still downloading.
-const TERRAIN_BASE = {
+const TERRAIN_BASE: Record<SceneTerrain, string> = {
   wood: '#57815a',
   brick: '#c57d59',
   sheep: '#a0b767',
   wheat: '#dcb95f',
   ore: '#8998a5',
   desert: '#e3c589',
-} as const;
+  gold: '#8f7f5a',
+  sea: '#2f7f86',
+};
+/** The short label under a tile's art, and a hex's accessible name. */
+const TERRAIN_LABEL: Record<SceneTerrain, string> = {
+  ...RESOURCE_NAMES,
+  desert: 'Desert',
+  gold: 'Gold',
+  sea: 'Sea',
+};
+const TERRAIN_NAME: Record<SceneTerrain, string> = { ...TERRAIN_LABEL, gold: 'Gold field' };
+/** The fields an Open Sea board carries besides its hexes: where the robber starts. */
+type OpenSeaBoard = { robberStart?: number };
 export type BuildMode = 'road' | 'settlement' | 'city' | null;
 function roadGeometry(board: Island, id: number) {
   const edge = board.edges[id]!,
@@ -140,12 +158,15 @@ const BoardScenery = memo(function BoardScenery({
   coast,
   water,
   world,
+  sea,
 }: {
   board: Island;
   art?: TerrainArt;
   coast: readonly string[];
-  water: string;
+  /** The water's outline, feathered into the table: one polygon round the island, or round an Open Sea frame. */
+  water: readonly string[];
   world: WorldBox;
+  sea: boolean;
 }) {
   return (
     <>
@@ -173,8 +194,23 @@ const BoardScenery = memo(function BoardScenery({
           height={world.height}
           style={{ maskType: 'alpha' }}
         >
-          <polygon points={water} fill="white" filter="url(#water-feather)" />
+          {water.map((points, i) => (
+            <polygon key={i} points={points} fill="white" filter="url(#water-feather)" />
+          ))}
         </mask>
+        {sea && (
+          <filter
+            id="island-shadow"
+            filterUnits="userSpaceOnUse"
+            x={world.x}
+            y={world.y}
+            width={world.width}
+            height={world.height}
+          >
+            <feOffset dy={ISLAND_SHADOW.offset} />
+            <feGaussianBlur stdDeviation={ISLAND_SHADOW.blur / 2} />
+          </filter>
+        )}
         <filter id="piece-shadow" x="-60%" y="-60%" width="220%" height="220%">
           <feDropShadow dx="1" dy="3" stdDeviation="1.5" floodColor="#0b1519" floodOpacity=".7" />
         </filter>
@@ -211,7 +247,7 @@ const BoardScenery = memo(function BoardScenery({
             ))}
           </pattern>
         ))}
-        {board.hexes.map((h) => (
+        {board.hexes.filter(isLand).map((h) => (
           <mask
             key={h.id}
             id={`terrain-${h.id}`}
@@ -226,6 +262,17 @@ const BoardScenery = memo(function BoardScenery({
         ))}
       </defs>
       <g className="terrain-fallback" aria-hidden="true">
+        {sea && (
+          <rect
+            className="sea-base"
+            x={world.x}
+            y={world.y}
+            width={world.width}
+            height={world.height}
+            fill={TERRAIN_BASE.sea}
+            mask="url(#water-fade-mask)"
+          />
+        )}
         <rect
           className="water-band"
           x={world.x}
@@ -235,6 +282,21 @@ const BoardScenery = memo(function BoardScenery({
           fill="url(#ocean-material)"
           mask="url(#water-fade-mask)"
         />
+        {sea && (
+          <g
+            className="island-shadow"
+            fill={`rgb(${ISLAND_SHADOW.colour.join(' ')})`}
+            stroke={`rgb(${ISLAND_SHADOW.colour.join(' ')})`}
+            strokeWidth={ISLAND_SHADOW.edge * 2}
+            strokeLinejoin="round"
+            opacity={ISLAND_SHADOW.opacity}
+            filter="url(#island-shadow)"
+          >
+            {coast.map((points, i) => (
+              <polygon key={i} points={points} />
+            ))}
+          </g>
+        )}
         {/* Every island's shallows go down before any island's sand, so no shallows lie over a beach. */}
         {coast.map((points, i) => (
           <polygon
@@ -258,8 +320,9 @@ const BoardScenery = memo(function BoardScenery({
             filter="url(#ground-edge)"
           />
         ))}
-        {board.hexes.map((h) => {
-          const n = TERRAIN_INDEX[h.terrain];
+        {board.hexes.filter(isLand).map((h) => {
+          const n = TERRAIN_INDEX[h.terrain],
+            gold = n === GOLD_TILE;
           return (
             <g key={h.id} mask={`url(#terrain-${h.id})`}>
               <polygon
@@ -277,20 +340,24 @@ const BoardScenery = memo(function BoardScenery({
                 fontWeight="600"
                 fill="#172d25"
               >
-                {h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain]}
+                {TERRAIN_LABEL[h.terrain]}
               </text>
               <svg
                 x={h.x * SIZE - SIZE}
                 y={h.y * SIZE - SIZE}
                 width={SIZE * 2}
                 height={SIZE * 2}
-                viewBox={`${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
+                viewBox={gold ? '0 0 512 512' : `${(n % 3) * 512} ${Math.floor(n / 3) * 512} 512 512`}
               >
-                <image
-                  href={art?.terrain ?? '/art/optimized/terrain-fantasy.777e0ac07117.webp'}
-                  width="1536"
-                  height="1024"
-                />
+                {gold ? (
+                  <image href={art?.gold ?? GOLD_ART} width="512" height="512" />
+                ) : (
+                  <image
+                    href={art?.terrain ?? '/art/optimized/terrain-fantasy.777e0ac07117.webp'}
+                    width="1536"
+                    height="1024"
+                  />
+                )}
               </svg>
             </g>
           );
@@ -304,10 +371,13 @@ const BoardScenery = memo(function BoardScenery({
  * The harbours never change during a game either, but they draw above the tiles
  * and below the pieces, so they cannot join the scenery layer. Memoised on the
  * board, their 374 SVG nodes are built once instead of on every board update.
+ * On a board with sea they have no boat, so a harbour is never taken for a
+ * ship, and their badges sit nearer the shore (see seaBadge).
  */
-const BoardHarbors = memo(function BoardHarbors({ board }: { board: Island }) {
+const BoardHarbors = memo(function BoardHarbors({ board, sea }: { board: Island; sea: boolean }) {
   return board.ports.map((port) => {
-    const p = portPlacement(board, port.edge),
+    const pose = portPlacement(board, port.edge),
+      p = sea ? { ...pose, ...seaBadge(pose) } : pose,
       n = SPRITE_INDEX[port.resource];
     return (
       <g
@@ -347,17 +417,19 @@ const BoardHarbors = memo(function BoardHarbors({ board }: { board: Island }) {
             </g>
           );
         })}
-        <g className="port-boat" transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
-          <svg
-            x={-SHIP_SIZE / 2}
-            y={-SHIP_SIZE / 2}
-            width={SHIP_SIZE}
-            height={SHIP_SIZE}
-            viewBox="1536 512 512 512"
-          >
-            <image href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp" width="2048" height="1024" />
-          </svg>
-        </g>
+        {!sea && (
+          <g className="port-boat" transform={`translate(${p.boatX},${p.boatY}) rotate(${p.angle})`}>
+            <svg
+              x={-SHIP_SIZE / 2}
+              y={-SHIP_SIZE / 2}
+              width={SHIP_SIZE}
+              height={SHIP_SIZE}
+              viewBox="1536 512 512 512"
+            >
+              <image href="/art/optimized/sprites-fantasy.3aaf69915ec6.webp" width="2048" height="1024" />
+            </svg>
+          </g>
+        )}
         <g
           className="port-cargo"
           data-resource={port.resource}
@@ -429,13 +501,16 @@ export const Board = memo(function Board({
   const key = boardKey(board);
   const world = useMemo(() => worldBox(board), [key]);
   const coast = useMemo(() => coastline(board), [key]);
+  const sea = useMemo(() => hasSea(board), [key]);
+  // The water's feathered outline: round the Classic island, or round the whole frame of an Open Sea board.
   const water = useMemo(
     () =>
-      waterOutline(board, WATER_FEATHER / 2)
-        .map((p) => `${p.x},${p.y}`)
-        .join(' '),
+      (sea ? seaOutline(board, WATER_FEATHER / 2) : [waterOutline(board, WATER_FEATHER / 2)]).map((outline) =>
+        outline.map((p) => `${p.x},${p.y}`).join(' '),
+      ),
     [key],
   );
+  const seaBoard = board as Island & OpenSeaBoard;
   // A board with no room to ask — a preview, a test — falls back to the four
   // the game has always started with, in whatever order it has.
   const color = (id: string) =>
@@ -479,7 +554,7 @@ export const Board = memo(function Board({
   };
   return (
     <div
-      className={`island-stage ${gpuReady ? 'gpu-ready' : ''}`}
+      className={`island-stage ${gpuReady ? 'gpu-ready' : ''}${sea ? ' sea-stage' : ''}`}
       style={{ aspectRatio: `${world.width}/${world.height}` }}
     >
       <Terrain board={board} onReady={setGpuReady} art={art} />
@@ -489,12 +564,13 @@ export const Board = memo(function Board({
         role="group"
         aria-label="Island board"
       >
-        <BoardScenery board={board} art={art} coast={coast} water={water} world={world} />
+        <BoardScenery board={board} art={art} coast={coast} water={water} world={world} sea={sea} />
         {board.hexes.map((h) => {
           const x = h.x * SIZE,
             y = h.y * SIZE;
-          const canMoveRobber = robberMode && h.id !== game?.robber && !disabled;
-          const name = h.terrain === 'desert' ? 'Desert' : RESOURCE_NAMES[h.terrain];
+          // The robber never goes to sea: sea hexes are targets only for the pirate.
+          const canMoveRobber = robberMode && h.id !== game?.robber && !disabled && isLand(h);
+          const name = TERRAIN_NAME[h.terrain];
           return (
             <g
               key={h.id}
@@ -555,7 +631,10 @@ export const Board = memo(function Board({
                   )}
                 </g>
               )}
-              {h.id === (game?.robber ?? board.hexes.find((h) => h.terrain === 'desert')!.id) && (
+              {h.id ===
+                (game?.robber ??
+                  seaBoard.robberStart ??
+                  board.hexes.find((h) => h.terrain === 'desert')?.id) && (
                 <g
                   className="robber-piece"
                   transform={`translate(${x + (h.number ? 29 : 0)},${y + 6})`}
@@ -569,7 +648,7 @@ export const Board = memo(function Board({
             </g>
           );
         })}
-        <BoardHarbors board={board} />
+        <BoardHarbors board={board} sea={sea} />
         {game &&
           Object.entries(game.roads).map(([id, owner]) => {
             const { length, transform } = roadGeometry(board, Number(id));

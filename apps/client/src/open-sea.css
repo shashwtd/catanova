@@ -1,0 +1,6 @@
+/* Open Sea on the board: the stage of a board with sea. */
+/* The islands cast the stage's drop shadow on the water (Terrain.tsx), so the
+   sea's own edge does not cast one on the table. */
+.board-camera .sea-stage {
+  filter: none;
+}
