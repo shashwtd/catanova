@@ -48,9 +48,19 @@ import { defaultProfile, emptyFriends } from '../../../../packages/protocol/src/
 import type { Profile } from '../../../../packages/protocol/src/profile.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
 import type { PlayerGameState } from '../MatchHistory.js';
+import { isLand } from '../../../../packages/rules/src/board.js';
+import type { GameView } from '../../../../packages/rules/src/game.js';
+import { hasSea } from '../scene.js';
+import { hexAt, sampleBoard, samplePieces, SAMPLE_BOARDS } from './sample-boards.js';
 import './preview.css';
 const noop = () => {};
-const names = ['FernCaptain', 'Mossling', 'CopperFox', 'Juniper'];
+/**
+ * `?board=big-table`, `isles3` or `isles4` deals the sample game on that board instead of the Classic island,
+ * and `&pirate=q,r` moves the pirate to the hex at q,r.
+ */
+const search = new URLSearchParams(location.search);
+const previewBoard = SAMPLE_BOARDS.find((name) => name === search.get('board'));
+const names = ['FernCaptain', 'Mossling', 'CopperFox', 'Juniper'].slice(0, previewBoard === 'isles3' ? 3 : 4);
 const seats = names.map((name, i) => ({
   id: `sample-${i}`,
   name,
@@ -69,27 +79,47 @@ const room: RoomState = {
   players: seats,
 };
 function sampleGame() {
-  let game = createGame(seats, 481, () => 0.37);
-  for (let i = 0; i < 16; i++) {
-    const player = game.players[game.active]!;
-    const view = gameView(game, player.id);
-    const action =
-      game.phase === 'setupSettlement'
-        ? { kind: 'settlement' as const, vertex: view.legal.settlements[0]! }
-        : { kind: 'road' as const, edge: view.legal.roads[0]! };
-    game = applyAction(game, player.id, action, () => 0.37);
-  }
-  game = applyAction(game, me, { kind: 'roll' }, () => 0.34);
-  // Give this local fixture a legal extension, so all three build states are inspectable.
-  extend: for (const edge of roadSites(game, me)) {
-    const candidate = structuredClone(game);
-    candidate.roads[edge] = me;
-    for (const next of roadSites(candidate, me)) {
-      const extended = structuredClone(candidate);
-      extended.roads[next] = me;
-      if (settlementSites(extended, me).length) {
-        game = extended;
-        break extend;
+  const board = previewBoard && sampleBoard(previewBoard, 9000 + SAMPLE_BOARDS.indexOf(previewBoard));
+  let game = createGame(seats, board ? board.seed : 481, () => 0.37, board ? { board } : {});
+  const pieces =
+    board &&
+    samplePieces(
+      previewBoard,
+      board,
+      seats.map((seat) => seat.id),
+    );
+  if (board && pieces) {
+    // The engine has no Open Sea rules yet: the sample's pieces go straight onto the board, mid-turn.
+    const pirate = search.get('pirate')?.split(',').map(Number);
+    Object.assign(game, {
+      ...pieces,
+      pirate: pirate?.length === 2 ? hexAt(board, [pirate[0]!, pirate[1]!]) : board.pirateStart,
+      phase: 'actions',
+      active: game.players.findIndex((p) => p.id === me),
+      dice: [2, 5],
+    });
+  } else {
+    for (let i = 0; i < 2 * seats.length * 2; i++) {
+      const player = game.players[game.active]!;
+      const view = gameView(game, player.id);
+      const action =
+        game.phase === 'setupSettlement'
+          ? { kind: 'settlement' as const, vertex: view.legal.settlements[0]! }
+          : { kind: 'road' as const, edge: view.legal.roads[0]! };
+      game = applyAction(game, player.id, action, () => 0.37);
+    }
+    game = applyAction(game, me, { kind: 'roll' }, () => 0.34);
+    // Give this local fixture a legal extension, so all three build states are inspectable.
+    extend: for (const edge of roadSites(game, me)) {
+      const candidate = structuredClone(game);
+      candidate.roads[edge] = me;
+      for (const next of roadSites(candidate, me)) {
+        const extended = structuredClone(candidate);
+        extended.roads[next] = me;
+        if (settlementSites(extended, me).length) {
+          game = extended;
+          break extend;
+        }
       }
     }
   }
@@ -127,6 +157,19 @@ const record: PlayerGameState = {
   refresh: noop,
   loadMore: noop,
 };
+/** On a board with sea, the engine's Classic rules would offer sites out at sea: the preview keeps those on land. */
+function landSites(view: GameView): GameView {
+  if (!hasSea(view.board)) return view;
+  const { hexes, edges, vertices } = view.board;
+  return {
+    ...view,
+    legal: {
+      ...view.legal,
+      roads: view.legal.roads.filter((id) => edges[id]!.hexes.some((h) => isLand(hexes[h]!))),
+      settlements: view.legal.settlements.filter((id) => vertices[id]!.hexes.some((h) => isLand(hexes[h]!))),
+    },
+  };
+}
 function PreviewDialog(props: { title: string; children: ReactNode; onClose: () => void; side?: boolean }) {
   return props.side ? (
     <UtilityPanel title={props.title} onClose={props.onClose}>
@@ -265,7 +308,7 @@ export function LoungePreview() {
     }
     return state;
   }, [simulation, availableBuilds, previewLeader, profile.name]);
-  const game = useMemo(() => gameView(previewState, me), [previewState]);
+  const game = useMemo(() => landSites(gameView(previewState, me)), [previewState]);
   const previewGame = {
     ...game,
     diceMode: settings?.diceMode ?? 'classic',

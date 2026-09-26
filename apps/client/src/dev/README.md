@@ -10,6 +10,8 @@ The real app is at `/play` and still uses the existing `/api` and `/ws` proxies 
 
 The collapsed **Preview** menu at the top switches between Hub, Lobby and Game. Enable **Concept terrain & ocean** to compare the simpler atlas on the same island; disable it to return to current production art. **Show sample awards** puts both award badges on sample profiles for inspection. These are visual fixtures, not a live rules simulation.
 
+Add `?board=big-table`, `?board=isles3` or `?board=isles4` to deal the sample game on a Big Table island or an Outer Isles board for three or four players instead of the Classic island. The boards are dealt by hand in `sample-boards.ts`, as the map docs describe them; the Outer Isles ones carry sample ships in several colours and the pirate, and `&pirate=q,r` moves the pirate to the hex at q,r, such as `&pirate=2,-3` beside a crowded harbour on `isles4`. The engine has no Open Sea rules yet, so the pieces are placed directly and dice events there still follow Classic rules.
+
 The game preview uses the shared GameTools menu: History and Connection remain visible, while help, game rules, sound, fullscreen and leaving are grouped under Menu. Preview history and ping values are sample data. Lobby leaving uses the same confirmation sheet as real rooms.
 
 Open <http://127.0.0.1:5173/dev/results> to inspect the game-over screen immediately.
