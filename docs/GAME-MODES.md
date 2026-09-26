@@ -785,9 +785,12 @@ cannot read.
      lists the modes they may pick (`RoomState.modes`), and only when that is
      more than Classic;
    - the capability is `rulesets` in the join message: the ruleset ids the
-     tab's build contains. A game in a mode this server does not know is
-     refused with `VERSION_MISMATCH`, not `CLIENT_UPDATE_REQUIRED`, since
-     refreshing cannot help;
+     tab's build contains. The field never costs a tab its handshake, so a
+     later client can always reconnect after a rollback: the server drops
+     anything that is not a ruleset id and any repeat, keeps at most 32, and
+     ignores a value that is not a list. A game in a mode this server does not
+     know is refused with `VERSION_MISMATCH`, not `CLIENT_UPDATE_REQUIRED`,
+     since refreshing cannot help;
    - start-up and the compactor leave a game in an unknown mode exactly as it
      is, the account history skips it, and the clock stops asking about it. Game
      analytics refuses it, the dice statistics leave its rolls out and the

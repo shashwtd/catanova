@@ -178,6 +178,13 @@ export type ServerMessage =
   /** A friend came online, went offline or changed where they can be watched. */
   | { type: 'friend'; friend: FriendPresenceChange };
 
+/**
+ * The rulesets a tab says it can draw, as ids. Never a reason to refuse a handshake: a client from a later
+ * release must still reconnect after a rollback, whatever it lists. Anything that is not a ruleset id, and any
+ * repeat, is dropped, and at most 32 are kept; a value that is not a list is ignored altogether.
+ */
+const drawableRulesets = (value: unknown[]) => [...new Set(value.filter(isRulesetId))].slice(0, 32);
+
 /** Bounds and a strict operation whitelist keep untrusted messages out of the store. */
 export function parseClientMessage(input: string): ClientMessage {
   const m: unknown = JSON.parse(input);
@@ -193,11 +200,6 @@ export function parseClientMessage(input: string): ClientMessage {
       throw new Error('Invalid room code');
     if (v.accessToken !== undefined && (typeof v.accessToken !== 'string' || v.accessToken.length > 16000))
       throw new Error('Invalid authentication');
-    if (
-      v.rulesets !== undefined &&
-      (!Array.isArray(v.rulesets) || v.rulesets.length > 32 || !v.rulesets.every(isRulesetId))
-    )
-      throw new Error('Invalid rulesets');
     return {
       type: v.type,
       version: v.version,
@@ -207,7 +209,7 @@ export function parseClientMessage(input: string): ClientMessage {
       ...(typeof v.accessToken === 'string' ? { accessToken: v.accessToken } : {}),
       ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
       ...(v.preloadGame === true ? { preloadGame: true } : {}),
-      ...(Array.isArray(v.rulesets) ? { rulesets: [...new Set(v.rulesets as string[])] } : {}),
+      ...(Array.isArray(v.rulesets) ? { rulesets: drawableRulesets(v.rulesets) } : {}),
     };
   }
   if (

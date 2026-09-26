@@ -58,26 +58,18 @@ test('a tab that cannot draw the room’s mode is kept out of it, and told to re
   // The capability is a field of the join message, like preloadGame; the protocol version stays 1.
   assert.equal(PROTOCOL_VERSION, 1);
   const joining = { type: 'join', version: 1, token: 'a'.repeat(64), name: 'A', roomId: 'ABCD' };
-  assert.deepEqual(
-    parseClientMessage(JSON.stringify({ ...joining, rulesets: [TEST, TEST, CLASSIC.id] })).type,
-    'join',
-  );
-  assert.deepEqual(
-    (
-      parseClientMessage(JSON.stringify({ ...joining, rulesets: [TEST, TEST, CLASSIC.id] })) as {
-        rulesets?: string[];
-      }
-    ).rulesets,
-    [TEST, CLASSIC.id],
-  );
-  assert.throws(
-    () => parseClientMessage(JSON.stringify({ ...joining, rulesets: 'test-table-v1' })),
-    /Invalid rulesets/,
-  );
-  assert.throws(
-    () => parseClientMessage(JSON.stringify({ ...joining, rulesets: ['Test Table'] })),
-    /Invalid rulesets/,
-  );
+  const drawable = (rulesets: unknown) =>
+    (parseClientMessage(JSON.stringify({ ...joining, rulesets })) as { rulesets?: string[] }).rulesets;
+  assert.equal(parseClientMessage(JSON.stringify({ ...joining, rulesets: [TEST, CLASSIC.id] })).type, 'join');
+  assert.deepEqual(drawable([TEST, TEST, CLASSIC.id]), [TEST, CLASSIC.id]);
+  // The field never costs a tab its handshake, whatever a later client sends: after a rollback it must
+  // still reconnect. What is not a ruleset id is dropped, repeats too, and at most 32 are kept.
+  assert.deepEqual(drawable([CLASSIC.id, 'Test Table', 7, null, { id: TEST }, '', TEST]), [CLASSIC.id, TEST]);
+  assert.equal(drawable('test-table-v1'), undefined);
+  assert.equal(drawable({ [TEST]: true }), undefined);
+  const many = Array.from({ length: 40 }, (_, i) => `mode-${i}-v1`);
+  assert.deepEqual(drawable([...many, ...many]), many.slice(0, 32));
+  assert.deepEqual(drawable([...Array.from({ length: 40 }, () => 'Not An Id'), TEST]), [TEST]);
 
   const host = open('Host');
   await until(() => host.client.status === 'connected');
@@ -93,8 +85,12 @@ test('a tab that cannot draw the room’s mode is kept out of it, and told to re
   assert.deepEqual(old.errors, ['CLIENT_UPDATE_REQUIRED: Refresh to play Test Table']);
   assert.equal(old.client.status, 'closed');
   assert.equal(server.store.snapshot(roomId).players.length, 2);
-  // A current tab joins; the older tab already seated stops the start until it refreshes.
-  const current = open('Current', roomId);
+  // The older tab already seated stops the start until it refreshes.
+  // A current tab joins; ids it lists that are not ruleset ids are simply dropped.
+  const current = open('Current', roomId, {
+    ...modern,
+    rulesets: ['Not An Id', ...modern.rulesets, 'x'.repeat(100)],
+  });
   await until(() => host.client.state?.players.length === 3);
   // Ready is refused against settings a tab has not seen yet, so both see the new mode first.
   await until(() => [early.client, current.client].every((client) => client.state?.settings?.mode === TEST));
