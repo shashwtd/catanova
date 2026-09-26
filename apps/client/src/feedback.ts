@@ -116,7 +116,7 @@ export function publicProduction(
           if (before.players.find((player) => player.id === building.player)?.resigned) continue;
           const payment = owed.get(building.player);
           if (!payment) return null;
-          payment[hex.terrain] += building.kind === 'city' ? 2 : 1;
+          payment[hex.terrain as Resource] += building.kind === 'city' ? 2 : 1;
         }
       }
   const paid = new Map(before.players.map((p) => [p.id, emptyHand()]));
@@ -261,17 +261,17 @@ export function deriveFeedback(
             n + (before.buildings[v]?.player === id ? (before.buildings[v]!.kind === 'city' ? 2 : 1) : 0),
           0,
         );
-        const amount = Math.min(units, payment[hex.terrain]);
+        const amount = Math.min(units, payment[hex.terrain as Resource]);
         if (!amount) continue;
         event.glowHexes.push(hex.id);
         event.flights.push({
-          resource: hex.terrain,
+          resource: hex.terrain as Resource,
           amount,
           from: `[data-effect-hex="${hex.id}"]`,
-          to: id === me ? card(hex.terrain) : `[data-player-profile="${id}"]`,
+          to: id === me ? card(hex.terrain as Resource) : `[data-player-profile="${id}"]`,
         });
-        payment[hex.terrain] -= amount;
-        if (id === me) gain[hex.terrain] -= amount;
+        payment[hex.terrain as Resource] -= amount;
+        if (id === me) gain[hex.terrain as Resource] -= amount;
       }
     }
   }

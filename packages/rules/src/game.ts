@@ -446,7 +446,7 @@ function produce(g: Game, number: number) {
         const b = g.buildings[v];
         if (b) {
           const i = g.players.findIndex((p) => p.id === b.player);
-          if (!g.players[i]?.resigned) owed[i]![h.terrain] += b.kind === 'city' ? 2 : 1;
+          if (!g.players[i]?.resigned) owed[i]![h.terrain as Resource] += b.kind === 'city' ? 2 : 1;
         }
       }
     }
@@ -780,7 +780,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     const startingResources = emptyHand();
     if (g.setupIndex >= g.players.length)
       for (const id of g.board.vertices[a.vertex]!.hexes) {
-        const resource = g.board.hexes[id]!.terrain;
+        const resource = g.board.hexes[id]!.terrain as Resource | 'desert';
         if (resource !== 'desert') {
           p.hand[resource]++;
           g.bank[resource]--;
