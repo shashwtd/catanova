@@ -4,6 +4,8 @@ import { BotMark, GameIcon, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView, PlayerView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
+import { ABSENCE_AFTER_MS } from '../../../packages/protocol/src/settings.js';
+import { findRuleset } from '../../../packages/rules/src/rulesets.js';
 import { Avatar } from './Profile.js';
 import { seatColorMap } from './player-colors.js';
 import { playerTurnActivity } from './turn-activity.js';
@@ -191,6 +193,8 @@ export function PlayerRail({
   if (room.serverNow !== undefined && room.serverNow !== fallback.current.server)
     fallback.current = { server: room.serverNow, local: Date.now() };
   const serverNow = now + (clockOffset ?? fallback.current.server - fallback.current.local);
+  // Classic covers an empty seat with a stand-in; a mode without one says when the clock takes over.
+  const standIns = findRuleset(game.ruleset)?.standIns ?? true;
   const counting =
     game.phase !== 'finished' && room.players.some((seat) => !seat.connected && seat.resignAt !== undefined);
   useEffect(() => {
@@ -255,6 +259,9 @@ export function PlayerRail({
                 deadline={!seat?.connected && game.phase !== 'finished' ? seat?.resignAt : undefined}
                 now={serverNow}
                 paused={room.paused}
+                {...(!standIns && seat?.disconnectedAt !== undefined
+                  ? { forcedMovesAt: seat.disconnectedAt + ABSENCE_AFTER_MS }
+                  : {})}
               />
               <AwardCounts player={p} road={road} army={army} />
               {friendship && seat?.accountId && seat.accountId !== friendship.self && (

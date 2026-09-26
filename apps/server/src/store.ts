@@ -19,7 +19,11 @@ import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import type { AccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
-import { DEFAULT_ROOM_SETTINGS, parseRoomSettings } from '../../../packages/protocol/src/settings.js';
+import {
+  ABSENCE_AFTER_MS,
+  DEFAULT_ROOM_SETTINGS,
+  parseRoomSettings,
+} from '../../../packages/protocol/src/settings.js';
 import type { RoomSettings, TurnClock } from '../../../packages/protocol/src/settings.js';
 import type { Identity } from './auth.js';
 import { createHash, randomUUID, randomInt } from 'node:crypto';
@@ -36,6 +40,7 @@ import {
 } from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
 import { timeoutAction, timeoutDescription } from '../../../packages/rules/src/timeout.js';
+import { owedMoves } from '../../../packages/rules/src/owed.js';
 import { generateBoard, shuffle } from '../../../packages/rules/src/board.js';
 import type { Board } from '../../../packages/rules/src/board.js';
 import {
@@ -44,6 +49,7 @@ import {
   findRuleset,
   numberWord,
   playsBoard,
+  rulesetOf,
   rulesets,
   switchBlock,
   targetRangeText,
@@ -78,6 +84,8 @@ export const RECONNECT_GRACE_MS = 3 * 60 * 1000;
  * game. Long enough that an ordinary reload does not hand the seat over.
  */
 export const STANDIN_AFTER_MS = 30 * 1000;
+/** How long an empty seat waits, in a mode without stand-ins, before the clock plays its forced moves. */
+export { ABSENCE_AFTER_MS };
 /** How well a stand-in plays. Not the champion — taking a seat over is meant to
  *  keep the game going, not to turn the absent player into the strongest one at
  *  the table — and not the mildest either, which would throw their game away. */
@@ -1492,18 +1500,23 @@ export class Store {
             disconnectedAt: now,
             resignAt: now + RECONNECT_GRACE_MS,
           };
-        this.writePresence(roomId, holdFromPause(state));
+        this.writePresence(roomId, holdFromPause(state), game);
       }
     });
   }
-  private writePresence(roomId: string, state: Presence) {
+  private writePresence(roomId: string, state: Presence, game: Game) {
     // Two deadlines matter for an absent seat: the short one, after which a bot
     // picks it up, and the long one, after which a table nobody is sitting at
     // is finally abandoned. A seat a bot already holds has only the second one
-    // left, so the room stops coming up due every tick.
+    // left, so the room stops coming up due every tick. In a mode without
+    // stand-ins the short one is when the clock starts making the seat's forced
+    // moves, and it counts only while the game is waiting on that seat.
+    const standIns = rulesetOf(game).standIns;
     const standing = new Set(this.standInIds(roomId));
+    const owed = new Set(owedMoves(game).map((move) => move.player));
     const deadlines = Object.entries(state.seats).flatMap(([id, seat]) => {
       if (state.pausedAt !== undefined) return [seat.resignAt];
+      if (!standIns) return owed.has(id) ? [seat.disconnectedAt + ABSENCE_AFTER_MS] : [];
       // Covered seats have no expiry while humans remain. An expired resignation
       // deadline here would otherwise wake this room on every scheduler tick.
       if (standing.has(id)) return [];
@@ -1539,7 +1552,7 @@ export class Store {
           resignAt: now + RECONNECT_GRACE_MS,
         };
       }
-    this.writePresence(roomId, holdFromPause(state));
+    this.writePresence(roomId, holdFromPause(state), game);
     if (resumed) {
       // Nobody owes an immediate automatic move for time when nobody could see the game.
       this.db.prepare('DELETE FROM turn_clocks WHERE room_id=?').run(roomId);
@@ -1608,13 +1621,15 @@ export class Store {
     // A seat that has been empty for half a minute is picked up by a bot, so
     // one person's dropped connection does not stop the game for everyone else.
     // Only while somebody is still at the table: a paused room has nobody to
-    // keep playing for, and a bot playing to an empty room is just noise.
-    const takeOver =
+    // keep playing for, and a bot playing to an empty room is just noise. Only
+    // in a mode with stand-ins: elsewhere the clock's absence rule covers them.
+    const due =
       presence.pausedAt !== undefined
         ? []
         : absent
             .filter(([id, absence]) => !holding.has(id) && absence.disconnectedAt + STANDIN_AFTER_MS <= now)
             .map(([id]) => id);
+    const takeOver = due.length && findRuleset(this.roomMode(roomId))?.standIns ? due : [];
     // Resignation is now only for a table nobody is sitting at. While anyone is
     // still watching, an absent player keeps their pieces, their points and
     // their place, and a bot plays their turns until they come back.
@@ -1779,8 +1794,11 @@ export class Store {
     if (next.phase === 'discard') {
       clock.pausedAt ??= now;
       const existing = clock.discardDeadlines ?? {};
+      // Each player the game waits on for a discard has a full turn's time of their own.
       clock.discardDeadlines = Object.fromEntries(
-        Object.keys(next.discards).map((id) => [id, existing[id] ?? now + seconds * 1000]),
+        owedMoves(next)
+          .filter((move) => move.kind === 'discard')
+          .map(({ player }) => [player, existing[player] ?? now + seconds * 1000]),
       );
     } else if (clock.pausedAt !== undefined) {
       clock.deadlineAt += Math.max(0, now - clock.pausedAt);
@@ -1851,6 +1869,7 @@ export class Store {
     let changed = this.expireAbsences(roomId) || presenceRecovered;
     if (this.trackPresence && (!this.presence(roomId) || this.presence(roomId)?.pausedAt !== undefined))
       return changed;
+    changed = this.playForAbsent(roomId) || changed;
     const firstClock = this.clock(roomId);
     if (!firstClock) return changed;
     // At most four discards, two free roads, a robber move, a roll and an end-turn.
@@ -1884,6 +1903,54 @@ export class Store {
     }
     return changed;
   }
+  /**
+   * The absence rule of modes without stand-ins (docs/TURN_CLOCK.md, "Modes without bots"). Once a player has
+   * been offline for two minutes, the clock makes every move the game waits on them for, exactly as when
+   * their time runs out, with or without a turn timer, until they reconnect. Only while somebody is at the
+   * table: the caller has already stopped for a paused room.
+   */
+  private playForAbsent(roomId: string): boolean {
+    let changed = false;
+    // A lap of a six-seat table at most, each seat rolling, settling a seven and ending its turn; anything
+    // left waits for the next tick.
+    for (let step = 0; step < 24; step++) {
+      const presence = this.presence(roomId);
+      if (!presence || presence.pausedAt !== undefined) break;
+      const game = this.loadGame(roomId);
+      if (!game || game.phase === 'finished' || rulesetOf(game).standIns) break;
+      const now = this.now();
+      const owed = owedMoves(game).find(({ player }) => {
+        const absence = presence.seats[player];
+        return (
+          !!absence && !this.connectedSeats.has(player) && absence.disconnectedAt + ABSENCE_AFTER_MS <= now
+        );
+      });
+      if (!owed) break;
+      const action = timeoutAction(game, owed.player, this.random);
+      if (!action)
+        throw new ProtocolError(
+          'CLOCK_STATE',
+          'The turn clock needs recovery before automatic play can continue',
+        );
+      const player = game.players.find((p) => p.id === owed.player)!;
+      const revision = this.db.prepare('SELECT revision FROM rooms WHERE id = ?').get(roomId)!
+        .revision as number;
+      const commandId =
+        'away-' +
+        hash(
+          JSON.stringify({ roomId, playerId: owed.player, revision, turn: game.turn, phase: game.phase }),
+        ).slice(0, 48);
+      this.action(
+        { id: owed.player, name: player.name, room_id: roomId },
+        commandId,
+        revision,
+        action,
+        'away',
+      );
+      changed = true;
+    }
+    return changed;
+  }
   loadGame(roomId: string): Game | undefined {
     const row = this.db.prepare('SELECT state FROM games WHERE room_id = ?').get(roomId) as
       { state: string } | undefined;
@@ -1906,7 +1973,8 @@ export class Store {
     commandId: string,
     expectedRevision: number,
     input: GameAction,
-    automatic: boolean | 'bot' = false,
+    // true: the turn clock ran out; 'away': the absence rule moved for a player gone too long; 'bot': a bot.
+    automatic: boolean | 'bot' | 'away' = false,
   ) {
     const action = parseGameAction(input);
     if (!automatic) this.expireRoom(seat.room_id);
@@ -2065,10 +2133,14 @@ export class Store {
         if (!current) throw new ProtocolError('NOT_STARTED', 'Start the game first');
         next = applyAction(current, seat.id, action, this.random);
       }
-      if (automatic === true) {
+      if (automatic === true || automatic === 'away') {
+        const description = timeoutDescription(action, current?.phase);
         next.log.push({
           id: next.nextLog++,
-          text: `${seat.name}'s timer expired; ${timeoutDescription(action)}.`,
+          text:
+            automatic === 'away'
+              ? `${seat.name} is away; ${description}.`
+              : `${seat.name}'s timer expired; ${description}.`,
         });
         if (next.log.length > 80) next.log.shift();
       }
@@ -2096,7 +2168,7 @@ export class Store {
         next,
         next.log.filter((e) => e.id >= (current?.nextLog ?? 0)).map((e) => e.text),
         action.kind,
-        automatic === true,
+        automatic === true || automatic === 'away',
         automatic === 'bot' ? 'bot' : automatic ? 'timer' : 'human',
       );
       this.db

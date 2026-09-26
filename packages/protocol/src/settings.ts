@@ -16,6 +16,11 @@ export type RoomSettings = {
 };
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = { turnTimerSeconds: 90, diceMode: 'balanced' };
 export const DEFAULT_TURN_TIMER_SECONDS: TurnTimerSeconds = 90;
+/**
+ * How long a seat sits empty, in a mode without stand-ins, before the clock makes its forced moves: whenever
+ * the game waits on that seat, exactly as if its time had run out (docs/TURN_CLOCK.md, "Modes without bots").
+ */
+export const ABSENCE_AFTER_MS = 2 * 60 * 1000;
 
 /** All timestamps use the server's epoch milliseconds. Setup has no clock. */
 export type TurnClock = {

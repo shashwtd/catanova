@@ -20,12 +20,15 @@ export function DisconnectStatus({
   deadline,
   now,
   paused,
+  forcedMovesAt,
 }: {
   resigned?: boolean;
   standIn?: boolean;
   deadline?: number;
   now: number;
   paused?: boolean;
+  /** In a mode without stand-ins, when the clock starts making this seat's forced moves. */
+  forcedMovesAt?: number;
 }) {
   if (resigned) return <span className="profile-absence resigned-label">Resigned</span>;
   if (standIn)
@@ -39,15 +42,38 @@ export function DisconnectStatus({
       </span>
     );
   if (deadline === undefined) return null;
+  const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const remaining = reconnectSeconds(deadline, now);
-  const time = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
-  if (!paused)
+  const time = clock(remaining);
+  if (!paused && forcedMovesAt === undefined)
     return (
       <span className="profile-absence" title="A bot takes this seat shortly, and hands it back on return">
         <Clock3 size={13} />
         <span>Away</span>
       </span>
     );
+  // No bot takes the seat in this mode. The table waits, then the clock makes only the moves the game must have.
+  if (!paused) {
+    const until = reconnectSeconds(forcedMovesAt!, now);
+    return until > 0 ? (
+      <span
+        className="profile-absence"
+        title="The clock makes this seat’s forced moves after 2 minutes away, until they reconnect"
+      >
+        <Clock3 size={13} />
+        <span>Auto moves in</span>
+        <b aria-label={`Forced moves begin in ${until} seconds`}>{clock(until)}</b>
+      </span>
+    ) : (
+      <span
+        className="profile-absence"
+        title="The clock is making this seat’s forced moves until they reconnect"
+      >
+        <Clock3 size={13} />
+        <span>Clock plays forced moves</span>
+      </span>
+    );
+  }
   return (
     <span className="profile-absence" title="Nobody is at this table. The match closes when this runs out">
       <Clock3 size={13} />
