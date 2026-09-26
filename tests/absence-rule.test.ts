@@ -236,6 +236,29 @@ test('an absent player the game is not waiting on does not wake the room on ever
   }
 });
 
+test('a connected player is never moved for, whatever a stale presence entry says', () => {
+  const t = table();
+  try {
+    while (game(t).turn === 0) play(t);
+    const here = seatOf(t, activePlayer(game(t)).id);
+    // A presence entry that still lists them as gone for ten minutes, as a write that had not caught up
+    // with their return would: the connection itself is what counts.
+    t.store.db.prepare('UPDATE room_presence SET state = ?, next_deadline = 0 WHERE room_id = ?').run(
+      JSON.stringify({
+        version: 2,
+        seats: { [here.id]: { disconnectedAt: t.clock.now - 10 * 60_000, resignAt: t.clock.now + 60_000 } },
+      }),
+      t.roomId,
+    );
+    t.store.expireRoom(t.roomId);
+    assert.deepEqual(awayLines(game(t)), []);
+    assert.equal(game(t).phase, 'roll');
+    assert.equal(activePlayer(game(t)).id, here.id);
+  } finally {
+    t.store.close();
+  }
+});
+
 test('an absent player owed a discard has it made for them, and the others still choose their own', () => {
   const t = table();
   try {
