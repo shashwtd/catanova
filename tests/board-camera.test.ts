@@ -300,7 +300,7 @@ test('a sea board opens on its islands where the whole frame would draw small to
   // A phone opens with the islands filling its width, their tokens nearly Classic's size.
   const opened = openingCamera(phone, world, islands),
     unit = fitBoard(phone, world).width / world.width;
-  assert.ok(opened.scale > 1.2 && opened.scale < 1.3, `${opened.scale}`);
+  assert.ok(opened.scale > 1.45 && opened.scale < 1.6, `${opened.scale}`);
   assert.ok(islands.width * unit * opened.scale <= phone.width - 24 + 1e-9);
   assert.ok(40 * unit * opened.scale > 15);
   assert.deepEqual(constrainCamera(opened, phone, world), opened);

@@ -470,14 +470,48 @@ export const BIG_TABLE_BALANCED_V1: BoardPreset = {
   fairness: { ...BALANCED_FAIRNESS, spread: 4, desertsApart: true },
 };
 
-/** Every hex in rows `top` to `bottom` whose column, 2q + r in half hexes, runs from `left` to `right`. */
-function rectangle(top: number, bottom: number, left: number, right: number): Axial[] {
-  const shape: Axial[] = [];
-  for (let r = top; r <= bottom; r++)
-    for (let column = left; column <= right; column++)
-      if ((column - r) % 2 === 0) shape.push({ q: (column - r) / 2, r });
-  return shape;
+/** How many rings of ocean an Open Sea board keeps round every coast, so that its outline follows its islands'. */
+export const OCEAN_RINGS = 2;
+/**
+ * An Open Sea board round some land: the land and every hex within `rings` steps of it, in rows from the top and
+ * left to right within a row, as topology() numbers them. The outermost ring is the rim, and the board's outline
+ * follows the islands' own rather than a rectangle's. A notch one hex wide, where the rings of two islands
+ * nearly meet, is filled: a hex with four or more neighbours on the board joins it, until none is left, so the
+ * outline has no pinch for the water's edge to fold into.
+ */
+export function withOcean(land: readonly Axial[], rings: number): Axial[] {
+  const near = new Map<string, Axial>();
+  const add = (q: number, r: number) => near.set(`${q},${r}`, { q, r });
+  for (const h of land)
+    for (let dq = -rings; dq <= rings; dq++)
+      for (let dr = Math.max(-rings, -dq - rings); dr <= Math.min(rings, rings - dq); dr++)
+        add(h.q + dq, h.r + dr);
+  const around = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, -1],
+    [-1, 1],
+  ] as const;
+  for (let filled = true; filled;) {
+    filled = false;
+    for (const { q, r } of [...near.values()])
+      for (const [dq, dr] of around) {
+        const nq = q + dq,
+          nr = r + dr;
+        if (near.has(`${nq},${nr}`)) continue;
+        if (around.filter(([a, b]) => near.has(`${nq + a},${nr + b}`)).length >= 4) {
+          add(nq, nr);
+          filled = true;
+        }
+      }
+  }
+  return [...near.values()].sort((a, b) => a.r - b.r || a.q - b.q);
 }
+/** A template's board: its islands with OCEAN_RINGS rings of ocean round them. */
+const oceanAround = (islands: Pick<IslandTemplate, 'main' | 'small'>, rings: number) =>
+  withOcean([...islands.main.hexes, ...Object.values(islands.small.hexes).flat()], rings);
 /** Hexes by their coordinates, each given as (q, r). */
 function hexesAt(...coordinates: [q: number, r: number][]): Axial[] {
   return coordinates.map(([q, r]) => ({ q, r }));
@@ -488,13 +522,13 @@ function runs(...rows: [r: number, first: number, last: number][]): Axial[] {
     Array.from({ length: last - first + 1 }, (_, k) => ({ q: first + k, r })),
   );
 }
-/** An Open Sea preset for one template: terrain and numbers total its two parts', and the rest is sea. */
-function outerIsles(
-  shape: BoardShape,
-  harbours: BoardPreset['harbours'],
-  islands: IslandTemplate,
-): BoardPreset {
-  const { main, small } = islands;
+/**
+ * An Open Sea preset for one template: its board is the islands with OCEAN_RINGS rings of ocean round them,
+ * terrain and numbers total its two parts', and the rest is sea.
+ */
+function outerIsles(harbours: BoardPreset['harbours'], islands: IslandTemplate): BoardPreset {
+  const { main, small } = islands,
+    shape = oceanAround(islands, OCEAN_RINGS);
   const total = (t: Resource | 'desert' | 'gold') => (main.terrain[t] ?? 0) + (small.terrain[t] ?? 0);
   const land = main.hexes.length + Object.values(small.hexes).flat().length;
   return {
@@ -523,7 +557,6 @@ function outerIsles(
  */
 export const OUTER_ISLES_V1: Readonly<Record<3 | 4, BoardPreset>> = {
   3: outerIsles(
-    rectangle(-4, 4, -7, 8),
     // Eight harbours round the main island's 36 coastal edges, spaced 4, 4, 4, 4, 5, 5, 5 and 5 edges apart.
     { slots: [0, 4, 8, 12, 16, 21, 26, 31], trades: ['any', 'any', 'any', ...RESOURCES] },
     {
@@ -548,7 +581,6 @@ export const OUTER_ISLES_V1: Readonly<Record<3 | 4, BoardPreset>> = {
     },
   ),
   4: outerIsles(
-    rectangle(-4, 4, -8, 8),
     // Nine harbours round the main island's 40 coastal edges, spaced 4, 4, 4, 5, 4, 4, 5, 5 and 5 edges
     // apart counting clockwise, the way the coast is walked; counted the other way they lay out differently.
     { slots: [0, 4, 8, 12, 17, 21, 25, 30, 35], trades: ['any', 'any', 'any', 'any', ...RESOURCES] },

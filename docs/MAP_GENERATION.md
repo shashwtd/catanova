@@ -145,11 +145,11 @@ Outer Isles is Open Sea's first scenario (ruleset `open-sea-v1`, scenario id `ou
 
 ### Coordinates
 
-Hexes use the axial coordinates of `packages/rules/src/board.ts`: pointy-top hexes, with q counting along a row and r numbering the rows downwards, so r = −4 is the top row. The third coordinate is s = −q − r. The distance between two hexes is the largest of their differences in q, r and s. Because each row sits half a hex from the next, a hex's column, counted in half-hex steps from left to right, is 2q + r. The boards below are bounded by rows and columns, which keeps them close to rectangles.
+Hexes use the axial coordinates of `packages/rules/src/board.ts`: pointy-top hexes, with q counting along a row and r numbering the rows downwards, so the top rows have negative r. The third coordinate is s = −q − r. The distance between two hexes is the largest of their differences in q, r and s.
 
 Each template gives:
 
-- The board: every hex inside its rows and columns.
+- The board: its islands and every hex within two steps of their land, two rings of ocean round every coast (`OCEAN_RINGS`), so the board's outline follows the islands' own. A notch one hex wide, where the rings of two islands nearly meet, is filled: a hex with four or more neighbours on the board joins it, so the water's edge has no pinch. The owner chose this outline on 26 September 2026 over the first, rectangular boards, which felt square.
 - The sea ring: every board hex with fewer than six neighbours on the board. Ring hexes are always sea. The edges on the board's outside, the outer rim, take no piece. Ships may use every other edge of a ring hex, including the edges between two ring hexes.
 - The main island and the small islands, by coordinates. Every other hex is sea.
 
@@ -157,68 +157,72 @@ In the sketches below, `M` is the main island, lower-case letters are small isla
 
 ### Three-player template
 
-The board is every hex with −4 ≤ r ≤ 4 and −7 ≤ 2q + r ≤ 8: 72 hexes in nine rows of 8, each row starting half a hex left or right of the one above. It is 8½ hexes wide.
+The board is the islands with two rings of ocean: 92 hexes in rows of 5, 6, 8, 9, 10, 10, 10, 10, 9, 8 and 7, from r = −5 to 5. It is 10½ hexes wide.
 
 - Main island, 16 hexes in rows of 5, 5, 3, 2 and 1, a shield with its point to the south: r = −1, q = −2 to 2; r = 0, q = −1 to 3; r = 1, q = −1 to 1; r = 2, q = −1 to 0; r = 3, q = −1.
 - North isle (`a`), 3 hexes: (1, −3), (2, −3), (3, −3).
 - South-west isle (`b`), 3 hexes: (−3, 1), (−3, 2), (−3, 3).
 - South-east isle (`c`), 2 hexes: (2, 2), (1, 3).
-- Sea: the other 48 hexes, 30 in the ring and 18 inside it.
+- Sea: the other 68 hexes, 31 in the ring and 37 inside it.
 - Pirate start: (4, −2), open water between the north isle and the main island's north-east corner. It touches no land.
 
 ```
-r=-4  ~ ~ ~ ~ ~ ~ ~ ~
-r=-3 ~ . . a a a . ~
-r=-2  ~ . . . . . P ~
-r=-1 ~ M M M M M . ~
-r= 0  ~ . M M M M M ~
-r= 1 ~ b . M M M . ~
-r= 2  ~ b . M M . c ~
-r= 3 ~ . b . M . c ~
-r= 4  ~ ~ ~ ~ ~ ~ ~ ~
+r=-5       ~ ~ ~ ~ ~
+r=-4      ~ . . . . ~
+r=-3   ~ ~ . a a a . ~
+r=-2  ~ . . . . . . P ~
+r=-1 ~ . M M M M M . . ~
+r= 0  ~ . . M M M M M . ~
+r= 1 ~ . b . M M M . . ~
+r= 2  ~ . b . M M . c . ~
+r= 3   ~ . b . M . c . ~
+r= 4    ~ . . . . . . ~
+r= 5     ~ ~ ~ ~ ~ ~ ~
 ```
 
 ### Four-player template
 
-The board is every hex with −4 ≤ r ≤ 4 and −8 ≤ 2q + r ≤ 8: 77 hexes in rows of 9, 8, 9, 8, 9, 8, 9, 8 and 9. It is 9 hexes wide.
+The board is the islands with two rings of ocean, and one notch at the top filled: 107 hexes in rows of 8, 9, 10, 11, 10, 11, 10, 11, 10, 9 and 8, from r = −5 to 5. It is 11 hexes wide.
 
 - Main island, 20 hexes in rows of 2, 4, 7, 4, 2 and 1, a diamond: r = −2, q = 0 to 1; r = −1, q = −1 to 2; r = 0, q = −3 to 3; r = 1, q = −2 to 1; r = 2, q = −1 to 0; r = 3, q = −1.
 - North-west isle (`a`), 2 hexes: (−1, −3), (−2, −2).
 - North-east isle (`b`), 3 hexes: (3, −3), (4, −3), (4, −2).
 - South-east isle (`c`), 2 hexes: (2, 2), (1, 3).
 - South-west isle (`d`), 3 hexes: (−4, 2), (−4, 3), (−3, 3).
-- Sea: the other 47 hexes, 32 in the ring and 15 inside it.
-- Pirate start: (2, 4), the ring's south-east corner. It touches no land.
+- Sea: the other 77 hexes, 34 in the ring and 43 inside it.
+- Pirate start: (2, 4), on the ring south-east of the main island. It touches no land.
 
-The board is point-symmetric about the hex (0, 0). A half turn, taking (q, r) to (−q, −r), swaps the north-west and south-east isles, and the north-east and south-west isles, and maps the main island onto itself except for its southern tip, (−1, 3). Twenty hexes cannot turn onto themselves about a hex, so one hex has to be left over.
+The islands are point-symmetric about the hex (0, 0). A half turn, taking (q, r) to (−q, −r), swaps the north-west and south-east isles, and the north-east and south-west isles, and maps the main island onto itself except for its southern tip, (−1, 3). Twenty hexes cannot turn onto themselves about a hex, so one hex has to be left over. The ocean follows the land, so the board is nearly symmetric too.
 
 ```
-r=-4 ~ ~ ~ ~ ~ ~ ~ ~ ~
-r=-3  ~ a . . . b b ~
-r=-2 ~ a . M M . . b ~
-r=-1  ~ . M M M M . ~
-r= 0 ~ M M M M M M M ~
-r= 1  ~ . M M M M . ~
-r= 2 ~ d . . M M . c ~
-r= 3  ~ d d . M . c ~
-r= 4 ~ ~ ~ ~ ~ ~ ~ ~ P
+r=-5    ~ ~ ~ ~ ~ ~ ~ ~
+r=-4   ~ . . . . . . . ~
+r=-3  ~ . a . . . b b . ~
+r=-2 ~ . a . M M . . b . ~
+r=-1  ~ . . M M M M . . ~
+r= 0 ~ . M M M M M M M . ~
+r= 1  ~ . . M M M M . . ~
+r= 2 ~ . d . . M M . c . ~
+r= 3  ~ . d d . M . c . ~
+r= 4   ~ . . . . . . . P
+r= 5    ~ ~ ~ ~ ~ ~ ~ ~
 ```
 
-In both templates the main island reaches the ring: at its west and east ends, and at its southern tip. Its coast there faces ring hexes, whose inner edges take ships like any other sea edge.
+In both templates every coast has two rings of ocean outside it, so ships can sail right round every island, the main island included.
 
 ### Size on screen
 
-The board has to fit a phone held upright. The first sketches of these templates were 11 and 12 hexes wide, 79 and 88 hexes, with a wide belt of open sea. On a phone that drew every hex at about half the size of a Classic hex. These templates keep the land and the ring and drop most of the open sea, so each board is about as tall as it is wide.
+The board has to fit a phone held upright. The first sketches were 11 and 12 hexes wide, 79 and 88 hexes, with a wide belt of open sea; the next boards were compact rectangles, which the owner found too square. These boards keep two rings of ocean round every coast, so they are larger than the rectangles, and a phone opens on the islands rather than the whole board.
 
-Hex size against Classic's in the same space, measured on the board area of the in-game preview with the current world margin:
+Hex size against Classic's in the same space, measured on the board area of the in-game preview with the sea's 72-unit world margin (the camera's opening view in brackets):
 
-| Screen                 | Board area | Three players (first sketch) | Four players (first sketch) |
-| ---------------------- | ---------- | ---------------------------- | --------------------------- |
-| Phone, 390 × 844       | 374 × 462  | 0.67 (0.54)                  | 0.64 (0.50)                 |
-| Small phone, 375 × 667 | 359 × 305  | 0.66 (0.60)                  | 0.66 (0.56)                 |
-| Desktop, 1440 × 900    | 1074 × 754 | 0.66 (0.66)                  | 0.66 (0.66)                 |
+| Screen                 | Board area | Three players | Four players |
+| ---------------------- | ---------- | ------------- | ------------ |
+| Phone, 390 × 844       | 374 × 462  | 0.60 (0.92)   | 0.57 (0.87)  |
+| Small phone, 375 × 667 | 359 × 305  | 0.60 (0.88)   | 0.60 (0.88)  |
+| Desktop, 1440 × 900    | 1074 × 754 | 0.60 (0.60)   | 0.60 (0.60)  |
 
-A taller, narrower board would gain a little on the upright phone and lose more on the desktop and the small phone, which are limited by height. The world margin, the painted water round the board, is 112 units on every side today. The ring is already water, so a sea board does not need all of it: the sea renderer keeps 72 units, and on a phone opens on the islands, whose tokens are then about 15 pixels (see [Bigger maps and modes](BIGGER-MAPS-AND-MODES.md#sea-hexes-and-the-ring-of-sea)).
+On a phone the board opens with its islands filling the width: number tokens are 16.5 pixels with three players and 15.5 with four, against Classic's 17.9, and a pinch shows the whole ocean. A desktop shows the whole board, with tokens of 23.7 pixels against Classic's 39.7. The world margin, the painted water round the board, is 112 units for Classic and 72 for a sea board, whose rings are already water (see [Bigger maps and modes](BIGGER-MAPS-AND-MODES.md#sea-hexes-and-the-ring-of-sea)).
 
 ### What each template holds
 
@@ -227,12 +231,12 @@ A taller, narrower board would gain a little on the upright phone and lose more 
 | Main island         | 16: Timber 3, Clay 3, Sheep 4, Hay 3, Rock 2, desert 1                                                     | 20: Timber 4, Clay 4, Sheep 5, Hay 3, Rock 3, desert 1                                      |
 | Small islands       | 8 in three isles (3, 3, 2): gold 2, Timber 1, Clay 1, Hay 2, Rock 2                                        | 10 in four isles (3, 3, 2, 2): gold 2, Timber 1, Clay 1, Hay 3, Rock 3                      |
 | All land            | 24: Timber 4, Clay 4, Sheep 4, Hay 5, Rock 4, gold 2, desert 1                                             | 30: Timber 5, Clay 5, Sheep 5, Hay 6, Rock 6, gold 2, desert 1                              |
-| Sea                 | 48: 30 ring, 18 inside                                                                                     | 47: 32 ring, 15 inside                                                                      |
+| Sea                 | 68: 31 ring, 37 inside                                                                                     | 77: 34 ring, 43 inside                                                                      |
 | Main-island tokens  | 15: 2, 3, 4, 4, 5, 6, 6, 8, 8, 9, 10, 10, 11, 11, 12. Classic's 18 without one each of 3, 5 and 9; 48 pips | 19: Classic's 18 and a third 10; 61 pips                                                    |
 | Small-island tokens | 8: 2, 4, 5, 6, 8, 9, 10, 12; 26 pips                                                                       | 10: one each of 2, 3, 4, 5, 6, 8, 9, 10, 11, 12; 30 pips                                    |
 | Harbours            | 8: three 3:1, and one 2:1 for each resource; 16 layouts round the main island                              | 9: four 3:1, and one 2:1 for each resource, as in Classic; 18 layouts round the main island |
 | Main-island coast   | 36 edges, facing 21 sea hexes                                                                              | 40 edges, facing 23 sea hexes                                                               |
-| Whole board         | 178 intersections; 249 edges, of which 66 are outer rim and 148 can hold a ship                            | 190 intersections; 266 edges, of which 70 are outer rim and 150 can hold a ship             |
+| Whole board         | 219 intersections; 310 edges, of which 68 are outer rim and 207 can hold a ship                            | 252 intersections; 358 edges, of which 74 are outer rim and 238 can hold a ship             |
 | Robber start        | The desert                                                                                                 | The desert                                                                                  |
 | Pirate start        | (4, −2)                                                                                                    | (2, 4)                                                                                      |
 

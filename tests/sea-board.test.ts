@@ -31,10 +31,10 @@ test('an Open Sea board draws its sea round the frame, sea hexes to choose, gold
   const board = dealtOuterIsles4(),
     html = render({ board, art: BOARD_THEMES.classic });
   assert.match(html, /class="island-stage  sea-stage"/);
-  assert.match(html, /viewBox="-576 -520 1152 1040"/);
+  assert.match(html, /viewBox="-688 -616 1376 1232"/);
   // Every hex keeps a target and a name; sea hexes have no tile, number or robber.
-  assert.equal((html.match(/class="terrain-hit/g) ?? []).length, 77);
-  assert.equal((html.match(/aria-label="Sea"/g) ?? []).length, 47);
+  assert.equal((html.match(/class="terrain-hit/g) ?? []).length, 107);
+  assert.equal((html.match(/aria-label="Sea"/g) ?? []).length, 77);
   assert.equal((html.match(/aria-label="Gold field, 9, 4 production pips"/g) ?? []).length, 2);
   assert.equal((html.match(/<mask id="terrain-/g) ?? []).length, 30);
   assert.equal((html.match(/class="terrain-base"/g) ?? []).length, 30);

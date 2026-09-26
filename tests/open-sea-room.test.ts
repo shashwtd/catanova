@@ -143,7 +143,7 @@ test('§15.1 an Open Sea lobby holds the board for its seated count, dealt again
     assert.equal(t.store.settings(t.roomId).mode, OPEN_SEA.id);
     assert.equal(t.store.settings(t.roomId).victoryPoints, undefined, 'the mode’s default, 14');
     const two = t.store.board(t.roomId);
-    assert.deepEqual([two.preset, two.players, two.hexes.length], ['outer-isles-v1', 3, 72]);
+    assert.deepEqual([two.preset, two.players, two.hexes.length], ['outer-isles-v1', 3, 92]);
     assert.throws(
       () => t.store.lobby(t.host, 'bot', t.revision(), false, undefined, undefined, true),
       code('MODE_BOTS'),
@@ -157,7 +157,7 @@ test('§15.1 an Open Sea lobby holds the board for its seated count, dealt again
     // A fourth sits down: the same seed, dealt on the four-player template.
     const fourth = t.join('Dan');
     const four = t.store.board(t.roomId);
-    assert.deepEqual([four.players, four.hexes.length, four.seed], [4, 77, two.seed]);
+    assert.deepEqual([four.players, four.hexes.length, four.seed], [4, 107, two.seed]);
     assert.deepEqual(four, dealBoard(two.seed, 'outer-isles-v1', 4));
     // Well within the 100 ms budget: the fastest of five deals, so that a loaded machine does not decide it.
     let fastest = Infinity;

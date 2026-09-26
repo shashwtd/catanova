@@ -431,10 +431,12 @@ only place it still makes sense.
 Terrain needs classes: resource, desert, sea and gold. The robber goes on land
 hexes only; today it may move to any other hex.
 
-Board size on screen. The world box already follows the board (Phase 0). The
-Outer Isles templates are kept about as tall as they are wide, so their hexes
-draw at about two-thirds of Classic's size on a phone, against about half for
-the first sketches ([Map generation](MAP_GENERATION.md#size-on-screen)).
+Board size on screen. The world box already follows the board (Phase 0). An
+Outer Isles board is its islands with two rings of ocean round every coast, so
+its outline follows the islands'; the owner chose it over compact rectangles,
+which felt square. A phone opens on the islands, at about nine-tenths of
+Classic's hex size, and a desktop shows the whole board at six-tenths
+([Map generation](MAP_GENERATION.md#size-on-screen)).
 Settled on 26 September 2026, from screenshots at 375 × 812, 390 × 844 and
 1440 × 900:
 

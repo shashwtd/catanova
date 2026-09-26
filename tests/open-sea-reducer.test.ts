@@ -132,8 +132,8 @@ test('§1.1, §3 and §15.1 Open Sea is a ruleset: three or four players, 14 poi
   const three = createGame(seats(3), 11, () => 0.5, { ruleset: OPEN_SEA.id });
   const four = createGame(seats(4), 11, () => 0.5, { ruleset: OPEN_SEA.id });
   assert.equal(three.board.preset, 'outer-isles-v1');
-  assert.deepEqual([three.board.players, three.board.hexes.length], [3, 72]);
-  assert.deepEqual([four.board.players, four.board.hexes.length], [4, 77]);
+  assert.deepEqual([three.board.players, three.board.hexes.length], [3, 92]);
+  assert.deepEqual([four.board.players, four.board.hexes.length], [4, 107]);
   assert.equal(three.victoryPoints, 14);
   assert.equal(total(three.bank), 95);
   assert.equal(three.deck.length, 25);

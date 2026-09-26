@@ -2,7 +2,7 @@
  * Board shapes for testing that the board code takes any list of hexes rather than the Classic island alone.
  * See docs/BIGGER-MAPS-AND-MODES.md.
  */
-import { isCoastalEdge, topology } from '../packages/rules/src/board.js';
+import { isCoastalEdge, OCEAN_RINGS, topology, withOcean } from '../packages/rules/src/board.js';
 import type { Board, BoardShape, Hex } from '../packages/rules/src/board.js';
 
 /** The 5–6 player island, which big-table-balanced-v1 deals. */
@@ -24,10 +24,6 @@ export const bareBoard = (shape: BoardShape): Board => ({
   ports: [],
 });
 
-/** Outer Isles for four players (docs/MAP_GENERATION.md): every hex with −4 ≤ r ≤ 4 and −8 ≤ 2q + r ≤ 8. */
-export const OUTER_ISLES_4_SHAPE: BoardShape = Array.from({ length: 9 }, (_, row) => row - 4).flatMap((r) =>
-  Array.from({ length: 17 }, (_, k) => ({ q: k - 8, r })).filter(({ q }) => Math.abs(2 * q + r) <= 8),
-);
 /** Its land: the main island's rows of 2, 4, 7, 4, 2 and 1, and the four small isles. */
 const OUTER_ISLES_4_LAND = [
   ...[
@@ -49,6 +45,17 @@ const OUTER_ISLES_4_LAND = [
   '-4,3',
   '-3,3',
 ];
+/**
+ * Outer Isles for four players (docs/MAP_GENERATION.md): its islands with two rings of ocean round them, as the
+ * outer-isles-v1 preset builds its board.
+ */
+export const OUTER_ISLES_4_SHAPE: BoardShape = withOcean(
+  OUTER_ISLES_4_LAND.map((key) => {
+    const [q, r] = key.split(',').map(Number);
+    return { q: q!, r: r! };
+  }),
+  OCEAN_RINGS,
+);
 /** The four-player Outer Isles frame, all sea but its islands, whose hexes are left as bareBoard deals them. */
 export const outerIsles4 = () =>
   flood(bareBoard(OUTER_ISLES_4_SHAPE), (h) => OUTER_ISLES_4_LAND.includes(`${h.q},${h.r}`));

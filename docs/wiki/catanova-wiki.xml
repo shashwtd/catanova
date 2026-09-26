@@ -813,7 +813,7 @@ The full specification is the [https://github.com/shashwtd/catanova/blob/main/do
       <origin>11</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="14545" sha1="3cuaialk6nzqbdrobd2kabrn5sgb9od">'''Open Sea''' is Catanova's sea [[Game modes|mode]]. Players build ships, sail to small islands, collect from gold fields and dodge a pirate. It is being built and is not yet playable. This page describes the planned rules for its first scenario, '''Outer Isles''', for three or four players. Everything works as in Classic unless this page says otherwise.
+      <text xml:space="preserve" bytes="14601" sha1="9ekfkji2ui5i1di47150pqjt9dzi5rl">'''Open Sea''' is Catanova's sea [[Game modes|mode]]. Players build ships, sail to small islands, collect from gold fields and dodge a pirate. It is being built and is not yet playable. This page describes the planned rules for its first scenario, '''Outer Isles''', for three or four players. Everything works as in Classic unless this page says otherwise.
 
 {| class="wikitable"
 ! !! Classic !! Open Sea
@@ -943,12 +943,12 @@ Outer Isles is Catanova's own scenario, not an official map. Every board has:
 * several small islands, reachable only by sea, each one sea hex from the main island and at least three from every other small island;
 * two gold fields, both on small islands but never on the same one;
 * one desert, where the robber starts;
-* a ring of sea around it all.
+* two rings of sea round every coast, so the board's edge follows the islands.
 
 {| class="wikitable"
 ! !! Three players !! Four players
 |-
-| Board || 72 hexes, 24 of them land || 77 hexes, 30 of them land
+| Board || 92 hexes, 24 of them land || 107 hexes, 30 of them land
 |-
 | Main island || 16 land hexes, shaped like a shield || 20 land hexes, shaped like a diamond
 |-
@@ -957,7 +957,7 @@ Outer Isles is Catanova's own scenario, not an official map. Every board has:
 | Ports || 8, all on the main island || 9, all on the main island
 |}
 
-Each board is about as tall as it is wide, so it fits a phone held upright. The shape is fixed for each player count, but terrain, numbers and port types are shuffled every game under fairness rules like those of the [[Map generation|balanced island]]. No 6 or 8 borders another, ports are spaced so that no two share or neighbour a corner, and every small island stays reachable by ship even with the pirate in the way.
+On a phone the board opens zoomed on its islands, and a pinch shows the whole sea. The shape is fixed for each player count, but terrain, numbers and port types are shuffled every game under fairness rules like those of the [[Map generation|balanced island]]. No 6 or 8 borders another, ports are spaced so that no two share or neighbour a corner, and every small island stays reachable by ship even with the pirate in the way.
 
 === Setting up ===
 Each player rolls both dice. The highest total starts, and players tied for highest roll again. Placement follows the usual snake (1, 2, 3, 3, 2, 1 with three players, 1, 2, 3, 4, 4, 3, 2, 1 with four), and both starting settlements go on the main island. After each settlement, place a road touching it or, if the settlement is on the coast, a ship instead. A starting ship may not go on an edge of the pirate's hex.
@@ -1005,7 +1005,7 @@ Later scenarios and a five-and-six-player version are listed under [[Game modes#
 
 [[Category:Game rules]]
 </text>
-      <sha1>3cuaialk6nzqbdrobd2kabrn5sgb9od</sha1>
+      <sha1>9ekfkji2ui5i1di47150pqjt9dzi5rl</sha1>
     </revision>
   </page>
   <page>

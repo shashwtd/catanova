@@ -36,30 +36,34 @@ import type { PresetFixture } from './board-presets.js';
  */
 const SKETCHES = {
   3: {
-    left: -7,
+    left: -9,
     text: `
-r=-4  ~ ~ ~ ~ ~ ~ ~ ~
-r=-3 ~ . . a a a . ~
-r=-2  ~ . . . . . P ~
-r=-1 ~ M M M M M . ~
-r= 0  ~ . M M M M M ~
-r= 1 ~ b . M M M . ~
-r= 2  ~ b . M M . c ~
-r= 3 ~ . b . M . c ~
-r= 4  ~ ~ ~ ~ ~ ~ ~ ~`,
+r=-5       ~ ~ ~ ~ ~
+r=-4      ~ . . . . ~
+r=-3   ~ ~ . a a a . ~
+r=-2  ~ . . . . . . P ~
+r=-1 ~ . M M M M M . . ~
+r= 0  ~ . . M M M M M . ~
+r= 1 ~ . b . M M M . . ~
+r= 2  ~ . b . M M . c . ~
+r= 3   ~ . b . M . c . ~
+r= 4    ~ . . . . . . ~
+r= 5     ~ ~ ~ ~ ~ ~ ~`,
   },
   4: {
-    left: -8,
+    left: -10,
     text: `
-r=-4 ~ ~ ~ ~ ~ ~ ~ ~ ~
-r=-3  ~ a . . . b b ~
-r=-2 ~ a . M M . . b ~
-r=-1  ~ . M M M M . ~
-r= 0 ~ M M M M M M M ~
-r= 1  ~ . M M M M . ~
-r= 2 ~ d . . M M . c ~
-r= 3  ~ d d . M . c ~
-r= 4 ~ ~ ~ ~ ~ ~ ~ ~ P`,
+r=-5    ~ ~ ~ ~ ~ ~ ~ ~
+r=-4   ~ . . . . . . . ~
+r=-3  ~ . a . . . b b . ~
+r=-2 ~ . a . M M . . b . ~
+r=-1  ~ . . M M M M . . ~
+r= 0 ~ . M M M M M M M . ~
+r= 1  ~ . . M M M M . . ~
+r= 2 ~ . d . . M M . c . ~
+r= 3  ~ . d d . M . c . ~
+r= 4   ~ . . . . . . . P
+r= 5    ~ ~ ~ ~ ~ ~ ~ ~`,
   },
 } as const;
 /** Every hex of a sketch, row by row and left to right, with the character drawn for it. */
@@ -80,9 +84,9 @@ function sketched(players: 3 | 4) {
  */
 const TEMPLATES = {
   3: {
-    rows: [8, 8, 8, 8, 8, 8, 8, 8, 8],
-    ring: 30,
-    insideSea: 18,
+    rows: [5, 6, 8, 9, 10, 10, 10, 10, 9, 8, 7],
+    ring: 31,
+    insideSea: 37,
     islands: { main: 16, a: 3, b: 3, c: 2 },
     main: { wood: 3, brick: 3, sheep: 4, wheat: 3, ore: 2, desert: 1, gold: 0 },
     small: { wood: 1, brick: 1, sheep: 0, wheat: 2, ore: 2, desert: 0, gold: 2 },
@@ -92,7 +96,7 @@ const TEMPLATES = {
     pips: [48, 26],
     harbours: ['any', 'any', 'any', ...RESOURCES],
     mainCoast: [36, 21],
-    board: { intersections: 178, edges: 249, rim: 66, ship: 148 },
+    board: { intersections: 219, edges: 310, rim: 68, ship: 207 },
     // Rule 3's range for each resource on the main island, and rule 10's for each small island.
     production: { wood: [8, 12], brick: [8, 12], sheep: [10, 16], wheat: [8, 12], ore: [5, 8] },
     islandProduction: { a: [8, 12], b: [8, 12], c: [5, 8] },
@@ -103,9 +107,9 @@ const TEMPLATES = {
     pirate: { q: 4, r: -2 },
   },
   4: {
-    rows: [9, 8, 9, 8, 9, 8, 9, 8, 9],
-    ring: 32,
-    insideSea: 15,
+    rows: [8, 9, 10, 11, 10, 11, 10, 11, 10, 9, 8],
+    ring: 34,
+    insideSea: 43,
     islands: { main: 20, a: 2, b: 3, c: 2, d: 3 },
     main: { wood: 4, brick: 4, sheep: 5, wheat: 3, ore: 3, desert: 1, gold: 0 },
     small: { wood: 1, brick: 1, sheep: 0, wheat: 3, ore: 3, desert: 0, gold: 2 },
@@ -115,7 +119,7 @@ const TEMPLATES = {
     pips: [61, 30],
     harbours: ['any', 'any', 'any', 'any', ...RESOURCES],
     mainCoast: [40, 23],
-    board: { intersections: 190, edges: 266, rim: 70, ship: 150 },
+    board: { intersections: 252, edges: 358, rim: 74, ship: 238 },
     production: { wood: [10, 16], brick: [10, 16], sheep: [13, 20], wheat: [8, 12], ore: [8, 12] },
     islandProduction: { a: [5, 8], b: [8, 12], c: [5, 8], d: [8, 12] },
     room: { good: 38, left: 11 },
@@ -164,8 +168,9 @@ for (const players of [3, 4] as const) {
     assert.deepEqual({ q: pirate.q, r: pirate.r }, expected.pirate);
 
     // Hex counts: rows, ring, sea inside it, and each island.
+    const top = Math.min(...board.hexes.map((h) => h.r));
     const rows = board.hexes.reduce<number[]>(
-      (row, h) => ((row[h.r + 4] = (row[h.r + 4] ?? 0) + 1), row),
+      (row, h) => ((row[h.r - top] = (row[h.r - top] ?? 0) + 1), row),
       [],
     );
     assert.deepEqual(rows, expected.rows);

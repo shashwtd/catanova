@@ -170,8 +170,9 @@ export const strait = () =>
 /** Two islands whose nearest corners are joined by a single sea edge: a narrow strait. */
 export const narrows = () => sketch(' . . . . .', '. . T . . .', ' . . . h .', '. . . . . .');
 /**
- * The shape of Outer Isles for three players, from docs/MAP_GENERATION.md, with terrain of the tests' choosing:
- * the real boards come from the outer-isles-v1 preset. The small islands are a (north), b (south-west) and c
+ * The first, rectangular shape of Outer Isles for three players, with terrain of the tests' choosing: a test board
+ * for the rules, which do not depend on the board's outline. The real boards, the islands with two rings of ocean
+ * round them, come from the outer-isles-v1 preset. The small islands are a (north), b (south-west) and c
  * (south-east), and the pirate starts in the template's place.
  */
 export const outerIslesThree = () =>
@@ -186,7 +187,7 @@ export const outerIslesThree = () =>
     '~ . h . S . c ~',
     ' ~ ~ ~ ~ ~ ~ ~ ~',
   );
-/** The shape of Outer Isles for four players, in the same way. */
+/** The first, rectangular shape of Outer Isles for four players, in the same way. */
 export const outerIslesFour = () =>
   sketch(
     '~ ~ ~ ~ ~ ~ ~ ~ ~',

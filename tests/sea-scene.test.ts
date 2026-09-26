@@ -47,7 +47,7 @@ test('a board with sea frames its hexes more closely, as its ring is already wat
     world = worldBox(board);
   assert.ok(hasSea(board) && !hasSea(generateBoard(481)) && !hasSea(bareBoard(BIG_TABLE_SHAPE)));
   assert.deepEqual(worldBox(generateBoard(481)), WORLD);
-  assert.deepEqual(world, { x: -576, y: -520, width: 1152, height: 1040 });
+  assert.deepEqual(world, { x: -688, y: -616, width: 1376, height: 1232 });
   for (const v of board.vertices) {
     assert.ok(
       v.x * HEX_SIZE - world.x >= SEA_WORLD_MARGIN &&
@@ -70,7 +70,7 @@ test('a board with sea frames its hexes more closely, as its ring is already wat
 test('the rim is one loop round an Open Sea board, and round Classic it is the coast', () => {
   const [rim, ...more] = rimPoints(outerIsles4());
   assert.equal(more.length, 0);
-  assert.equal(rim!.length, 70, 'the four-player frame has 70 rim edges');
+  assert.equal(rim!.length, 74, 'the four-player frame has 74 rim edges');
   assert.deepEqual(rimPoints(generateBoard(42)), coastPoints(generateBoard(42)));
 });
 
@@ -176,13 +176,13 @@ test('the shader takes land in uLand, the sea two to a vector, and draws gold fr
       ),
     ],
   );
-  assert.equal(uniforms.seaCount, 47);
-  assert.equal(uniforms.sea.length, 96);
+  assert.equal(uniforms.seaCount, 77);
+  assert.equal(uniforms.sea.length, 156);
   for (const [i, h] of sea.entries()) {
     assert.equal(uniforms.sea[i * 2], Math.fround(h.x * HEX_SIZE));
     assert.equal(uniforms.sea[i * 2 + 1], Math.fround(h.y * HEX_SIZE));
   }
-  assert.deepEqual([...uniforms.sea.slice(94)], [0, 0], 'the odd sea hex out pads its vector');
+  assert.deepEqual([...uniforms.sea.slice(154)], [0, 0], 'the odd sea hex out pads its vector');
   assert.deepEqual(uniforms.world, worldBox(board));
   // Room for both arrays and the rest in the 224 vectors WebGL 2 guarantees.
   assert.ok(MAX_TERRAIN_HEXES + MAX_SEA_HEXES / 2 + 4 <= 224);

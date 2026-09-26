@@ -1,13 +1,14 @@
 /**
  * Dev-only boards for the design preview, `/dev/lounge?board=big-table`, `isles3` or `isles4`: a Big Table island
- * and the two Outer Isles templates of docs/MAP_GENERATION.md, dealt once by hand. They show how the board draws;
+ * and the two Outer Isles templates of docs/MAP_GENERATION.md, their islands dealt once by hand and their sea, as
+ * the preset's, every hex within two steps of land. They show how the board draws;
  * the presets that deal real games are built elsewhere.
  *
  * Each row lists its hexes west to east, starting at `q`. `~` is sea. Any other hex is a terrain letter (w Timber,
  * b Clay, s Sheep, h Hay, o Rock, d desert, g gold field), then its number, then `/x` if it is on small isle x
  * rather than the main island.
  */
-import { topology } from '../../../../packages/rules/src/board.js';
+import { OCEAN_RINGS, topology, withOcean } from '../../../../packages/rules/src/board.js';
 import type { Board, Edge, Hex } from '../../../../packages/rules/src/board.js';
 import type { Resource } from '../../../../packages/rules/src/index.js';
 import type { SceneTerrain } from '../scene.js';
@@ -133,9 +134,16 @@ export function side(board: Board, at: At, name: Side): number {
 /** One of the sample boards, built with topology() like any other. `seed` keeps each one's layers apart. */
 export function sampleBoard(name: SampleBoardName, seed: number): SampleBoard {
   const sample: Sample = SAMPLES[name];
-  const cells = sample.rows.flatMap(([r, q, hexes]) =>
+  let cells = sample.rows.flatMap(([r, q, hexes]) =>
     hexes.split(' ').map((cell, k) => ({ q: q + k, r, cell })),
   );
+  // An Outer Isles sample keeps its islands and takes the preset's sea, built the same way.
+  if (name !== 'big-table') {
+    const land = new Map(cells.filter((c) => c.cell !== '~').map((c) => [`${c.q},${c.r}`, c]));
+    cells = withOcean([...land.values()], OCEAN_RINGS).map(
+      ({ q, r }) => land.get(`${q},${r}`) ?? { q, r, cell: '~' },
+    );
+  }
   const board = { seed, preset: 'balanced-v2' as const, ...topology(cells), ports: [] as Board['ports'] };
   for (const [i, { cell }] of cells.entries()) {
     const [, letter, number, island] = /^([~wbshodg])(\d*)(?:\/([a-z]))?$/.exec(cell)!;

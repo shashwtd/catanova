@@ -434,8 +434,15 @@ test('a gold pick is made with Year of Plenty’s buttons, only from what the ba
   };
   const card = (html: string, id: string) =>
     html.match(new RegExp(`<article data-player-profile="${id}"[^]*?</article>`))![0];
+  // The timer reads the clock twice as it first renders; hold it still so a millisecond between the two readings
+  // cannot round 12 seconds up to 13.
+  const realNow = Date.now,
+    frozen = Date.now();
+  Date.now = () => frozen;
+  const rails = Object.fromEntries(['red', 'green'].map((viewer) => [viewer, railFor(viewer)]));
+  Date.now = realNow;
   for (const viewer of ['red', 'green']) {
-    const rail = railFor(viewer);
+    const rail = rails[viewer]!;
     assert.match(card(rail, 'green'), /<span class="turn-timer[^"]*"[^>]*><svg[^]*?<b>12s<\/b><\/span>/);
     assert.doesNotMatch(card(rail, 'green'), /Gold picks/);
     assert.match(card(rail, 'blue'), /<b>60s<\/b><small>Gold picks<\/small>/);

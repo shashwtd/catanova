@@ -12,7 +12,7 @@ This is the rules target for the mode. The engine plays it and the game has its 
 
 ### 1.1 What version 1 contains
 
-`open-sea-v1` has one scenario, Outer Isles (`outer-isles`), for three or four players. There is no Open Sea game for two players, and none for five or six in this version. Outer Isles is Catanova's own map: a main island where everyone starts, several small islands that can be reached only by ship, and a ring of sea around it all (section 4). It is not an official layout.
+`open-sea-v1` has one scenario, Outer Isles (`outer-isles`), for three or four players. There is no Open Sea game for two players, and none for five or six in this version. Outer Isles is Catanova's own map: a main island where everyone starts, several small islands that can be reached only by ship, and sea all round it (section 4). It is not an official layout.
 
 ### 1.2 Choosing the mode
 
@@ -119,7 +119,7 @@ Outer Isles is a Catanova map preset, not an official layout. Its templates and 
 3. Several small islands, each separated from the main island and from each other by sea.
 4. Gold fields only on small islands. A gold field never carries a 6 or an 8.
 5. At least one desert, because the robber starts on one.
-6. A ring of sea hexes around everything, which is part of the board.
+6. Two rings of sea hexes round every coast, which are part of the board, so the board's outline follows its islands'.
 7. Every small island reachable by ship: a chain of legal ship edges leads from the main island's coast to its coast.
 8. Harbours only on the main island's coast, spaced so that no two harbours share an intersection or sit on neighbouring intersections.
 9. A starting sea hex for the pirate, fixed by the template, away from the places where starting settlements can go.
