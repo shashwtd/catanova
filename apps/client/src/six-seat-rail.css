@@ -9,9 +9,10 @@
  *
  * On a phone the cards get small, so what a card shows changes with them. Its
  * award counts join the score instead of sitting on a portrait with no room at
- * its foot (PlayerRail renders them in both places; this sheet shows one), and
- * the leader's badge steps aside for the turn chip rather than hiding under
- * it. Held upright, the phone also drops the development-card count.
+ * its foot (PlayerRail renders them in both places; this sheet shows one).
+ * Held upright, the phone also drops the development-card count. At every
+ * size, the leader's badge steps aside for the turn chip rather than hiding
+ * under it.
  */
 
 /* --- desktop ------------------------------------------------------------- */
@@ -28,6 +29,12 @@
 .playing :where(.player-rail[data-seats='6']) .player-profile,
 .playing :where(.player-rail[data-seats='6']) .player-profile.active {
   --portrait-size: min(84px, calc((100dvh - var(--hud-bottom) - 6px - 36px - 5 * 12px) / 6 - 12px));
+}
+/* The turn chip, with its timer, sits where the leader's badge does and cut
+   it down to a "#" once the portrait shrinks, so the badge steps aside while
+   the chip shows. */
+:where(.playing .player-rail[data-seats] .profile-portrait:has(> .profile-turn)) > .profile-rank {
+  display: none;
 }
 /* The second copy of the award counts, in the score, is for phones. */
 .playing :where(.player-rail[data-seats]) .player-profile .profile-stats > span:where(.profile-award-counts) {
@@ -48,10 +55,6 @@
     > span:where(.profile-award-counts) {
     display: inline-flex;
     gap: 4px;
-  }
-  /* The turn chip sits where the leader's badge does. */
-  :where(.playing .player-rail[data-seats] .profile-portrait:has(> .profile-turn)) > .profile-rank {
-    display: none;
   }
   :where(.playing .player-rail[data-seats]) .profile-medal {
     width: 22px;
