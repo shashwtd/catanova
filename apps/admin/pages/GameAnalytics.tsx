@@ -178,6 +178,9 @@ function Standings({ game }: { game: GameAnalytics }) {
               {player.turnTime.meanSeconds !== null && (
                 <div className="muted small">mean {duration(player.turnTime.meanSeconds)}</div>
               )}
+              {player.partnerTime?.medianSeconds != null && (
+                <div className="muted small">as Partner {duration(player.partnerTime.medianSeconds)}</div>
+              )}
             </td>
             <td className="num nowrap">
               {player.moves.own + player.moves.bot + player.moves.timer}

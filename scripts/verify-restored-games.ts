@@ -50,6 +50,8 @@ const PHASES: Phase[] = [
   'discard',
   'robber',
   'freeRoads',
+  'partner',
+  'buildWindow',
   'finished',
 ];
 const MISSING_JOURNAL_CHECK =
@@ -251,10 +253,42 @@ export function gameInvariantProblems(game: Game): string[] {
         problems.push('the free-road phase has no free road left');
       if (game.trade && (game.phase !== 'actions' || game.trade.player !== active?.id))
         problems.push("an open trade is not the active player's, during their actions");
+      problems.push(...turnStructureProblems(game, rules.turns));
     }
   } catch (error) {
     problems.push(`the saved game is malformed: ${message(error)}`);
   }
+  return problems;
+}
+
+/**
+ * Big Table's turn structures (docs/RULEBOOK-BIG-TABLE.md, sections 6 and 7): the structure is one the mode
+ * offers, the markers of a paired turn and the build windows point at real seats, and the player acting is the
+ * one the phase belongs to. A game in progress only.
+ */
+function turnStructureProblems(game: Game, offered: readonly string[] | undefined): string[] {
+  const problems: string[] = [];
+  const seat = (index: unknown) => Number.isInteger(index) && !!game.players[index as number];
+  if (offered ? !game.turns || !offered.includes(game.turns) : game.turns !== undefined)
+    problems.push(`the turn structure ${String(game.turns)} is not one this mode offers`);
+  const setup = game.phase === 'setupSettlement' || game.phase === 'setupRoad';
+  if (game.pair) {
+    if (game.turns !== 'paired' || setup) problems.push('a paired turn is under way outside paired turns');
+    else if (!seat(game.pair.lead) || !seat(game.pair.partner) || game.pair.lead === game.pair.partner)
+      problems.push('the Lead and Partner markers are not on two seats of the game');
+    else if (game.active !== game.pair.lead && game.active !== game.pair.partner)
+      problems.push('a player holding neither marker is acting in a paired turn');
+  }
+  const partner = !!game.pair && game.active === game.pair.partner;
+  if ((game.phase === 'partner' || game.returnPhase === 'partner') && !partner)
+    problems.push("the Partner's phase is under way without its Partner acting");
+  if (game.windows) {
+    if (game.turns !== 'betweenTurnsBuild')
+      problems.push('build windows are open outside Between-turns build');
+    else if (!seat(game.windows.after) || game.windows.after === game.active)
+      problems.push("a build window follows no other seat's turn");
+    if (game.phase !== 'buildWindow') problems.push(`build windows are open during ${game.phase}`);
+  } else if (game.phase === 'buildWindow') problems.push('a build window is open with no turn before it');
   return problems;
 }
 

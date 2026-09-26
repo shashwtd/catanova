@@ -22,7 +22,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { journalReader } from '../journal.js';
 import type { JournalRow } from '../journal.js';
-import { score } from '../../../../packages/rules/src/game.js';
+import { partnerActing, score } from '../../../../packages/rules/src/game.js';
 import { findRuleset, rulesetOf } from '../../../../packages/rules/src/rulesets.js';
 import type { Game, Player } from '../../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../../packages/rules/src/index.js';
@@ -178,14 +178,30 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
   const robberMoves: GameAnalytics['robberMoves'] = [];
   const trades: GameAnalytics['trades'] = [];
   const turnTimes = new Map<string, number[]>();
-  // The turn under way: whose it is, when it began, and whether a bot played any of it for a person.
-  let turn: { number: number; player: string; at: number; botPlayed: boolean } | null = null;
+  const partnerTimes = new Map<string, number[]>();
+  // The turn under way: whose it is, when it began, and whether a bot played any of it for a person. Times go to
+  // whoever acted: in Big Table a Partner's phase is timed for the Partner, not the Lead, and build windows,
+  // which are not turns, are not timed at all.
+  let turn: { number: number; player: string; at: number; botPlayed: boolean; partner: boolean } | null =
+    null;
+  let turnKey = '';
+  const part = (game: Game) =>
+    `${game.turn}:${game.phase === 'buildWindow' ? 'window' : partnerActing(game) ? 'partner' : 'turn'}`;
+  const openTurn = (game: Game, at: number) => {
+    turnKey = part(game);
+    const partner = partnerActing(game);
+    const holder = game.pair && !partner ? game.players[game.pair.lead]! : game.players[game.active]!;
+    return game.phase === 'buildWindow'
+      ? null
+      : { number: game.turn, player: holder.id, at, botPlayed: false, partner };
+  };
   const closeTurn = (at: number | null) => {
     if (!turn || turn.number < 1 || at === null) return;
     const player = players.get(turn.player);
     if (!player) return;
+    const times = turn.partner ? partnerTimes : turnTimes;
     if (turn.botPlayed && !player.bot) player.turnTime.botTurns++;
-    else turnTimes.set(turn.player, [...(turnTimes.get(turn.player) ?? []), (at - turn.at) / 1000]);
+    else times.set(turn.player, [...(times.get(turn.player) ?? []), (at - turn.at) / 1000]);
   };
 
   for (const row of rows) {
@@ -233,7 +249,7 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
         if (bot) botSeats.add(player.id);
         players.set(player.id, blankPlayer(player, seats.get(player.id), bot));
       }
-      turn = { number: game.turn, player: game.players[game.active]!.id, at: at ?? 0, botPlayed: false };
+      turn = openTurn(game, at ?? 0);
     }
     moves++;
     lastMoveAt = at ?? lastMoveAt;
@@ -379,10 +395,10 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
         if (actor) actor.robber.sevens++;
       }
     }
-    // A new turn: the last one ends now.
-    if (turn && game.turn !== turn.number) {
+    // A new turn, or a new part of one: the last one ends now.
+    if (part(game) !== turnKey) {
       closeTurn(at);
-      turn = { number: game.turn, player: game.players[game.active]!.id, at: at ?? 0, botPlayed: false };
+      turn = openTurn(game, at ?? 0);
     }
     pointsByTurn.set(
       game.turn,
@@ -416,12 +432,22 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       roads: Object.values(final.roads).filter((owner) => owner === player.id).length,
     };
     const times = turnTimes.get(player.id) ?? [];
+    const mean = (values: number[]) =>
+      round(values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
     stats.turnTime = {
       turns: times.length,
-      meanSeconds: round(times.length ? times.reduce((a, b) => a + b, 0) / times.length : null),
+      meanSeconds: mean(times),
       medianSeconds: round(median(times)),
       botTurns: stats.turnTime.botTurns,
     };
+    if (first.turns === 'paired') {
+      const phases = partnerTimes.get(player.id) ?? [];
+      stats.partnerTime = {
+        phases: phases.length,
+        meanSeconds: mean(phases),
+        medianSeconds: round(median(phases)),
+      };
+    }
   }
   // Standings: the winner, then those still at the table by points, then those who resigned.
   const standing = (player: AnalyticsPlayer) => (player.winner ? 0 : player.resigned ? 2 : 1);

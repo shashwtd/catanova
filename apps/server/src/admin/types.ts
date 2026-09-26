@@ -436,8 +436,13 @@ export type AnalyticsPlayer = {
   moves: { own: number; bot: number; timer: number };
   /** Times a bot took the seat over while its player was away. */
   standIns: number;
-  /** Seconds from the start of each of its turns to the next, leaving out turns a stand-in played. */
+  /**
+   * Seconds from the start of each of its turns to the next, leaving out turns a stand-in played. In Big Table a
+   * turn is the player's own, or their part as Lead; build windows are not counted.
+   */
   turnTime: { turns: number; meanSeconds: number | null; medianSeconds: number | null; botTurns: number };
+  /** Big Table under paired turns: the seconds each of the player's Partner's phases took. */
+  partnerTime?: { phases: number; meanSeconds: number | null; medianSeconds: number | null };
   resources: {
     /** From dice rolls, by type. */
     produced: ResourceCounts;
