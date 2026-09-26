@@ -4,6 +4,7 @@ import { applyAction, createGame, gameView } from '../packages/rules/src/game.js
 import {
   PREVIEW_EVENTS,
   previewEvent,
+  previewOpenTrade,
   previewRobber,
   previewTrade,
 } from '../apps/client/src/dev/preview-events.js';
@@ -75,4 +76,33 @@ test('robber and trade scenarios expose the real decision states for local UI in
   const received = previewTrade(base, 'p0', true);
   assert.notEqual(received.trade!.player, 'p0');
   assert.equal(received.phase, 'actions');
+});
+test('a big table can show every seat discarding and an open offer answered every way', () => {
+  const base = fixture();
+  // The preview seats a fifth and sixth player after setup, as the rules deal four at most.
+  for (const id of ['p4', 'p5'])
+    base.players.push({
+      id,
+      name: id,
+      hand: { wood: 1, brick: 0, sheep: 0, wheat: 0, ore: 0 },
+      cards: [],
+      knights: 0,
+    });
+  assert.deepEqual(Object.keys(previewRobber(base, 'p0', 'waiting', true).discards).sort(), [
+    'p1',
+    'p2',
+    'p3',
+    'p4',
+    'p5',
+  ]);
+  assert.equal(Object.keys(previewRobber(base, 'p0', 'discard', true).discards).length, 6);
+  // Four seats still show one discard, as before.
+  assert.deepEqual(Object.keys(previewRobber(fixture(), 'p0', 'waiting').discards), ['p1']);
+  const open = previewOpenTrade(base, 'p0');
+  assert.equal(open.trade!.open, true);
+  assert.deepEqual(
+    open.trade!.proposals!.map((p) => p.player),
+    ['p1', 'p2', 'p3'],
+  );
+  assert.deepEqual(open.trade!.declinedBy, ['p4']);
 });
