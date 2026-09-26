@@ -120,7 +120,7 @@ test('a ship on any edge a ship may take, and the pirate on any sea hex, stay in
     assert.ok(inside(h.x * HEX_SIZE, h.y * HEX_SIZE + 6, [-21, -26.5, 21, 12]), `hex ${h.id}`);
 });
 
-test('the Open Sea stylesheet gives the pieces the house contour and the robber’s colours, and loads last', () => {
+test('the Open Sea stylesheet gives the pieces the house contour and the robber’s colours, and loads after every layered sheet', () => {
   const css = readFileSync('apps/client/src/open-sea.css', 'utf8');
   const rule = (selector: string) =>
     new RegExp(`${selector.replace(/[.*]/g, '\\$&')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
@@ -134,5 +134,7 @@ test('the Open Sea stylesheet gives the pieces the house contour and the robber�
   const imports = [
     ...readFileSync('apps/client/src/main.tsx', 'utf8').matchAll(/^import '\.\/([\w-]+\.css)';$/gm),
   ];
-  assert.equal(imports.at(-1)?.[1], 'open-sea.css');
+  // Only the components' own sheets come after table-light.css, the last layered one.
+  const sheets = imports.map((match) => match[1]);
+  assert.ok(sheets.indexOf('open-sea.css') > sheets.indexOf('table-light.css'));
 });
