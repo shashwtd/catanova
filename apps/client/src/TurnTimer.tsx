@@ -8,6 +8,7 @@ export function TurnTimer({
   connected,
   onWarning,
   discard = false,
+  goldPicker,
 }: {
   room: RoomState;
   me?: string;
@@ -15,6 +16,8 @@ export function TurnTimer({
   connected: boolean;
   onWarning: () => void;
   discard?: boolean;
+  /** Open Sea: the player picking from a gold field, whose own 20 seconds this shows instead of the turn's. */
+  goldPicker?: string;
 }) {
   const [now, setNow] = useState(Date.now),
     fallback = useRef({ server: room.serverNow ?? Date.now(), local: Date.now() }),
@@ -22,13 +25,25 @@ export function TurnTimer({
   if (fallback.current.server !== room.serverNow && room.serverNow)
     fallback.current = { server: room.serverNow, local: Date.now() };
   const clock = room.turnClock,
-    deadline = discard ? (me ? clock?.discardDeadlines?.[me] : undefined) : clock?.deadlineAt;
-  const paused = room.paused || (clock?.pausedAt !== undefined && !discard);
+    deadline = goldPicker
+      ? clock?.goldDeadlines?.[goldPicker]
+      : discard
+        ? me
+          ? clock?.discardDeadlines?.[me]
+          : undefined
+        : clock?.deadlineAt;
+  const paused = room.paused || (clock?.pausedAt !== undefined && !discard && !goldPicker);
   const serverNow = now + (offset ?? fallback.current.server - fallback.current.local),
     remaining = deadline
       ? Math.max(0, Math.ceil((deadline - (paused ? (clock?.pausedAt ?? serverNow) : serverNow)) / 1000))
       : 0;
-  const mine = !!clock && (discard ? !!(me && clock.discardDeadlines?.[me]) : clock.playerId === me);
+  const mine =
+    !!clock &&
+    (goldPicker
+      ? goldPicker === me
+      : discard
+        ? !!(me && clock.discardDeadlines?.[me])
+        : clock.playerId === me);
   const warning = useRef(onWarning);
   warning.current = onWarning;
   useEffect(() => {
@@ -58,9 +73,13 @@ export function TurnTimer({
             ? picking
               ? 'Turn clock paused while players pick from a gold field'
               : 'Turn clock paused while players discard'
-            : mine
-              ? 'Your remaining time'
-              : 'Active player’s remaining time'
+            : goldPicker
+              ? mine
+                ? 'Your time to pick from the gold field'
+                : 'Time left to pick from the gold field'
+              : mine
+                ? 'Your remaining time'
+                : 'Active player’s remaining time'
       }
     >
       {paused ? <Pause size={13} /> : <Clock3 size={13} />}

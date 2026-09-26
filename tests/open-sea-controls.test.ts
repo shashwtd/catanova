@@ -21,6 +21,8 @@ import { buildShown, edgePieces, isBuildAction, placementValid } from '../apps/c
 import type { BuildAction } from '../apps/client/src/placement.js';
 import { MoveShipButton, shipMoveUnavailable } from '../apps/client/src/ShipMove.js';
 import { RobberFlow } from '../apps/client/src/RobberFlow.js';
+import { GoldPick } from '../apps/client/src/GoldPick.js';
+import { TurnTimer } from '../apps/client/src/TurnTimer.js';
 import { SEA_ICONS } from '../apps/client/src/GameIcons.js';
 import { SEATS, giveCards } from './open-sea-game.js';
 
@@ -326,7 +328,92 @@ test('after a seven, Open Sea offers the robber and the pirate, then only the ch
   assert.match(flow({ me: 'red' }, gameView(g, 'red')), /Blue is moving the robber or the pirate/);
 });
 
+test('a gold pick is made with Year of Plenty’s buttons, only from what the bank has, in the order of picks', () => {
+  const g = blueToAct();
+  g.phase = 'goldPick';
+  g.goldOwed = [
+    { player: 'blue', picks: 2 },
+    { player: 'green', picks: 1 },
+  ];
+  g.bank.ore = 0;
+  const clock = {
+    playerId: 'blue',
+    turn: 1,
+    startedAt: 1,
+    pausedAt: 990_000,
+    goldDeadlines: { blue: 1_014_000 },
+  };
+  const panel = (me: string) =>
+    renderToStaticMarkup(
+      createElement(GoldPick, {
+        room: room(gameView(g, me), { turnClock: clock }),
+        me,
+        disabled: false,
+        connected: true,
+        onAction: noop,
+        onWarning: noop,
+      }),
+    );
+  const picker = panel('blue');
+  assert.match(picker, /<aside class="robber-flow gold-pick needs-you" aria-label="Gold picks">/);
+  assert.match(picker, /<h2 aria-live="polite">Gold field: choose 2<\/h2>/);
+  // The picker's own 20 seconds, 14 of them left.
+  assert.match(picker, /title="Your time to pick from the gold field"><svg[^]*?<b>14s<\/b>/);
+  // The bank has no Rock: its button cannot be chosen; the others can.
+  assert.match(picker, /aria-label="Choose Rock, 0 selected, 0 available" aria-pressed="false" disabled=""/);
+  assert.match(picker, /aria-label="Choose Timber, 0 selected, \d+ available" aria-pressed="false">/);
+  assert.match(picker, /<button type="button" class="gold-button" disabled="">[^]*Choose 2 more<\/button>/);
+  // The order of picks, in the discard list's rows.
+  const rows = picker.match(/<div class="discard-player"[^]*?<\/div>/g)!;
+  assert.match(rows[0]!, /data-current="true"[^]*<strong>You<\/strong><small>Picking now<\/small>/);
+  assert.match(rows[1]!, /data-current="false"[^]*<strong>Green<\/strong><small>Next<\/small>/);
+  // Everyone else sees who is picking, without the buttons.
+  const waiting = panel('red');
+  assert.match(waiting, /<h2 aria-live="polite">Blue is picking from a gold field<\/h2>/);
+  assert.match(waiting, /title="Time left to pick from the gold field"/);
+  assert.doesNotMatch(waiting, /development-resources/);
+  // The count follows the bank when it holds fewer cards than are owed.
+  for (const r of ['wood', 'brick', 'sheep', 'wheat'] as const) g.bank[r] = 0;
+  g.bank.wheat = 1;
+  assert.match(panel('blue'), /Gold field: choose 1/);
+  // Outside gold picks, nothing.
+  g.phase = 'actions';
+  assert.equal(panel('blue'), '');
+  // The turn clock itself stays paused, as it says, while picks are made.
+  g.phase = 'goldPick';
+  const paused = renderToStaticMarkup(
+    createElement(TurnTimer, {
+      room: room(gameView(g, 'red'), { turnClock: { ...clock, deadlineAt: 1_050_000 } }),
+      me: 'red',
+      connected: true,
+      onWarning: noop,
+    }),
+  );
+  assert.match(paused, /<small>Gold picks<\/small>/);
+});
+
 test('the stand-in icons for the pirate, gold and the island bonus are painted icons, named in one place', () => {
   const painted = readFileSync('apps/client/src/painted-icons.ts', 'utf8');
   for (const name of Object.values(SEA_ICONS)) assert.match(painted, new RegExp(`^  '?${name}'?: \\[`, 'm'));
+});
+
+test('each new component has one stylesheet, loaded last, in the house’s selector shapes', () => {
+  const main = readFileSync('apps/client/src/main.tsx', 'utf8');
+  const sheets = [...main.matchAll(/^import '\.\/([\w-]+\.css)';$/gm)].map((match) => match[1]);
+  assert.deepEqual(sheets.slice(sheets.indexOf('open-sea.css') + 1), [
+    'ship-sites.css',
+    'placement-choice.css',
+    'robber-choice.css',
+    'gold-pick.css',
+  ]);
+  for (const sheet of ['ship-sites.css', 'placement-choice.css', 'robber-choice.css', 'gold-pick.css']) {
+    const css = readFileSync(`apps/client/src/${sheet}`, 'utf8');
+    assert.doesNotMatch(css, /!important|#[\w-]+[\s{:.[]|:not\(|@keyframes|animation/, sheet);
+    // Barlow only, never a new family or weight.
+    for (const [, weight, family] of css.matchAll(/font:\s*(\d+) [^,]*? (\w+),/g))
+      assert.ok(
+        ['400', '500', '600'].includes(weight!) && family === 'Barlow',
+        `${sheet}: ${weight} ${family}`,
+      );
+  }
 });

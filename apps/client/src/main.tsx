@@ -27,6 +27,7 @@ import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
 import { SendFeedback, useLastMessage } from './SendFeedback.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
+import { GoldPick } from './GoldPick.js';
 import type { RobberPiece } from './RobberChoice.js';
 import { useGameAttention } from './useGameAttention.js';
 import { FantasyTransition } from './FantasyTransition.js';
@@ -145,6 +146,7 @@ import './open-sea.css';
 import './ship-sites.css';
 import './placement-choice.css';
 import './robber-choice.css';
+import './gold-pick.css';
 
 /** One shared empty list, so `glowHexes` is not a new array every render. */
 const NO_GLOW: number[] = [];
@@ -1511,6 +1513,17 @@ function App() {
                 setRobberPiece(piece);
                 setRobberHex(null);
               }}
+            />
+          )}
+          {room && !room.spectating && !feedback.presentationBusy && (
+            <GoldPick
+              room={room}
+              me={me}
+              disabled={disabled}
+              connected={connected}
+              offset={clockOffset}
+              onAction={(a) => void act(a)}
+              onWarning={() => feedback.sound.play('warning')}
             />
           )}
         </>
