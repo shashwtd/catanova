@@ -385,37 +385,63 @@ hexes only; today it may move to any other hex.
 Board size on screen. The world box already follows the board (Phase 0). The
 Outer Isles templates are kept about as tall as they are wide, so their hexes
 draw at about two-thirds of Classic's size on a phone, against about half for
-the first sketches ([Map generation](MAP_GENERATION.md#size-on-screen)). The
-112-unit world margin exists for the water band round Classic's island. On a
-sea board the ring is already water, so a narrower margin would help: at 48
-units the hexes on a 390-pixel phone would be 0.75 and 0.71 of Classic's size
-instead of 0.67 and 0.64. Decide it when the renderer is built, with
-before-and-after screenshots at phone and desktop sizes.
+the first sketches ([Map generation](MAP_GENERATION.md#size-on-screen)).
+Settled on 26 September 2026, from screenshots at 375 × 812, 390 × 844 and
+1440 × 900:
 
-**What the renderer must add.** On 26 September 2026 the Phase 0 branch drew
-Outer Isles boards in a throwaway preview. Its data is right, but the client
-has no idea of sea: sea hexes draw as land tiles (in WebGL from an undefined
-atlas cell, in the fallback as forest), and their labels read "undefined".
-With the sea hexes left out, each island already gets its own beach and
-shallows. The outer islets reach about 442 units from the centre with three
-players and 462 with four, past `waterOutline`'s 440, so the fallback's band
-is visibly cut there. Phase 2 adds:
+- A board with sea keeps 72 units of table round its rim, not Classic's 112.
+  The ring is already water, and the fade past the rim needs about 67 units.
+  On a 390-pixel phone that alone takes the four-player board's number tokens
+  from 11.4 to 12.2 pixels.
+- Where the whole frame would draw its tokens under 16 pixels, the board opens
+  zoomed until its islands, with a hex of water round them, fill the screen.
+  The tokens are then 15.5 pixels on a 390-pixel phone and 14.8 on a 375-pixel
+  one, against Classic's 17.9 and 17.1. Only the outer edge of the ring starts
+  off screen. A pinch or a drag reaches it, and `0` returns to the opening
+  view.
+- Desktops open on the whole board: tokens 28 pixels at 1440 × 900, against
+  Classic's 40.
+- Bigger tokens alone were tried and dropped. They covered the tiles and left
+  hexes, pieces and badges as small as before.
 
-- sea as a client terrain: `TERRAIN_INDEX`, `TERRAIN_BASE` and the label
-  "Sea". The fallback's tile loop skips sea hexes, and sea hexes get hit
-  targets for the pirate and accessible names;
-- in the shader, only land hexes in `uLand`, for beach, foam and shallows, and
-  a separate mask of the whole sea frame so water fills it. The fade keys on
-  distance outside the frame's rim rather than 90 units from land, and the
-  waves on the frame rather than the angle about the origin. Deep-water seams
-  in narrow channels need tuning;
-- in the SVG fallback, the frame's outline, feathered as today, in place of
-  the ray-march from the origin and its 440-unit cap. The per-island shallows
-  and sand stay;
-- gold as a new terrain, added without disturbing the 3 × 2 terrain atlases or
-  Classic's pixels: as a second texture, or in a new atlas that keeps the old
-  cells pixel for pixel and is saved losslessly
-  ([Game modes](GAME-MODES.md#matching-the-existing-look)).
+**What the renderer adds.** On 26 September 2026 the Phase 0 branch drew Outer
+Isles boards in a throwaway preview. Its data was right, but the client had no
+idea of sea: sea hexes drew as land tiles, and the fallback's band was cut
+where the outer islets reach past `waterOutline`'s 440 units. With the sea
+hexes left out, each island already got its own beach and shallows. Built the
+same day on `feature/sea-render/2026-09-26`, not yet merged:
+
+- Sea and gold are client terrains: `TERRAIN_INDEX`, `TERRAIN_BASE`, and the
+  names Sea and Gold field. The client knows them before the rules' `Terrain`
+  does. Sea hexes get no tile but keep a hit target and their name, and the
+  robber never goes to one.
+- A board with sea has a shader of its own; Classic's source is unchanged.
+  Land hexes go in `uLand` and make the coasts, beaches, foam and shallows
+  exactly as on Classic. Sea hexes go in `uSea`, two to a vector. Together
+  they make the frame, a smooth union of every hex, so the rim's corners and
+  the half-hex steps between rows round off.
+- Water fills the frame and the ring stays opaque. The fade into the table
+  starts just outside the rim and ends about 67 units past it. Its waves are
+  keyed on the position, not the angle about the centre.
+- The water's depth still follows the distance to land, blended where two
+  coasts face each other, so a one-hex channel has no dark seam. The open sea
+  is painted in patches, so the mirrored water tile does not line up into a
+  kaleidoscope.
+- Each island casts the stage's drop shadow on the water round it. The stage
+  casts none, so no shadow traces the sea's edge.
+- The SVG fallback feathers the same outline, traced round the frame on an
+  8-unit grid, in place of the ray-march from the origin and its 440-unit
+  reach. Outer islets are no longer cut. Each island keeps its shallows and
+  sand.
+- Gold is a texture of its own in each theme, loaded only for a board with a
+  gold field, so the 3 × 2 atlases and Classic's pixels are untouched. Until
+  it loads, and in the fallback without WebGL, the hex is warm stone labelled
+  Gold. The tiles are in [the art docs](art/gold-field.md).
+- The design preview shows it all: `/dev/lounge?board=isles3`, `isles4` or
+  `big-table`.
+
+The rules for sea, ships, gold and the pirate, and the screens for placing
+ships and choosing the pirate's hex, are other work.
 
 ### Ships
 
@@ -465,11 +491,14 @@ game that moves a piece already on the board:
 - No ship move between the two placements of Road Building.
 
 On the board, ships are small upright boats in the player's colour with cream
-sails, drawn on the edge they occupy, and the pirate is a ship with black sails.
-In Open Sea, harbour markers drop their painted boat and keep only the pier and
-the trade badge, so a harbour cannot be mistaken for a ship. This look is
-proposed and mocked up
-([Game modes](GAME-MODES.md#interface-decisions-for-the-build)).
+sails, drawn on the edge they occupy, and the pirate is a ship in the robber's
+colours. In Open Sea, harbour markers drop their painted boat and keep only the
+pier and the trade badge, so a harbour cannot be mistaken for a ship. The owner
+picked this look from mock-ups
+([Game modes](GAME-MODES.md#interface-decisions-for-the-build)), and the board
+draws it: `ShipShape` and `PirateShape` in `Board.tsx`, above the harbour
+badges. The Board takes `ships` and `pirate` as props, or reads the
+same-named fields off the game.
 
 Data model: a second map, `ships: Record<edgeId, playerId>`, rather than
 overloading `roads`. Two maps keep `longestTrail` honest about which segments
@@ -508,9 +537,8 @@ discards.
 
 The gold field's art is chosen from drafts: a painted Storybook-style tile with
 one large rock and a wide, glowing seam of gold above a pool with nuggets, which
-read best at board size. The final tile is made with the high-quality image
-model when Open Sea is built, as a new terrain in both board themes (see the
-sea renderer list above).
+read best at board size. The final tiles for both board themes were made on 26
+September 2026 and are in the game ([gold field tiles](art/gold-field.md)).
 
 ### The pirate
 
@@ -523,10 +551,10 @@ resource card. It blocks building and moving ships on its hex's edges, and
 blocks no production, roads, buildings or harbours.
 
 `Game.robber: number` becomes two fields. `RobberFlow.tsx` grows a choice of
-which piece to move, pirate victims come from ships on the hex's edges, and the
-board needs sea-hex targeting. When the clock has to finish this step, it
-always moves the robber, never the pirate (section 15.3 of the Open Sea
-rulebook).
+which piece to move, and pirate victims come from ships on the hex's edges. The
+board already gives every sea hex a target and the name Sea. When the clock has
+to finish this step, it always moves the robber, never the pirate (section 15.3
+of the Open Sea rulebook).
 
 ### Victory points for islands
 

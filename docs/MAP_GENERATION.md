@@ -198,7 +198,7 @@ Hex size against Classic's in the same space, measured on the board area of the 
 | Small phone, 375 × 667 | 359 × 305  | 0.66 (0.60)                  | 0.66 (0.56)                 |
 | Desktop, 1440 × 900    | 1074 × 754 | 0.66 (0.66)                  | 0.66 (0.66)                 |
 
-A taller, narrower board would gain a little on the upright phone and lose more on the desktop and the small phone, which are limited by height. The world margin, the painted water round the board, is 112 units on every side today. The ring is already water, so a sea board may not need all of it. That is a rendering choice for Phase 2, to be decided with screenshots (see [Bigger maps and modes](BIGGER-MAPS-AND-MODES.md)).
+A taller, narrower board would gain a little on the upright phone and lose more on the desktop and the small phone, which are limited by height. The world margin, the painted water round the board, is 112 units on every side today. The ring is already water, so a sea board does not need all of it: the sea renderer keeps 72 units, and on a phone opens on the islands, whose tokens are then about 15 pixels (see [Bigger maps and modes](BIGGER-MAPS-AND-MODES.md#sea-hexes-and-the-ring-of-sea)).
 
 ### What each template holds
 
