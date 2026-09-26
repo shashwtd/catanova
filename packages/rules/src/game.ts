@@ -514,6 +514,9 @@ function checkWin(g: Game) {
     g.winner = activePlayer(g).id;
     g.phase = 'finished';
     g.trade = null;
+    // Open Sea: a win can come while gold is being picked, when a resignation hands over an award; a finished
+    // game owes nobody a pick.
+    if (g.goldOwed) g.goldOwed = [];
     log(g, `${activePlayer(g).name} wins with ${score(g, activePlayer(g))} points!`);
   }
 }

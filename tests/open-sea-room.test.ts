@@ -21,7 +21,7 @@ import { owedMoves } from '../packages/rules/src/owed.js';
 import { CLASSIC, OPEN_SEA } from '../packages/rules/src/rulesets.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 import type { TurnTimerSeconds } from '../packages/protocol/src/settings.js';
-import { accountedFor } from './open-sea-game.js';
+import { accountedFor, dealCards, rigGold } from './open-sea-game.js';
 import { scriptedMove } from './open-sea-play.js';
 
 const OPEN: ModeSwitches = { open: [CLASSIC.id, OPEN_SEA.id], testers: new Set() };
@@ -64,6 +64,16 @@ type Table = ReturnType<typeof lobby>;
  * Isles never deals but the rules allow (section 5.5): gold then comes into setup and most turns.
  */
 function table(count: number, timer: TurnTimerSeconds | null = null, options: { goldOnMain?: boolean } = {}) {
+  const t = started(count, timer, options);
+  while (game(t).turn === 0) play(t);
+  return t;
+}
+/** The same game, just started: setup is still to play. */
+function started(
+  count: number,
+  timer: TurnTimerSeconds | null = null,
+  options: { goldOnMain?: boolean } = {},
+) {
   const t = lobby(count);
   t.store.configureSettings(t.host, 'sea', t.revision(), { turnTimerSeconds: timer, mode: OPEN_SEA.id });
   const board = dealBoard(2026, OPEN_SEA.board, count);
@@ -76,7 +86,6 @@ function table(count: number, timer: TurnTimerSeconds | null = null, options: { 
     .run(JSON.stringify(board), t.roomId);
   for (const seat of t.seats.slice(1)) t.store.lobby(seat, `ready-${seat.id}`, t.revision(), true);
   t.store.action(t.host, 'start', t.revision(), { kind: 'start' });
-  while (game(t).turn === 0) play(t);
   return t;
 }
 const game = (t: Table) => t.store.loadGame(t.roomId)!;
@@ -331,6 +340,47 @@ test('§15.5 a player offline for 2 minutes has their gold picks made at once; o
     assert.equal(activePlayer(game(t)).id, roller);
     assert.deepEqual(accountedFor(game(t)), []);
     assert.deepEqual(gameInvariantProblems(game(t)), []);
+  } finally {
+    t.store.close();
+  }
+});
+
+test('§9.2 and §12.3 a player leaving during gold picks can hand the player on turn the win: the picks end with it', () => {
+  const t = table(4, 90);
+  try {
+    const g0 = game(t);
+    const [onTurn, picker, , holder] = [0, 1, 2, 3].map((i) => g0.players[(g0.active + i) % 4]!.id) as [
+      string,
+      string,
+      string,
+      string,
+    ];
+    let goldNumber = 0;
+    rig(t, (g) => {
+      // The player on turn: two cities and four hidden Victory Point cards, 8 of a target of 10, and three
+      // Knights, as many as the holder of Largest Army. The next player is owed a pick from a gold field.
+      g.victoryPoints = 10;
+      for (const [v, building] of Object.entries(g.buildings))
+        if (building.player === onTurn) g.buildings[Number(v)] = { player: onTurn, kind: 'city' };
+      dealCards(g, onTurn, 'victoryPoint', 4);
+      dealCards(g, onTurn, 'knight', 3, true);
+      dealCards(g, holder, 'knight', 3, true);
+      g.largestArmy = holder;
+      goldNumber = rigGold(g, [picker]).gold.number;
+    });
+    const first = Math.max(1, goldNumber - 6);
+    t.queue.push(die(first), die(goldNumber - first));
+    play(t, { player: onTurn, action: { kind: 'roll' } });
+    assert.deepEqual(game(t).goldOwed, [{ player: picker, picks: 1 }]);
+    assert.ok(t.store.clock(t.roomId)!.goldDeadlines![picker]);
+    // The holder leaves while the picker picks: the award passes to the player on turn, who wins at once.
+    t.store.leave(seatOf(t, holder), 'leave-holder', t.revision());
+    const done = game(t);
+    assert.deepEqual([done.phase, done.winner, done.largestArmy], ['finished', onTurn, onTurn]);
+    assert.deepEqual(done.goldOwed, []);
+    assert.equal(t.store.clock(t.roomId), undefined, 'no clock is left running');
+    const room = verifyStore(t.store).details.find((detail) => detail.roomId === t.roomId)!;
+    assert.equal(room.status, 'verified', room.problems.join('; '));
   } finally {
     t.store.close();
   }

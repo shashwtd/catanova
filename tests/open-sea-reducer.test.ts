@@ -45,7 +45,19 @@ import { timeoutAction, timeoutDescription } from '../packages/rules/src/timeout
 import { requiredAction } from '../apps/client/src/game-attention.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
 import { outerIslesThree, sketch } from './sea-boards.js';
-import { SEATS, accountedFor, dice, giveCards, hand, newLines, seaGame } from './open-sea-game.js';
+import {
+  SEATS,
+  accountedFor,
+  afterSetup,
+  dealCards,
+  dice,
+  giveCards,
+  hand,
+  newLines,
+  rigGold,
+  seaGame,
+} from './open-sea-game.js';
+import { gameInvariantProblems } from '../scripts/verify-restored-games.js';
 
 const rule = (message: RegExp | string) => (error: unknown) =>
   error instanceof RuleError &&
@@ -1120,4 +1132,38 @@ test('the new moves are parsed like the others, and a Classic game refuses each 
     rule('Nobody is picking from a gold field now'),
   );
   assert.deepEqual(owedMoves(classic), [{ player: 'blue', kind: 'actions' }]);
+});
+
+// Guards the first review found no test for, each by its section, and what a resignation or a win must end.
+
+test('§9.2 and §12.3 a resignation during gold picks that hands the player on turn the win ends the picks too', () => {
+  // Blue, on turn, has two cities and four hidden Victory Point cards: 8 of a target of 10. Blue and Orange have
+  // played three Knights each, and Orange holds Largest Army on the tie. Red is owed a pick from a gold field.
+  const g = afterSetup(4, 11, { victoryPoints: 10 });
+  for (const [v, building] of Object.entries(g.buildings))
+    if (building.player === 'blue') g.buildings[Number(v)] = { player: 'blue', kind: 'city' };
+  dealCards(g, 'blue', 'victoryPoint', 4);
+  dealCards(g, 'blue', 'knight', 3, true);
+  dealCards(g, 'orange', 'knight', 3, true);
+  g.largestArmy = 'orange';
+  const { random } = rigGold(g, ['red']);
+  assert.deepEqual(gameInvariantProblems(g), []);
+  assert.equal(score(g, g.players[0]!), 8);
+  const rolled = applyAction(g, 'blue', { kind: 'roll' }, random);
+  assert.deepEqual([rolled.phase, rolled.goldOwed], ['goldPick', [{ player: 'red', picks: 1 }]]);
+  // Orange leaves while Red picks: Largest Army passes to Blue, who has 10 on their own turn and wins at once.
+  const left = resignPlayers(rolled, ['orange'], { reason: 'leave' });
+  assert.deepEqual([left.phase, left.winner, left.largestArmy], ['finished', 'blue', 'blue']);
+  assert.deepEqual(newLines(rolled, left).slice(-2), [
+    'Blue claimed Largest Army (+2 points).',
+    'Blue wins with 10 points!',
+  ]);
+  // Nobody picks in a finished game, and the restore verifier finds nothing wrong with it.
+  assert.deepEqual(left.goldOwed, []);
+  assert.deepEqual(owedMoves(left), []);
+  assert.deepEqual(gameInvariantProblems(left), []);
+  assert.throws(
+    () => applyAction(left, 'red', { kind: 'goldPick', resources: hand({ ore: 1 }) }, () => 0.5),
+    rule('The game has ended'),
+  );
 });

@@ -3,13 +3,15 @@
  * an Outer Isles preset would deal it, the players seated, and pieces, hands and the phase laid out as a test needs.
  * Everything else goes through createGame and applyAction, as a real game does.
  */
-import { isLand } from '../packages/rules/src/board.js';
+import { isLand, seededRandom } from '../packages/rules/src/board.js';
 import type { Board } from '../packages/rules/src/board.js';
 import { applyAction, createGame, emptyHand } from '../packages/rules/src/game.js';
-import type { Game, GameAction, Hand, Phase } from '../packages/rules/src/game.js';
+import type { CardKind, Game, GameAction, Hand, Phase } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
+import { owedMoves } from '../packages/rules/src/owed.js';
 import { OPEN_SEA } from '../packages/rules/src/rulesets.js';
 import { hexEdges, vertexIsland } from '../packages/rules/src/sea.js';
+import { timeoutAction } from '../packages/rules/src/timeout.js';
 import type { Sketch } from './sea-boards.js';
 
 /** The seats, in turn order: "you" are Blue, on turn unless a test says otherwise. */
@@ -134,6 +136,67 @@ export function play(g: Game, moves: [player: string, action: GameAction, random
 /** The log lines a move wrote. */
 export const newLines = (before: Game, after: Game) =>
   after.log.filter((line) => line.id >= before.nextLog).map((line) => line.text);
+
+/**
+ * A game on a real Outer Isles board, its setup placed by the clock's own moves: turn 1, the first seat about to
+ * roll, and every rule's invariant holding, so a test can change one thing and see what follows.
+ */
+export function afterSetup(players: number, seed: number, options: { victoryPoints?: number } = {}): Game {
+  const random = seededRandom(seed);
+  let g = createGame(SEATS.slice(0, players), seed, random, { ruleset: OPEN_SEA.id, ...options });
+  while (g.turn === 0) {
+    const [owed] = owedMoves(g);
+    g = applyAction(g, owed!.player, timeoutAction(g, owed!.player, random)!, random);
+  }
+  return g;
+}
+
+/**
+ * Deal development cards off the deck into a hand, as if bought on turn 0, or straight into play: each played
+ * Knight counts for the player's army. The deck and the purchase counter stay in step, as the verifier checks.
+ */
+export function dealCards(g: Game, player: string, kind: CardKind, count: number, played = false) {
+  const p = g.players.find((other) => other.id === player)!;
+  for (let i = 0; i < count; i++) {
+    const at = g.deck.indexOf(kind);
+    if (at < 0) throw new Error(`No ${kind} left in the deck`);
+    g.deck.splice(at, 1);
+    const id = `card-${g.nextCard++}`;
+    if (played && kind === 'knight') p.knights++;
+    else p.cards.push({ id, kind, boughtTurn: 0 });
+  }
+}
+
+/** Corners of a hex where a settlement may stand under the distance rule, apart from one another too. */
+export function freeCorners(g: Game, hex: number): number[] {
+  const corners: number[] = [];
+  for (const v of g.board.hexes[hex]!.vertices) {
+    const near = g.board.vertices[v]!.neighbors;
+    if (g.buildings[v] || near.some((n) => g.buildings[n] || corners.includes(n))) continue;
+    corners.push(v);
+  }
+  return corners;
+}
+
+/**
+ * Rig the next roll to pay gold to `pickers`, in the order given: a settlement for each on a corner of one gold
+ * field, with the island bonus it would have earned, and no other hex with that number. Returns the field and a
+ * random source that rolls its number.
+ */
+export function rigGold(g: Game, pickers: string[]) {
+  const gold = g.board.hexes.find(
+    (h) => h.terrain === 'gold' && freeCorners(g, h.id).length >= pickers.length,
+  )!;
+  for (const h of g.board.hexes) if (h.id !== gold.id && h.number === gold.number) h.number = 0;
+  const corners = freeCorners(g, gold.id);
+  for (const [i, player] of pickers.entries()) {
+    g.buildings[corners[i]!] = { player, kind: 'settlement' };
+    const bonuses = g.islandBonuses![player] ?? [];
+    if (!bonuses.includes(gold.island!)) g.islandBonuses![player] = [...bonuses, gold.island!];
+  }
+  const first = Math.max(1, gold.number - 6);
+  return { gold, random: dice(first, gold.number - first) };
+}
 
 /** Intersections of an island, by its name, in id order. */
 export const islandCorners = (g: Game, island: string) =>
