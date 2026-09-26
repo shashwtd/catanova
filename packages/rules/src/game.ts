@@ -1,7 +1,18 @@
-import { DEFAULT_VICTORY_POINTS, validVictoryPoints } from './victory.js';
-import { COSTS, DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES, SUPPLY, RULESET } from './index.js';
+import { DEVELOPMENT_DECK, RESOURCES, RESOURCE_NAMES } from './index.js';
 import type { Resource } from './index.js';
 import { generateBoard, shuffle } from './board.js';
+import {
+  CLASSIC,
+  boardPresetOf,
+  findRuleset,
+  fullBank,
+  handLimit,
+  playsBoard,
+  rulesetOf,
+  seatRange,
+  targetRangeText,
+  validTarget,
+} from './rulesets.js';
 import type { Board } from './board.js';
 import { rollDice } from './dice.js';
 import type { DiceMode, BalancedDiceState } from './dice.js';
@@ -122,6 +133,17 @@ function onBoard(board: Board, a: GameAction) {
   );
 }
 
+/**
+ * Whether every resource count an action names fits in a bank of this size. Like onBoard, it reads the fields
+ * rather than the kinds, so a new action with a hand of cards is checked without being listed here.
+ */
+function handsWithin(bank: number, a: GameAction) {
+  return (['resources', 'give', 'want', 'expectedGive'] as const).every((field) => {
+    const hand = (a as Partial<Record<typeof field, unknown>>)[field];
+    return !hand || typeof hand !== 'object' || RESOURCES.every((r) => (hand as Hand)[r] <= bank);
+  });
+}
+
 /** Untrusted input becomes a small, canonical action before it reaches a transaction. */
 export function parseGameAction(input: unknown): GameAction {
   requireRule(input && typeof input === 'object' && !Array.isArray(input), 'Invalid action');
@@ -146,10 +168,12 @@ export function parseGameAction(input: unknown): GameAction {
       Object.keys(h).every((k) => RESOURCES.includes(k as Resource)),
       'Unknown resource',
     );
+    // No count can exceed the bank. Which bank is the game's to say (handsWithin); here, the largest.
+    const limit = handLimit();
     for (const r of RESOURCES) {
       requireRule(
-        Number.isInteger(h[r]) && (h[r] as number) >= 0 && (h[r] as number) <= 19,
-        'Choose whole resource counts from 0 to 19',
+        Number.isInteger(h[r]) && (h[r] as number) >= 0 && (h[r] as number) <= limit,
+        `Choose whole resource counts from 0 to ${limit}`,
       );
       result[r] = h[r] as number;
     }
@@ -213,22 +237,29 @@ export function createGame(
   random: () => number,
   // `board`: the island a lobby was already showing, played exactly as dealt. A seed
   // only reproduces a board under the generator that dealt it, and generators change.
-  options: { diceMode?: DiceMode; victoryPoints?: number; board?: Board } = {},
+  // `ruleset`: the mode the room chose, frozen into the game here. Classic when absent.
+  options: { diceMode?: DiceMode; victoryPoints?: number; board?: Board; ruleset?: string } = {},
 ): Game {
+  const rules = findRuleset(options.ruleset);
+  requireRule(rules, 'This game mode is not available');
   requireRule(
-    options.victoryPoints === undefined || validVictoryPoints(options.victoryPoints),
-    'Choose a victory target from 8 to 15 points',
+    options.victoryPoints === undefined || validTarget(rules, options.victoryPoints),
+    targetRangeText(rules),
   );
-  requireRule(seats.length >= 2 && seats.length <= 4, 'Start with two to four players');
+  requireRule(
+    seats.length >= rules.seats.min && seats.length <= rules.seats.max,
+    `Start with ${seatRange(rules)} players`,
+  );
   requireRule(new Set(seats.map((p) => p.id)).size === seats.length, 'Seats must be unique');
   requireRule(!options.board || options.board.seed === seed >>> 0, 'The island does not match its seed');
-  const board = options.board ? structuredClone(options.board) : generateBoard(seed);
+  requireRule(!options.board || playsBoard(rules, options.board), 'The island was dealt for another mode');
+  const board = options.board ? structuredClone(options.board) : generateBoard(seed, boardPresetOf(rules));
   const g: Game = {
     schema: 1,
-    ruleset: RULESET,
+    ruleset: rules.id,
     board,
     players: seats.map((p) => ({ ...p, hand: emptyHand(), cards: [], knights: 0 })),
-    bank: { wood: 19, brick: 19, sheep: 19, wheat: 19, ore: 19 },
+    bank: fullBank(rules),
     buildings: {},
     roads: {},
     robber: board.hexes.find((h) => h.terrain === 'desert')!.id,
@@ -239,7 +270,7 @@ export function createGame(
     turn: 0,
     dice: null,
     deck: shuffle(
-      Object.entries(DEVELOPMENT_DECK).flatMap(([k, n]) => Array<CardKind>(n).fill(k as CardKind)),
+      Object.entries(rules.supply.deck).flatMap(([k, n]) => Array<CardKind>(n).fill(k as CardKind)),
       random,
     ),
     nextCard: 0,
@@ -255,7 +286,7 @@ export function createGame(
     log: [],
     nextLog: 0,
     diceMode: options.diceMode ?? 'classic',
-    victoryPoints: options.victoryPoints ?? DEFAULT_VICTORY_POINTS,
+    victoryPoints: options.victoryPoints ?? rules.victoryPoints.default,
   };
   log(g, 'The island is ready. Place two settlements and roads in snake order.');
   return g;
@@ -358,7 +389,7 @@ function checkWin(g: Game) {
   if (
     g.turn &&
     !activePlayer(g).resigned &&
-    score(g, activePlayer(g)) >= (g.victoryPoints ?? DEFAULT_VICTORY_POINTS)
+    score(g, activePlayer(g)) >= (g.victoryPoints ?? rulesetOf(g).victoryPoints.default)
   ) {
     g.winner = activePlayer(g).id;
     g.phase = 'finished';
@@ -382,7 +413,7 @@ export function robberVictims(
 function finishFreeRoads(g: Game) {
   if (
     g.freeRoads <= 0 ||
-    pieces(g, activePlayer(g).id).roads >= SUPPLY.roads ||
+    pieces(g, activePlayer(g).id).roads >= rulesetOf(g).supply.pieces.roads ||
     !roadSites(g, activePlayer(g).id).length
   ) {
     g.freeRoads = 0;
@@ -567,6 +598,9 @@ export function resignPlayers(
 export function applyAction(state: Game, playerId: string, raw: GameAction, random: () => number): Game {
   const a = parseGameAction(raw);
   requireRule(onBoard(state.board, a), 'Invalid board location');
+  const rules = rulesetOf(state),
+    { bank, pieces: supply } = rules.supply;
+  requireRule(handsWithin(bank, a), `Choose whole resource counts from 0 to ${bank}`);
   const g = structuredClone(state);
   const p = g.players.find((p) => p.id === playerId);
   requireRule(p, 'Not a player in this game');
@@ -775,7 +809,10 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     return g;
   }
   if (a.kind === 'road' && g.phase === 'freeRoads') {
-    requireRule(owned.roads < 15 && roadSites(g, p.id).includes(a.edge), 'Choose a legal road site');
+    requireRule(
+      owned.roads < supply.roads && roadSites(g, p.id).includes(a.edge),
+      'Choose a legal road site',
+    );
     g.roads[a.edge] = p.id;
     g.freeRoads--;
     finishFreeRoads(g);
@@ -799,8 +836,8 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
       g.phase = 'robber';
     }
     if (card.kind === 'roadBuilding') {
-      requireRule(owned.roads < 15 && roadSites(g, p.id).length, 'No legal road is available');
-      g.freeRoads = Math.min(2, 15 - owned.roads);
+      requireRule(owned.roads < supply.roads && roadSites(g, p.id).length, 'No legal road is available');
+      g.freeRoads = Math.min(2, supply.roads - owned.roads);
       g.phase = 'freeRoads';
     }
     if (card.kind === 'yearOfPlenty') {
@@ -856,34 +893,37 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   else g.trade = null;
   switch (a.kind) {
     case 'road':
-      requireRule(owned.roads < 15 && roadSites(g, p.id).includes(a.edge), 'Choose a legal road site');
-      transfer(p.hand, g.bank, COSTS.road);
+      requireRule(
+        owned.roads < supply.roads && roadSites(g, p.id).includes(a.edge),
+        'Choose a legal road site',
+      );
+      transfer(p.hand, g.bank, rules.costs.road);
       g.roads[a.edge] = p.id;
       log(g, `${p.name} built a road on edge ${a.edge + 1}.`);
       break;
     case 'settlement':
       requireRule(
-        owned.settlements < 5 && settlementSites(g, p.id).includes(a.vertex),
+        owned.settlements < supply.settlements && settlementSites(g, p.id).includes(a.vertex),
         'Choose a legal settlement site',
       );
-      transfer(p.hand, g.bank, COSTS.settlement);
+      transfer(p.hand, g.bank, rules.costs.settlement);
       g.buildings[a.vertex] = { player: p.id, kind: 'settlement' };
       log(g, `${p.name} built a settlement at corner ${a.vertex + 1}.`);
       break;
     case 'city':
       requireRule(
-        owned.cities < 4 &&
+        owned.cities < supply.cities &&
           g.buildings[a.vertex]?.player === p.id &&
           g.buildings[a.vertex]?.kind === 'settlement',
         'Upgrade one of your settlements',
       );
-      transfer(p.hand, g.bank, COSTS.city);
+      transfer(p.hand, g.bank, rules.costs.city);
       g.buildings[a.vertex]!.kind = 'city';
       log(g, `${p.name} built a city at corner ${a.vertex + 1}.`);
       break;
     case 'buyCard':
       requireRule(g.deck.length > 0, 'The development deck is empty');
-      transfer(p.hand, g.bank, COSTS.developmentCard);
+      transfer(p.hand, g.bank, rules.costs.developmentCard);
       p.cards.push({ id: `card-${g.nextCard++}`, kind: g.deck.pop()!, boughtTurn: g.turn });
       log(g, `${p.name} bought a development card.`);
       break;
@@ -987,6 +1027,7 @@ export function gameView(g: Game, viewer: string): GameView {
   const me = players.find((p) => p.id === viewer);
   const active = !!me && !me.resigned && activePlayer(g).id === viewer;
   const owned = pieces(g, viewer);
+  const { costs, supply } = rulesetOf(g);
   const build = active && g.phase === 'actions',
     setup = active && g.phase === 'setupSettlement';
   return {
@@ -1006,19 +1047,20 @@ export function gameView(g: Game, viewer: string): GameView {
     })),
     legal: {
       roads:
-        owned.roads >= 15
+        owned.roads >= supply.pieces.roads
           ? []
           : active && g.phase === 'setupRoad'
             ? roadSites(g, viewer, g.setupVertex)
-            : (active && g.phase === 'freeRoads') || (build && canPay(me.hand, COSTS.road))
+            : (active && g.phase === 'freeRoads') || (build && canPay(me.hand, costs.road))
               ? roadSites(g, viewer)
               : [],
       settlements:
-        owned.settlements < 5 && (setup || (build && canPay(me.hand, COSTS.settlement)))
+        owned.settlements < supply.pieces.settlements &&
+        (setup || (build && canPay(me.hand, costs.settlement)))
           ? settlementSites(g, viewer, setup)
           : [],
       cities:
-        build && owned.cities < 4 && canPay(me.hand, COSTS.city)
+        build && owned.cities < supply.pieces.cities && canPay(me.hand, costs.city)
           ? Object.entries(g.buildings)
               .filter(([, b]) => b.player === viewer && b.kind === 'settlement')
               .map(([id]) => Number(id))
@@ -1027,7 +1069,7 @@ export function gameView(g: Game, viewer: string): GameView {
         active && ['roll', 'actions'].includes(g.phase) && !g.playedCard
           ? me.cards.filter((c) => c.kind !== 'victoryPoint' && c.boughtTurn < g.turn).map((c) => c.id)
           : [],
-      canBuyCard: build && deck.length > 0 && canPay(me.hand, COSTS.developmentCard),
+      canBuyCard: build && deck.length > 0 && canPay(me.hand, costs.developmentCard),
       rates: Object.fromEntries(RESOURCES.map((r) => [r, tradeRate(g, viewer, r)])) as Hand,
     },
   };
