@@ -1,3 +1,4 @@
+import type { WorldBox } from './scene.js';
 export type Camera = { scale: number; x: number; y: number };
 export type Bounds = { width: number; height: number };
 export type Point = { x: number; y: number };
@@ -39,6 +40,28 @@ export function zoomAt(
     bounds,
     world,
   );
+}
+/** How small a fitted board may draw its 40-unit number tokens before an Open Sea board opens on its islands. */
+export const OPENING_TOKEN_PX = 16;
+/**
+ * The view a board opens on, and `0` returns to: the whole board. An Open Sea board passes the box of its islands,
+ * and on a screen where the whole frame would draw its number tokens smaller than OPENING_TOKEN_PX, it opens
+ * zoomed until the islands fill the screen instead. Mostly its ring of open sea is left outside, a drag or a
+ * pinch away.
+ */
+export function openingCamera(bounds: Bounds, world: WorldBox, islands?: WorldBox): Camera {
+  const whole = { scale: 1, x: 0, y: 0 };
+  const unit = fitBoard(bounds, world).width / world.width;
+  if (!islands || 40 * unit >= OPENING_TOKEN_PX) return whole;
+  const scale = Math.min(
+    maxZoom(bounds, world),
+    Math.max(1, bounds.width - 24) / (islands.width * unit),
+    Math.max(1, bounds.height - 24) / (islands.height * unit),
+  );
+  if (scale <= 1) return whole;
+  const dx = islands.x + islands.width / 2 - (world.x + world.width / 2),
+    dy = islands.y + islands.height / 2 - (world.y + world.height / 2);
+  return constrainCamera({ scale, x: -dx * unit * scale, y: -dy * unit * scale }, bounds, world);
 }
 export const wheelScale = (scale: number, delta: number) => scale * Math.exp(-clamp(delta, -24, 24) * 0.0009);
 export const pinchScale = (scale: number, distance: number, previous: number) =>
