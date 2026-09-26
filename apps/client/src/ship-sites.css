@@ -11,10 +11,6 @@
   opacity: 0.8;
   pointer-events: none;
 }
-.build-ghost .ship-hull {
-  stroke-dasharray: 3 2;
-  stroke-width: 1.4;
-}
 .ship-piece[data-moving='true'] {
   opacity: 0.45;
 }

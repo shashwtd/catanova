@@ -395,6 +395,33 @@ export function edgeCentre(board: Board, edgeId: number): ShorePoint {
     b = board.vertices[edge.b]!;
   return { x: ((a.x + b.x) * HEX_SIZE) / 2, y: ((a.y + b.y) * HEX_SIZE) / 2 };
 }
+/** How far a ship on a coastal edge sits out from the shore, so that it floats on the water rather than the sand. */
+export const SHIP_SHORE_OFFSET = 9;
+/**
+ * Where a ship draws: the middle of its edge, pushed out to sea on a coast, lying along the edge. The angle is
+ * kept between −90 and 90 degrees so that no ship is drawn upside down against the painting's light.
+ */
+export function shipPlacement(board: Board, edgeId: number) {
+  const edge = board.edges[edgeId]!,
+    a = board.vertices[edge.a]!,
+    b = board.vertices[edge.b]!;
+  let x = ((a.x + b.x) * HEX_SIZE) / 2,
+    y = ((a.y + b.y) * HEX_SIZE) / 2;
+  const land = edge.hexes.filter((h) => isLand(board.hexes[h]!));
+  const sea = edge.hexes.find((h) => !isLand(board.hexes[h]!));
+  if (land.length === 1 && sea !== undefined) {
+    const to = board.hexes[sea]!,
+      dx = to.x * HEX_SIZE - x,
+      dy = to.y * HEX_SIZE - y,
+      d = Math.hypot(dx, dy);
+    x += (dx / d) * SHIP_SHORE_OFFSET;
+    y += (dy / d) * SHIP_SHORE_OFFSET;
+  }
+  let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+  if (angle > 90) angle -= 180;
+  else if (angle <= -90) angle += 180;
+  return { x, y, angle };
+}
 /** The normal is perpendicular to this exact coast edge, not a ray from the island center. */
 export function portPlacement(board: Board, edgeId: number) {
   const e = board.edges[edgeId]!;

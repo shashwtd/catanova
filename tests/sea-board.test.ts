@@ -7,7 +7,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { generateBoard, isLand } from '../packages/rules/src/board.js';
 import type { Board as Island } from '../packages/rules/src/board.js';
 import { gameView } from '../packages/rules/src/game.js';
-import { edgeCentre, HEX_SIZE, seaOutline, WATER_FEATHER, worldBox } from '../apps/client/src/scene.js';
+import {
+  edgeCentre,
+  HEX_SIZE,
+  seaOutline,
+  shipPlacement,
+  WATER_FEATHER,
+  worldBox,
+} from '../apps/client/src/scene.js';
+import { SHIP_ART } from '../apps/client/src/game-assets.js';
 import { Board, PirateShape, ShipShape } from '../apps/client/src/Board.js';
 import { BOARD_THEMES } from '../apps/client/src/board-theme.js';
 import { loungeGame } from './board-fixtures.js';
@@ -50,19 +58,21 @@ test('an Open Sea board draws its sea round the frame, sea hexes to choose, gold
   assert.equal((render({ board: generateBoard(42) }).match(/class="port-boat"/g) ?? []).length, 9);
 });
 
-test('ships and the pirate are flat pieces in the house style, drawn on their edge and their sea hex', () => {
+test('ships and the pirate are the painted ship, lying on their edge and on their sea hex', () => {
   const ship = renderToStaticMarkup(
-    createElement('svg', null, createElement(ShipShape, { color: '#54b3dc' })),
+    createElement('svg', null, createElement(ShipShape, { color: '#54b3dc', angle: 30 })),
   );
   assert.match(ship, /<ellipse class="ship-plinth"/);
-  assert.equal((ship.match(/class="ship-sail"/g) ?? []).length, 2);
-  assert.match(ship, /<path class="ship-mast" d="M0 1V-23"/);
-  assert.match(ship, /<path class="ship-hull" fill="#54b3dc"/);
-  assert.match(ship, /<path class="ship-sheen"/);
-  assert.doesNotMatch(ship, /stroke="#54b3dc"|fill="#54b3dc"[^>]*class="ship-sail"/, 'no coloured stripe');
+  // The painting lies along the edge, and only its sail takes the seat colour, through the sail's mask.
+  assert.match(
+    ship,
+    new RegExp(`<g transform="rotate\\(120\\)"><image href="${SHIP_ART.replace(/\./g, '\\.')}"`),
+  );
+  assert.match(ship, /<rect class="ship-sail-tint"[^>]* fill="#54b3dc" mask="url\(#ship-sail\)"/);
+  assert.equal((ship.match(/#54b3dc/g) ?? []).length, 1, 'the colour goes on the sail alone');
   const dark = renderToStaticMarkup(createElement('svg', null, createElement(PirateShape)));
-  assert.match(dark, /^<svg><g transform="scale\(1\.1\)">/);
-  assert.match(dark, /class="pirate-pennant"/);
+  assert.match(dark, /<rect class="pirate-hull"[^>]* mask="url\(#ship-hull\)"/);
+  assert.match(dark, /<rect class="pirate-sail"[^>]* mask="url\(#ship-sail\)"/);
   assert.doesNotMatch(dark, /fill="/, 'the pirate takes its colours from the robber’s');
 
   // The pieces come from props, or from the same-named fields of the game the board is given.
@@ -77,7 +87,7 @@ test('ships and the pirate are flat pieces in the house style, drawn on their ed
     colors: { 'sample-1': '#b08be4' },
   });
   for (const html of [fromProps, withGame]) {
-    const at = edgeCentre(board, a!.id);
+    const at = shipPlacement(board, a!.id);
     assert.match(html, new RegExp(`data-ship-id="${a!.id}"[^>]*transform="translate\\(${at.x},${at.y}\\)"`));
     const h = board.hexes[pirate]!;
     assert.match(
@@ -92,7 +102,10 @@ test('ships and the pirate are flat pieces in the house style, drawn on their ed
   }
   assert.equal((fromProps.match(/data-ship-id/g) ?? []).length, 2);
   assert.match(withGame, /aria-label="Mossling · Ship \d+"/);
-  assert.match(withGame, /class="ship-hull" fill="#b08be4"/);
+  assert.match(withGame, /class="ship-sail-tint"[^>]* fill="#b08be4"/);
+  // The masks the ships are dyed through exist only on a board with sea, so Classic's markup is as it was.
+  assert.match(fromProps, /<mask id="ship-sail"/);
+  assert.doesNotMatch(render({ board: generateBoard(481), game: view }), /<mask id="ship-/);
   // Before a game the pirate waits on its board's start; a game without one has no pirate.
   assert.match(
     render({ board: Object.assign(dealtOuterIsles4(), { pirateStart: pirate }) }),
@@ -104,7 +117,8 @@ test('ships and the pirate are flat pieces in the house style, drawn on their ed
 test('a ship on any edge a ship may take, and the pirate on any sea hex, stay inside the scene', () => {
   const board = dealtOuterIsles4(),
     world = worldBox(board);
-  // The ship's outline and plinth, and the pirate's at its scale and offset, as Board.tsx draws them.
+  // The ship lying along its edge with its shadow, and the pirate at its scale and offset, as Board.tsx draws
+  // them: no part reaches further than half a ship's length and the shadow's offset from its middle.
   const inside = (x: number, y: number, [left, top, right, bottom]: number[]) =>
     x + left! >= world.x &&
     x + right! <= world.x + world.width &&
@@ -113,22 +127,20 @@ test('a ship on any edge a ship may take, and the pirate on any sea hex, stay in
   for (const edge of board.edges.filter(
     (e) => e.hexes.length === 2 && e.hexes.some((h) => !isLand(board.hexes[h]!)),
   )) {
-    const { x, y } = edgeCentre(board, edge.id);
-    assert.ok(inside(x, y, [-18.9, -24, 18.9, 15]), `edge ${edge.id}`);
+    const { x, y } = shipPlacement(board, edge.id);
+    assert.ok(inside(x, y, [-30, -30, 30, 30]), `edge ${edge.id}`);
   }
   for (const h of board.hexes.filter((h) => !isLand(h)))
-    assert.ok(inside(h.x * HEX_SIZE, h.y * HEX_SIZE + 6, [-21, -26.5, 21, 12]), `hex ${h.id}`);
+    assert.ok(inside(h.x * HEX_SIZE, h.y * HEX_SIZE + 6, [-33, -33, 33, 33]), `hex ${h.id}`);
 });
 
-test('the Open Sea stylesheet gives the pieces the house contour and the robber’s colours, and loads after every layered sheet', () => {
+test('the Open Sea stylesheet dyes the ships’ sails and gives the pirate the robber’s colours, and loads after every layered sheet', () => {
   const css = readFileSync('apps/client/src/open-sea.css', 'utf8');
   const rule = (selector: string) =>
     new RegExp(`${selector.replace(/[.*]/g, '\\$&')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
-  assert.match(rule('.ship-hull'), /stroke: #31453e;\s*stroke-width: 1\.7;\s*stroke-linejoin: round;/);
-  assert.match(rule('.ship-sail'), /fill: #fff0cc;\s*stroke: #31453e;/);
-  assert.match(rule('.ship-mast'), /stroke: #31453e;/);
-  assert.match(rule('.pirate-piece path'), /fill: #172231;\s*stroke: #c3b488;/);
-  assert.match(rule('.pirate-piece .pirate-pennant'), /stroke: #e7d8af;/);
+  assert.match(rule('.ship-sail-tint'), /mix-blend-mode: multiply;/);
+  assert.match(rule('.pirate-piece .pirate-hull'), /fill: #2b3442;/);
+  assert.match(rule('.pirate-piece .pirate-sail'), /fill: #172231;\s*mix-blend-mode: multiply;/);
   assert.match(rule('.board-camera .sea-stage'), /filter: none;/);
   assert.doesNotMatch(css, /!important|#[\w-]+ \{|:not\(/);
   const imports = [

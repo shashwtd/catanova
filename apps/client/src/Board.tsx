@@ -18,6 +18,7 @@ import {
   boardKey,
   coastline,
   edgeCentre,
+  shipPlacement,
   GOLD_TILE,
   hasSea,
   HEX_SIZE as SIZE,
@@ -38,7 +39,7 @@ import {
   worldBox,
 } from './scene.js';
 import type { SceneTerrain, WorldBox } from './scene.js';
-import { GOLD_ART } from './game-assets.js';
+import { GOLD_ART, SHIP_ART, SHIP_SAIL_MASK } from './game-assets.js';
 
 /** The seat colours a board falls back to when nothing tells it otherwise —
  *  a preview, or the first frame before the room arrives. A real table passes
@@ -117,20 +118,41 @@ function BuildingShape({ city, color }: { city: boolean; color: string }) {
     </>
   );
 }
-/** A ship's outline, standing upright on its edge like a house on its corner, about a house's size. */
-const SHIP_SAILS = ['M2-21Q12-13 13.5-1H2Z', 'M-2-16Q-9.5-10-10.5-1H-2Z'];
-const SHIP_HULL = 'M-18 0H18Q15.5 9 10 9.5H-10Q-15.5 9-18 0Z';
-/** A ship: an upright boat in the seat colour with cream sails, standing on the edge it holds. */
-export function ShipShape({ color }: { color: string }) {
+/** A ship is about a road's length, lying along its edge; the painting is 130 by 256 pixels. */
+const SHIP_LENGTH = 54,
+  SHIP_WIDTH = (SHIP_LENGTH * 130) / 256;
+const SHIP_BOX = { x: -SHIP_WIDTH / 2, y: -SHIP_LENGTH / 2, width: SHIP_WIDTH, height: SHIP_LENGTH };
+/**
+ * A ship: the painted wooden boat lying along its edge, its sail dyed the seat colour through the sail's mask
+ * (docs/art/ship.md), with a soft shadow on the water towards the lower right, away from the painting's light.
+ */
+export function ShipShape({ color, angle = 0 }: { color: string; angle?: number }) {
   return (
     <>
-      <ellipse className="ship-plinth" rx="17" ry="4.5" cy="10.5" />
-      {SHIP_SAILS.map((d) => (
-        <path key={d} className="ship-sail" d={d} />
-      ))}
-      <path className="ship-mast" d="M0 1V-23" />
-      <path className="ship-hull" fill={color} d={SHIP_HULL} />
-      <path className="ship-sheen" d="M-14 3.5H14" />
+      <ellipse
+        className="ship-plinth"
+        rx={SHIP_LENGTH * 0.44}
+        ry={SHIP_WIDTH * 0.36}
+        transform={`translate(2,3) rotate(${angle})`}
+      />
+      <g transform={`rotate(${angle + 90})`}>
+        <image href={SHIP_ART} {...SHIP_BOX} />
+        <rect className="ship-sail-tint" {...SHIP_BOX} fill={color} mask="url(#ship-sail)" />
+      </g>
+    </>
+  );
+}
+/** The masks the ships' dye and the pirate's darkening are cut to, in each ship's own frame. */
+function ShipMasks() {
+  const region = { x: -SHIP_LENGTH, y: -SHIP_LENGTH, width: SHIP_LENGTH * 2, height: SHIP_LENGTH * 2 };
+  return (
+    <>
+      <mask id="ship-sail" maskUnits="userSpaceOnUse" {...region} style={{ maskType: 'alpha' }}>
+        <image href={SHIP_SAIL_MASK} {...SHIP_BOX} />
+      </mask>
+      <mask id="ship-hull" maskUnits="userSpaceOnUse" {...region} style={{ maskType: 'alpha' }}>
+        <image href={SHIP_ART} {...SHIP_BOX} />
+      </mask>
     </>
   );
 }
@@ -159,7 +181,7 @@ function ShipSite({
   onChoose: () => void;
 }) {
   const { length, transform } = roadGeometry(board, edge),
-    at = edgeCentre(board, edge);
+    at = shipPlacement(board, edge);
   return (
     <g
       role="button"
@@ -198,22 +220,27 @@ function ShipSite({
         />
       </g>
       <g className="build-site-preview" aria-hidden="true" transform={`translate(${at.x},${at.y})`}>
-        <ShipShape color={color} />
+        <ShipShape color={color} angle={at.angle} />
       </g>
     </g>
   );
 }
-/** The pirate: a ship in the robber's colours, about a tenth larger than a player's ship. */
+/** The pirate: the same painted ship in the robber's colours, dark sail and darkened hull, a tenth larger. */
 export function PirateShape() {
   return (
-    <g transform="scale(1.1)">
-      {SHIP_SAILS.map((d) => (
-        <path key={d} d={d} />
-      ))}
-      <path className="pirate-mast" d="M0 1V-23" />
-      <path d={SHIP_HULL} />
-      <path className="pirate-pennant" d="M1.5-22.5H8" />
-    </g>
+    <>
+      <ellipse
+        className="ship-plinth"
+        rx={SHIP_LENGTH * 0.48}
+        ry={SHIP_WIDTH * 0.4}
+        transform="translate(2,3) rotate(-25)"
+      />
+      <g transform="rotate(65) scale(1.1)">
+        <image href={SHIP_ART} {...SHIP_BOX} />
+        <rect className="pirate-hull" {...SHIP_BOX} mask="url(#ship-hull)" />
+        <rect className="pirate-sail" {...SHIP_BOX} mask="url(#ship-sail)" />
+      </g>
+    </>
   );
 }
 export function Sprite({
@@ -307,6 +334,7 @@ const BoardScenery = memo(function BoardScenery({
             <polygon key={i} points={points} fill="white" filter="url(#water-feather)" />
           ))}
         </mask>
+        {sea && <ShipMasks />}
         {sea && (
           <filter
             id="island-shadow"
@@ -845,7 +873,7 @@ export const Board = memo(function Board({
             );
           })}
         {Object.entries(shipsShown).map(([id, owner]) => {
-          const at = edgeCentre(board, Number(id)),
+          const at = shipPlacement(board, Number(id)),
             label = `${game?.players.find((p) => p.id === owner)?.name ?? 'Player'} · Ship ${Number(id) + 1}`;
           return (
             <g
@@ -859,7 +887,7 @@ export const Board = memo(function Board({
               transform={`translate(${at.x},${at.y})`}
             >
               <title>{label}</title>
-              <ShipShape color={color(owner)} />
+              <ShipShape color={color(owner)} angle={at.angle} />
             </g>
           );
         })}
@@ -885,7 +913,7 @@ export const Board = memo(function Board({
           // The player's own ships, as the city upgrade marks a settlement: a movable one takes the orbit, and
           // any other says why it stays.
           const edge = Number(id),
-            at = edgeCentre(board, edge),
+            at = shipPlacement(board, edge),
             block = shipBlocks[edge],
             chosen = shipMove?.from === edge;
           const activate = (target: Element) =>
@@ -908,8 +936,8 @@ export const Board = memo(function Board({
                   ? `Your ship on edge ${edge + 1}. It cannot move: ${SHIP_MOVE_BLOCKS[block]}`
                   : `Your ship on edge ${edge + 1}. ${chosen ? 'Chosen to move' : 'Move this ship'}`
               }
-              // Round the ship itself, which stands on its edge: half a mast above the middle.
-              transform={`translate(${at.x},${at.y - 6})`}
+              // Round the ship itself, where it lies on its edge.
+              transform={`translate(${at.x},${at.y})`}
               onClick={(e) => activate(e.currentTarget)}
               onKeyDown={(e) => keyActivate(e, () => activate(e.currentTarget))}
               onPointerEnter={(e) => {
@@ -1037,7 +1065,7 @@ export const Board = memo(function Board({
         })}
         {(pending?.kind === 'ship' || pending?.kind === 'moveShip') &&
           (() => {
-            const at = edgeCentre(board, pending.kind === 'ship' ? pending.edge : pending.to);
+            const at = shipPlacement(board, pending.kind === 'ship' ? pending.edge : pending.to);
             return (
               <g
                 className="build-ghost ship-piece"
@@ -1047,7 +1075,7 @@ export const Board = memo(function Board({
                 pointerEvents="none"
                 transform={`translate(${at.x},${at.y})`}
               >
-                <ShipShape color={color(me!)} />
+                <ShipShape color={color(me!)} angle={at.angle} />
               </g>
             );
           })()}

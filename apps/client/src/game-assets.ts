@@ -4,6 +4,9 @@ export const TERRAIN_ART = '/art/optimized/terrain-fantasy.777e0ac07117.webp';
 export const ENVIRONMENT_ART = '/art/optimized/environment-painted.00c506c983c0.webp';
 /** Only a board with a gold field loads it, so it stays out of GAME_ART. */
 export const GOLD_ART = BOARD_THEMES.classic.gold;
+/** Open Sea's painted ship, and the mask of its sail that takes the seat colour; loaded only on a board with sea. */
+export const SHIP_ART = '/art/optimized/ship-painted.8c31ede90b16.webp';
+export const SHIP_SAIL_MASK = '/art/optimized/ship-sail-mask.49ba6ca51b30.webp';
 export const GAME_ART = [
   BOARD_THEMES.storybook.terrain,
   BOARD_THEMES.storybook.environment,

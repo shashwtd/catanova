@@ -175,6 +175,30 @@
       "quality": 78,
       "originalBytes": 584738,
       "bytes": 85302
+    },
+    {
+      "source": "assets/source-art/ship-painted.png",
+      "legacyUrl": "/art/ship-painted.png",
+      "url": "/art/optimized/ship-painted.8c31ede90b16.webp",
+      "sha256": "8c31ede90b1670c0a697bfcfe458f305a94b6be7970b47704abedb4f48b59d91",
+      "sourceSha256": "18043321b9f88f78be572d45060483028342c62cb9f48ecec6feb5351c518949",
+      "width": 130,
+      "height": 256,
+      "quality": 88,
+      "originalBytes": 59777,
+      "bytes": 11540
+    },
+    {
+      "source": "assets/source-art/ship-sail-mask.png",
+      "legacyUrl": "/art/ship-sail-mask.png",
+      "url": "/art/optimized/ship-sail-mask.49ba6ca51b30.webp",
+      "sha256": "49ba6ca51b306820da225c2348e8c6779bbbd0f0dd8f81f1a7e879d5a5a6b48b",
+      "sourceSha256": "4a40187b65139bd0cec11177609abc81e2cb333f3c4c0be182bd45e6248e0f03",
+      "width": 130,
+      "height": 256,
+      "quality": 90,
+      "originalBytes": 4235,
+      "bytes": 2134
     }
   ]
 }
