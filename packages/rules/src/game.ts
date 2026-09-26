@@ -715,7 +715,10 @@ export function resignPlayers(
       g.discards = {};
       g.freeRoads = 0;
       g.setupVertex = null;
+      // Open Sea: the survivor starts afresh, and no ship built or moved in the last turn is theirs.
       if (g.goldOwed) g.goldOwed = [];
+      if (g.shipsBuiltThisTurn) g.shipsBuiltThisTurn = [];
+      if (g.shipMovedThisTurn) g.shipMovedThisTurn = false;
       return g;
     }
     g.winner = remaining[0]!.id;

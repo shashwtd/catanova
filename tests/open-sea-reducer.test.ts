@@ -1167,3 +1167,20 @@ test('§9.2 and §12.3 a resignation during gold picks that hands the player on 
     rule('The game has ended'),
   );
 });
+
+test('§15.6 the last player left, offline, starts a turn with no ship built or moved in it', () => {
+  const g = afterSetup(3, 1);
+  Object.assign(g, { phase: 'actions', dice: [2, 3] });
+  giveCards(g, 'blue', { wood: 1, sheep: 1 });
+  const edge = gameView(g, 'blue').legal.ships![0]!;
+  const built = applyAction(g, 'blue', { kind: 'ship', edge }, () => 0.5);
+  assert.deepEqual(built.shipsBuiltThisTurn, [edge]);
+  // Blue and Green leave while Red, the only one left, is offline: the game waits for Red's return.
+  const alone = resignPlayers(built, ['blue', 'green'], { reason: 'leave', winnerEligibleIds: [] });
+  assert.deepEqual(
+    [alone.phase, alone.players[alone.active]!.id, alone.shipsBuiltThisTurn, alone.shipMovedThisTurn],
+    ['roll', 'red', [], false],
+  );
+  assert.equal(alone.ships![edge], 'blue', 'the ship stays on the board');
+  assert.deepEqual(gameInvariantProblems(alone), []);
+});
