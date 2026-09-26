@@ -361,6 +361,20 @@ reuses the second-actor work.
 The big one. Four new systems, and a renderer that has to learn to draw an
 archipelago.
 
+**Status on 26 September 2026.** The rules are built on
+`feature/open-sea/2026-09-26`, not yet merged: `sea.ts` and `gold.ts` hold them
+as pure functions, and `applyAction` calls into them from small branches that
+only a game whose ruleset has the sea reaches. A game keeps Classic's fields and
+adds `ships` (edge id to player id), `pirate` (a sea hex), `shipsBuiltThisTurn`,
+`shipMovedThisTurn`, `lockedShips` and `closedShipEnds` (the records of the Open
+Sea rulebook's section 8.7), `islandBonuses` (player id to small islands) and
+`goldOwed` (the picks still owed, in order), all public; a Classic game has none
+of them and saves as before. A new phase, `goldPick`, waits for the picks, and
+the moves are `{ kind: 'ship', edge }`, `{ kind: 'moveShip', from, to }`,
+`{ kind: 'pirate', hex, victim? }` and `{ kind: 'goldPick', resources }`, with
+a road or a ship as the setup piece and for Road Building. The award keeps its
+key, `longestRoad`, and is named Longest Route in the log and the client.
+
 ### Sea hexes and the ring of sea
 
 Sea becomes a real terrain, not the absence of one. Outer Isles surrounds its
@@ -550,8 +564,9 @@ player who has a ship on an edge of that hex, if anyone does: one random
 resource card. It blocks building and moving ships on its hex's edges, and
 blocks no production, roads, buildings or harbours.
 
-`Game.robber: number` becomes two fields. `RobberFlow.tsx` grows a choice of
-which piece to move, and pirate victims come from ships on the hex's edges. The
+`Game.robber: number` keeps the robber, and `Game.pirate` is the pirate's sea
+hex. `RobberFlow.tsx` grows a choice of which piece to move, and pirate victims
+come from ships on the hex's edges. The
 board already gives every sea hex a target and the name Sea. When the clock has
 to finish this step, it always moves the robber, never the pirate (section 15.3
 of the Open Sea rulebook).

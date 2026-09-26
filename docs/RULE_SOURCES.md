@@ -127,7 +127,7 @@ Translate each applicable row into executable game-state scenarios as the rules 
 
 Reviewed 26 September 2026. This part covers two planned rulesets: `big-table-v1`, Big Table, for five and six players, described in the [Big Table rulebook](RULEBOOK-BIG-TABLE.md); and `open-sea-v1`, Open Sea, described in the [Open Sea rulebook](RULEBOOK-OPEN-SEA.md). Both books are companions to the Classic rulebook. Every Classic rule, and every row B01–B74 above, applies to them unless a row below changes it.
 
-Neither mode is implemented. "Documented" means the behaviour appears in the mode's rulebook, as for Classic. "Catanova decision" marks a rule we chose where the official texts are silent or disagree, or where we knowingly depart from them; each points to an entry in the decision lists below. Section numbers refer to the mode's own rulebook. Mode, role and scenario names are Catanova's own; official product names appear only to identify the references.
+Open Sea's rules are implemented in the engine, though the mode is not yet offered to players; Big Table's are not. "Documented" means the behaviour appears in the mode's rulebook, as for Classic. "Catanova decision" marks a rule we chose where the official texts are silent or disagree, or where we knowingly depart from them; each points to an entry in the decision lists below. Section numbers refer to the mode's own rulebook. Mode, role and scenario names are Catanova's own; official product names appear only to identify the references.
 
 ### Primary references for the modes
 
@@ -255,7 +255,7 @@ Neither mode rulebook, nor [map generation](MAP_GENERATION.md), reproduces an of
 | OS49 | Road Building places two roads or ships in any mix, one straight after the other; no paid build between | 13.2 | S6 p. 3; SFAQ: Road Building | Documented (OD23) |
 | OS50 | Other development cards unchanged | 13.3 | S6 p. 3; R6 p. 9 | Documented |
 | OS51 | Ships, moves, pirate and bonuses public; gold picks public | 14 | S6 p. 4 (public bonus tokens) | Documented; gold-pick visibility is a Catanova decision (OD19) |
-| OS52 | Clocks: turn timer, discards, one 20-second gold clock per player owed gold; expiry defaults | 15.3 | — | Catanova decision (OD19, OD26) |
+| OS52 | Clocks: turn timer, discards, one 20-second gold clock per player owed gold; expiry defaults | 15.3 | — | Catanova decision (OD19, OD26, OD27, OD28) |
 | OS53 | No bots and no stand-in bots | 15.4 | — | Catanova decision (M3) |
 | OS54 | Absent player: the game waits; after 2 minutes offline the clock acts for them, setup placements included | 15.5 | TURN_CLOCK.md | Catanova decision (M4, M7) |
 | OS55 | Resignation, pausing and abandonment as in Classic; ships stay on the board | 15.6 | TURN_CLOCK.md | Documented |
@@ -323,6 +323,8 @@ Neither mode rulebook, nor [map generation](MAP_GENERATION.md), reproduces an of
 24. **OD24 Setup:** the Classic snake draft, on the main island. Each setup piece after a settlement may be a road or, if the settlement is coastal, a ship (S6 p. 3).
 25. **OD25 Everything else:** every other rule is Classic.
 26. **OD26 Clock defaults:** when a turn runs out with a robber-or-pirate move owed, the clock always moves the robber, never the pirate. If the pirate has moved and only its victim is owed, the clock picks a random legal victim among the other players with a ship on an edge of its hex (OQ3). Each Road Building piece still owed becomes a road on a random legal site if possible, otherwise a ship on a random legal edge away from the pirate, otherwise nothing (OQ4).
+27. **OD27 Gold picks in setup:** a second starting settlement's gold picks have the same 20-second clock as a roll's, although setup placements themselves are untimed (sections 9.5 and 15.3). Outer Isles never deals the case. Decided when the engine was built, 26 September 2026.
+28. **OD28 The pirate's victim:** online, a player moves the pirate and names its victim in one move, as with the robber, so the game never waits on a victim alone, and the clock's default for that case (OD26) never arises (section 15.3). Decided when the engine was built, 26 September 2026.
 
 ### Open points: Big Table
 
@@ -366,4 +368,4 @@ An official clarification or errata for either expansion should be linked here w
 
 ### Mode conformance gate
 
-Neither mode has an engine yet. When one is built, translate each row into executable scenarios, as for Classic, and add the preset tests listed in [map generation](MAP_GENERATION.md). Classic's tests and the `balanced-v2` fixture must keep passing unchanged.
+Open Sea's rows are translated into executable scenarios. `tests/open-sea-reducer.test.ts` plays each rule through the reducer, every test named by its rulebook section; `tests/sea.test.ts`, `tests/sea-ships.test.ts` and `tests/gold.test.ts` test the rules module by module; `tests/open-sea-games.test.ts` plays whole three- and four-player games across seeds with every card and piece accounted for after each move; `tests/open-sea-room.test.ts` covers the lobby's board, the clocks, absences, journal replay and the restore verifier; and `tests/outer-isles-board.test.ts` checks the preset as [map generation](MAP_GENERATION.md) lists. Big Table has no engine yet; when it does, translate its rows the same way. Classic's tests and the `balanced-v2` fixture must keep passing unchanged, and do.

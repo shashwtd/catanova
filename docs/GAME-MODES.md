@@ -430,17 +430,19 @@ Four things every mode touches, so they get one home early:
   turn, or `discard` for each player who must discard. Trade replies are never
   owed, since nothing waits for them. The turn clock's discard clocks, the
   absence rule, the bot driver's `owedBy`, `timeoutAction` and the client's
-  "your move" cue read from it. A later kind (`partner`, `buildWindow`,
-  `goldPick`) is added there with its timeout move in `timeout.ts`, and whatever
-  must be answered in order lists only the player whose turn it is to answer.
+  "your move" cue read from it. A later kind is added there with its timeout
+  move in `timeout.ts`, and whatever must be answered in order lists only the
+  player whose turn it is to answer. Open Sea's `goldPick` is built that way:
+  owed by the player picking now, whoever is on turn, its timeout the default
+  picks. Big Table adds `partner` and `buildWindow`.
 - **Scoring.** `score()` is a sum of named terms (built in Release A, as
-  `scoreTerms()` in `game.ts`): settlements, cities, the two awards and victory
-  point cards, with island bonuses (and later, perhaps, a harbour bonus) to
-  come. A new term is one more entry there, read from its mode's own state. The
-  game view, the win check, player records and the admin analytics all read it.
-  The game view sends each player's terms, with cards hidden as in their points,
-  and results keep them, so the results screen names each part. Results saved
-  before terms still work their parts out as before.
+  `scoreTerms()` in `game.ts`): settlements, cities, the two awards, victory
+  point cards and Open Sea's island bonuses (`islandBonus`), with perhaps a
+  harbour bonus later. A new term is one more entry there, read from its mode's
+  own state. The game view, the win check, player records and the admin
+  analytics all read it. The game view sends each player's terms, with cards
+  hidden as in their points, and results keep them, so the results screen names
+  each part. Results saved before terms still work their parts out as before.
 - **Supply and costs.** One table per ruleset instead of constants: 19, 24 and
   19 cards of each resource; 25, 34 and 25 development cards; 15 roads, 5
   settlements and 4 cities per player, plus 15 ships in Open Sea. Built in
@@ -621,6 +623,24 @@ In the order the maps plan gives:
 
 None of these is offered alone; they open with Outer Isles.
 
+**Status on 26 September 2026.** Built on `feature/open-sea/2026-09-26`, not
+yet merged, with the sea rules (`sea.ts`, `gold.ts`), the board presets and the
+sea renderer merged into it. `open-sea-v1` is registered, and a whole game can
+be played through `applyAction` and the server: starting settlements on the
+main island with a road or a ship, ships bought, free and moved, gold picks in
+turn order after production with their 20-second clock, the robber or the
+pirate after a seven or a Knight, Longest Route, island bonuses as the score
+term `islandBonus`, and the clock's and the absence rule's defaults for each.
+Classic never reaches the new code: its fixtures are unchanged, and every
+client surface the build touched renders a Classic game character for
+character as before. What players still cannot do is make these moves in the
+game: the ship controls, the gold-pick panel and the robber-or-pirate choice are
+the next build, written against the view's `legal.ships`, `legal.shipMoves`,
+`legal.shipMoveBlocks`, `legal.robberHexes`, `legal.pirateHexes` and
+`legal.goldPick`. Until it lands, Open Sea must stay out of `CATANOVA_MODES` and
+no tester should be added: a tester's room could start a game its players
+cannot fully play.
+
 ### Step 5: Outer Isles (M)
 
 Open Sea's first scenario, for three and four players, with separate templates
@@ -629,6 +649,13 @@ for each count. The map writer defines the templates and fairness rules in
 finish a game on phones, with a reproducible map for each seed that meets every
 fairness rule across many seeds. The target of 14 and the 2-point island bonus
 are to playtest after release; that is a balance question, not a rules one.
+
+**Status on 26 September 2026.** Both templates deal from `outer-isles-v1`
+(`feature/map-presets/2026-09-26`), and the room deals by its seated count on
+`feature/open-sea/2026-09-26`: the four-player template while four are seated,
+the three-player one otherwise, dealt again from the same seed as the count
+moves, within the 100 ms budget (a board takes a few milliseconds). Start
+refuses a board dealt for another count.
 
 ### Step 6: more Open Sea (M each)
 
@@ -852,6 +879,12 @@ cannot read.
 6. **Open Sea follows the same path.** Its core ships hidden, one part at a
    time. Outer Isles then goes to testers, then to everyone, with its own
    capability value ("Refresh to play Open Sea") and its own copy changes.
+   The engine (`feature/open-sea/2026-09-26`) registers `open-sea-v1`, so any
+   build containing it lets a tester pick Open Sea and advertises the mode in
+   every tab's `rulesets`. Keep `CATANOVA_MODE_TESTERS` empty until the build
+   with the in-game controls for ships, gold picks and the robber-or-pirate
+   choice is deployed too: before that, the only way to make those moves is
+   the protocol.
 
 ### What needs the owner
 
@@ -968,7 +1001,7 @@ its 18-screenshot comparison differs in no pixel. How it is built is in the
 | Lead and Partner markers                    | Not designed yet  | Add the Partner's phase and build windows to `playerTurnActivity`, so both marker holders get the existing `.profile-turn` chip. Both get `.active`, and the timer shows only on the one acting; today both follow `game.active`. Label them with the existing, unused `.profile-turn-label`.                                                           |
 | Partner's phase prompt and trade lock       | Not designed yet  | `.action-prompt`: "Your Partner's phase: build, buy, trade with the bank, play one card". The attention cue for the Partner only. The trade panel greys its player offers with a muted line. The end button reads "End phase".                                                                                                                          |
 | Between-turns build windows                 | Not designed yet  | For the player in the window: `.action-prompt` "Build window: build or buy, no trading", the timer in their chip, and the end button labelled "Done". Everyone else sees only the chip move along the rail, with no sound and no prompt.                                                                                                                |
-| Turn clock in the new phases                | Not designed yet  | The same `.turn-timer`, reading its deadline from whoever is owed a move. Change both its title and its visible label, which today says "Discards": "Gold picks", "Partner".                                                                                                                                                                            |
+| Turn clock in the new phases                | Not designed yet  | The same `.turn-timer`, reading its deadline from whoever is owed a move. Change both its title and its visible label, which today says "Discards": "Gold picks", "Partner". The paused clock already says "Gold picks" during Open Sea's picks; the picker's own 20 seconds (`turnClock.goldDeadlines`) are not shown yet.                             |
 | Absent player with no stand-in              | Built (Release A) | Reuse `.offline-mark` and `.profile-absence`. Change the visible "Away" and the tooltip, which says a bot takes the seat: "Auto moves in 1:32", then "Clock plays forced moves". On the smallest cards, the mark only: the in-game rail already hides the label's words and shows only the countdown.                                                   |
 | Big Table island                            | Blends            | Measured above. The fallback's water outline peaks about 436 units out, just inside `waterOutline`'s 440-unit reach, so nothing is cut; a wider band would need the reach raised. Screenshot the 11 harbours on both themes, in WebGL and the fallback.                                                                                                 |
 | Tokens and harbour badges on smaller hexes  | Built             | A sea board keeps 72 units round its rim, not 112, and where the whole frame would draw tokens under 16 px it opens zoomed on its islands: 15.5 px on a 390 × 844 phone and 14.8 on 375 × 812 (Classic 17.9, 17.1), badges and pieces with them. Desktops open on the whole board. Bigger tokens alone were dropped.                                    |
@@ -984,8 +1017,8 @@ its 18-screenshot comparison differs in no pixel. How it is built is in the
 | Moving a ship                               | Not designed yet  | "Move ship" in the dock's `.utility-actions`, styled like Trade; tapping your own ship also starts a move. Movable ships get the dashed orbit, destinations the site guide, and `PlacementConfirmation` confirms. A tooltip says why a ship cannot move.                                                                                                |
 | Gold pick                                   | Not designed yet  | Built from Year of Plenty's picker in `DevelopmentCards` ("Gold field: choose N", buttons limited by the bank) in a `.robber-flow`-style panel, with the discard waiting list for the order of picks and `TurnTimer` for the 20 seconds.                                                                                                                |
 | Robber or pirate                            | Not designed yet  | A first step with two `.robber-victim`-style buttons, robber and pirate, each with a title and one line. Then the existing target selection, on sea hexes for the pirate. Robber and pirate hexes are never targetable at once.                                                                                                                         |
-| Island bonus                                | Not designed yet  | One celebration through `.award-celebration-layer`, +2 in the score tooltip and the log, and "Island bonus × n" with its icon in the results. No permanent board marker, unless a small pennant reads on a phone.                                                                                                                                       |
-| Results screen                              | Needs work        | Points named by score term, built in Release A. Still to do: "Longest Route" in Open Sea in the facts, the standings and the medal's label; a Mode fact. Screenshot six players at 375 × 812.                                                                                                                                                           |
+| Island bonus                                | Not designed yet  | One celebration through `.award-celebration-layer`, +2 in the score tooltip and the log, and "Island bonus × n" with its icon in the results. No permanent board marker, unless a small pennant reads on a phone. The log line and the results' "Island bonus × n" label are built; the icon and the celebration are not.                               |
+| Results screen                              | Needs work        | Points named by score term, built in Release A. "Longest Route" in Open Sea in the facts, the point breakdown, the standings and the medal's label, built with Open Sea's engine. Still to do: a Mode fact. Screenshot six players at 375 × 812.                                                                                                        |
 | Trade and robber panels with five opponents | Not designed yet  | `.trade-partners` is one row. Five partners in a 351-pixel phone panel, and the Partner as a trade partner during the Lead's part, need a layout. So do the discard and victim lists.                                                                                                                                                                   |
 | Copy, history and labels                    | Not designed yet  | Per-mode quick rules, card text ("robber or pirate", "roads or ships"), costs with the ship, a guide section per mode, log lines and icons for every new action, a notice when Big Table drops below five players, and accessible names for sea, gold, ships, the pirate and the Partner.                                                               |
 
