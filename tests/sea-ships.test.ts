@@ -123,6 +123,11 @@ test('§8.8 an open line, then an opponent: the ships beside the new settlement 
   assert.deepEqual(openEnds(g, 'blue', bc!), [c], 'b–c still moves, through its open end at c');
   assert.deepEqual(movableShips(g, 'blue'), [bc]);
   assert.equal(shipMoveBlock(g, 'blue', Ha!), 'no-open-end');
+  // The record lasts while a–b stays on its edge, even once b–c has sailed away to your settlement.
+  const [, out] = walk(sk.board, H, 'ne');
+  g = moved(g, 'blue', bc!, edgeBetween(sk.board, H, out!));
+  assert.deepEqual(g.closedShipEnds, { [ab!]: [b] });
+  assert.deepEqual(openEnds(g, 'blue', ab!), []);
 });
 
 test('§8.8 a closed line, then an opponent: it stays closed, and the route is broken there', () => {
