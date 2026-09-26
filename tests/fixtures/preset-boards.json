@@ -1,0 +1,116 @@
+{
+  "big-table-balanced-v1": {
+    "boards": [
+      [0, "0d89374d8e019a8604818e23caa34174c212995fd13d03ee40a513237774d865"],
+      [1, "1a2b4f3651ef42e6396a6d5e78344cdef48bd5fec46c596f69e2bd70de6601d1"],
+      [2, "35ba555b3af12c103cb0d67869c87d6ec3c211c32d6a0d4884acc12ed41fffc6"],
+      [3, "36067cf09c52e09ba22577cf464e0b34eb09bf943cc08a5d6f5fbf3bfa438c6e"],
+      [4, "adc11a7595185fbcc78665442d35496bb50eae00cb9460fd84eab32a761827bb"],
+      [5, "c1616c1939cd32cfe771a7cef7fb062b3bb0e5ba6eafe5c58f529affd8fb4853"],
+      [6, "8f921356afb00d34544375140fb11713578534a54fede19123655dc4f40f41b4"],
+      [7, "da9afb616ef336eb8ea4a83d5110586f24a30304abcb8dabb219b77b8a93e246"],
+      [8, "cbc27822074af932096985bdec3f2bf04aaa2a48ee0f0641cde3d397bd4d3277"],
+      [9, "6c05828b2065ee44a17ef9d36c7999fd1b6940d96375492dfe16e762f655ea87"],
+      [10, "3db2cdcc0e86a2ce3a36071070cf92e9596bdb57ebc73e76c56b8c03e3db2e18"],
+      [11, "9d1749dd2eb3bff50bbaa64d78702e98f90a7bca7678938e7ff15b4d59647865"],
+      [12, "4efd33bda60def758bc57cff2714a865b3722ffc3f39394247dce3ba479b5a3f"],
+      [13, "0b10704140e24dea23e88b874db3e00a842e29d37a21e99fd6838613f6a78ac9"],
+      [14, "01dc7b42865837f2163cf21bd45bf3e6fc3096ed0e05d4e53e74bbf96988c6a1"],
+      [15, "64a40ce740dc490c2accb5d42dff2237c29cee56c253820d9cc9e95def60be7a"],
+      [16, "692db5ef48209b1628c3975a29d334f0d2ac486a9b818afbb616f6ef8a31b879"],
+      [17, "d568c91d432318bed658b9885705031b68e20aa7f5b05210d619ca9ec22d7ec0"],
+      [18, "bd08a8d7be9ec4c881735cdc977d0ce89c6a906508cae3050973bb3f1fbea0a0"],
+      [19, "75a305ee08503347a08f19f4f3942601672aa65d1daa26729bbbb874f355d4ac"],
+      [3620437523, "bcde3d02d04e2ac390f35d8e9284001f03aee07f66593ebf9eeb08a047da5689"],
+      [3603468086, "ea3d2ff39bb11b1591e9e7e54a41a05349a5c28408a714fb9ae1ce50c84a4c08"],
+      [1922315000, "aa6c2d46a3bad745f209a144fb83dac13201544a85648c479f13ae14eae3f1f7"],
+      [3582294466, "04bfdfd15f47367251bc3c6bbeb1f13bcf6045c2e8e2a5f07456783b7041b30b"],
+      [3835569077, "e2ad7b555f857bd2e9f334e6962d588e4b85461577f2c019978aca764775e1d7"],
+      [2147483648, "d79bc1c788a944fcc2123e3be429129425502e77613e96b5a41dae1e96c12968"],
+      [4294967295, "4520af3db6345e1f2b8320e39aa4fb4fd02e2837b551570240e7eb762b5806e7"],
+      [-1, "4520af3db6345e1f2b8320e39aa4fb4fd02e2837b551570240e7eb762b5806e7"]
+    ],
+    "deal": {
+      "seed": 42,
+      "hexes": [
+        ["sheep", 8],
+        ["ore", 5],
+        ["sheep", 10],
+        ["wood", 3],
+        ["brick", 2],
+        ["wheat", 9],
+        ["sheep", 5],
+        ["brick", 8],
+        ["ore", 5],
+        ["wheat", 11],
+        ["desert", 0],
+        ["wheat", 11],
+        ["ore", 4],
+        ["desert", 0],
+        ["wood", 9],
+        ["ore", 8],
+        ["sheep", 2],
+        ["sheep", 10],
+        ["brick", 6],
+        ["wheat", 4],
+        ["wood", 12],
+        ["wheat", 4],
+        ["wood", 6],
+        ["wood", 3],
+        ["brick", 9],
+        ["sheep", 10],
+        ["brick", 3],
+        ["ore", 12],
+        ["wood", 11],
+        ["wheat", 6]
+      ],
+      "ports": [
+        {
+          "edge": 27,
+          "resource": "wheat"
+        },
+        {
+          "edge": 46,
+          "resource": "any"
+        },
+        {
+          "edge": 68,
+          "resource": "any"
+        },
+        {
+          "edge": 97,
+          "resource": "sheep"
+        },
+        {
+          "edge": 108,
+          "resource": "any"
+        },
+        {
+          "edge": 101,
+          "resource": "wood"
+        },
+        {
+          "edge": 89,
+          "resource": "ore"
+        },
+        {
+          "edge": 52,
+          "resource": "any"
+        },
+        {
+          "edge": 35,
+          "resource": "brick"
+        },
+        {
+          "edge": 5,
+          "resource": "any"
+        },
+        {
+          "edge": 6,
+          "resource": "sheep"
+        }
+      ],
+      "robberStart": 13
+    }
+  }
+}
