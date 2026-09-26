@@ -292,6 +292,9 @@ test('§5.4 after a starting settlement: a road touching it, or on the coast a s
   );
   assert.deepEqual(shipSites(g, 'blue', { setup: inland }), [], 'only a coastal settlement may take a ship');
   assert.equal(roadSitesOpenSea(g, 'blue', inland).length, 3);
+  // Only at your own settlement: nothing for red at yours.
+  assert.deepEqual(roadSitesOpenSea(g, 'red', coastal), []);
+  assert.deepEqual(shipSites(g, 'red', { setup: coastal }), []);
   // Either settlement, both or neither: a ship at the coastal one leaves the other's road free.
   const after = {
     ...g,

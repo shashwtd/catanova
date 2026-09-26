@@ -138,7 +138,7 @@ function roadSite(g: SeaState, player: string, edge: number, setupVertex: number
     !g.roads[edge] &&
     !shipsOf(g)[edge] &&
     (setupVertex !== null
-      ? e.a === setupVertex || e.b === setupVertex
+      ? (e.a === setupVertex || e.b === setupVertex) && g.buildings[setupVertex]?.player === player
       : [e.a, e.b].some((v) =>
           g.buildings[v]
             ? g.buildings[v]!.player === player
@@ -149,8 +149,8 @@ function roadSite(g: SeaState, player: string, edge: number, setupVertex: number
 /**
  * Where the player may build a road (sections 2.4, 5.4, 7.2 and 7.3): an empty land or coastal edge, holding no
  * ship either, that touches their own settlement or city, or meets one of their roads where no other player has
- * built. A ship never serves. In setup, `setupVertex` is the settlement just placed, and the road must touch it.
- * Nothing is legal once all their roads are on the board.
+ * built. A ship never serves. In setup, `setupVertex` is the settlement they just placed, and the road must touch
+ * it. Nothing is legal once all their roads are on the board.
  */
 export function roadSitesOpenSea(g: SeaState, player: string, setupVertex: number | null = null): number[] {
   if (count(g.roads, player) >= SEA_SUPPLY.roads) return [];
