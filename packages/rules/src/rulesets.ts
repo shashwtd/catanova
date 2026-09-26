@@ -56,8 +56,8 @@ export type Ruleset = {
    */
   standIns: boolean;
   /**
-   * Open Sea: the scenario whose board the mode deals. It turns on the sea's rules (sea.ts, gold.ts and
-   * sea-play.ts): ships, gold fields, the pirate, Longest Route and island bonuses.
+   * Open Sea: the scenario whose board the mode deals. It turns on the sea's rules, which sea.ts and gold.ts
+   * hold and game.ts applies: ships, gold fields, the pirate, Longest Route and island bonuses.
    */
   sea?: { scenario: 'outer-isles' };
 };
