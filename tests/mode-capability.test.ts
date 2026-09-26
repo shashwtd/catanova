@@ -137,3 +137,42 @@ test('a tab that cannot draw the room’s mode is kept out of it, and told to re
   await until(() => reader.client.status === 'connected');
   assert.equal(reader.client.state?.game?.ruleset, TEST);
 });
+
+test('a room that cannot start in its mode says so before the loading screen, not after it', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'catanova-modes-launch-'));
+  const server = await startServer({
+    port: 0,
+    databasePath: join(directory, 'game.sqlite'),
+    auth: null,
+    modes: OPEN,
+  });
+  const clients: Connection[] = [];
+  t.after(async () => {
+    clients.forEach((client) => client.stop());
+    await server.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const options = { minRetryMs: 30, maxRetryMs: 100, rulesets: [CLASSIC.id, TEST], preloadGame: true };
+  const host = new Connection(server.url, newSession('Host'), options);
+  clients.push(host);
+  host.start();
+  await until(() => host.status === 'connected');
+  const roomId = host.session.roomId!;
+  for (const name of ['Second', 'Third']) {
+    const guest = new Connection(server.url, newSession(name, roomId), options);
+    clients.push(guest);
+    guest.start();
+  }
+  await until(() => host.state?.players.length === 3);
+  await host.settings({ turnTimerSeconds: 90, mode: TEST });
+  for (const guest of clients.slice(1)) await guest.lobby(true);
+  await until(() => host.state?.players.filter((p) => p.ready).length === 2);
+  // An island from an older deal is no board for the test mode: refused at once, and no launch begins.
+  const board = server.store.board(roomId);
+  server.store.db
+    .prepare('UPDATE room_boards SET board = ? WHERE room_id = ?')
+    .run(JSON.stringify({ ...board, preset: 'balanced-v1' }), roomId);
+  await assert.rejects(host.action({ kind: 'start' }), /BOARD_MISMATCH/);
+  assert.equal(host.state?.launch, undefined);
+  assert.equal(server.store.loadGame(roomId), undefined);
+});

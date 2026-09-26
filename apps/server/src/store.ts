@@ -646,6 +646,31 @@ export class Store {
   seatLimit(roomId: string): number {
     return (this.lobbyRules(roomId) ?? CLASSIC).seats.max;
   }
+  /**
+   * The ruleset a lobby would start with, or why it cannot. Checked at Start, not only when the mode was
+   * chosen: a switch may have closed it since, a bot may have sat down, or the lobby may hold an older island.
+   * The server asks before the loading screen too, so the host hears why at once.
+   */
+  startingRules(roomId: string): Ruleset {
+    const mode = this.settings(roomId).mode ?? CLASSIC.id,
+      rules = findRuleset(mode);
+    if (!rules || !this.modesFor(roomId).includes(mode))
+      throw new ProtocolError(
+        'MODE_UNAVAILABLE',
+        `${rules?.name ?? 'This game mode'} is not open to this room. Choose another mode.`,
+      );
+    if (
+      !rules.bots &&
+      this.db.prepare('SELECT 1 FROM seats WHERE room_id = ? AND departed = 0 AND bot = 1').get(roomId)
+    )
+      throw new ProtocolError('MODE_BOTS', `${switchBlock(rules, [{ bot: true }])!.reason}.`);
+    if (!playsBoard(rules, this.board(roomId)))
+      throw new ProtocolError(
+        'BOARD_MISMATCH',
+        'This island was dealt for another game mode. Change the mode to deal a new one.',
+      );
+    return rules;
+  }
   /** The modes the room's host may pick, Classic first: decided by the host's account (modes.ts). */
   modesFor(roomId: string): string[] {
     const seats = this.db
@@ -2103,22 +2128,8 @@ export class Store {
           .prepare('SELECT user_id,name FROM seats WHERE room_id=? AND departed=0 AND user_id IS NOT NULL')
           .all(seat.room_id) as { user_id: string; name: string }[])
           this.assertAccountAvailable(member.user_id, seat.room_id, member.name);
-        // The mode is checked again here, not only when it was chosen: a switch may have closed it since.
         const settings = this.settings(seat.room_id),
-          mode = settings.mode ?? CLASSIC.id,
-          rules = findRuleset(mode);
-        if (!rules || !this.modesFor(seat.room_id).includes(mode))
-          throw new ProtocolError(
-            'MODE_UNAVAILABLE',
-            `${rules?.name ?? 'This game mode'} is not open to this room. Choose another mode.`,
-          );
-        if (!rules.bots && room.players.some((p) => p.bot))
-          throw new ProtocolError('MODE_BOTS', `${switchBlock(rules, [{ bot: true }])!.reason}.`);
-        if (!playsBoard(rules, room.board))
-          throw new ProtocolError(
-            'BOARD_MISMATCH',
-            'This island was dealt for another game mode. Change the mode to deal a new one.',
-          );
+          rules = this.startingRules(seat.room_id);
         next = createGame(
           shuffle(
             room.players.map((p) => ({ id: p.id, name: p.name })),

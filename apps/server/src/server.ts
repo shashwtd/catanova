@@ -1062,8 +1062,10 @@ export async function startServer(
               .players.every((p) => p.bot || activeSeats.get(p.id)?.readyState === WebSocket.OPEN)
           )
             throw new ProtocolError('NOT_CONNECTED', 'Wait for every player to reconnect');
-          // A game in another mode starts only when every tab at the table can draw it.
+          // A game in another mode starts only when every tab at the table can draw it, and the mode must
+          // still be one this room may start: asked now, so the host hears why before any loading screen.
           if (message.type === 'action' && message.action.kind === 'start' && !store.loadGame(seat.room_id)) {
+            store.startingRules(seat.room_id);
             const mode = store.roomMode(seat.room_id),
               name = findRuleset(mode)?.name ?? 'this game';
             if (!canDraw(ws, mode))
