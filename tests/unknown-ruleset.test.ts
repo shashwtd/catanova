@@ -131,9 +131,15 @@ test('a game in a mode this version does not know is refused on load and left un
     );
     assert.equal(store.roomMode(newer.roomId), NEWER, 'the room still says what it is');
     assert.ok(store.loadGame(classic.roomId));
-    // Its turn clock and presence come up due, as a game left running by a newer release's server would.
+    // Its turn clock and presence come up due, as a game left running by a newer release's server would,
+    // and a bot sits at it, as one may in a later release whose mode has bots.
     store.db.prepare('UPDATE turn_clocks SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
     store.db.prepare('UPDATE room_presence SET next_deadline = 0 WHERE room_id = ?').run(newer.roomId);
+    store.db
+      .prepare(
+        "INSERT INTO seats(id, room_id, token_hash, name, ready, bot, bot_level) VALUES ('later-bot', ?, 'no-token', 'Anchor', 1, 1, 'steady')",
+      )
+      .run(newer.roomId);
     // A restart rewrites the presence of the games it can play, and leaves this one exactly as it was.
     const before = rowsOf(store, newer.roomId);
     const classicPresence = store.db
@@ -147,8 +153,10 @@ test('a game in a mode this version does not know is refused on load and left un
       classicPresence,
       'a Classic game at the same restart gets its recovery grace',
     );
-    // The clock never asks about it, from the first tick on: nothing tries to load it, and nothing is logged.
+    // The clock and the bots never ask about it, from the first tick on: nothing tries to load it, and
+    // nothing is logged.
     assert.ok(!store.dueRooms().includes(newer.roomId));
+    assert.ok(!store.botRooms().includes(newer.roomId));
     // Neither a player nor the clock can move it.
     // Joining, resuming and watching all read the room's snapshot, which refuses it.
     assert.throws(
