@@ -28,6 +28,9 @@ import {
 export const MAX_TERRAIN_HEXES = 128;
 /** The most sea hexes the sea shader takes besides its land hexes, packed two to a uniform vector. */
 export const MAX_SEA_HEXES = 128;
+/** The terrain canvas's largest side and area, in device pixels: sharp when zoomed, within a phone's memory. */
+export const TERRAIN_SIDE = 4096;
+export const TERRAIN_PIXELS = 9_000_000;
 /**
  * What the terrain shader is given for a board: each land hex's centre and tile, how many there are, the box. On
  * a board with sea, the sea hexes' centres too, two to a vector: they make the frame the water fills, and nothing
@@ -168,17 +171,20 @@ void main(){
   float outer=-${glsl(SEA_SMOOTHING)}*log(frame)-seaWidth;
   if(outer>=0.0){outColor=vec4(0);return;}
   float rough=(noise(p*0.13)-0.5)*3.0+(noise(p*0.043)-0.5)*3.0;
-  vec3 deep=water(p,vec2(0,0));
-  vec3 shallow=water(p,vec2(1,0));
-  vec3 color=mix(deep,shallow,1.0-smoothstep(10.0,69.0,shoal));
+  vec3 color=water(p,vec2(1,0));
+  float cover=1.0-smoothstep(10.0,69.0,shoal);
   float foam=(1.0-smoothstep(0.4,1.7,abs(land+rough-11.0)))*(0.35+noise(p*0.09)*0.4);
   color=mix(color,vec3(0.87,0.96,0.86),foam);
+  cover=max(cover,foam);
   // Each island casts the stage's drop shadow onto the water round it, so the sea's own edge needs none.
-  color=mix(color,vec3(${ISLAND_SHADOW.color.map((c) => (c / 255).toFixed(4)).join(',')}),${ISLAND_SHADOW.opacity.toFixed(2)}*(1.0-smoothstep(${glsl(ISLAND_SHADOW.edge - ISLAND_SHADOW.blur)},${glsl(ISLAND_SHADOW.edge + ISLAND_SHADOW.blur)},shade)));
+  float shadow=${ISLAND_SHADOW.opacity.toFixed(2)}*(1.0-smoothstep(${glsl(ISLAND_SHADOW.edge - ISLAND_SHADOW.blur)},${glsl(ISLAND_SHADOW.edge + ISLAND_SHADOW.blur)},shade));
+  color=mix(color,vec3(${ISLAND_SHADOW.color.map((c) => (c / 255).toFixed(4)).join(',')}),shadow);
+  cover=max(cover,shadow);
   vec3 sand=environment((p+vec2(600))/145.0,vec2(0,1));
   float coast=1.0-smoothstep(4.0,7.5,land+rough);
   float bankShade=mix(0.68,1.03,1.0-smoothstep(-2.0,6.0,land+rough));
   color=mix(color,sand*bankShade,coast);
+  cover=max(cover,coast);
   vec2 local=p-uLand[nearest].xy;
   float terrainEdge=hex(local,mix(58.5,57.0,uConcept))+rough*0.65;
   float terrainMask=1.0-smoothstep(-2.0,2.8,terrainEdge);
@@ -189,7 +195,8 @@ void main(){
   float light=dot(terrain,vec3(0.2126,0.7152,0.0722));
   terrain=clamp((mix(vec3(light),terrain,0.94)-0.5)*0.94+0.54,0.0,1.0);
   color=mix(color,terrain,terrainMask);
-  outColor=vec4(color,1.0-smoothstep(-${WATER_FEATHER.toFixed(1)},0.0,outer));
+  cover=max(cover,terrainMask);
+  outColor=vec4(color,cover*(1.0-smoothstep(-${WATER_FEATHER.toFixed(1)},0.0,outer)));
 }
 `;
 function compile(gl: WebGL2RenderingContext, type: number, source: string) {
@@ -296,20 +303,33 @@ export function Terrain({
         gl.uniform4fv(gl.getUniformLocation(program, 'uSea[0]'), uniforms.sea);
         gl.uniform1i(gl.getUniformLocation(program, 'uSeaCount'), uniforms.seaCount);
       }
+      // Drawn at the size the board is shown, the camera's zoom included, so it stays sharp when zoomed in: again
+      // when a zoom settles (BoardViewport's `boardzoom`), within a budget of pixels, and only if the size moved.
+      let drawn = false;
       const draw = () => {
         if (disposed || gl.isContextLost()) return;
-        const ratio = Math.min(devicePixelRatio || 1, 2),
-          rect = canvas.getBoundingClientRect();
-        canvas.width = Math.max(1, Math.round(rect.width * ratio));
-        canvas.height = Math.max(1, Math.round(rect.height * ratio));
+        const rect = canvas.getBoundingClientRect(),
+          wide = rect.width * Math.min(devicePixelRatio || 1, 3),
+          high = rect.height * Math.min(devicePixelRatio || 1, 3),
+          fit = Math.min(1, TERRAIN_SIDE / Math.max(wide, high), Math.sqrt(TERRAIN_PIXELS / (wide * high)));
+        const width = Math.max(1, Math.round(wide * fit)),
+          height = Math.max(1, Math.round(high * fit));
+        if (drawn && Math.abs(width / canvas.width - 1) < 0.08 && Math.abs(height / canvas.height - 1) < 0.08)
+          return;
+        canvas.width = width;
+        canvas.height = height;
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+        drawn = true;
         onReady(true);
       };
       const observer = new ResizeObserver(draw);
       observer.observe(canvas);
+      const viewport = canvas.closest('.board-viewport');
+      viewport?.addEventListener('boardzoom', draw);
       draw();
       cleanup = () => {
+        viewport?.removeEventListener('boardzoom', draw);
         observer.disconnect();
         textures.forEach((t) => gl.deleteTexture(t));
         gl.deleteBuffer(buffer);

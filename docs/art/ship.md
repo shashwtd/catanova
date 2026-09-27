@@ -1,17 +1,17 @@
 # Open Sea's ship
 
-Ships and the pirate are one painted wooden ship, seen from above like the harbour boat in the sprite sheet. The owner did not like the first, flat ship drawn in the house contour, so on 26 September 2026 it was replaced by this painting, whose sail takes each player's colour.
+Ships and the pirate are one painted wooden ship, seen from above like the harbour boat in the sprite sheet. The owner did not like the first, flat ship drawn in the house contour, so on 26 September 2026 it was replaced by a painting whose sail takes each player's colour. On 27 September 2026 the owner asked for better boat textures: the painting was redrawn as a sturdier sailing ship with a bold rim, a billowing sail and a pennant, at twice the resolution, and drawn a little larger (58 units).
 
 | File                                   | What it is                                               | Browser file                                                        |
 | -------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
-| `assets/source-art/ship-painted.png`   | The ship, 130 × 256, bow up, on a transparent background | `apps/client/public/art/optimized/ship-painted.8c31ede90b16.webp`   |
-| `assets/source-art/ship-sail-mask.png` | White, with the sail's coverage as its alpha             | `apps/client/public/art/optimized/ship-sail-mask.49ba6ca51b30.webp` |
+| `assets/source-art/ship-painted.png`   | The ship, 230 × 512, bow up, on a transparent background | `apps/client/public/art/optimized/ship-painted.b54e41641623.webp`   |
+| `assets/source-art/ship-sail-mask.png` | White, with the sail's coverage as its alpha             | `apps/client/public/art/optimized/ship-sail-mask.925772c58de2.webp` |
 
 Both browser files are exported by `scripts/optimize-art.mjs` from [runtime-art.json](runtime-art.json), the ship at WebP quality 88 and the mask at 90, with their alpha kept exactly. Only a board with sea loads them.
 
 ## How the board uses them
 
-`ShipShape` in `apps/client/src/Board.tsx` lays the painting along its edge, about a road's length (54 units), with a soft shadow towards the lower right. On a coastal edge the ship sits 9 units out to sea (`shipPlacement` in `scene.ts`), so it floats rather than lying on the sand. A rectangle in the seat colour is drawn over the ship through the sail's mask and multiplied onto it, so the sail takes the colour and keeps the painting's shading, and the hull stays wood.
+`ShipShape` in `apps/client/src/Board.tsx` lays the painting along its edge, a little longer than a road (58 units), with a soft shadow towards the lower right. On a coastal edge the ship sits 9 units out to sea (`shipPlacement` in `scene.ts`), so it floats rather than lying on the sand. A rectangle in the seat colour is drawn over the ship through the sail's mask and multiplied onto it, so the sail takes the colour and keeps the painting's shading, and the hull stays wood.
 
 The pirate is the same ship a tenth larger, turned across its hex: its hull is multiplied by a dark slate through the ship's own outline and its sail by the robber's near-black `#172231`.
 
@@ -21,3 +21,9 @@ The pirate is the same ship a tenth larger, turned across its hex: its hull is m
 2. The master is the draft cropped to its outline and resized to 130 × 256 (SHA-256 `18043321b9f88f78be572d45060483028342c62cb9f48ecec6feb5351c518949`). The sail's mask takes pixels that are bright in blue and low in saturation, ramping in so its edge is soft (SHA-256 `4a40187b65139bd0cec11177609abc81e2cb333f3c4c0be182bd45e6248e0f03`).
 
 It was checked on the four-player Outer Isles board in the design preview at 1440 × 900 and 390 × 844: each sail reads in its player's colour, and the pirate reads as a dark ship on open water.
+
+## The second painting (27 September 2026)
+
+1. Drafts, gpt-image-2.5-flare, two edits of the harbour boat cut from the sprite sheet: a small wooden sailing ship from directly above, bow up, a sturdy hull with a thick dark rim so it stands out on dark water, one large square sail billowing forward and wider than the hull, a pennant at the masthead, sail and pennant plain white for recolouring, transparent background. The second draft was chosen.
+2. Final, gpt-image-2.5-sunburst, an edit of that draft: the same ship repainted crisp, its rim a little bolder, sail and pennant plain white, no glow or shadow.
+3. The master is the final trimmed to its outline and resized to 230 × 512. The sail's mask is white with, as alpha, how light and how nearly grey each pixel is, ramped so its edge is soft; it takes the pennant too, so both show the player's colour.

@@ -119,8 +119,8 @@ function BuildingShape({ city, color }: { city: boolean; color: string }) {
   );
 }
 /** A ship is about a road's length, lying along its edge; the painting is 130 by 256 pixels. */
-const SHIP_LENGTH = 54,
-  SHIP_WIDTH = (SHIP_LENGTH * 130) / 256;
+const SHIP_LENGTH = 58,
+  SHIP_WIDTH = (SHIP_LENGTH * 230) / 512;
 const SHIP_BOX = { x: -SHIP_WIDTH / 2, y: -SHIP_LENGTH / 2, width: SHIP_WIDTH, height: SHIP_LENGTH };
 /**
  * A ship: the painted wooden boat lying along its edge, its sail dyed the seat colour through the sail's mask
@@ -201,6 +201,7 @@ function ShipSite({
       }}
     >
       <g transform={transform}>
+        {kind === 'ship' && <ShipWaterHint length={length} />}
         <line className="road-hit" x1={-length / 2} y1="0" x2={length / 2} y2="0" />
         <line
           className="site-guide site-guide-back road-site-guide"
@@ -223,6 +224,22 @@ function ShipSite({
         <ShipShape color={color} angle={at.angle} />
       </g>
     </g>
+  );
+}
+/**
+ * Where a ship may be built now, marked softly on the water all the time, not only on hover: the sea is Open Sea's
+ * whole point, and a player who cannot see where ships go never builds one (ship-sites.css).
+ */
+function ShipWaterHint({ length }: { length: number }) {
+  return (
+    <line
+      className="ship-water-hint"
+      x1={-length / 2 + 6}
+      y1="0"
+      x2={length / 2 - 6}
+      y2="0"
+      aria-hidden="true"
+    />
   );
 }
 /** The pirate: the same painted ship in the robber's colours, dark sail and darkened hull, a tenth larger. */
@@ -597,6 +614,48 @@ const BoardHarbors = memo(function BoardHarbors({ board, sea }: { board: Island;
   });
 });
 
+/** The ring round a corner, or along an edge, that the move history points at. */
+function Spotlight({
+  board,
+  place,
+  peek,
+}: {
+  board: Island;
+  place: { vertex: number } | { edge: number };
+  peek: boolean;
+}) {
+  if ('vertex' in place) {
+    const vertex = board.vertices[place.vertex];
+    if (!vertex) return null;
+    return (
+      <g
+        className="board-spotlight"
+        data-spotlight="vertex"
+        data-peek={peek || undefined}
+        transform={`translate(${vertex.x * SIZE},${vertex.y * SIZE})`}
+        pointerEvents="none"
+        aria-hidden="true"
+      >
+        <circle className="board-spotlight-ring" r="29" />
+      </g>
+    );
+  }
+  if (!board.edges[place.edge]) return null;
+  const { length, transform } = roadGeometry(board, place.edge);
+  return (
+    <g
+      className="board-spotlight"
+      data-spotlight="edge"
+      data-peek={peek || undefined}
+      transform={transform}
+      pointerEvents="none"
+      aria-hidden="true"
+    >
+      <rect className="board-spotlight-ring" x={-length / 2 - 8} y="-13" width={length + 16} height="26" rx="13" />
+    </g>
+  );
+}
+
 /**
  * Memoised because it is the most expensive thing on the screen — roughly
  * 18ms a commit, measured — and it was being re-rendered by every unrelated
@@ -623,6 +682,7 @@ export const Board = memo(function Board({
   shipMove = null,
   onShip,
   reducedMotion = false,
+  spotlight = null,
 }: {
   board: Island;
   game?: GameView;
@@ -650,6 +710,11 @@ export const Board = memo(function Board({
   /** Open Sea: the player chose one of their ships to move. */
   onShip?: (edge: number) => void;
   reducedMotion?: boolean;
+  /**
+   * A corner or edge the move history is pointing at, ringed for a moment. `count` restarts the ring; `peek` says
+   * the history steps aside while it shows (board-polish.css).
+   */
+  spotlight?: { place: { vertex: number } | { edge: number }; count: number; peek?: boolean } | null;
 }) {
   const [gpuReady, setGpuReady] = useState(false);
   /** The ship whose reason for staying put is showing, and the mark it hangs from. */
@@ -976,6 +1041,7 @@ export const Board = memo(function Board({
               onClick={() => onAction({ kind: 'road', edge: id })}
               onKeyDown={(e) => keyActivate(e, () => onAction({ kind: 'road', edge: id }))}
             >
+              {shipSites.includes(id) && <ShipWaterHint length={length} />}
               <line className="road-hit" x1={-length / 2} y1="0" x2={length / 2} y2="0" />
               <line
                 className="site-guide site-guide-back road-site-guide"
@@ -1102,6 +1168,9 @@ export const Board = memo(function Board({
               </g>
             );
           })()}
+        {spotlight && (
+          <Spotlight key={spotlight.count} board={board} place={spotlight.place} peek={!!spotlight.peek} />
+        )}
         <circle
           data-effect-bank
           cx="0"

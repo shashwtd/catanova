@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
 import type { RoomInvite } from '../../../packages/protocol/src/room-invites.js';
+import type { PublicAccount } from '../../../packages/protocol/src/profile.js';
 import type { useAuth } from './auth.js';
+import { FriendSearchResults, FriendSearchSequence } from './FriendsPanel.js';
 import type { RoomInvitesController } from './useRoomInvites.js';
 import { Avatar } from './Profile.js';
 import { Check, Clock3, Plus, RefreshCw, Users, X } from './GameIcons.js';
@@ -156,8 +158,54 @@ export function RoomInvitePanel({
     [error, setError] = useState(''),
     [linking, setLinking] = useState(false),
     [loading, setLoading] = useState(!guest);
+  // Everyone else with that username, found from here as from the player home, to add as a friend.
+  const [results, setResults] = useState<PublicAccount[] | null>(null),
+    [searching, setSearching] = useState(false),
+    [requesting, setRequesting] = useState(''),
+    [notice, setNotice] = useState('');
   const authRef = useRef(auth);
   authRef.current = auth;
+  const sequence = useRef(new FriendSearchSequence());
+  useEffect(() => () => sequence.current.invalidate(), []);
+  const changeQuery = (next: string) => {
+    sequence.current.invalidate();
+    setQuery(next);
+    setResults(null);
+    setSearching(false);
+    setNotice('');
+  };
+  const search = async () => {
+    const name = query.trim();
+    if (name.length < 2 || searching) return;
+    const version = sequence.current.start();
+    setSearching(true);
+    setError('');
+    setNotice('');
+    try {
+      const found = await auth.searchFriends(name);
+      if (sequence.current.isCurrent(version))
+        setResults(found.filter((account) => account.id !== auth.account?.id));
+    } catch (failure) {
+      if (sequence.current.isCurrent(version))
+        setError(failure instanceof Error ? failure.message : 'Could not search. Try again.');
+    } finally {
+      if (sequence.current.isCurrent(version)) setSearching(false);
+    }
+  };
+  const request = async (account: PublicAccount) => {
+    if (requesting) return;
+    setRequesting(account.id);
+    setError('');
+    setNotice('');
+    try {
+      await auth.requestFriend(account.id);
+      setNotice(`Friend request sent to ${account.username}.`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'That friend request did not go through.');
+    } finally {
+      setRequesting('');
+    }
+  };
   useEffect(() => {
     let active = true;
     if (!guest) {
@@ -211,7 +259,7 @@ export function RoomInvitePanel({
         <>
           <div className="roster-fixed">
             <label className="room-invite-filter">
-              Find a friend
+              Find a friend or player
               <input
                 type="search"
                 value={query}
@@ -220,12 +268,24 @@ export function RoomInvitePanel({
                 autoComplete="off"
                 autoCapitalize="none"
                 spellCheck={false}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => changeQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void search();
+                  }
+                }}
               />
             </label>
             {(error || invites?.error) && (
               <p className="roster-error" role="alert">
                 {error || invites?.error}
+              </p>
+            )}
+            {notice && (
+              <p className="roster-notice" role="status">
+                <Check size={17} />
+                {notice}
               </p>
             )}
             {unavailable && (
@@ -286,7 +346,7 @@ export function RoomInvitePanel({
                   );
                 })}
               </ul>
-              {!friends.length && (
+              {!friends.length && !results && (
                 <div className="roster-empty">
                   <Users size={50} />
                   <strong>
@@ -300,12 +360,30 @@ export function RoomInvitePanel({
                     {loading
                       ? 'Just a moment.'
                       : query.trim()
-                        ? 'Try another username.'
-                        : 'Share the room below, or add friends from your player home.'}
+                        ? 'Search all players to add them as a friend.'
+                        : 'Type a username to find players, or share the room below.'}
                   </p>
                 </div>
               )}
             </section>
+            {query.trim().length >= 2 &&
+              (results ? (
+                <FriendSearchResults
+                  results={results}
+                  friendships={auth.friends}
+                  busy={!!requesting}
+                  onRequest={(account) => void request(account)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="roster-action room-invite-search"
+                  disabled={searching}
+                  onClick={() => void search()}
+                >
+                  {searching ? 'Searching…' : `Search all players for “${query.trim()}”`}
+                </button>
+              ))}
           </div>
           <button
             type="button"

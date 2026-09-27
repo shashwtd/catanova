@@ -19,6 +19,7 @@ import { UtilityPanel } from '../UtilityPanel.js';
 import { GameTools, type GameToolPanel } from '../GameTools.js';
 import { QuickRules } from '../QuickRules.js';
 import { MoveHistory } from '../MoveHistory.js';
+import type { BoardPlace } from '../MoveHistory.js';
 import { BOARD_THEMES } from '../board-theme.js';
 /** Vite-only design preview. Uses real components with local sample data, never account APIs. */
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -36,6 +37,7 @@ import { BoardViewport } from '../BoardViewport.js';
 import { ResourceHand } from '../ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from '../DevelopmentCards.js';
 import { PlayerRail } from '../PlayerRail.js';
+import type { RailFriendship } from '../PlayerRail.js';
 import { TurnTimer } from '../TurnTimer.js';
 import { seatColorMap } from '../player-colors.js';
 import type { FriendStatus } from '../social-presence.js';
@@ -52,7 +54,7 @@ import { defaultProfile, emptyFriends } from '../../../../packages/protocol/src/
 import type { Profile } from '../../../../packages/protocol/src/profile.js';
 import type { RoomState } from '../../../../packages/protocol/src/index.js';
 import type { RoomSettings } from '../../../../packages/protocol/src/settings.js';
-import { CLASSIC, registerRuleset } from '../../../../packages/rules/src/rulesets.js';
+import { CLASSIC, OPEN_SEA, registerRuleset } from '../../../../packages/rules/src/rulesets.js';
 import type { Ruleset } from '../../../../packages/rules/src/rulesets.js';
 import type { PlayerGameState } from '../MatchHistory.js';
 import { isLand } from '../../../../packages/rules/src/board.js';
@@ -132,9 +134,11 @@ function sampleGame() {
       seats.map((seat) => seat.id),
     );
   if (board && pieces) {
-    // The engine has no Open Sea rules yet: the sample's pieces go straight onto the board, mid-turn.
+    // The sample's pieces go straight onto the board, mid-turn, under Open Sea's rules, so the game offers its
+    // ship sites as a real one does.
     const pirate = search.get('pirate')?.split(',').map(Number);
     Object.assign(game, {
+      ruleset: OPEN_SEA.id,
       ...pieces,
       pirate: pirate?.length === 2 ? hexAt(board, [pirate[0]!, pirate[1]!]) : board.pirateStart,
       phase: 'actions',
@@ -225,6 +229,11 @@ const samples: Record<TableSize, Game> = { 4: sample, 5: bigTableGame(5), 6: big
 const friends = seats
   .slice(1)
   .map((seat) => ({ id: seat.id, username: seat.name, profile: seat.profile, isGuest: false, online: true }));
+/** Players who are not friends yet, for the friend search: one signed in with Google, one still a guest. */
+const strangers = [
+  { id: 'sample-stranger-1', username: 'Saltwhisker', profile: { ...seats[1]!.profile, avatar: 11 }, isGuest: false },
+  { id: 'sample-stranger-2', username: 'Saltmarsh', profile: { ...seats[2]!.profile, avatar: 5 }, isGuest: true },
+];
 const record: PlayerGameState = {
   data: {
     stats: { wins: 8, played: 23 },
@@ -319,6 +328,12 @@ export function LoungePreview() {
   const [friendships, setFriendships] = useState<Record<string, FriendStatus>>({
     [seats[2]!.accountId]: 'received',
   });
+  const friendship: RailFriendship = {
+    self: seats[0]!.accountId,
+    status: (id) => friendships[id] ?? 'none',
+    request: async (id) => setFriendships((current) => ({ ...current, [id]: 'sent' })),
+    accept: async (id) => setFriendships((current) => ({ ...current, [id]: 'friends' })),
+  };
   const [availableBuilds, setAvailableBuilds] = useState(true);
   const [selectedBuild, setSelectedBuild] = useState<BuildMode>(null);
   const [placement, setPlacement] = useState<PlacementDraft | null>(null);
@@ -326,6 +341,7 @@ export function LoungePreview() {
   const [simulation, setSimulation] = useState<Game | null>(null);
   const [robberPreview, setRobberPreview] = useState<RobberPreview>('off');
   const [robberHex, setRobberHex] = useState<number | null>(null);
+  const [spotlight, setSpotlight] = useState<{ place: BoardPlace; count: number; peek: boolean } | null>(null);
   const [previewError, setPreviewError] = useState('');
   const revision = useRef(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -372,7 +388,8 @@ export function LoungePreview() {
     signIn: async () => {},
     checkUsername: async () => ({ available: true }),
     refreshFriends: async () => {},
-    searchFriends: async () => [],
+    searchFriends: async (name: string) =>
+      strangers.filter((account) => account.username.toLowerCase().includes(name.toLowerCase())),
     requestFriend: async () => {},
     respondFriend: async () => {},
     removeFriend: async () => {},
@@ -591,6 +608,7 @@ export function LoungePreview() {
         <Lobby
           room={currentRoom}
           me={me}
+          friendship={friendship}
           busy={false}
           connected
           onReady={noop}
@@ -609,7 +627,11 @@ export function LoungePreview() {
       {screen === 'game' && (
         <>
           <div className="board-anchor">
-            <BoardViewport board={game.board} reducedMotion={reducedMotion}>
+            <BoardViewport
+              board={game.board}
+              reducedMotion={reducedMotion}
+              ocean={BOARD_THEMES[preferences.boardTheme].environment}
+            >
               <Board
                 board={game.board}
                 art={BOARD_THEMES[preferences.boardTheme]}
@@ -624,6 +646,7 @@ export function LoungePreview() {
                 onAction={previewPlacement}
                 onRobber={setRobberHex}
                 colors={colors}
+                spotlight={spotlight}
               />
             </BoardViewport>
           </div>
@@ -644,12 +667,7 @@ export function LoungePreview() {
             game={displayedGame}
             me={me}
             timer={clock}
-            friendship={{
-              self: seats[0]!.accountId,
-              status: (id) => friendships[id] ?? 'none',
-              request: async (id) => setFriendships((current) => ({ ...current, [id]: 'sent' })),
-              accept: async (id) => setFriendships((current) => ({ ...current, [id]: 'friends' })),
-            }}
+            friendship={friendship}
           />
           <GameTools
             onClosePanel={() => setPanel(null)}
@@ -864,6 +882,9 @@ export function LoungePreview() {
             game={game}
             hasMore={false}
             onEarlier={noop}
+            onPlace={(place, tapped = false) =>
+              setSpotlight((shown) => (place ? { place, count: (shown?.count ?? 0) + 1, peek: tapped } : null))
+            }
             entries={game.log.map((entry, index) => ({
               revision: index,
               actor: null,

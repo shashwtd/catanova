@@ -15,7 +15,7 @@ import { CLASSIC, TURN_STRUCTURES, findRuleset, switchBlock } from '../../../pac
 import type { Ruleset, TurnStructure } from '../../../packages/rules/src/rulesets.js';
 import { Fragment, useEffect, useId, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { Check, Clock3, Dices, GameMode, Trophy, Volume2, Music, Eye } from './GameIcons.js';
+import { ArrowLeftRight, Check, Clock3, Dices, GameMode, Trophy, Volume2, Music, Eye } from './GameIcons.js';
 import type { Preferences } from './preferences.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { roomHostId } from '../../../packages/protocol/src/room-host.js';
@@ -108,11 +108,17 @@ export function PlayerSettings({
   previewSound,
   privacy,
   savePrivacy,
+  trades,
   initialTab = 'table',
 }: {
   preferences: Preferences;
   update: (patch: Partial<Preferences>) => void;
   previewSound: () => void;
+  /**
+   * In a game you are playing: whether you take trade offers, and the switch that stops them. Stopping them is
+   * for every player at once, never one, so nobody can be singled out.
+   */
+  trades?: { taking: boolean; onChange: (taking: boolean) => void };
   /** Absent for a guest or a local server: there is then nothing to share. */
   privacy?: AccountPrivacy | null;
   savePrivacy?: (next: AccountPrivacy) => Promise<void>;
@@ -197,6 +203,37 @@ export function PlayerSettings({
               </label>
             ))}
           </fieldset>
+          {trades && (
+            <section className="settings-privacy settings-trades" aria-labelledby={`${base}-trades-label`}>
+              <RowHeading
+                label={
+                  <label id={`${base}-trades-label`} htmlFor={`${base}-trades`}>
+                    <ArrowLeftRight />
+                    Take trade offers
+                  </label>
+                }
+                value={
+                  <label className="settings-switch">
+                    <span aria-hidden="true">{trades.taking ? 'On' : 'Off'}</span>
+                    <input
+                      id={`${base}-trades`}
+                      type="checkbox"
+                      role="switch"
+                      aria-labelledby={`${base}-trades-label`}
+                      aria-describedby={`${base}-trades-caption`}
+                      checked={trades.taking}
+                      onChange={(event) => trades.onChange(event.target.checked)}
+                    />
+                  </label>
+                }
+              />
+              <p id={`${base}-trades-caption`} className="settings-caption">
+                {trades.taking
+                  ? 'Switch off to stop every offer from reaching you. Bank and harbour trades stay open.'
+                  : 'Nobody’s offers reach you, and you count as saying no. Everyone at the table can see it.'}
+              </p>
+            </section>
+          )}
         </div>
       )}
       {tab === 'privacy' && (

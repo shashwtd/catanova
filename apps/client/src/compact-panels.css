@@ -102,6 +102,86 @@
   padding: 5px 9px;
   font-size: 11px;
 }
+/* Where a piece went: the tiles it touches, each with its number token as the board draws it, and a harbour.
+   A button that shows the place on the board. */
+.turn-journal .journal-place {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px 4px;
+  margin: -1px 0;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: #b2966114;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  vertical-align: middle;
+}
+.turn-journal button.journal-place {
+  cursor: pointer;
+}
+.turn-journal button.journal-place:hover,
+.turn-journal button.journal-place:focus-visible {
+  background: #b2966133;
+}
+.turn-journal .journal-tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  white-space: nowrap;
+}
+.turn-journal .journal-tile .sprite {
+  width: 16px;
+  height: 18px;
+}
+.turn-journal .journal-tile .game-icon {
+  width: 15px;
+  height: 15px;
+}
+.turn-journal .journal-number {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid #ac9162;
+  border-radius: 50%;
+  background: #fff0cc;
+  color: #26392e;
+  font:
+    800 9.5px/1 Barlow,
+    sans-serif;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+.turn-journal .journal-number-red {
+  color: #b23827;
+}
+.turn-journal .journal-harbour {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: #6f5433;
+  color: #fff3dc;
+  font:
+    700 9.5px/1.3 Barlow,
+    sans-serif;
+  white-space: nowrap;
+}
+.turn-journal .journal-harbour .sprite {
+  width: 13px;
+  height: 14px;
+}
+.turn-journal .journal-place-end {
+  white-space: nowrap;
+}
+.turn-journal .journal-place-word {
+  font-size: 11px;
+  opacity: 0.85;
+}
 
 .game-dialog:has(.rules-book) {
   width: min(420px, calc(100vw - 24px));

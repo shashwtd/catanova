@@ -202,7 +202,9 @@ test('camera presents a straight-down island and a matching wooden world with ge
   assert.match(html, /Scroll or pinch to zoom/);
   assert.ok(!html.includes('rotateX') && !html.includes('rotateY') && !html.includes('zoom-controls'));
   assert.match(html, /class="board-world-surface"/);
-  assert.match(html, /patternTransform="translate\(0 0\) scale\(1\)"/);
+  // The table is drawn once on its own plane and only moved and scaled with the camera: never repainted per frame.
+  assert.match(html, /class="board-world-plane"[^>]*style="transform:translate\(-720px, -720px\) scale\(1\)"/);
+  assert.doesNotMatch(html, /patternTransform/);
   const reduced = renderToStaticMarkup(
     createElement(BoardViewport, { board: generateBoard(42), reducedMotion: true, children: 'board' }),
   );

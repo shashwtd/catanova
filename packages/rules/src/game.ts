@@ -141,6 +141,12 @@ export type Game = {
    * resigned player left owing, which the next player makes before rolling, once the windows are over.
    */
   windows?: { after: number; robber?: true };
+  /**
+   * The players not taking trade offers, whoever makes them: they cannot answer one, and count as having declined
+   * each until they take offers again. Absent while everyone takes them, so a game in which nobody switches them
+   * off saves exactly as it always has.
+   */
+  notTrading?: string[];
 } & SeaFields;
 /**
  * What an Open Sea game keeps besides Classic's fields (docs/RULEBOOK-OPEN-SEA.md), all public. A game in any
@@ -187,12 +193,28 @@ export type GameAction =
   | { kind: 'withdrawProposal'; tradeId: number }
   | { kind: 'acceptProposal'; tradeId: number; player: string; expectedGive?: Hand }
   | { kind: 'acceptTrade' | 'declineTrade'; tradeId: number }
+  /** Stop taking trade offers from anyone, or take them again. Any player, at any time. */
+  | { kind: 'blockTrades'; on: boolean }
   | { kind: 'playCard'; cardId: string; resources?: Hand; resource?: Resource };
 export class RuleError extends Error {
   readonly code = 'ILLEGAL_ACTION';
 }
 function requireRule(condition: unknown, message: string): asserts condition {
   if (!condition) throw new RuleError(message);
+}
+const NOT_TRADING = 'You are not taking trade offers. Take them again in Settings first.';
+/**
+ * Whether an offer still waits on someone: another player who has neither declined it nor stopped taking offers.
+ * One who accepted before stopping still counts, since an acceptance holds until the offer ends.
+ */
+function awaitingAnswer(g: Game, offer: Trade) {
+  return g.players.some(
+    (other) =>
+      !other.resigned &&
+      other.id !== offer.player &&
+      !offer.declinedBy?.includes(other.id) &&
+      (!g.notTrading?.includes(other.id) || !!offer.proposals?.some((proposal) => proposal.player === other.id)),
+  );
 }
 export const emptyHand = (): Hand => ({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 });
 export const total = (hand: Hand) => RESOURCES.reduce((n, r) => n + hand[r], 0);
@@ -329,6 +351,9 @@ export function parseGameAction(input: unknown): GameAction {
         player: id(a.player),
         ...(a.expectedGive === undefined ? {} : { expectedGive: hand(a.expectedGive) }),
       };
+    case 'blockTrades':
+      requireRule(typeof a.on === 'boolean', 'Invalid action');
+      return { kind: a.kind, on: a.on };
     case 'playCard':
       return {
         kind: a.kind,
@@ -849,10 +874,7 @@ export function resignPlayers(
     if (g.players.find((p) => p.id === g.trade!.player)?.resigned) g.trade = null;
     else {
       g.trade.proposals = g.trade.proposals?.filter((proposal) => !playerIds.includes(proposal.player));
-      if (
-        g.players.every((p) => p.resigned || p.id === g.trade!.player || g.trade!.declinedBy?.includes(p.id))
-      )
-        g.trade = null;
+      if (!awaitingAnswer(g, g.trade)) g.trade = null;
     }
   }
   updateAwards(g);
@@ -941,6 +963,23 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
   requireRule(!p.resigned, 'You resigned from this game; you can still watch');
   requireRule(g.phase !== 'finished', 'The game has ended');
   const isActive = activePlayer(g).id === p.id;
+  if (a.kind === 'blockTrades') {
+    const blocked = g.notTrading ?? [];
+    requireRule(
+      a.on !== blocked.includes(p.id),
+      a.on ? 'You are already not taking trade offers' : 'You are already taking trade offers',
+    );
+    const next = a.on ? [...blocked, p.id] : blocked.filter((id) => id !== p.id);
+    if (next.length) g.notTrading = next;
+    else delete g.notTrading;
+    log(g, a.on ? `${p.name} is not taking trade offers.` : `${p.name} is taking trade offers again.`);
+    // An offer open now stops waiting on them, and one that nobody else can answer closes.
+    if (a.on && g.trade && !awaitingAnswer(g, g.trade)) {
+      g.trade = null;
+      log(g, 'Trade closed: everyone declined.');
+    }
+    return g;
+  }
   if (a.kind === 'discard') {
     requireRule(g.phase === 'discard' && !!g.discards[p.id], 'You do not need to discard');
     requireRule(total(a.resources) === g.discards[p.id], `Discard exactly ${g.discards[p.id]} cards`);
@@ -983,11 +1022,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     offer.declinedBy = [...(offer.declinedBy ?? []), p.id];
     if (offer.proposals) offer.proposals = offer.proposals.filter((proposal) => proposal.player !== p.id);
     log(g, `${p.name} declined the trade offer.`);
-    if (
-      g.players.every(
-        (other) => other.resigned || other.id === offer.player || offer.declinedBy!.includes(other.id),
-      )
-    ) {
+    if (!awaitingAnswer(g, offer)) {
       g.trade = null;
       log(g, 'Trade closed: everyone declined.');
     }
@@ -1005,6 +1040,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     const offer = g.trade;
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
     requireRule(a.kind !== 'withdrawProposal', 'Your acceptance is committed until this offer ends');
+    requireRule(!g.notTrading?.includes(p.id), NOT_TRADING);
     requireRule(
       !offer.proposals?.some((proposal) => proposal.player === p.id),
       'Your acceptance is committed until this offer ends',
@@ -1069,6 +1105,7 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     const maker = activePlayer(g),
       offer = g.trade;
     requireRule(!offer.declinedBy?.includes(p.id), 'You already declined this trade');
+    requireRule(!g.notTrading?.includes(p.id), NOT_TRADING);
     requireRule(
       canPay(maker.hand, offer.give) && canPay(p.hand, offer.want),
       'A player no longer has the offered cards',
@@ -1304,9 +1341,13 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
     );
   requireRule(a.kind !== 'bankTrade' || g.phase !== 'buildWindow', 'No trading in a build window');
   // Keep one live offer; cancelling it deliberately permits another with no per-turn cap.
-  if (a.kind === 'offerTrade' || a.kind === 'openTrade')
+  if (a.kind === 'offerTrade' || a.kind === 'openTrade') {
     requireRule(!g.trade, 'Cancel your current offer before creating another');
-  else g.trade = null;
+    requireRule(
+      g.players.some((other) => !other.resigned && other.id !== p.id && !g.notTrading?.includes(other.id)),
+      'Nobody else is taking trade offers right now',
+    );
+  } else g.trade = null;
   switch (a.kind) {
     case 'road':
       requireRule(

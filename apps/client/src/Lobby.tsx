@@ -40,6 +40,8 @@ import { seatHexColors } from './player-colors.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
 import { BrandLogo } from './BrandLogo.js';
 import { Avatar } from './Profile.js';
+import { FriendButton } from './PlayerRail.js';
+import type { RailFriendship } from './PlayerRail.js';
 import { roomPath, visibleRoomCode } from './navigation.js';
 
 export function Invite({ code, roomId = code ?? '' }: { code?: string; roomId?: string }) {
@@ -339,6 +341,7 @@ export function Lobby({
   onKick,
   onChooseColor,
   onPreviousResults,
+  friendship,
   seats = seatsOf(room),
 }: {
   room: RoomState;
@@ -357,6 +360,8 @@ export function Lobby({
   onKick?: (playerId: string) => Promise<void>;
   onChooseColor?: (color: PlayerColor) => void;
   onPreviousResults?: () => void;
+  /** Friend requests from a seat, for a viewer with a Google account, as the in-game rail makes them. */
+  friendship?: RailFriendship;
   /** How many the table seats: the room's mode's number unless a preview says otherwise. */
   seats?: number;
 }) {
@@ -512,6 +517,14 @@ export function Lobby({
                       >
                         <Pencil size={14} />
                       </button>
+                    )}
+                    {p.id !== me && friendship && p.accountId && p.accountId !== friendship.self && (
+                      <FriendButton
+                        name={p.name}
+                        accountId={p.accountId}
+                        friendship={friendship}
+                        className="seat-badge is-friend"
+                      />
                     )}
                     {!p.connected && (
                       <span className="offline-mark" title="Disconnected">

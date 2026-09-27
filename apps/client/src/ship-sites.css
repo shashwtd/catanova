@@ -21,3 +21,16 @@
 [data-build-site='movable'] .vertex-site-guide {
   fill: none;
 }
+/* Where a ship may be built now: a soft lane of light on the water (it breathes, in board-polish.css), until
+   the site is pointed at, chosen or guided, when the dashed guide takes over. */
+.ship-water-hint {
+  stroke: #d8fbff;
+  stroke-width: 11;
+  stroke-linecap: round;
+  opacity: 0.32;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px #bff6ff);
+}
+[data-build-site]:is(:hover, :focus-visible, [data-guided='true'], [data-pending='true']) .ship-water-hint {
+  opacity: 0;
+}

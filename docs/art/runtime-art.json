@@ -179,26 +179,26 @@
     {
       "source": "assets/source-art/ship-painted.png",
       "legacyUrl": "/art/ship-painted.png",
-      "url": "/art/optimized/ship-painted.8c31ede90b16.webp",
-      "sha256": "8c31ede90b1670c0a697bfcfe458f305a94b6be7970b47704abedb4f48b59d91",
-      "sourceSha256": "18043321b9f88f78be572d45060483028342c62cb9f48ecec6feb5351c518949",
-      "width": 130,
-      "height": 256,
+      "url": "/art/optimized/ship-painted.b54e41641623.webp",
+      "sha256": "b54e41641623cce71592a7b12fdffbe7f0296dc8236b17601783de059d5c7022",
+      "sourceSha256": "f57a82f437a5d6d1af6683e3457eacb5af4720ffdc9eab144590b5be5b7cad27",
+      "width": 230,
+      "height": 512,
       "quality": 88,
-      "originalBytes": 59777,
-      "bytes": 11540
+      "originalBytes": 183564,
+      "bytes": 27798
     },
     {
       "source": "assets/source-art/ship-sail-mask.png",
       "legacyUrl": "/art/ship-sail-mask.png",
-      "url": "/art/optimized/ship-sail-mask.49ba6ca51b30.webp",
-      "sha256": "49ba6ca51b306820da225c2348e8c6779bbbd0f0dd8f81f1a7e879d5a5a6b48b",
-      "sourceSha256": "4a40187b65139bd0cec11177609abc81e2cb333f3c4c0be182bd45e6248e0f03",
-      "width": 130,
-      "height": 256,
+      "url": "/art/optimized/ship-sail-mask.925772c58de2.webp",
+      "sha256": "925772c58de243e89fc00ebf9864d7f95ca120cab3f8362dba6ea2bfbf37bf2f",
+      "sourceSha256": "025d642bceeda1a160c4a16ca6dfa0781e8f2d1eb3ca34a15e397f5e6191dfaa",
+      "width": 230,
+      "height": 512,
       "quality": 90,
-      "originalBytes": 4235,
-      "bytes": 2134
+      "originalBytes": 6236,
+      "bytes": 2374
     }
   ]
 }

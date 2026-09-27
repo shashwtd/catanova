@@ -30,7 +30,19 @@
   width: 100vw;
   height: 100dvh;
   z-index: -1;
+  overflow: hidden;
   pointer-events: none;
+}
+/* Drawn once and only moved: its own layer, so a pan or zoom composites it rather than painting it again. */
+.board-world-plane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.table-tint {
+  fill: #241d2714;
 }
 .board-viewport[data-dragging='true'] {
   cursor: grabbing;
