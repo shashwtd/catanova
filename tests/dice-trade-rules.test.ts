@@ -204,6 +204,38 @@ test('an absent sole survivor must reconnect to win, and offline award transfers
   assert.equal(connected.finishReason, undefined);
 });
 
+test('a player a resignation leaves at the target while away wins at their next move, not at the resignation', () => {
+  // Alice, on turn, holds Largest Army and leaves. Bob, next, has as many Knights, so the award is his, and with
+  // four cities it gives him the target; but he is away, so the resignation declares nobody as his turn begins.
+  const game = prepared();
+  for (let n = 0; n < 4; n++) game.buildings[n] = { player: 'p1', kind: 'city' };
+  game.players[0]!.knights = 3;
+  game.players[1]!.knights = 3;
+  game.largestArmy = 'p0';
+  const left = resignPlayers(game, ['p0'], { reason: 'leave', winnerEligibleIds: ['p2', 'p3'] });
+  assert.equal(left.largestArmy, 'p1');
+  assert.equal(left.winner, null);
+  assert.equal(left.players[left.active]!.id, 'p1');
+  assert.equal(left.phase, 'roll');
+  // The first move of his turn, his stand-in's or his own once back, is the roll, and it declares him.
+  const rolled = move(left, { kind: 'roll' }, 'p1');
+  assert.equal(rolled.winner, 'p1');
+  assert.equal(rolled.log.at(-1)!.text, 'Bob wins with 10 points!');
+  // An award handed to the player on turn while away is declared as that turn ends, not after it.
+  const turn = prepared();
+  turn.active = 1;
+  for (let n = 0; n < 4; n++) turn.buildings[n] = { player: 'p1', kind: 'city' };
+  turn.players[1]!.knights = 3;
+  turn.players[2]!.knights = 3;
+  turn.largestArmy = 'p2';
+  const handed = resignPlayers(turn, ['p2'], { reason: 'leave', winnerEligibleIds: ['p0', 'p3'] });
+  assert.equal(handed.largestArmy, 'p1');
+  assert.equal(handed.winner, null);
+  const ended = move(handed, { kind: 'endTurn' }, 'p1');
+  assert.equal(ended.winner, 'p1');
+  assert.equal(ended.players[ended.active]!.id, 'p1', 'in his own turn');
+});
+
 test('the port inventory, coastal spacing and both ownership endpoints preserve standard harbor behavior', () => {
   for (let seed = 0; seed < 100; seed++) {
     const board = generateBoard(seed);

@@ -1,4 +1,6 @@
 import type { ResultGame, ResultPlayer } from '../../../packages/protocol/src/results.js';
+import type { ScoreTermId } from '../../../packages/rules/src/game.js';
+import { findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 
 /** Rank the scores in this viewer's server projection: their own VP cards are
  * already counted once, while opponents' hidden points are still excluded. */
@@ -40,28 +42,49 @@ export function finalStandings(game: ResultGame) {
  * Where a score came from.
  *
  * A results screen that says "8 points" and nothing else is a number without a
- * reason, and the reason is the whole interest of the last ten minutes. Every
- * part is derived from the revealed final view rather than tracked during play:
- * buildings are on the board, the two awards are declared, and whatever is left
- * over must have been victory point cards, which are only revealed at the end.
+ * reason, and the reason is the whole interest of the last ten minutes. The
+ * server names every part of a score (scoreTerms in the rules), revealed at the
+ * end, so each part is shown under its own name.
  *
- * The parts always add up to the score. If a future rule adds points from
- * somewhere else, the remainder absorbs it rather than the total disagreeing
- * with the sum of its own breakdown.
+ * Results saved before the server named them carry only the total. For those,
+ * buildings are on the board, the two awards are declared, and whatever is left
+ * over must have been victory point cards, the only points Classic keeps
+ * hidden. Either way the parts always add up to the score.
  */
 export type PointPart = { key: string; label: string; points: number; count?: number };
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const TERM_LABELS: Record<ScoreTermId, (count: number) => string> = {
+  settlements: (n) => plural(n, 'settlement', 'settlements'),
+  cities: (n) => plural(n, 'city', 'cities'),
+  longestRoad: () => 'Longest Road',
+  largestArmy: () => 'Largest Army',
+  islandBonus: (n) => (n === 1 ? 'Island bonus' : `Island bonus × ${n}`),
+  cards: (n) => plural(n, 'victory point card', 'victory point cards'),
+};
+/** Terms whose count is worth reading beside the label: the awards are one each, and say so by name. */
+const COUNTED = new Set<string>(['settlements', 'cities', 'islandBonus', 'cards']);
 export function pointBreakdown(game: ResultGame, player: ResultPlayer): PointPart[] {
+  if (player.terms)
+    return player.terms.map(({ id, points, count }) => ({
+      key: id,
+      label:
+        id === 'longestRoad'
+          ? routeAwardName(findRuleset(game.ruleset))
+          : ((TERM_LABELS as Partial<Record<string, (count: number) => string>>)[id]?.(count) ??
+            'Other points'),
+      points,
+      ...(COUNTED.has(id) ? { count } : {}),
+    }));
   const parts: PointPart[] = [];
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const add = (key: string, label: string, points: number, count?: number) => {
     if (points > 0) parts.push({ key, label, points, ...(count === undefined ? {} : { count }) });
   };
   const { settlements, cities } = player.pieces;
-  add('settlements', plural(settlements, 'settlement', 'settlements'), settlements, settlements);
-  add('cities', plural(cities, 'city', 'cities'), cities * 2, cities);
+  add('settlements', TERM_LABELS.settlements(settlements), settlements, settlements);
+  add('cities', TERM_LABELS.cities(cities), cities * 2, cities);
   add('longestRoad', 'Longest Road', game.longestRoad === player.id ? 2 : 0);
   add('largestArmy', 'Largest Army', game.largestArmy === player.id ? 2 : 0);
   const hidden = player.points - parts.reduce((n, part) => n + part.points, 0);
-  add('cards', plural(hidden, 'victory point card', 'victory point cards'), hidden, hidden);
+  add('cards', TERM_LABELS.cards(hidden), hidden, hidden);
   return parts;
 }

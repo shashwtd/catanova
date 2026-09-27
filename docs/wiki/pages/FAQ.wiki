@@ -1,5 +1,5 @@
 == How many people can play? ==
-Two to four invited players. There is no solo mode, bot opponent, or public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players.
+Classic, the mode playable today, has two to four seats, filled by invited friends or by bots the host adds. One person can play against one to three bots. There is no public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players. See [[Getting started#Playing with bots|Playing with bots]]. [[Big Table]], for five and six players, and [[Open Sea]], for three or four, are being built.
 
 == Are Timber and Clay different from wood and brick? ==
 Only the names differ. [[Resources|Timber, Clay, Sheep, Hay, and Rock]] correspond to wood, brick, wool, wheat, and ore.
@@ -28,7 +28,22 @@ No. The optional [[Turn timer|timer]] completes compulsory steps and ends the tu
 == Will refreshing delete my roads? ==
 A reconnect should restore the server's saved game for the same identity and room. Wait for synchronization before repeating an uncertain action. Guest access depends on keeping that temporary identity; [[Accounts and friends|link Google]] for recovery across devices. Persistence still depends on the server's storage and backups—it is not a promise that a damaged server disk can never lose data.
 
+== What happens if someone drops out? ==
+In Classic, after about 30 seconds, a bot plays their seat with their own cards and pieces, and hands it back the moment they reconnect. '''Leave game''' is different: it resigns for good. If everyone disconnects, the game pauses and closes with no winner after three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
+
+== Can five or six people play together? ==
+Not yet. [[Big Table]], for five and six players, is being built. It uses a larger island and a bigger bank and deck, and lets a second player act in every turn so the wait between turns stays short. See [[Game modes]].
+
+== Can I add bots in Big Table or Open Sea? ==
+No. For now bots play only in Classic, and the lobby will not switch to another mode while a bot is seated. In [[Big Table]] and [[Open Sea]], two modes still being built, nobody will take over a disconnected player's seat. The game will wait, and after 2 minutes the clock will make only the moves the game cannot go on without. See [[Game modes#When a player disconnects|When a player disconnects]].
+
+== What are the Lead and the Partner? ==
+The two roles in a paired turn in [[Big Table]], a mode still being built. The Lead rolls and plays a full turn. Then the Partner, the third player to the Lead's left, gets one action phase to trade with the bank, build, buy and play a card, but not to trade with players.
+
+== Do ships count toward Longest Road? ==
+In [[Open Sea]], a mode still being built, yes. There the award is called Longest Route and counts roads and ships, which join only through your own settlement or city. Classic and Big Table have no ships and keep [[Awards|Longest Road]].
+
 == Is this an official CATAN release? ==
-No. Catanova is an independent, open-source project. Its current balanced maps, optional timer, and two-player option are identified separately; two rare development-card cases remain provisional. The [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md full rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes] explain the target and differences.
+No. Catanova is an independent, open-source project. Its current balanced maps and dice, optional timer, adjustable points target, bots, and two-player option are identified separately; two rare development-card cases remain provisional. The [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md full rulebook] and [https://github.com/shashwtd/catanova/blob/main/docs/RULE_SOURCES.md compatibility notes] explain the target and differences.
 
 [[Category:Guides]]

@@ -228,7 +228,8 @@ test('new trade commands canonicalize at the protocol boundary and reject invali
       { type: 'action', commandId: 'open-trade-parse', expectedRevision: 2, action },
     );
   }
-  for (const count of [-1, 1.5, 20, NaN, Infinity, '1'])
+  // Above every bank: Big Table's 24 is the largest.
+  for (const count of [-1, 1.5, 25, NaN, Infinity, '1'])
     assert.throws(() =>
       parseGameAction({ kind: 'proposeTrade', tradeId: 0, give: { ...emptyHand(), sheep: count } }),
     );

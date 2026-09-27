@@ -22,7 +22,7 @@ Run three separate workloads behind the VM's HTTPS reverse proxy: the existing C
 
 The community-maintained **Docker Official Image** provides a practical starting point. Persist `/var/www/html/images`, `LocalSettings.php`, and the MariaDB data directory on the managed data disk. The image does not create these persistence mounts for us. Keep credentials and private configuration outside Git. This image is distinct from Wikimedia's **MediaWiki-Docker development environment**, which is not the production setup. [Image and persistence instructions](https://hub.docker.com/_/mediawiki), [development-environment scope](https://www.mediawiki.org/wiki/MediaWiki-Docker)
 
-Start with the Vector skin and bundled VisualEditor, ordinary categories, tables and built-in search. VisualEditor supports editing without wikitext and still needs enabling/configuration. Avoid adding a separate search cluster or unrelated extensions for 14 starter pages. A logo and restrained CSS can make this recognizably Catanova without recreating Fandom's interface. [VisualEditor setup and skin support](https://www.mediawiki.org/wiki/Extension:VisualEditor)
+Start with the Vector skin and bundled VisualEditor, ordinary categories, tables and built-in search. VisualEditor supports editing without wikitext and still needs enabling/configuration. Avoid adding a separate search cluster or unrelated extensions for 17 starter pages. A logo and restrained CSS can make this recognizably Catanova without recreating Fandom's interface. [VisualEditor setup and skin support](https://www.mediawiki.org/wiki/Extension:VisualEditor)
 
 Before public editing, finish HTTPS, an owner-controlled administrator account, account recovery email delivery, editor permissions and basic spam controls. Put resource limits on the wiki workloads and bound PHP concurrency so a burst of page requests cannot consume all game-server memory. Test a wiki edit and thumbnail generation while a game runs; a too-small VM should keep the static guide until it can support both. These are deployment recommendations, not measured capacity claims.
 
@@ -49,24 +49,24 @@ Ordinary content overlap does **not** imply an automatic search penalty. Google 
 
 ## Contents
 
-- `pages/*.wiki`: editable MediaWiki source for 11 articles, two category pages, and `Project:Copyrights`.
-- `catanova-wiki.xml`: the same 14 pages in MediaWiki export format 0.11, with one starter revision each.
+- `pages/*.wiki`: editable MediaWiki source for 14 articles, two category pages, and `Project:Copyrights`.
+- `catanova-wiki.xml`: the same 17 pages in MediaWiki export format 0.11, with one starter revision each.
 - `build_pack.py`: regenerates the XML and checks every internal article/category link, source coverage, and exact text round-trip.
 
-Articles cover getting started, resources, buildings, trades and ports, development cards, awards, balanced maps, the timer, accounts and friends, and common questions. Tables, categories, and ordinary links provide an encyclopedia structure that can be themed later. `Main Page` is the entry point.
+Articles cover getting started, resources, buildings, trades and ports, development cards, awards, balanced maps, the timer, accounts and friends, game modes, and common questions. Two further articles guide players through the planned Big Table and Open Sea modes. Tables, categories, and ordinary links provide an encyclopedia structure that can be themed later. `Main Page` is the entry point.
 
-The text describes repository behavior as reviewed on **9 September 2026**. It identifies the custom two-player option, custom map preset, optional timer, and provisional rare-card cases. It makes no claim that a public game server is already deployed. The complete [rulebook](https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md) remains the detailed specification.
+The text describes repository behavior as reviewed on **9 September 2026** and revised on **25 September 2026**. It identifies the custom two-player option, custom map preset, balanced dice, optional timer, adjustable points target, bots, and provisional rare-card cases. The `Game modes`, `Big Table` and `Open Sea` articles, added on 26 September 2026, describe planned rules from the [Big Table](../RULEBOOK-BIG-TABLE.md) and [Open Sea](../RULEBOOK-OPEN-SEA.md) rulebooks. Neither mode is built yet, and the articles say so. The pack makes no claim that a public game server is already deployed. The complete [rulebook](https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK.md) remains the detailed specification.
 
 ## Import into MediaWiki
 
 1. Use a fresh wiki or review existing pages with the same titles first. Importing can merge histories; this is a starter pack, not a mechanism for overwriting later community edits.
 2. Sign in with an administrator account that has both `import` and `importupload`. Open **Special:Import**, select the XML upload option, and upload `catanova-wiki.xml`. A managed host may need to grant these rights or perform the import.
 3. If asked for a source/interwiki prefix, use a distinct source label such as `catanova-starter` as supported by the host. Keep imported attribution separate from local users; `Catanova contributors` is this pack's collective attribution label, not an account to create or impersonate.
-4. Keep the source namespaces: article pages in main, copyright notice in Project, categories in Category. Import and verify the result reports 14 pages. Open `Main Page`, follow its links, and check the tables on a phone.
+4. Keep the source namespaces: article pages in main, copyright notice in Project, categories in Category. Import and verify the result reports 17 pages. Open `Main Page`, follow its links, and check the tables on a phone.
 
-The pack contains no real user IDs, email addresses, credentials, files, or user account history. Its page/revision numbers are identifiers within this generated package. The fixed timestamp records the starter edition, not edits on an existing public wiki. XML content imports do not upload image files or configure the site. [MediaWiki import manual](https://www.mediawiki.org/wiki/Manual:Importing_XML_dumps)
+The pack contains no real user IDs, email addresses, credentials, files, or user account history. Its page/revision numbers are identifiers within this generated package. The fixed timestamp (26 September 2026) records this starter edition, not edits on an existing public wiki. XML content imports do not upload image files or configure the site. [MediaWiki import manual](https://www.mediawiki.org/wiki/Manual:Importing_XML_dumps)
 
-For Fandom or another managed service, ask its administrator to use the supported import route. If file imports are unavailable, create the 14 titles from `PAGES` in `build_pack.py` and paste their `.wiki` source using the source editor. That fallback does not depend on import permissions. The pack does not assume Fandom supports the custom domain or a particular skin.
+For Fandom or another managed service, ask its administrator to use the supported import route. If file imports are unavailable, create the 17 titles from `PAGES` in `build_pack.py` and paste their `.wiki` source using the source editor. That fallback does not depend on import permissions. The pack does not assume Fandom supports the custom domain or a particular skin.
 
 ## Logo, navigation, and editing
 
@@ -74,7 +74,7 @@ Upload the existing [Catanova full logo](../../assets/source-art/branding/catano
 
 Use a readable encyclopedia skin, the Catanova logo, warm paper surfaces, restrained teal links, and the existing resource colors. Keep article text on a quiet background. No game login, OAuth secret, or Supabase key belongs in the wiki theme. Set the site's project/copyright link to the imported `Project:Copyrights` page as appropriate to its contribution license.
 
-For navigation, add links to Main Page, Getting started, Resources, Buildings, Trading and ports, Development cards, and FAQ using the host's navigation editor. On a standard MediaWiki sidebar, this block can be merged into **MediaWiki:Sidebar**; keep any existing tools and search sections. [Sidebar customization](https://www.mediawiki.org/wiki/Manual:Interface/Sidebar)
+For navigation, add links to Main Page, Getting started, Resources, Buildings, Trading and ports, Development cards, Game modes, and FAQ using the host's navigation editor. On a standard MediaWiki sidebar, this block can be merged into **MediaWiki:Sidebar**; keep any existing tools and search sections. [Sidebar customization](https://www.mediawiki.org/wiki/Manual:Interface/Sidebar)
 
 ```text
 * Explore Catanova
@@ -84,6 +84,7 @@ For navigation, add links to Main Page, Getting started, Resources, Buildings, T
 ** Buildings|Buildings
 ** Trading and ports|Trading and ports
 ** Development cards|Development cards
+** Game modes|Game modes
 ** FAQ|FAQ
 ```
 
@@ -104,6 +105,6 @@ The package follows the official [MediaWiki 0.11 export schema](https://www.medi
 
 ## Sources and reuse
 
-The starter prose is original documentation based on the repository's [rulebook](../RULEBOOK.md), [playtest notes](../PLAYTEST.md), [map generator](../MAP_GENERATION.md), [turn clock](../TURN_CLOCK.md), [guest access](../GUEST_ACCESS.md), and account/profile implementation. The in-article external links point to the public repository so they remain usable outside this checkout.
+The starter prose is original documentation based on the repository's [rulebook](../RULEBOOK.md), [playtest notes](../PLAYTEST.md), [map generator](../MAP_GENERATION.md), [turn clock](../TURN_CLOCK.md), [guest access](../GUEST_ACCESS.md), and account/profile implementation. The mode articles draw on the [game modes plan](../GAME-MODES.md) and the [Big Table](../RULEBOOK-BIG-TABLE.md) and [Open Sea](../RULEBOOK-OPEN-SEA.md) rulebooks. The in-article external links point to the public repository so they remain usable outside this checkout.
 
 The repository [MIT license](../../LICENSE) permits reuse of this text with its notice retained; the complete notice is included in `Project:Copyrights`. No official CATAN assets or third-party wiki passages are included. A hosted wiki's terms and selected license for future contributions still apply. Importing this starter does not silently change the license for later community edits.

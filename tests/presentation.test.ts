@@ -12,6 +12,7 @@ import {
   wheelScale,
   zoomAt,
 } from '../apps/client/src/camera.js';
+import { WORLD } from '../apps/client/src/scene.js';
 
 test('all road orientations render as visible solid pieces without zero-width SVG filter bounds', () => {
   const g = createGame(
@@ -52,15 +53,19 @@ test('zoom has uniform bounded steps, retains its focal point, and cannot shrink
   const bounds = { width: 600, height: 600 };
   const initial = { scale: 1.4, x: 0, y: 0 };
   const focal = { x: 20, y: 10 };
-  const next = zoomAt(initial, 1.6, focal, bounds);
+  const next = zoomAt(initial, 1.6, focal, bounds, WORLD);
   assert.ok(Math.abs((focal.x - initial.x) / initial.scale - (focal.x - next.x) / next.scale) < 1e-8);
-  assert.equal(zoomAt(initial, 100, focal, bounds).scale, MAX_ZOOM);
-  assert.equal(zoomAt(initial, 0.001, focal, bounds).scale, MIN_ZOOM);
+  assert.equal(zoomAt(initial, 100, focal, bounds, WORLD).scale, MAX_ZOOM);
+  assert.equal(zoomAt(initial, 0.001, focal, bounds, WORLD).scale, MIN_ZOOM);
   assert.ok(wheelScale(1, -10000) < 1.08);
   assert.ok(wheelScale(1, 10000) > 0.92);
-  assert.equal(zoomAt(initial, pinchScale(initial.scale, 10000, 1), focal, bounds).scale, MAX_ZOOM);
-  assert.equal(zoomAt(initial, pinchScale(initial.scale, 1, 10000), focal, bounds).scale, MIN_ZOOM);
-  assert.deepEqual(constrainCamera({ scale: 0.9, x: 9999, y: -9999 }, bounds), { scale: 0.9, x: 90, y: -80 });
-  const bounded = constrainCamera({ scale: 2, x: 9999, y: -9999 }, bounds);
+  assert.equal(zoomAt(initial, pinchScale(initial.scale, 10000, 1), focal, bounds, WORLD).scale, MAX_ZOOM);
+  assert.equal(zoomAt(initial, pinchScale(initial.scale, 1, 10000), focal, bounds, WORLD).scale, MIN_ZOOM);
+  assert.deepEqual(constrainCamera({ scale: 0.9, x: 9999, y: -9999 }, bounds, WORLD), {
+    scale: 0.9,
+    x: 90,
+    y: -80,
+  });
+  const bounded = constrainCamera({ scale: 2, x: 9999, y: -9999 }, bounds, WORLD);
   assert.ok(Math.abs(bounded.x) < bounds.width && Math.abs(bounded.y) < bounds.height);
 });

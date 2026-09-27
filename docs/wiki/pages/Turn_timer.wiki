@@ -6,7 +6,7 @@ The '''turn timer''' is an optional Catanova house rule. New rooms start with a 
 | 40 · 65 · 90 · 115 · 140 seconds
 |}
 
-The initial enabled value is 90 seconds. Rolling, trading, buying, playing a development card, or reconnecting does not restart the normal turn's countdown.
+The initial enabled value is 90 seconds. Rolling, trading, buying, or playing a development card does not restart the normal turn's countdown. Bots play under the same clock as people.
 
 == When time runs out ==
 The server finishes compulsory steps with legal defaults, then ends the turn:
@@ -18,11 +18,16 @@ The server finishes compulsory steps with legal defaults, then ends the turn:
 It does '''not''' buy optional pieces or cards, spend resources on optional purchases, accept a trade, play an unchosen development card, or forfeit the player's seat. Automatic actions appear in move history.
 
 == Discarding after a seven ==
-The active player's clock pauses while required [[Resources|discards]] are outstanding. Every player who must discard gets the full configured duration for that decision. If a player runs out of time, the server discards the required number of random resource cards from that player's actual hand. Other players see the count, not the private selection.
+The active player's clock pauses while required [[Resources|discards]] are outstanding. Every player who must discard gets the full configured duration for that decision. If a player runs out of time, the server discards the required number of random resource cards from that player's actual hand. Discarded cards go back to the bank in view, so the move history names them, as it does for a discard made by hand.
 
 Once all discards finish, the active clock resumes with its remaining time. If time had already expired before the seven was automatically rolled, the server finishes the robber step and ends the turn after discards resolve.
 
 == Disconnects and restarts ==
-Deadlines survive refreshes, reconnects, and server restarts. The timer keeps running even if every player is offline. After a long server outage, the current expired turn can finish automatically, but the next player receives a fresh full turn; the server does not fast-forward through many missed turns.
+The server keeps every deadline. While at least one person is still at the table, a refresh or reconnect does not change the countdown. A player who drops keeps their clock running. After about 30 seconds a bot plays their seat until they return; see [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]]. With the timer off, that bot is what keeps an absent player's turn from holding up the table.
+
+If every person disconnects, the clock stops and nothing is played automatically. When someone returns, the current turn and any outstanding discards start again with the full configured time. A server restart is handled the same way: the game waits for its players, and nobody's turn runs out while the server is down. The server never fast-forwards through missed turns.
+
+== In other modes ==
+[[Big Table]] and [[Open Sea]], modes still being built, use the same turn timer. Big Table adds a clock for the Partner's phase, half the room's turn time rounded up to a whole second and at least 30 seconds, and 20 seconds for each build window, even with the timer off. Open Sea gives each player owed gold one 20-second clock for all their picks, also with the timer off. Those modes have no bots, so once a player has been away for 2 minutes the clock makes their forced moves instead, with or without a turn timer. That includes their setup placements, which are otherwise untimed. See [[Game modes#When a player disconnects|When a player disconnects]].
 
 [[Category:Game rules]]

@@ -447,6 +447,8 @@ test('archived results authorize recorded participants and return only final pub
         'points',
         ...(original.resigned ? ['resigned'] : []),
         'roadLength',
+        // Where the points came from, revealed exactly as far as the points themselves.
+        'terms',
       ]);
       assert.equal(player.resigned, original.resigned || undefined);
     }

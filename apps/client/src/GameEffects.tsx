@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { GameIcon, Sparkles } from './GameIcons.js';
+import { GameIcon, SEA_ICONS, Sparkles } from './GameIcons.js';
 import { DevelopmentArt } from './DevelopmentCards.js';
 import { CARD_NAMES } from '../../../packages/rules/src/game.js';
 import { ResourceIcon } from './Board.js';
@@ -272,6 +272,11 @@ const CARD_PLAY_CAPTIONS = {
   yearOfPlenty: 'Two resources from the bank.',
   monopoly: 'One resource, gathered from every rival.',
 };
+/** Open Sea's Knight moves the robber or the pirate, and its Road Building places roads or ships. */
+const SEA_CAPTIONS: Partial<typeof CARD_PLAY_CAPTIONS> = {
+  knight: 'The watch rides out. Move the robber or the pirate.',
+  roadBuilding: 'Two roads or ships, ready to build.',
+};
 function CardPlayToast({
   card,
   reducedMotion,
@@ -294,7 +299,7 @@ function CardPlayToast({
         <div className="card-play-copy">
           <span>{card.playerName} played</span>
           <strong>{CARD_NAMES[card.kind]}</strong>
-          <p>{CARD_PLAY_CAPTIONS[card.kind]}</p>
+          <p>{(card.sea && SEA_CAPTIONS[card.kind]) || CARD_PLAY_CAPTIONS[card.kind]}</p>
         </div>
       </div>
     </div>
@@ -340,6 +345,12 @@ export function AwardToast({
       clearTimeout(finish);
     };
   }, [award.id]);
+  // What it takes, for the two awards: Open Sea's island bonus has no minimum.
+  const minimum = (
+    <small>
+      {award.kind === 'longestRoad' ? 'Longest route' : 'Most Knights played'} · minimum {award.minimum}
+    </small>
+  );
   return (
     <div className="award-celebration-layer">
       <div
@@ -351,7 +362,16 @@ export function AwardToast({
         aria-atomic="true"
       >
         <div className="award-emblem" aria-hidden="true">
-          <GameIcon name={award.kind === 'longestRoad' ? 'road-award' : 'army-award'} size={60} />
+          <GameIcon
+            name={
+              award.kind === 'longestRoad'
+                ? 'road-award'
+                : award.kind === 'largestArmy'
+                  ? 'army-award'
+                  : SEA_ICONS.islandBonus
+            }
+            size={60}
+          />
         </div>
         <div className="award-celebration-copy">
           <span className="award-recipient">
@@ -360,11 +380,17 @@ export function AwardToast({
           <h2>{award.name}</h2>
           <p>
             <b>{award.count}</b>{' '}
-            {award.kind === 'longestRoad' ? 'roads in one continuous route' : 'Knights played'}
+            {award.kind === 'largestArmy'
+              ? 'Knights played'
+              : award.kind === 'islandBonus'
+                ? award.count === 1
+                  ? 'island settled'
+                  : 'islands settled'
+                : award.name === 'Longest Route'
+                  ? 'roads and ships in one continuous route'
+                  : 'roads in one continuous route'}
           </p>
-          <small>
-            {award.kind === 'longestRoad' ? 'Longest route' : 'Most Knights played'} · minimum {award.minimum}
-          </small>
+          {award.kind === 'islandBonus' ? <small>A first settlement on a new island</small> : minimum}
           {award.previousPlayerName && (
             <small className="award-transfer">Previously held by {award.previousPlayerName}</small>
           )}

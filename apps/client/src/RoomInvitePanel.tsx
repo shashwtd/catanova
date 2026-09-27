@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
+import { CLASSIC, findRuleset } from '../../../packages/rules/src/rulesets.js';
 import type { RoomInvite } from '../../../packages/protocol/src/room-invites.js';
 import type { useAuth } from './auth.js';
 import type { RoomInvitesController } from './useRoomInvites.js';
@@ -179,7 +180,8 @@ export function RoomInvitePanel({
     .sort(
       (a, b) => Number(b.online === true) - Number(a.online === true) || a.username.localeCompare(b.username),
     );
-  const unavailable = !!room.game || room.players.length >= 4;
+  const unavailable =
+    !!room.game || room.players.length >= (findRuleset(room.settings?.mode) ?? CLASSIC).seats.max;
   return (
     <section className="friends-roster room-invite-panel" aria-label="Invite friends to this room">
       {guest ? (

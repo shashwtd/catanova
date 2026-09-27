@@ -1,0 +1,69 @@
+A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for five and six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
+
+{| class="wikitable"
+! Mode !! Players !! Board !! Points target !! Bots !! Status
+|-
+| '''Classic''' || 2–4 || One island of 19 land hexes || 10; host can set 8–15 || Yes || Playable
+|-
+| '''[[Big Table]]''', for five and six players || 5 or 6 || One island of 30 land hexes || 10; host can set 8–15 || No || Being built
+|-
+| '''[[Open Sea]]''' || 3 or 4 || Outer Isles: a main island, small islands and open sea || 14; host can set 10–18 || No || Being built
+|}
+
+== Classic ==
+Classic is the game every room plays today: one island, two to four seats, and the rules described across this wiki. Start with [[Getting started]]. Its two-player option, bots, balanced island and turn timer are Catanova choices.
+
+== Big Table, for five and six players ==
+A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so the host chooses one of two ways to share each turn:
+* '''Paired turns''', the default. Each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
+* '''Between-turns build'''. After each ordinary turn, every other player gets a short window to build with the cards in their hand.
+
+See [[Big Table]].
+
+== Open Sea ==
+Islands separated by sea. Players build ships to cross it, and can move a ship at the open end of a line. Gold fields pay any resource you choose. A pirate on the sea robs ships, and the route award becomes '''Longest Route''', because ships count. Your first settlement on each small island earns 2 bonus points. The first scenario, '''Outer Isles''', is for three or four players.
+
+See [[Open Sea]].
+
+== Choosing a mode ==
+When the new modes open, the host will pick the mode in Room setup, beside the points target, the dice and the [[Turn timer|turn timer]]. Until then, every room plays Classic.
+* Only the host will change the mode. As with other settings, a change will clear the other people's ready status.
+* Each mode will deal its own island, so changing the mode will deal a new one.
+* Changing the mode will reset the points target to the new mode's default: 10 for Classic and Big Table, 14 for Open Sea.
+* The lobby will refuse a change while more players are seated than the new mode allows. For example, a table of five will not be able to switch to Open Sea. A table with too few players can switch and wait for more.
+* The lobby will also refuse a change to a mode without bots while bots are seated. Remove them first.
+* A game will start only with a player count its mode allows. The mode will then lock, and a saved game will keep its rules for good.
+
+== Bots ==
+Bots are allowed only in Classic for now. Big Table and Open Sea allow no bots, either in a seat or as a stand-in for a player who loses their connection. Every seat in those modes is a person. Bots for them are a later step in the plan, not a promise.
+
+== When a player disconnects ==
+Without stand-in bots, Big Table and Open Sea handle an absent player differently from Classic.
+
+{| class="wikitable"
+! Time away !! Classic !! Big Table and Open Sea
+|-
+| First 30 seconds || The card shows the player as away. The game waits; the room's timer, if any, runs as usual. || The same.
+|-
+| From 30 seconds || A bot plays the seat fully, with the player's own cards and pieces. || No bot. The player is still shown as disconnected, and the game keeps waiting.
+|-
+| From 2 minutes || The bot carries on. || Whenever the game waits on this player, the clock acts for them as if their time had run out. It makes only forced moves.
+|-
+| On return || The seat is handed back at once. || The clock stops acting for them at once.
+|}
+
+The 2-minute rule applies whether or not the room has a turn timer. It covers the player's setup placements, their turns and anything else they owe: a discard after a seven, a Partner's phase or build window in Big Table, and a gold pick in Open Sea. In setup, the clock places a settlement on the legal corner with the most production dots (on the main island in Open Sea), then a road touching it, or in Open Sea a ship if no road fits. The clock never builds, buys, trades, plays a card or moves a ship for anyone. Reconnecting does not reset a clock that is already running.
+
+Everything else is as in Classic. '''Leave game''' resigns for good. If every remaining player is offline, the game pauses, and it closes with no winner once nobody has returned within three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
+
+== Later ==
+None of these is part of the first versions:
+* Three more Open Sea scenarios, with names reserved: Sister Isles, with four islands; Sand Divide, with a desert barrier; and Veiled Waters, with fog.
+* Open Sea for five and six players, using Big Table's paired turns.
+* A knights mode. It is parked, and nothing about it is decided.
+
+== About the modes ==
+Big Table and Open Sea are inspired by the official 5–6 player and Seafarers expansions to the CATAN base game, but their names, maps and online rules are Catanova's own. The full specifications are the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-BIG-TABLE.md Big Table rulebook] and the [https://github.com/shashwtd/catanova/blob/main/docs/RULEBOOK-OPEN-SEA.md Open Sea rulebook]. Each lists the cases the official rules leave open and how Catanova settles them.
+
+[[Category:Guides]]
+[[Category:Game rules]]

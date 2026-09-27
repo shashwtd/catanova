@@ -72,7 +72,7 @@ export class RoomInviteService {
     const players = this.store.db
       .prepare('SELECT COUNT(*) AS count FROM seats WHERE room_id=? AND departed=0')
       .get(roomId)?.count as number | undefined;
-    if (!players || players >= 4) return null;
+    if (!players || players >= this.store.seatLimit(roomId)) return null;
     return { players, roomCode: this.store.roomCode(roomId) };
   }
   private incoming(row: InviteRow, from: PublicAccount): RoomInvite | null {

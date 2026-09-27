@@ -1,5 +1,6 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { roomHostId } from '../../../packages/protocol/src/room-host.js';
+import { CLASSIC, findRuleset, numberWord } from '../../../packages/rules/src/rulesets.js';
 import { ProtocolError } from './store.js';
 
 export const LAUNCH_MIN_MS = 2_000;
@@ -55,7 +56,14 @@ export class GameLaunch {
       throw new ProtocolError('STALE_STATE', 'The room changed; try again');
     if (roomHostId(state.players) !== request.hostId)
       throw new ProtocolError('NOT_HOST', 'Only the host can start');
-    if (state.players.length < 2) throw new ProtocolError('NOT_ENOUGH_PLAYERS', 'Invite at least one player');
+    const rules = findRuleset(state.settings?.mode) ?? CLASSIC;
+    if (state.players.length < rules.seats.min)
+      throw new ProtocolError(
+        'NOT_ENOUGH_PLAYERS',
+        rules.seats.min === 2
+          ? 'Invite at least one player'
+          : `${rules.name} needs at least ${numberWord(rules.seats.min)} players`,
+      );
     if (state.players.some((p) => !p.connected))
       throw new ProtocolError('NOT_CONNECTED', 'Wait for everyone to reconnect');
     if (state.players.some((p) => p.id !== request.hostId && !p.ready))

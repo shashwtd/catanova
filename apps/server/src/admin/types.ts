@@ -10,6 +10,7 @@ import type { AuditEntry } from './audit.js';
 import type { ServerErrorEntry } from './errors.js';
 import type { LoopWindow, MetricSample } from './metrics.js';
 import type { FeedbackItem } from '../feedback.js';
+import type { ModeSetting, Tester } from '../modes.js';
 
 export type { AuditEntry, LoopWindow, Metric, MetricSample, ServerErrorEntry };
 
@@ -370,6 +371,8 @@ export type PlayerDetail = {
   matches: PlayerMatch[];
   seats: { roomId: string; roomCode: string | null; name: string; departed: boolean }[];
   feedback: { id: number; at: number; category: string; status: string }[];
+  /** Whether the account may pick modes open to testers, and who made it a tester. */
+  tester: Tester | null;
 };
 
 /**
@@ -428,7 +431,8 @@ export type AnalyticsPlayer = {
   rank: number;
   winner: boolean;
   resigned: { turn: number; how: string } | null;
-  pieces: { settlements: number; cities: number; roads: number };
+  /** `ships` only in Open Sea. */
+  pieces: { settlements: number; cities: number; roads: number; ships?: number };
   knights: number;
   longestRoad: boolean;
   largestArmy: boolean;
@@ -436,10 +440,16 @@ export type AnalyticsPlayer = {
   moves: { own: number; bot: number; timer: number };
   /** Times a bot took the seat over while its player was away. */
   standIns: number;
-  /** Seconds from the start of each of its turns to the next, leaving out turns a stand-in played. */
+  /**
+   * Seconds from the start of each of its turns to the next, leaving out turns a stand-in played, and the time
+   * other players took over Open Sea gold picks in them, which is theirs. In Big Table a turn is the player's
+   * own, or their part as Lead; build windows are not counted.
+   */
   turnTime: { turns: number; meanSeconds: number | null; medianSeconds: number | null; botTurns: number };
+  /** Big Table under paired turns: the seconds each of the player's Partner's phases took. */
+  partnerTime?: { phases: number; meanSeconds: number | null; medianSeconds: number | null };
   resources: {
-    /** From dice rolls, by type. */
+    /** From dice rolls, by type, Open Sea's gold picks included. */
     produced: ResourceCounts;
     /** `fromCards`: taken with Year of Plenty or Monopoly. */
     gained: {
@@ -452,6 +462,8 @@ export type AnalyticsPlayer = {
     };
     spent: {
       roads: number;
+      /** Open Sea only. */
+      ships?: number;
       settlements: number;
       cities: number;
       devCards: number;
@@ -480,6 +492,8 @@ export type GameAnalytics = {
   unreadable: number;
   status: 'setup' | 'playing' | 'finished';
   diceMode: string;
+  /** The game's mode, when it is not Classic: the page names some things by it, such as Longest Route. */
+  ruleset?: string;
   victoryPoints: number;
   startedAt: number | null;
   endedAt: number | null;
@@ -498,6 +512,7 @@ export type GameAnalytics = {
     playerId: string | null;
     fromId: string | null;
   }[];
+  /** The robber's moves, and in Open Sea the pirate's, which the same seven or Knight may make instead. */
   robberMoves: {
     turn: number;
     playerId: string;
@@ -506,6 +521,8 @@ export type GameAnalytics = {
     victimId: string | null;
     stole: boolean;
     cause: 'seven' | 'knight';
+    /** Open Sea: the pirate moved, to a sea hex, rather than the robber. */
+    piece?: 'pirate';
   }[];
   /** Exchanges between players, as the game announced them. */
   trades: { turn: number; text: string }[];
@@ -624,3 +641,15 @@ export type RetentionReport = {
   metrics: Metric[];
   csv: string;
 };
+
+/** A game mode on the Modes tab: who may pick it, and whether the console or a start-up switch decided. */
+export type AdminMode = ModeSetting & {
+  name: string;
+  summary: string;
+  seats: { min: number; max: number };
+  bots: boolean;
+};
+
+export type AdminTester = Tester & { name: string | null };
+
+export type AdminModes = { modes: AdminMode[]; testers: AdminTester[]; now: number };

@@ -7,7 +7,7 @@ import type {
   PlayerSort,
   PlayersPage,
 } from '../../server/src/admin/types.js';
-import { useApi } from '../api.js';
+import { api, ApiError, useApi } from '../api.js';
 import { accountLabel, count, relative, short, time } from '../format.js';
 import { Badge, Empty, Failure, Loading, Section, Stat, When } from '../ui.js';
 import type { Tone } from '../ui.js';
@@ -312,6 +312,64 @@ function OnlineNow({ person, presence }: { person: OnlinePerson | null; presence
   );
 }
 
+/** Whether the account's rooms may pick the modes open to testers, and the switch that changes it. */
+function TesterSwitch({
+  userId,
+  tester,
+  onChanged,
+}: {
+  userId: string;
+  tester: Detail['tester'];
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<ApiError>();
+  const toggle = async () => {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      await api(`/api/admin/testers/${encodeURIComponent(userId)}`, {
+        method: 'POST',
+        body: { tester: !tester },
+      });
+      onChanged();
+    } catch (failure) {
+      setProblem(failure instanceof ApiError ? failure : new ApiError(0, 'ERROR', 'Something went wrong.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <div className="footnote tester-line">
+        <span>
+          {tester ? (
+            <>
+              A tester: their rooms may pick the <a href="#/modes">modes</a> open to testers
+              {tester.source === 'environment' && (
+                <>
+                  , as <code>production.env</code> says
+                </>
+              )}
+              .
+            </>
+          ) : (
+            <>
+              Not a tester: their rooms may pick the <a href="#/modes">modes</a> open to everyone.
+            </>
+          )}
+        </span>
+        {tester?.source !== 'environment' && (
+          <button type="button" className="button" disabled={busy} onClick={() => void toggle()}>
+            {tester ? 'Stop testing' : 'Make tester'}
+          </button>
+        )}
+      </div>
+      <Failure error={problem} />
+    </>
+  );
+}
+
 export function PlayerDetail({ userId }: { userId: string }) {
   const { data, error, reload } = useApi<Detail>(`/api/admin/players/${encodeURIComponent(userId)}`, 30_000);
   if (!data) return error ? <Failure error={error} retry={reload} /> : <Loading />;
@@ -330,6 +388,7 @@ export function PlayerDetail({ userId }: { userId: string }) {
           </Badge>
         )}
         {data.online && <Badge tone="good">online</Badge>}
+        {data.tester && <Badge>tester</Badge>}
       </div>
       <div className="grid">
         <Section title="Account">
@@ -353,6 +412,7 @@ export function PlayerDetail({ userId }: { userId: string }) {
           {data.names.length > 1 && (
             <p className="footnote">Also played as {data.names.slice(1).join(', ')}.</p>
           )}
+          <TesterSwitch userId={data.userId} tester={data.tester} onChanged={reload} />
         </Section>
         <Section title="Record">
           <div className="stats">

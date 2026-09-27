@@ -11,6 +11,9 @@ const ACTION_TONE: Record<string, Tone> = {
   'report.retention': 'accent',
   'feedback.resolve': 'good',
   'feedback.reopen': 'neutral',
+  'mode.set': 'accent',
+  'mode.tester_add': 'accent',
+  'mode.tester_remove': 'neutral',
 };
 
 /** "roomCode" becomes "room code". */
@@ -44,6 +47,13 @@ function Target({ entry }: { entry: AuditEntry }) {
   const { target } = entry;
   if (!target) return <span className="muted">—</span>;
   if (target.startsWith('feedback:')) return <a href="#/feedback?status=all">{target}</a>;
+  if (target.startsWith('mode:')) return <a href="#/modes">{target}</a>;
+  if (target.startsWith('player:'))
+    return (
+      <a href={`#/players/${encodeURIComponent(target.slice(7))}`} className="mono" title={target}>
+        player:{short(target.slice(7))}
+      </a>
+    );
   if (ROOM_ID.test(target))
     return (
       <a href={`#/games/${target}`} className="mono" title={target}>

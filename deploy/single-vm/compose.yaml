@@ -30,6 +30,9 @@ services:
       # Optional server-only bot credentials. Empty means deterministic fallback play.
       TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
       CATANOVA_BOT_MODEL: ${CATANOVA_BOT_MODEL:-jev-latest}
+      # Game modes beyond Classic (docs/GAME-MODES.md). Empty means Classic only, for everyone.
+      CATANOVA_MODES: ${CATANOVA_MODES:-}
+      CATANOVA_MODE_TESTERS: ${CATANOVA_MODE_TESTERS:-}
       CATANOVA_REVISION: ${CATANOVA_REVISION:?Set the full deployed Git commit in .env}
       # Admin console (docs/ADMIN.md): a second listener on this private network only. The
       # Cloudflare Tunnel below is the one way in, and every request must also carry a Cloudflare

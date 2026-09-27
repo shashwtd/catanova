@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
+import { generateBoard } from '../packages/rules/src/board.js';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
 import { CORD_HEIGHT, StringLights, cordY } from '../apps/client/src/StringLights.js';
 import {
@@ -10,12 +11,15 @@ import {
   constrainCamera,
   fitBoard,
   maxZoom,
+  OPENING_TOKEN_PX,
+  openingCamera,
   pinchScale,
   wheelScale,
   zoomAt,
 } from '../apps/client/src/camera.js';
 import type { Camera, Point } from '../apps/client/src/camera.js';
-import { WORLD } from '../apps/client/src/scene.js';
+import { islandsBox, WORLD, worldBox } from '../apps/client/src/scene.js';
+import { bareBoard, BIG_TABLE_SHAPE, outerIsles4 } from './board-shapes.js';
 import { FantasyTransition, FANTASY_TRANSITION_MS } from '../apps/client/src/FantasyTransition.js';
 
 test('initial island fit keeps the complete scene in view across narrow and short viewports', () => {
@@ -25,14 +29,14 @@ test('initial island fit keeps the complete scene in view across narrow and shor
     { width: 620, height: 560 },
     { width: 280, height: 190 },
   ]) {
-    const fitted = fitBoard(bounds);
+    const fitted = fitBoard(bounds, WORLD);
     assert.ok(fitted.width <= bounds.width - 24 && fitted.height <= bounds.height - 24 + 1e-8);
     assert.ok(Math.abs(fitted.width / fitted.height - WORLD.width / WORLD.height) < 1e-8);
   }
   assert.ok(wheelScale(1, -10000) < 1.023 && wheelScale(1, 10000) > 0.978);
   assert.equal(pinchScale(1, 200, 100), 2);
   assert.equal(pinchScale(2, 100, 200), 1);
-  const moved = constrainCamera({ scale: 1, x: 40, y: -30 }, { width: 600, height: 600 });
+  const moved = constrainCamera({ scale: 1, x: 40, y: -30 }, { width: 600, height: 600 }, WORLD);
   assert.deepEqual(
     moved,
     { scale: 1, x: 40, y: -30 },
@@ -56,8 +60,10 @@ test('pinch follows finger distance and moving midpoint without depending on eve
     for (let i = 1; i <= steps; i++) {
       const progress = i / steps;
       camera =
-        gesture.update(1, { x: -80 - 40 * progress, y: -15 * progress }, camera, largeBounds) ?? camera;
-      camera = gesture.update(2, { x: 80 + 80 * progress, y: 35 * progress }, camera, largeBounds) ?? camera;
+        gesture.update(1, { x: -80 - 40 * progress, y: -15 * progress }, camera, largeBounds, WORLD) ??
+        camera;
+      camera =
+        gesture.update(2, { x: 80 + 80 * progress, y: 35 * progress }, camera, largeBounds, WORLD) ?? camera;
     }
     return camera;
   }
@@ -80,12 +86,12 @@ test('pinch preserves the island point under the fingers on an already panned ca
   gesture.start(1, a, camera);
   gesture.start(2, b, camera);
   const world = { x: (-10 - camera.x) / camera.scale, y: (-20 - camera.y) / camera.scale };
-  camera = gesture.update(1, { x: -150, y: -90 }, camera, largeBounds) ?? camera;
-  camera = gesture.update(2, { x: 110, y: 10 }, camera, largeBounds) ?? camera;
+  camera = gesture.update(1, { x: -150, y: -90 }, camera, largeBounds, WORLD) ?? camera;
+  camera = gesture.update(2, { x: 110, y: 10 }, camera, largeBounds, WORLD) ?? camera;
   close(world.x * camera.scale + camera.x, -20);
   close(world.y * camera.scale + camera.y, -40);
-  camera = gesture.update(1, a, camera, largeBounds) ?? camera;
-  camera = gesture.update(2, b, camera, largeBounds) ?? camera;
+  camera = gesture.update(1, a, camera, largeBounds, WORLD) ?? camera;
+  camera = gesture.update(2, b, camera, largeBounds, WORLD) ?? camera;
   close(camera.scale, initial.scale);
   close(camera.x, initial.x);
   close(camera.y, initial.y);
@@ -96,16 +102,16 @@ test('lifting one finger continues panning and rejoining starts a fresh pinch wi
   let camera = centered;
   gesture.start(1, { x: -60, y: 0 }, camera);
   gesture.start(2, { x: 60, y: 0 }, camera);
-  camera = gesture.update(2, { x: 100, y: 0 }, camera, phoneBounds) ?? camera;
+  camera = gesture.update(2, { x: 100, y: 0 }, camera, phoneBounds, WORLD) ?? camera;
   gesture.end(2, camera);
   const beforePan = camera;
-  camera = gesture.update(1, { x: -57, y: 4 }, camera, phoneBounds) ?? camera;
+  camera = gesture.update(1, { x: -57, y: 4 }, camera, phoneBounds, WORLD) ?? camera;
   close(camera.x, beforePan.x + 3);
   close(camera.y, beforePan.y + 4);
   close(camera.scale, beforePan.scale);
   gesture.start(3, { x: 120, y: 40 }, camera);
   const beforePinch = camera;
-  camera = gesture.update(3, { x: 120, y: 40 }, camera, phoneBounds) ?? camera;
+  camera = gesture.update(3, { x: 120, y: 40 }, camera, phoneBounds, WORLD) ?? camera;
   assert.deepEqual(camera, beforePinch);
   assert.ok(gesture.blocksClick(1));
   gesture.end(1, camera);
@@ -119,11 +125,11 @@ test('a third contact does not disturb the pair and replaces a lifted contact wi
   gesture.start(1, { x: -50, y: 0 }, camera);
   gesture.start(2, { x: 50, y: 0 }, camera);
   gesture.start(3, { x: 120, y: 80 }, camera);
-  assert.equal(gesture.update(3, { x: 130, y: 80 }, camera, phoneBounds), null);
+  assert.equal(gesture.update(3, { x: 130, y: 80 }, camera, phoneBounds, WORLD), null);
   gesture.end(1, camera);
   assert.deepEqual(gesture.pointerIds, [2, 3]);
-  assert.deepEqual(gesture.update(2, { x: 50, y: 0 }, camera, phoneBounds), camera);
-  camera = gesture.update(3, { x: 150, y: 80 }, camera, phoneBounds) ?? camera;
+  assert.deepEqual(gesture.update(2, { x: 50, y: 0 }, camera, phoneBounds, WORLD), camera);
+  camera = gesture.update(3, { x: 150, y: 80 }, camera, phoneBounds, WORLD) ?? camera;
   assert.ok(camera.scale > 1, 'the remaining two contacts continue pinching');
 });
 
@@ -135,13 +141,13 @@ test('transferring implicit SVG touch capture keeps both fingers active; only re
   assert.equal(gesture.captureLost(1, centered, { fromViewport: false, stillCaptured: true }), false);
   assert.equal(gesture.captureLost(2, centered, { fromViewport: false, stillCaptured: true }), false);
   assert.deepEqual(gesture.pointerIds, [1, 2]);
-  const zoomed = gesture.update(2, { x: 100, y: 0 }, centered, phoneBounds)!;
+  const zoomed = gesture.update(2, { x: 100, y: 0 }, centered, phoneBounds, WORLD)!;
   close(zoomed.scale, 1.5);
   assert.equal(gesture.dragging, true);
   assert.equal(gesture.captureLost(1, zoomed, { fromViewport: true, stillCaptured: true }), false);
   assert.equal(gesture.captureLost(1, zoomed, { fromViewport: true, stillCaptured: false }), true);
   assert.deepEqual(gesture.pointerIds, [2]);
-  const panned = gesture.update(2, { x: 104, y: 3 }, zoomed, phoneBounds)!;
+  const panned = gesture.update(2, { x: 104, y: 3 }, zoomed, phoneBounds, WORLD)!;
   close(panned.x, zoomed.x + 4);
   close(panned.y, zoomed.y + 3);
   assert.ok(gesture.blocksClick(1));
@@ -150,7 +156,7 @@ test('transferring implicit SVG touch capture keeps both fingers active; only re
 test('single taps survive touch jitter, while cancelled gestures suppress pointer clicks but not keyboard activation', () => {
   const gesture = new BoardGesture();
   gesture.start(1, { x: 0, y: 0 }, centered);
-  assert.equal(gesture.update(1, { x: 3, y: 3 }, centered, phoneBounds), null);
+  assert.equal(gesture.update(1, { x: 3, y: 3 }, centered, phoneBounds, WORLD), null);
   gesture.end(1, centered);
   assert.equal(gesture.blocksClick(1), false);
   gesture.start(2, { x: -50, y: 0 }, centered);
@@ -158,7 +164,7 @@ test('single taps survive touch jitter, while cancelled gestures suppress pointe
   gesture.cancel();
   assert.equal(gesture.dragging, false);
   assert.deepEqual(gesture.pointerIds, []);
-  assert.equal(gesture.update(3, { x: 200, y: 20 }, centered, phoneBounds), null);
+  assert.equal(gesture.update(3, { x: 200, y: 20 }, centered, phoneBounds, WORLD), null);
   assert.equal(gesture.blocksClick(1), true);
   assert.equal(gesture.blocksClick(0), false);
   gesture.start(4, { x: 10, y: 10 }, centered);
@@ -167,36 +173,38 @@ test('single taps survive touch jitter, while cancelled gestures suppress pointe
 });
 
 test('camera limits remain bounded, allow useful phone magnification and reverse promptly after overshoot', () => {
-  assert.equal(maxZoom(largeBounds), 2.2);
-  assert.ok(maxZoom(phoneBounds) > 2.2 && maxZoom({ width: 160, height: 240 }) <= 4);
+  assert.equal(maxZoom(largeBounds, WORLD), 2.2);
+  assert.ok(maxZoom(phoneBounds, WORLD) > 2.2 && maxZoom({ width: 160, height: 240 }, WORLD) <= 4);
   const focal = { x: 70, y: -40 };
-  const zoomed = zoomAt(centered, 1.2, focal, phoneBounds);
+  const zoomed = zoomAt(centered, 1.2, focal, phoneBounds, WORLD);
   close((focal.x - zoomed.x) / zoomed.scale, focal.x);
   close((focal.y - zoomed.y) / zoomed.scale, focal.y);
   const gesture = new BoardGesture();
   let camera = centered;
   gesture.start(1, { x: -50, y: 0 }, camera);
   gesture.start(2, { x: 50, y: 0 }, camera);
-  camera = gesture.update(1, { x: -1000, y: 0 }, camera, phoneBounds) ?? camera;
-  camera = gesture.update(2, { x: 1000, y: 0 }, camera, phoneBounds) ?? camera;
-  close(camera.scale, maxZoom(phoneBounds));
-  const smaller = gesture.update(2, { x: 900, y: 0 }, camera, phoneBounds)!;
+  camera = gesture.update(1, { x: -1000, y: 0 }, camera, phoneBounds, WORLD) ?? camera;
+  camera = gesture.update(2, { x: 1000, y: 0 }, camera, phoneBounds, WORLD) ?? camera;
+  close(camera.scale, maxZoom(phoneBounds, WORLD));
+  const smaller = gesture.update(2, { x: 900, y: 0 }, camera, phoneBounds, WORLD)!;
   assert.ok(smaller.scale < camera.scale);
-  assert.deepEqual(constrainCamera(smaller, phoneBounds), smaller);
+  assert.deepEqual(constrainCamera(smaller, phoneBounds, WORLD), smaller);
   gesture.end(2, smaller);
-  const dragged = gesture.update(1, { x: 10000, y: 10000 }, smaller, phoneBounds)!;
+  const dragged = gesture.update(1, { x: 10000, y: 10000 }, smaller, phoneBounds, WORLD)!;
   assert.ok(Math.abs(dragged.x) < 1000 && Math.abs(dragged.y) < 1000);
 });
 
 test('camera presents a straight-down island and a matching wooden world with gestures and no buttons', () => {
-  const html = renderToStaticMarkup(createElement(BoardViewport, { seed: 42, children: 'board' }));
+  const html = renderToStaticMarkup(
+    createElement(BoardViewport, { board: generateBoard(42), children: 'board' }),
+  );
   assert.equal([...html.matchAll(/<button/g)].length, 0);
   assert.match(html, /Scroll or pinch to zoom/);
   assert.ok(!html.includes('rotateX') && !html.includes('rotateY') && !html.includes('zoom-controls'));
   assert.match(html, /class="board-world-surface"/);
   assert.match(html, /patternTransform="translate\(0 0\) scale\(1\)"/);
   const reduced = renderToStaticMarkup(
-    createElement(BoardViewport, { seed: 42, reducedMotion: true, children: 'board' }),
+    createElement(BoardViewport, { board: generateBoard(42), reducedMotion: true, children: 'board' }),
   );
   assert.ok(!reduced.includes('gently tilt'));
 });
@@ -227,7 +235,7 @@ test('new-match curtain has two opposing cloud shapes and a bounded reduced-moti
 
 test('the table is lit, the board is not, and none of the lighting can be clicked', () => {
   const html = renderToStaticMarkup(
-    createElement(BoardViewport, { seed: 7, children: createElement('div', null, 'island') }),
+    createElement(BoardViewport, { board: generateBoard(7), children: createElement('div', null, 'island') }),
   );
   const css = readFileSync('apps/client/src/table-light.css', 'utf8');
   // The lighting is scenery: it must never take a click meant for a corner.
@@ -275,4 +283,27 @@ test('the string of lights still hangs together, for whenever it goes back up', 
   assert.ok(body.includes('pointer-events: none'));
   assert.ok(Number(body.match(/height: (\d+)px/)![1]) <= 56, 'the string stays a small thing');
   assert.match(css, /prefers-reduced-motion[\s\S]*animation: none/);
+});
+
+test('a sea board opens on its islands where the whole frame would draw small tokens, and is still all in reach', () => {
+  const board = outerIsles4(),
+    world = worldBox(board),
+    islands = islandsBox(board)!;
+  const phone = { width: 374, height: 462 },
+    desktop = { width: 1074, height: 754 };
+  // Classic, and any board without sea, always opens on the whole board.
+  assert.deepEqual(openingCamera(phone, WORLD), { scale: 1, x: 0, y: 0 });
+  assert.deepEqual(openingCamera(phone, worldBox(bareBoard(BIG_TABLE_SHAPE))), { scale: 1, x: 0, y: 0 });
+  // A desktop draws the whole frame's tokens large enough.
+  assert.ok((40 * fitBoard(desktop, world).width) / world.width >= OPENING_TOKEN_PX);
+  assert.deepEqual(openingCamera(desktop, world, islands), { scale: 1, x: 0, y: 0 });
+  // A phone opens with the islands filling its width, their tokens nearly Classic's size.
+  const opened = openingCamera(phone, world, islands),
+    unit = fitBoard(phone, world).width / world.width;
+  assert.ok(opened.scale > 1.45 && opened.scale < 1.6, `${opened.scale}`);
+  assert.ok(islands.width * unit * opened.scale <= phone.width - 24 + 1e-9);
+  assert.ok(40 * unit * opened.scale > 15);
+  assert.deepEqual(constrainCamera(opened, phone, world), opened);
+  // Pinching out still shows the whole frame.
+  assert.deepEqual(constrainCamera({ scale: 0.85, x: 0, y: 0 }, phone, world), { scale: 0.85, x: 0, y: 0 });
 });

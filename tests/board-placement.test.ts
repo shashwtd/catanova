@@ -178,7 +178,7 @@ test('terrain retains accessible production odds without native title popups', (
     9,
   );
   assert.equal([...html.matchAll(/viewBox="1536 512 512 512"/g)].length, 9);
-  assert.ok(!html.includes('class="ship-hull"'));
+  assert.ok(!html.includes('class="ship-sail-tint"'));
 });
 
 test('the initial board stays readable and exposes legal sites before any texture downloads', () => {

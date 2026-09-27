@@ -1,11 +1,30 @@
-'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. Rooms support two to four invited players. There is no solo mode or public matchmaking.
+'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. The host can set a different target, from 8 to 15, before the game starts. A table has two to four seats, filled by invited friends or by bots, so one person can also play against bots alone. There is no public matchmaking. This is the Classic mode, the only one playable today; see [[#Choose a mode|Choose a mode]].
 
 == Gather your players ==
 # Continue with Google or as a guest, then choose your username and avatar when prompted. See [[Accounts and friends]].
-# Create a room, or join a friend's room using its code or invitation. An invitation lets you inspect the room before joining.
-# The host chooses the settings. Other players mark themselves ready; the host starts once everyone is present and ready. The host does not need a separate ready check.
+# Create a room, or join a friend's room using its four-character code or invitation link. An invitation lets you inspect the room before joining.
+# Fill the open seats. Share the code or link, or use '''Invite a friend''' on an open seat to invite a Google-linked friend directly. The host can also choose '''Add a bot'''; see [[#Playing with bots|Playing with bots]].
+# Pick one of eight colours under your own card. Your pieces carry no names, so colour is how the table tells them apart. Two players cannot hold the same colour.
+# The host chooses the room settings. Other people mark themselves ready; bots are always ready. The host starts once every seat is connected and ready. The host does not need a separate ready check.
 
-Settings lock when the game starts. Changing them beforehand clears the other players' ready status. New players cannot take a seat after the game has begun, but an existing player can reconnect.
+{| class="wikitable"
+! Room setting !! New rooms !! Choices
+|-
+| Points to win || 10 || Any whole number from 8 to 15
+|-
+| [[Turn timer]] || 90 seconds || 40, 65, 90, 115 or 140 seconds, or off
+|-
+| Dice || Balanced || Balanced or Natural; see [[Map generation]]
+|}
+
+Settings lock when the game starts. Changing them beforehand clears the other people's ready status. Before the start, the host can remove a player from the lobby; that player cannot rejoin it until after the room's next game. New players cannot take a seat after the game has begun. Opening that room's code or link lets them watch instead, and an existing player can reconnect.
+
+== Choose a mode ==
+Every room plays Classic today. Two more [[Game modes|game modes]] are being built and are not yet playable:
+* [[Big Table]], for five and six players, on a larger island. The host chooses whether two players share each turn or everyone gets a short build window between turns.
+* [[Open Sea]], for three or four players, with ships, gold fields, a pirate and bonus points for settling small islands.
+
+When they open, the host will pick the mode in Room setup, beside the other settings. A mode fixes how many seats the table needs, and bots can sit only in Classic, so the lobby refuses a change of mode that the current seats do not fit. See [[Game modes#Choosing a mode|Choosing a mode]].
 
 == Place your first pieces ==
 The server shuffles player order. Each player places a settlement and an attached road, then everyone takes a second placement in reverse order.
@@ -31,7 +50,26 @@ Choose sites with useful resource variety and dice numbers. [[Map generation|Dot
 
 You may also play one eligible [[Development cards|development card]] before rolling or during your action phase. Select a building site to preview it, then confirm '''Build'''. A preview does not spend cards.
 
+== At the table ==
+Each player has a card with their portrait in their colour, their points, and how many resource and development cards they hold. A small plate under the portrait shows their longest road and Knights played; the award holder's number is gold. See [[Awards]].
+
+* '''Reactions:''' twelve drawn faces you can send across the board. A quick burst of up to ten is fine; after that the button rests for a few seconds.
+* '''Move history:''' every public action, grouped by turn. Discarded cards and Year of Plenty picks are named; a stolen card is not.
+* '''Dice statistics''' in the menu: this game's roll totals beside the expected average.
+* '''Add friend:''' hover over or tap another Google player's card to send them a friend request. See [[Accounts and friends]].
+* '''Send feedback''' in the menu: report a problem or an idea without leaving the game.
+
+== Playing with bots ==
+The host fills an open seat with '''Add a bot'''. The server draws one of three kinds: steady, sharp or champion. A champion turns up about one time in five. The seat says only '''Bot''', and each kind has its own small machine mark beside its name. A bot sees what your browser would see from its seat: its own hand, the board and the player cards. It gets no view of other hands, no peek at the deck, and no adjusted dice.
+
+Bots follow the same rules and pause briefly before each move. They trade with the bank and ports but never answer or make player offers. A game with bots still needs a person at the table: when only bots remain connected, the game pauses. Bots also cover a player who loses their connection; see [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
+
+== After the game ==
+The results screen shows the final standings, each player's points, the number of turns, and who held each award. '''Return to lobby''' takes you back to the same room for a rematch. The code, settings, colours and bots stay; a new island is dealt and turn order is shuffled again. People mark themselves ready again and the host starts.
+
+Each person can keep reading the results while others return. The lobby's '''Previous results''' button shows them until the next game starts. '''Back to hub''' leaves the room. A player who resigned does not return to the lobby with the group.
+
 == Playing with two ==
-The two-player option keeps the same island, bank, costs, piece limits, normal turns, and ten-point goal. It adds no neutral players. This is a Catanova variant, not an official two-player ruleset; its balance still needs human playtesting.
+The two-player option keeps the same island, bank, costs, piece limits, normal turns, and points target. It adds no neutral players. This is a Catanova variant, not an official two-player ruleset; its balance still needs human playtesting. Two people can also add one or two bots for a three- or four-seat game.
 
 [[Category:Guides]]

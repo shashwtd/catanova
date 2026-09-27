@@ -43,8 +43,27 @@ const CONTROL_PATHS = {
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7 M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
   feedback:
     'M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-8l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2 M8 9h8 M8 12.5h5',
+  // Three tiles of an island: which game the table plays. Stands in until the painted icon is made.
+  'game-mode':
+    'M8 4l4 2.3v4.6L8 13.2l-4-2.3V6.3z M16 4l4 2.3v4.6l-4 2.3-4-2.3V6.3z M12 10.9l4 2.3v4.6l-4 2.3-4-2.3v-4.6z',
+  // A ship and the way it sails: Open Sea's one ship move a turn.
+  'move-ship': 'M3 15.5h12.5l-2 4H5z M9.5 15.5V4 M9.5 5l5 8h-5 M17 9.5h4.5 m-2-2 2 2-2 2',
+  // Open Sea's ship, and the pennant the pirate sails under. They stand in while the ship's own look is chosen.
+  ship: 'M4 15.5h16l-2.5 4h-11z M12 15.5V3.5 M12 4.5l6 9h-6 M11 6.5l-5 7h5',
+  pirate: 'M6.5 21V3 M6.5 4h12l-3.5 4.25 3.5 4.25h-12',
 } as const;
 export type GameIconName = keyof typeof PAINTED_ICONS | keyof typeof CONTROL_PATHS;
+/**
+ * Open Sea's own symbols, until their painted icons are made (docs/GAME-MODES.md, "New icons"), named here once so
+ * that each swap is one line. The ship and the pirate take line icons, not the painted boat, whose look is being
+ * chosen again; existing painted icons stand in for gold and the island bonus.
+ */
+export const SEA_ICONS = {
+  ship: 'ship',
+  pirate: 'pirate',
+  gold: 'spark',
+  islandBonus: 'trophy',
+} as const satisfies Record<string, GameIconName>;
 export const GAME_ICON_NAMES = [
   ...new Set([...Object.keys(PAINTED_ICONS), ...Object.keys(CONTROL_PATHS)]),
 ] as GameIconName[];
@@ -165,7 +184,8 @@ export const JoinRoom = icon('join'),
   LightClose = icon('light-close'),
   LightCheck = icon('light-check'),
   Configure = icon('configure'),
-  MessageSquare = icon('feedback');
+  MessageSquare = icon('feedback'),
+  GameMode = icon('game-mode');
 
 /**
  * The champion.

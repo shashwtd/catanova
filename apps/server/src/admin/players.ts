@@ -213,5 +213,6 @@ export function playerDetail(context: AdminContext, userId: string): PlayerDetai
         category: row.category as string,
         status: row.status as string,
       })),
+    tester: store.modes.tester(userId),
   };
 }

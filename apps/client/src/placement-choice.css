@@ -1,0 +1,37 @@
+/*
+ * Road or ship, in the placement's confirmation on an Open Sea coastal edge (PlacementChoice.tsx).
+ *
+ * The two options are the confirmation's own buttons (game-dialogs.css), widened to hold a name and, when the
+ * piece is bought, its cost in the small sprites of the development card's Buy button. The chosen one takes the
+ * pressed gold a chosen resource has in a card's details. The selectors keep the shape of the confirmation's
+ * `.placement-confirmation .placement-confirm`, so its other buttons are untouched.
+ */
+.placement-choice {
+  display: flex;
+  gap: 5px;
+}
+.placement-confirmation .placement-option {
+  display: flex;
+  gap: 4px;
+  width: auto;
+  padding: 0 8px 0 6px;
+  font:
+    600 13px Barlow,
+    sans-serif;
+  white-space: nowrap;
+}
+.placement-confirmation .placement-option[aria-pressed='true'] {
+  color: #4a3a26;
+  background: #d9bd73;
+  border-color: #a27b32;
+}
+.placement-option-cost {
+  display: flex;
+  gap: 1px;
+}
+.placement-option-cost > span,
+.placement-option-cost .sprite {
+  display: block;
+  width: 14px;
+  height: 14px;
+}

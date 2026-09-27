@@ -1,0 +1,80 @@
+/**
+ * Board shapes for testing that the board code takes any list of hexes rather than the Classic island alone.
+ * See docs/BIGGER-MAPS-AND-MODES.md.
+ */
+import { isCoastalEdge, OCEAN_RINGS, topology, withOcean } from '../packages/rules/src/board.js';
+import type { Board, BoardShape, Hex } from '../packages/rules/src/board.js';
+
+/** The 5–6 player island, which big-table-balanced-v1 deals. */
+export { BIG_TABLE_SHAPE } from '../packages/rules/src/board.js';
+
+/**
+ * Turns every hex that fails `land` into sea, as Open Sea's presets do, for shapes that no preset deals. The
+ * coast rule asks isLand, which knows sea by name.
+ */
+export function flood<T extends Pick<Board, 'hexes'>>(board: T, land: (hex: Hex) => boolean): T {
+  for (const hex of board.hexes) if (!land(hex)) Object.assign(hex, { terrain: 'sea' });
+  return board;
+}
+/** A whole Board of the given shape for the renderer's functions, with nothing dealt on it. */
+export const bareBoard = (shape: BoardShape): Board => ({
+  seed: 0,
+  preset: 'balanced-v2',
+  ...topology(shape),
+  ports: [],
+});
+
+/** Its land: the main island's rows of 2, 4, 7, 4, 2 and 1, and the four small isles. */
+const OUTER_ISLES_4_LAND = [
+  ...[
+    [-2, 0, 1],
+    [-1, -1, 2],
+    [0, -3, 3],
+    [1, -2, 1],
+    [2, -1, 0],
+    [3, -1, -1],
+  ].flatMap(([r, from, to]) => Array.from({ length: to! - from! + 1 }, (_, k) => `${from! + k},${r}`)),
+  '-1,-3',
+  '-2,-2',
+  '3,-3',
+  '4,-3',
+  '4,-2',
+  '2,2',
+  '1,3',
+  '-4,2',
+  '-4,3',
+  '-3,3',
+];
+/**
+ * Outer Isles for four players (docs/MAP_GENERATION.md): its islands with two rings of ocean round them, as the
+ * outer-isles-v1 preset builds its board.
+ */
+export const OUTER_ISLES_4_SHAPE: BoardShape = withOcean(
+  OUTER_ISLES_4_LAND.map((key) => {
+    const [q, r] = key.split(',').map(Number);
+    return { q: q!, r: r! };
+  }),
+  OCEAN_RINGS,
+);
+/** The four-player Outer Isles frame, all sea but its islands, whose hexes are left as bareBoard deals them. */
+export const outerIsles4 = () =>
+  flood(bareBoard(OUTER_ISLES_4_SHAPE), (h) => OUTER_ISLES_4_LAND.includes(`${h.q},${h.r}`));
+/**
+ * The four-player frame with something on it to draw: a gold field on two small isles, carrying a 9, and one
+ * harbour, on the main island's eastern coast.
+ */
+export function dealtOuterIsles4() {
+  const board = outerIsles4();
+  for (const [q, r] of [
+    [-4, 2],
+    [2, 2],
+  ])
+    Object.assign(
+      board.hexes.find((h) => h.q === q && h.r === r)!,
+      { terrain: 'gold', number: 9 },
+    );
+  const east = board.hexes.find((h) => h.q === 3 && h.r === 0)!;
+  const edge = board.edges.find((e) => e.hexes.includes(east.id) && isCoastalEdge(board, e))!;
+  board.ports = [{ edge: edge.id, resource: 'any' }];
+  return board;
+}

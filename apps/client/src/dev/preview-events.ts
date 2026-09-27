@@ -110,21 +110,26 @@ export function previewEvent(base: Game, me: string, event: PreviewEvent) {
     throw new Error('Preview award route is blocked');
   return { before, after };
 }
-export function previewRobber(base: Game, me: string, mode: Exclude<RobberPreview, 'off'>) {
+/** A seven. At a table of five or six, `everyone` has too many cards, for the longest waiting list. */
+export function previewRobber(base: Game, me: string, mode: Exclude<RobberPreview, 'off'>, everyone = false) {
   const game = ready(base, me);
   if (mode === 'robber') {
     game.phase = 'robber';
     return game;
   }
-  const target = mode === 'discard' ? me : game.players.find((p) => p.id !== me)!.id;
-  fund(game, target, { wood: 3, brick: 3, wheat: 3 });
+  const first = mode === 'discard' ? me : game.players.find((p) => p.id !== me)!.id;
+  const targets = everyone
+    ? game.players.filter((p) => mode === 'discard' || p.id !== me).map((p) => p.id)
+    : [first];
   game.phase = 'discard';
   game.dice = [3, 4];
-  game.discards = {
-    [target]: Math.floor(
+  game.discards = {};
+  for (const target of targets) {
+    fund(game, target, { wood: 3, brick: 3, wheat: 3 });
+    game.discards[target] = Math.floor(
       Object.values(game.players.find((p) => p.id === target)!.hand).reduce((a, b) => a + b, 0) / 2,
-    ),
-  };
+    );
+  }
   return game;
 }
 export function previewTrade(base: Game, me: string, incoming: boolean) {
@@ -142,5 +147,33 @@ export function previewTrade(base: Game, me: string, incoming: boolean) {
   if (!incoming)
     for (const player of game.players.filter((p) => p.id !== me).slice(0, 2))
       game = applyAction(game, player.id, { kind: 'acceptTrade', tradeId: game.trade!.id }, () => 0.34);
+  return game;
+}
+/** Your open offer, answered three ways: three players propose different cards, one declines, one waits. */
+export function previewOpenTrade(base: Game, me: string) {
+  let game = ready(base, me);
+  fund(game, me, { wood: 1 });
+  game = applyAction(game, me, { kind: 'openTrade', give: { ...emptyHand(), wood: 1 } }, () => 0.34);
+  const answers: (Partial<Hand> | 'decline' | null)[] = [
+    { sheep: 1 },
+    { wheat: 1, ore: 1 },
+    { brick: 2, sheep: 1 },
+    'decline',
+    null,
+  ];
+  game.players
+    .filter((p) => p.id !== me)
+    .forEach((player, i) => {
+      const answer = answers[i];
+      if (!answer) return;
+      const tradeId = game.trade!.id;
+      if (answer === 'decline') {
+        game = applyAction(game, player.id, { kind: 'declineTrade', tradeId }, () => 0.34);
+        return;
+      }
+      fund(game, player.id, answer);
+      const give = { ...emptyHand(), ...answer };
+      game = applyAction(game, player.id, { kind: 'proposeTrade', tradeId, give }, () => 0.34);
+    });
   return game;
 }

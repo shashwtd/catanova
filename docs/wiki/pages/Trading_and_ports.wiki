@@ -3,9 +3,11 @@
 == Trade with players ==
 Every completed player trade must include the active player. Both sides must give at least one resource, and the same resource type cannot appear on both sides. Development cards, buildings, gifts, loans, and future payments are not tradeable.
 
-In '''Trade''', select cards for what you give and what you want. A fixed offer specifies both sides. '''? Open to offers''' specifies your contribution and lets opponents propose a return. They may change or withdraw proposals; you choose which one to accept.
+In '''Trade''', select cards for what you give and what you want. A fixed offer specifies both sides. '''? Open to offers''' specifies your contribution and lets opponents propose a return.
 
-Offers do not reserve cards. A trade completes only if both players can still pay. Changing or withdrawing an offer, ending the turn, or taking another active-player game action invalidates its old replies. Opponents may reply to your offer, but cannot trade with each other during your turn.
+You can have '''one live offer''' at a time, with no limit on offers per turn. To offer something different, cancel the current offer first. Each opponent can decline, accept a fixed offer, or propose a return to an open one. An acceptance or proposal stays committed until the offer ends: it cannot be withdrawn or changed. When several opponents are willing, you choose the partner and confirm. In a game with only two players left, accepting a fixed offer completes the trade at once. If every opponent declines, the offer closes.
+
+Offers do not reserve cards. A trade completes only if both players can still pay, and both sides' cards change hands together. Cancelling the offer, ending the turn, or taking another active-player game action ends it and its replies. Opponents may reply to your offer, but cannot trade with each other during your turn. Bots never answer or make player offers; they trade only with the bank and ports.
 
 == Trade with the bank ==
 {| class="wikitable"

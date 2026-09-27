@@ -1,0 +1,28 @@
+/*
+ * Open Sea's gold picks (GoldPick.tsx): the robber flow's panel, discard list and gold button, with Year of
+ * Plenty's resource buttons.
+ *
+ * Those buttons take their parchment colours from a card's details in game-dialogs.css, under the same selectors'
+ * shapes; without these rules they would keep the dark ones meant for the old card panel (polish.css). The discard
+ * list's rows gain a word for each player's place in the order, and keep to their own height: the list runs in a
+ * column (game-guidance.css), where the rows' 120-pixel basis (match-followups.css) would make each that tall.
+ */
+.playing .gold-pick :is(.development-resources button, .plenty-picked button) {
+  color: #55432d;
+  background: #fff2d15e;
+  border-color: #bca07066;
+}
+.playing .gold-pick .development-resources button[aria-pressed='true'] {
+  color: #4a3a26;
+  background: #d9bd73;
+  border-color: #a27b32;
+}
+.gold-pick .discard-player small {
+  color: var(--dialog-muted);
+  font:
+    500 12px Barlow,
+    sans-serif;
+}
+.gold-pick .discard-player {
+  flex: none;
+}

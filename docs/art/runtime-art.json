@@ -151,6 +151,54 @@
       "quality": 88,
       "originalBytes": 457795,
       "bytes": 50294
+    },
+    {
+      "source": "assets/source-art/gold-storybook.png",
+      "legacyUrl": "/art/gold-storybook.png",
+      "url": "/art/optimized/gold-storybook.017351263200.webp",
+      "sha256": "017351263200781dace7b8320408778c180c0f8f7b9bde4e1e58f400a8d0cc75",
+      "sourceSha256": "4ec6cac646214a2bada77d5d6e92a2e54e557a7312c6dc2475a52ec0f5fce8d0",
+      "width": 512,
+      "height": 512,
+      "quality": 78,
+      "originalBytes": 523940,
+      "bytes": 62332
+    },
+    {
+      "source": "assets/source-art/gold-classic.png",
+      "legacyUrl": "/art/gold-classic.png",
+      "url": "/art/optimized/gold-classic.5a9996f0725b.webp",
+      "sha256": "5a9996f0725b4d190f9ce5e718e50dc608188b00a77fd0b82cc170748836bbe2",
+      "sourceSha256": "79534c793c9380f872323dea29e3717eccf90e631e89ac465a2ef3b18f23b904",
+      "width": 512,
+      "height": 512,
+      "quality": 78,
+      "originalBytes": 584738,
+      "bytes": 85302
+    },
+    {
+      "source": "assets/source-art/ship-painted.png",
+      "legacyUrl": "/art/ship-painted.png",
+      "url": "/art/optimized/ship-painted.8c31ede90b16.webp",
+      "sha256": "8c31ede90b1670c0a697bfcfe458f305a94b6be7970b47704abedb4f48b59d91",
+      "sourceSha256": "18043321b9f88f78be572d45060483028342c62cb9f48ecec6feb5351c518949",
+      "width": 130,
+      "height": 256,
+      "quality": 88,
+      "originalBytes": 59777,
+      "bytes": 11540
+    },
+    {
+      "source": "assets/source-art/ship-sail-mask.png",
+      "legacyUrl": "/art/ship-sail-mask.png",
+      "url": "/art/optimized/ship-sail-mask.49ba6ca51b30.webp",
+      "sha256": "49ba6ca51b306820da225c2348e8c6779bbbd0f0dd8f81f1a7e879d5a5a6b48b",
+      "sourceSha256": "4a40187b65139bd0cec11177609abc81e2cb333f3c4c0be182bd45e6248e0f03",
+      "width": 130,
+      "height": 256,
+      "quality": 90,
+      "originalBytes": 4235,
+      "bytes": 2134
     }
   ]
 }

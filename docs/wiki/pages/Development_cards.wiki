@@ -19,12 +19,12 @@ You may play '''one non-Victory-Point development card per turn''', before rolli
 
 Select a held card to review its effect and use its '''Play''' action. Finish that effect before trading or building normally. You may buy several cards in a turn if you can pay and the deck is not empty. Played cards never return to it.
 
-Victory Point cards are different: they count without being played, including on the turn they are bought. They do not use your one-card allowance. They can bring you to ten points and win immediately on your own turn.
+Victory Point cards are different: they count without being played, including on the turn they are bought. They do not use your one-card allowance. They can bring you to the room's [[Awards|points target]] and win immediately on your own turn.
 
 == Useful distinctions ==
 * Knights count toward [[Awards|Largest Army]] only after being played. A Knight can move the robber before you roll.
 * Road Building places roads one at a time. The second may connect to the first; [[Awards|Longest Road]] and victory are checked after each.
-* Year of Plenty takes cards from the bank; Monopoly takes them from opponents. Monopoly may legally collect nothing.
+* Year of Plenty takes cards from the bank; Monopoly takes them from opponents. Monopoly may legally collect nothing. The move history names the cards Year of Plenty took and says how many Monopoly collected.
 * Unplayed cards are private. They cannot be traded, stolen, or discarded as resources.
 
 == Provisional rare cases ==

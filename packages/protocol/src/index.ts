@@ -32,6 +32,7 @@ export {
 } from './colors.js';
 export type { PlayerColor } from './colors.js';
 import { parseGameAction } from '../../rules/src/game.js';
+import { isRulesetId } from '../../rules/src/rulesets.js';
 import type { GameAction, GameView } from '../../rules/src/game.js';
 import type { Board } from '../../rules/src/board.js';
 export const PROTOCOL_VERSION = 1;
@@ -92,6 +93,11 @@ export type RoomState = {
   historyRevision?: number;
   round?: number;
   settings?: RoomSettings;
+  /**
+   * The modes the host may pick, as ruleset ids, Classic first. Sent to the host alone, and only when there is
+   * more than Classic to pick: absent, the host may pick Classic only.
+   */
+  modes?: string[];
   turnClock?: TurnClock;
   serverNow?: number;
   paused?: boolean;
@@ -115,6 +121,12 @@ export type ClientMessage =
       roomId?: string;
       accessToken?: string;
       preloadGame?: boolean;
+      /**
+       * The rulesets this tab can draw, by id, like `preloadGame` a capability rather than a new protocol
+       * version. A tab from before modes sends none and can draw Classic only; the server keeps it out of any
+       * other mode's room (CLIENT_UPDATE_REQUIRED).
+       */
+      rulesets?: string[];
       profile?: Profile;
     }
   | { type: 'increment'; commandId: string; expectedRevision: number }
@@ -166,6 +178,13 @@ export type ServerMessage =
   /** A friend came online, went offline or changed where they can be watched. */
   | { type: 'friend'; friend: FriendPresenceChange };
 
+/**
+ * The rulesets a tab says it can draw, as ids. Never a reason to refuse a handshake: a client from a later
+ * release must still reconnect after a rollback, whatever it lists. Anything that is not a ruleset id, and any
+ * repeat, is dropped, and at most 32 are kept; a value that is not a list is ignored altogether.
+ */
+const drawableRulesets = (value: unknown[]) => [...new Set(value.filter(isRulesetId))].slice(0, 32);
+
 /** Bounds and a strict operation whitelist keep untrusted messages out of the store. */
 export function parseClientMessage(input: string): ClientMessage {
   const m: unknown = JSON.parse(input);
@@ -190,6 +209,7 @@ export function parseClientMessage(input: string): ClientMessage {
       ...(typeof v.accessToken === 'string' ? { accessToken: v.accessToken } : {}),
       ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
       ...(v.preloadGame === true ? { preloadGame: true } : {}),
+      ...(Array.isArray(v.rulesets) ? { rulesets: drawableRulesets(v.rulesets) } : {}),
     };
   }
   if (

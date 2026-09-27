@@ -1,0 +1,27 @@
+/* Open Sea on the board: ships and the pirate, painted ships whose sails take
+   their colour (docs/art/ship.md), and the stage of a board with sea. */
+.ship-plinth {
+  fill: #26373170;
+  stroke: none;
+}
+/* The painted ship's sail takes the seat colour by multiplying it over the white
+   cloth, so the painting's shading shows through (Board.tsx, ShipShape). */
+.ship-sail-tint {
+  mix-blend-mode: multiply;
+}
+/* The pirate: the same painted ship in the robber's colours (.robber-piece in
+   style.css), its hull darkened and its sail dyed near-black. */
+.pirate-piece .pirate-hull {
+  fill: #2b3442;
+  opacity: 0.8;
+  mix-blend-mode: multiply;
+}
+.pirate-piece .pirate-sail {
+  fill: #172231;
+  mix-blend-mode: multiply;
+}
+/* The islands cast the stage's drop shadow on the water (Terrain.tsx), so the
+   sea's own edge does not cast one on the table. */
+.board-camera .sea-stage {
+  filter: none;
+}

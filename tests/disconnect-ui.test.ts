@@ -101,3 +101,21 @@ test('profiles and turn prompts distinguish reconnecting, paused, resigned and r
   assert.equal(gameStatus(view, 'b', room).favicon, null);
   assert.ok(!gameStatus(view, 'b', room).title.includes('wins'));
 });
+
+test('in a mode without stand-ins the empty chair counts down to the clock’s forced moves, not to a bot', () => {
+  const render = (props: Parameters<typeof DisconnectStatus>[0]) =>
+    renderToStaticMarkup(createElement(DisconnectStatus, props));
+  const waiting = render({ deadline: 181000, now: 1000, forcedMovesAt: 93000 });
+  assert.match(waiting, /<span>Auto moves in<\/span><b[^>]*>1:32<\/b>/);
+  assert.match(waiting, /title="The clock makes this seat’s forced moves after 2 minutes away/);
+  assert.ok(!waiting.includes('A bot'), 'no bot is coming');
+  const moving = render({ deadline: 181000, now: 93000, forcedMovesAt: 93000 });
+  assert.match(moving, /<span>Clock plays forced moves<\/span>/);
+  // An empty table is still an empty table: the abandonment countdown is the one that matters then.
+  assert.match(
+    render({ deadline: 181000, now: 1000, paused: true, forcedMovesAt: 93000 }),
+    /Abandoned in.*3:00/,
+  );
+  // Classic's chair is unchanged.
+  assert.match(render({ deadline: 181000, now: 1000 }), />Away</);
+});

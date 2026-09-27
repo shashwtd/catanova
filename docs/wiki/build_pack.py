@@ -12,7 +12,7 @@ OUTPUT = ROOT / "catanova-wiki.xml"
 NAMESPACE = "http://www.mediawiki.org/xml/export-0.11/"
 XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace"
 XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
-TIMESTAMP = "2026-09-09T00:00:00Z"
+TIMESTAMP = "2026-09-26T00:00:00Z"
 PAGES = [
     ("Main_Page", "Main Page", 0),
     ("Getting_started", "Getting started", 0),
@@ -22,6 +22,9 @@ PAGES = [
     ("Development_cards", "Development cards", 0),
     ("Awards", "Awards", 0),
     ("Map_generation", "Map generation", 0),
+    ("Game_modes", "Game modes", 0),
+    ("Big_Table", "Big Table", 0),
+    ("Open_Sea", "Open Sea", 0),
     ("Turn_timer", "Turn timer", 0),
     ("Accounts_and_friends", "Accounts and friends", 0),
     ("FAQ", "FAQ", 0),

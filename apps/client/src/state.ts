@@ -16,7 +16,12 @@ export function snapshotProblem(current: RoomState | null, next: RoomState): str
   if ((next.round ?? 0) > (current.round ?? 0) && next.revision > current.revision) return null;
   if (!current.game) return null;
   if (!next.game) return 'Started game missing from snapshot';
-  if (next.game.board.seed !== current.game.board.seed) return 'The saved island changed';
+  // A seed deals one island per preset, so the two together say which island this is (scene.ts boardKey).
+  if (
+    next.game.board.seed !== current.game.board.seed ||
+    next.game.board.preset !== current.game.board.preset
+  )
+    return 'The saved island changed';
   if (next.game.turn < current.game.turn) return 'Turn moved backwards';
   for (const [edge, owner] of Object.entries(current.game.roads))
     if (next.game.roads[Number(edge)] !== owner) return 'A committed road is missing';

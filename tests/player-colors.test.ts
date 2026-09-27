@@ -10,6 +10,7 @@ import {
   PLAYER_COLOR_LIST,
   PLAYER_COLORS,
   availableColors,
+  isPlayerColor,
   seatColors,
 } from '../packages/protocol/src/colors.js';
 import {
@@ -57,6 +58,71 @@ test('two seats can never end up the same colour, whatever the stored data says'
     [{ color: 'bronze' }, { color: 'slate' }, {}, {}],
   ])
     assert.equal(new Set(seatColors(seats)).size, seats.length);
+});
+
+/** `seatColors` as it was before five and six seats, kept to prove small tables did not move. */
+function seatColorsBeforeBigTables(seats: readonly { color?: string | null }[]) {
+  const taken = new Set<string>();
+  const chosen = seats.map((seat) => {
+    if (!isPlayerColor(seat.color) || taken.has(seat.color)) return null;
+    taken.add(seat.color);
+    return seat.color;
+  });
+  const spare = [...DEFAULT_SEAT_COLORS, ...PLAYER_COLOR_LIST].filter((color) => !taken.has(color));
+  let next = 0;
+  return chosen.map((color) => color ?? spare[next++] ?? PLAYER_COLOR_LIST[0]);
+}
+/** Every table of `size` seats where each seat asked for nothing, nonsense, or one of the palette. */
+function* tables(size: number, answers: readonly ({ color?: string | null } | undefined)[]) {
+  const seats = Array.from({ length: size }, () => 0);
+  while (true) {
+    yield seats.map((answer) => answers[answer] ?? {});
+    let place = size - 1;
+    while (place >= 0 && seats[place] === answers.length - 1) seats[place--] = 0;
+    if (place < 0) return;
+    seats[place]!++;
+  }
+}
+const ANSWERS = [
+  undefined,
+  { color: null },
+  { color: 'chartreuse' },
+  ...PLAYER_COLOR_LIST.map((color) => ({ color })),
+];
+
+test('tables of up to four resolve exactly as they did before five and six seats', () => {
+  let checked = 0;
+  for (let size = 0; size <= 4; size++)
+    for (const seats of tables(size, ANSWERS)) {
+      assert.deepEqual(seatColors(seats), seatColorsBeforeBigTables(seats), JSON.stringify(seats));
+      checked++;
+    }
+  assert.equal(checked, 1 + 11 + 11 ** 2 + 11 ** 3 + 11 ** 4);
+});
+
+test('a fifth and sixth seat get jade and rose, and no table of six repeats a colour', () => {
+  // The old list came round to coral and sky again.
+  assert.deepEqual(seatColors([{}, {}, {}, {}, {}, {}]), [...DEFAULT_SEAT_COLORS, 'jade', 'rose']);
+  assert.deepEqual(seatColors([{}, {}, {}, {}, {}]), [...DEFAULT_SEAT_COLORS, 'jade']);
+  // A seat that chose jade takes it off the spare list, so the sixth seat gets rose.
+  assert.deepEqual(seatColors([{ color: 'jade' }, {}, {}, {}, {}, {}]), [
+    'jade',
+    'coral',
+    'sky',
+    'violet',
+    'amber',
+    'rose',
+  ]);
+  for (const size of [5, 6])
+    for (const seats of tables(size, [undefined, { color: 'chartreuse' }, ...ANSWERS.slice(3)])) {
+      const resolved = seatColors(seats);
+      assert.equal(new Set(resolved).size, size, JSON.stringify(seats));
+      // Whoever asked first for a colour still has it.
+      seats.forEach((seat, i) => {
+        if (seat.color && seats.findIndex((s) => s.color === seat.color) === i && isPlayerColor(seat.color))
+          assert.equal(resolved[i], seat.color);
+      });
+    }
 });
 
 test('the palette on offer is everything nobody else is holding', () => {

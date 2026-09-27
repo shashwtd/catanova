@@ -93,6 +93,8 @@ export class Connection {
       accessToken?: () => Promise<string | undefined>;
       pending?: PendingCommand;
       preloadGame?: boolean;
+      /** The rulesets this tab can draw, sent on joining so the server keeps it out of any other mode. */
+      rulesets?: readonly string[];
       minRetryMs?: number;
       maxRetryMs?: number;
       pingIntervalMs?: number;
@@ -215,6 +217,7 @@ export class Connection {
           version: PROTOCOL_VERSION,
           ...this.session,
           ...(this.options.preloadGame ? { preloadGame: true } : {}),
+          ...(this.options.rulesets ? { rulesets: [...this.options.rulesets] } : {}),
           ...(accessToken ? { accessToken } : {}),
         });
       } catch (error) {

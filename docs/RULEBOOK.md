@@ -8,6 +8,8 @@ Catanova rooms accept **two to four invited players**, with no solo mode or publ
 
 This document specifies the base-game target for three/four players and the mechanics reused by the two-player option. An early playable engine now implements the ordinary flow. The app defaults to a separately named [balanced island preset](MAP_GENERATION.md); [playtest notes](PLAYTEST.md) list setup/UI differences and two provisional rare-card decisions. Extensions, expansions and tournaments remain separate rulesets.
 
+Two planned modes have their own rulebooks: [Big Table](RULEBOOK-BIG-TABLE.md), for five and six players (ruleset `big-table-v1`), and [Open Sea](RULEBOOK-OPEN-SEA.md) (ruleset `open-sea-v1`). Neither is playable yet. Catanova calls the game this rulebook describes Classic, the name it will carry in the mode picker. [Game modes](GAME-MODES.md) has the plan.
+
 ## 1. What you are trying to do
 
 Be the first player with at least **10 victory points during your own turn**. The game ends immediately when that happens. Players do not get an equalizing final round.

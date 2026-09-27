@@ -105,7 +105,16 @@ test('local CI validates Compose with the workflow placeholders and a clean envi
   });
   // Values that alter the build, the bots or the admin listener must not leak from a developer
   // shell into the gate.
-  for (const name of ['GA_MEASUREMENT_ID', 'TYPESAFE_API_KEY', 'SUPABASE_URL', 'NODE_ENV', 'ADMIN_PORT'])
+  for (const name of [
+    'GA_MEASUREMENT_ID',
+    'TYPESAFE_API_KEY',
+    'SUPABASE_URL',
+    'NODE_ENV',
+    'ADMIN_PORT',
+    // Which game modes the server opens, which would change what the tests see.
+    'CATANOVA_MODES',
+    'CATANOVA_MODE_TESTERS',
+  ])
     assert.ok(SCRUBBED_VARIABLES.includes(name), name);
 });
 

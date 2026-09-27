@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { decodeState } from '../../apps/server/src/journal.js';
+import { findRuleset } from '../../packages/rules/src/rulesets.js';
 
 type AccountType = 'guest' | 'permanent' | 'unknown';
 type Outcome = 'points' | 'resignation' | 'abandoned' | 'running' | 'finishedUnknown';
@@ -86,11 +87,12 @@ export function readMatches(db: DatabaseSync): {
     const compactRow = row.state === '' || row.state === '{}';
     const board = compactRow ? (boardQuery?.get(row.board_hash)?.board as string | undefined) : undefined;
     const game = !compactRow
-      ? (JSON.parse(row.state) as { phase?: string; finishReason?: string })
+      ? (JSON.parse(row.state) as { phase?: string; finishReason?: string; ruleset?: string })
       : row.state_z && board
         ? decodeState(row.state_z, board)
         : undefined;
-    return game ? { phase: game.phase, reason: game.finishReason } : undefined;
+    // A game in a mode this version does not know is not read, as if its last row were missing.
+    return game && findRuleset(game.ruleset) ? { phase: game.phase, reason: game.finishReason } : undefined;
   };
   const actionsQuery =
     db.prepare(`SELECT actor,public_entry,${cols.has('actor_kind') ? 'actor_kind' : 'NULL AS actor_kind'} FROM game_events

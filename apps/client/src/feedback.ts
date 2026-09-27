@@ -1,7 +1,9 @@
 import type { RoomState } from '../../../packages/protocol/src/index.js';
-import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
+import { RESOURCES, RESOURCE_NAMES } from '../../../packages/rules/src/index.js';
+import { CLASSIC, findRuleset, routeAwardName } from '../../../packages/rules/src/rulesets.js';
 import type { Resource } from '../../../packages/rules/src/index.js';
 import { CARD_NAMES, emptyHand, total } from '../../../packages/rules/src/game.js';
+import { producedResource } from '../../../packages/rules/src/sea.js';
 import type { CardKind, GameView, Hand } from '../../../packages/rules/src/game.js';
 import type { SoundCue } from './sound.js';
 export type FlightIntent = {
@@ -17,7 +19,8 @@ export type FeedbackEvent = {
   /** Stable committed roll identity, independent of later room/presence revisions. */
   diceId?: string;
   notices: string[];
-  cardPlay?: { kind: Exclude<CardKind, 'victoryPoint'>; playerName: string };
+  /** A card played, and whether in Open Sea, where a Knight and Road Building do more. */
+  cardPlay?: { kind: Exclude<CardKind, 'victoryPoint'>; playerName: string; sea?: true };
   sounds: SoundCue[];
   flights: FlightIntent[];
   glowHexes: number[];
@@ -107,17 +110,20 @@ export function publicProduction(
   const sum = dice[0] + dice[1];
   if (sum === 7 || before.robber !== next.robber) return null;
   const owed = new Map(before.players.map((p) => [p.id, emptyHand()]));
-  for (const hex of before.board.hexes)
-    if (hex.number === sum && hex.id !== before.robber && hex.terrain !== 'desert')
+  for (const hex of before.board.hexes) {
+    // A desert, the sea and a gold field pay no resource of their own: gold is picked afterwards.
+    const resource = producedResource(hex);
+    if (hex.number === sum && hex.id !== before.robber && resource)
       for (const vertex of hex.vertices) {
         const building = before.buildings[vertex];
         if (building) {
           if (before.players.find((player) => player.id === building.player)?.resigned) continue;
           const payment = owed.get(building.player);
           if (!payment) return null;
-          payment[hex.terrain] += building.kind === 'city' ? 2 : 1;
+          payment[resource] += building.kind === 'city' ? 2 : 1;
         }
       }
+  }
   const paid = new Map(before.players.map((p) => [p.id, emptyHand()]));
   for (const resource of RESOURCES) {
     const recipients = [...owed].filter(([, hand]) => hand[resource] > 0),
@@ -149,9 +155,10 @@ export function publicProduction(
 }
 /** Trade sounds use canonical public evidence, including equal-count trades invisible to observers' hands. */
 function traded(before: GameView, next: GameView, lines: string[]): boolean {
+  // A turn's actions, or Big Table's Partner's phase, where the Partner trades with the bank.
   if (
-    before.phase !== 'actions' ||
-    next.phase !== 'actions' ||
+    (before.phase !== 'actions' && before.phase !== 'partner') ||
+    next.phase !== before.phase ||
     before.turn !== next.turn ||
     before.active !== next.active ||
     before.robber !== next.robber ||
@@ -246,6 +253,12 @@ export function deriveFeedback(
       event.sites.push(`[data-road-id="${id}"]`);
       event.sounds.push('road');
     }
+  // Open Sea: a ship built, or moved to a new edge, lands like a road.
+  for (const id of Object.keys(g.ships ?? {}))
+    if (!before.ships?.[Number(id)]) {
+      event.sites.push(`[data-ship-id="${id}"]`);
+      event.sounds.push('road');
+    }
   const production = dice ? publicProduction(before, g, dice) : null;
   if (dice) {
     event.sounds.push('dice');
@@ -253,24 +266,25 @@ export function deriveFeedback(
       ? new Map([...production].map(([id, hand]) => [id, { ...hand }]))
       : new Map<string, Hand>();
     for (const hex of before.board.hexes) {
-      if (hex.number !== dice[0] + dice[1] || hex.id === before.robber || hex.terrain === 'desert') continue;
+      const resource = producedResource(hex);
+      if (hex.number !== dice[0] + dice[1] || hex.id === before.robber || !resource) continue;
       for (const [id, payment] of remaining) {
         const units = hex.vertices.reduce(
           (n, v) =>
             n + (before.buildings[v]?.player === id ? (before.buildings[v]!.kind === 'city' ? 2 : 1) : 0),
           0,
         );
-        const amount = Math.min(units, payment[hex.terrain]);
+        const amount = Math.min(units, payment[resource]);
         if (!amount) continue;
         event.glowHexes.push(hex.id);
         event.flights.push({
-          resource: hex.terrain,
+          resource,
           amount,
           from: `[data-effect-hex="${hex.id}"]`,
-          to: id === me ? card(hex.terrain) : `[data-player-profile="${id}"]`,
+          to: id === me ? card(resource) : `[data-player-profile="${id}"]`,
         });
-        payment[hex.terrain] -= amount;
-        if (id === me) gain[hex.terrain] -= amount;
+        payment[resource] -= amount;
+        if (id === me) gain[resource] -= amount;
       }
     }
   }
@@ -293,7 +307,10 @@ export function deriveFeedback(
       });
     if (hand[r] < old[r]) {
       const spent = old[r] - hand[r];
-      const purchaseCost = Math.min(spent, purchasedCards * COSTS.developmentCard[r]);
+      const purchaseCost = Math.min(
+        spent,
+        purchasedCards * (findRuleset(g.ruleset) ?? CLASSIC).costs.developmentCard[r],
+      );
       if (purchaseCost)
         event.flights.push({
           resource: r,
@@ -329,7 +346,7 @@ export function deriveFeedback(
     }
   if (event.flights.some((f) => !f.spending && f.resource !== 'any')) event.sounds.push('gain');
   if (event.flights.some((f) => f.spending)) event.sounds.push('spend');
-  if (before.robber !== g.robber) event.sounds.push('robber');
+  if (before.robber !== g.robber || before.pirate !== g.pirate) event.sounds.push('robber');
   const resignation = g.players.some(
     (p) => p.resigned && !before.players.find((q) => q.id === p.id)?.resigned,
   );
@@ -346,20 +363,28 @@ export function deriveFeedback(
     event.sounds.push('development');
   if (!dice && !event.sites.length && traded(before, g, lines)) event.sounds.push('trade');
   if (resignation && !g.winner) event.sounds.push('warning');
-  if (!resignation && !g.winner && g.turn > before.turn && before.players[before.active]?.id === me)
+  // Passing on: a turn ends, or in Big Table a Lead's part, a Partner's phase or a build window.
+  const passed =
+    g.turn > before.turn ||
+    (g.active !== before.active && ['actions', 'partner', 'buildWindow'].includes(before.phase));
+  if (!resignation && !g.winner && passed && before.players[before.active]?.id === me)
     event.sounds.push('pass');
   if (g.winner && !before.winner) event.sounds.push('win');
   for (const line of lines)
     for (const player of g.players)
       for (const kind of ['knight', 'roadBuilding', 'yearOfPlenty', 'monopoly'] as const)
         if (line === `${player.name} played ${CARD_NAMES[kind]}.`)
-          event.cardPlay = { kind, playerName: player.name };
+          event.cardPlay = {
+            kind,
+            playerName: player.name,
+            ...(findRuleset(g.ruleset)?.sea ? { sea: true as const } : {}),
+          };
   event.notices = lines
     .filter((s) => !s.endsWith("'s turn.") && !before.players.some((player) => rollFaces(s, player.name)))
     .filter(
       (s) =>
         !g.players.some((player) =>
-          ['Longest Road', 'Largest Army'].some(
+          ['Longest Road', 'Longest Route', 'Largest Army'].some(
             (award) => s === `${player.name} claimed ${award} (+2 points).`,
           ),
         ),
@@ -377,8 +402,10 @@ export type AwardCelebration = {
   id: string;
   /** The snapshot that earned it; the celebration waits until the board shows that move. */
   revision: number;
-  kind: 'longestRoad' | 'largestArmy';
-  name: 'Longest Road' | 'Largest Army';
+  /** The two awards, or Open Sea's island bonus, celebrated the same way once for each island. */
+  kind: 'longestRoad' | 'largestArmy' | 'islandBonus';
+  /** Open Sea calls the route award Longest Route. */
+  name: 'Longest Road' | 'Longest Route' | 'Largest Army' | 'Island bonus';
   playerId: string;
   playerName: string;
   previousPlayerName?: string;
@@ -391,7 +418,7 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
     return [];
   const before = previous.game,
     game = next.game;
-  return (['longestRoad', 'largestArmy'] as const).flatMap((kind) => {
+  const awards = (['longestRoad', 'largestArmy'] as const).flatMap((kind): AwardCelebration[] => {
     const owner = game[kind];
     if (!owner || owner === before[kind]) return [];
     const player = game.players.find((p) => p.id === owner);
@@ -401,7 +428,7 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
         id: `${next.roomId}:${next.revision}:${kind}`,
         revision: next.revision,
         kind,
-        name: kind === 'longestRoad' ? 'Longest Road' : 'Largest Army',
+        name: kind === 'longestRoad' ? routeAwardName(findRuleset(game.ruleset)) : 'Largest Army',
         playerId: owner,
         playerName: player.name,
         previousPlayerName: before.players.find((p) => p.id === before[kind])?.name,
@@ -410,6 +437,25 @@ export function deriveAwardCelebrations(previous: RoomState | null, next: RoomSt
       },
     ];
   });
+  // Open Sea: a player's first settlement on a small island, whoever settled it before (section 12.2).
+  const islands = game.players.flatMap((player): AwardCelebration[] => {
+    const count = game.islandBonuses?.[player.id]?.length ?? 0;
+    return count > (before.islandBonuses?.[player.id]?.length ?? 0)
+      ? [
+          {
+            id: `${next.roomId}:${next.revision}:islandBonus:${player.id}`,
+            revision: next.revision,
+            kind: 'islandBonus',
+            name: 'Island bonus',
+            playerId: player.id,
+            playerName: player.name,
+            count,
+            minimum: 1,
+          },
+        ]
+      : [];
+  });
+  return islands.length ? [...awards, ...islands] : awards;
 }
 /** Separate from coalesced card effects: a fast move cannot erase an award or its later transfer. */
 export class AwardPresentationQueue {

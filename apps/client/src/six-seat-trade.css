@@ -1,0 +1,36 @@
+/*
+ * Four or five people to trade with.
+ *
+ * A table of five or six can leave four or five partners, and TradePanel marks
+ * the row with `data-partners` only when there are more than three, which a
+ * table of four never has. The selectors match the rules they override, with
+ * the mark inside `:where()` so it adds no specificity.
+ */
+
+/* A partner's offered cards took the whole height of the button, squeezing
+   the portrait and the name out of view, and their counts were the pale cream
+   meant for a dark panel. They take only their own height and the partner's
+   ink. */
+:where(.trade-partners[data-partners]) .trade-partner .resource-summary {
+  flex-basis: auto;
+}
+:where(.trade-partners[data-partners]) .trade-partner .resource-summary b {
+  color: inherit;
+}
+
+/* The panel on an upright phone is 355 pixels wide, and one row gave each
+   partner about 60: half a portrait and a few letters of a name. There they
+   wrap, two by two or three and two centred, each about as wide as one of
+   three. The wider panel of a landscape phone or a desktop keeps one row. */
+@media (max-width: 700px) and (orientation: portrait) {
+  .playing .trade-partners:where([data-partners]) {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .trade-partners:where([data-partners='4']) .trade-partner {
+    flex: 0 1 calc((100% - 8px) / 2);
+  }
+  .trade-partners:where([data-partners='5']) .trade-partner {
+    flex: 0 1 calc((100% - 2 * 8px) / 3);
+  }
+}

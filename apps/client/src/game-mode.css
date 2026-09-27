@@ -1,0 +1,39 @@
+/*
+ * The game mode: its section in Room setup and its chip in the lobby.
+ *
+ * Both are built from existing parts, so almost everything comes from the rules
+ * they share: the section is the dice fieldset with the same option cards, so
+ * today's selected and hover states apply, and the chip is one more button in
+ * the lobby's option strip. This sheet owns the one state neither had: a mode
+ * the host cannot switch to yet. The card fades like a disabled seat control,
+ * its text goes muted, and its small line gives the reason. The selectors keep
+ * the shape of the selected-card rules in game-dialogs.css, so nothing else on
+ * the card changes weight.
+ */
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option)[data-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+.game-world .settings-menu :is(.settings-theme > label, .settings-dice-option)[data-disabled='true']:hover {
+  background: transparent;
+  border-color: transparent;
+}
+.game-world .settings-menu .settings-dice-option[data-disabled='true'] :is(strong, small) {
+  color: var(--dialog-muted);
+}
+
+/* Four chips do not fit a phone's width in one row. Wrapped as they come, the
+   fourth would sit alone on a second row with a divider floating at its start,
+   so with the mode chip they sit two by two, with a divider inside each pair.
+   The attribute is there only while the mode chip is, so Classic's three-chip
+   strip is untouched. */
+@media (max-width: 650px) {
+  .room-lobby .lobby-room-options[data-mode] {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    justify-content: center;
+  }
+  .room-lobby .lobby-room-options[data-mode] > button:nth-child(odd) {
+    border-left-color: transparent;
+  }
+}

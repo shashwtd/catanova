@@ -1,35 +1,62 @@
-'''Accounts''' give your username, avatar, and room seats a persistent identity. Catanova supports Google sign-in and temporary guest accounts.
+'''Accounts''' give your username, avatar, record, and room seats a persistent identity. Catanova supports Google sign-in and temporary guest accounts.
 
 {| class="wikitable"
 ! Feature !! Guest !! Google-linked account
 |-
 | Join and create rooms || Yes || Yes
+|-
 | Choose a game avatar || Yes || Yes
-| Use a verified Google photo || No || Yes
+|-
+| Keep a record of wins and past games || Yes || Yes
+|-
+| Watch a game from its code or link || Yes || Yes
+|-
 | Send and receive friend requests || No || Yes
+|-
+| Invite friends to a room, see them online, watch their games || No || Yes
+|-
 | Keep a guest username when linking || Yes, link before expiry || Same identity is retained
 |}
 
 == Your name and avatar ==
 Usernames contain 3–20 letters, numbers, or underscores, using A–Z and a–z. They are unique without regard to capitalization: River and river cannot belong to different accounts. Your chosen capitalization is kept.
 
-Choose from twelve game avatars. A Google-linked player may also use their verified Google photo.
+Choose from twelve game avatars. Catanova does not use your Google name or photo. Once a game starts, it keeps the names and avatars its players had at the start.
+
+== Your record ==
+After signing in you arrive at your hub, which shows your avatar, wins, games played, recent matches, and friends. Your profile lists past games with their outcome, turns, date, and each player's score.
+
+Wins and games played count only games that finished with a winner. A player who resigned receives a loss when that game finishes. An abandoned game counts toward neither total. If you still hold a seat in an unfinished game, its entry in your match history offers '''Return to game'''.
 
 == Guest expiry ==
 A guest identity expires after '''seven days without confirmed account activity'''. Closing a tab does not immediately erase it. Clearing browser storage or signing out can lose access to that anonymous identity sooner, so link Google before relying on access from another device.
 
-Linking Google before expiry retains your username, avatar, and ownership of your room seats. If that Google account already belongs to a different account, linking is refused rather than silently merging them or replacing the guest.
+Linking Google before expiry retains your username, avatar, record, and ownership of your room seats. If that Google account already belongs to a different account, linking is refused rather than silently merging them or replacing the guest.
 
 Expiry releases the username and removes access to the guest's old seats. It does not erase pieces or history from a saved game.
 
 == Friends ==
 Both players must link Google before they can become friends. Guests cannot send, receive, or accept friend requests; the app prompts them to connect an account.
 
-Search with at least three characters from the beginning of a username. A request becomes a friendship only when the recipient accepts it.
+Search with at least three characters from the beginning of a username. At a table, you can also hover over or tap another Google player's card and choose '''Add friend''', or accept their request if they asked first. A request becomes a friendship only when the recipient accepts it.
+
+Friends see each other as '''Online''' while Catanova is open in any tab, even a background one. About ten seconds after your last tab closes, you show as offline. Offline friends show when they were last online, unless they turn off '''Show when you were last online''' under Settings → Privacy. It is on by default. Only confirmed friends see any of this.
+
+* '''Invite:''' the '''Invite a friend''' button on an open lobby seat sends a room invitation. It expires after five minutes.
+* '''Watch:''' when a friend is online and playing an unfinished game, a '''Watch''' button opens it. Friends never see which room you are in unless it is a game they can watch.
+
+== Watching a game ==
+Opening the code or link of a game that has already started, without a seat in it, shows the game as a spectator. You see the public view only: the board, player cards, dice, and move history, but no hands. Spectators cannot move, trade, or send reactions. Up to 24 people can watch one game. Choose '''Stop watching''' to leave.
 
 == Leaving and reconnecting ==
-Leaving a lobby frees the seat. If the host leaves, another remaining player becomes host. Leaving or disconnecting during a started game preserves the player's seat, pieces, and history.
+Leaving a lobby frees the seat. The person who has been seated longest is the host; if the host leaves, the next longest-seated person takes over. A bot never hosts.
 
-Return with the same identity and room invitation to resume. A Google-linked identity can resume on another device; the newer connection replaces the older one. After an interrupted action, let the room synchronize before attempting it again.
+In a started game, '''Leave game''' resigns permanently. Your roads, settlements, and cities stay on the island, but they stop producing. Your resource cards return to the bank, your unplayed development cards are removed from play, and you can no longer hold an award. You cannot rejoin that game, but you can watch it. If every other seat resigns and one person is left, that person wins by resignation rather than on points.
+
+A lost connection is different. Your card first shows '''Away'''. After about 30 seconds, a bot plays your seat and the card shows '''Bot playing'''. It uses your own hand, pieces, and place in the turn order; nothing is surrendered. The moment you reconnect the seat is yours again, including any moves the bot made. Both handovers appear in the move history. This happens only while at least one person is still at the table. In [[Big Table]] and [[Open Sea]], modes still being built, no bot takes over; see [[Game modes#When a player disconnects|When a player disconnects]].
+
+If every person disconnects, the game pauses and nothing is played automatically. The cards show a countdown. If nobody returns within '''three minutes''', the game closes as abandoned, with no winner. A game where only bots remain also ends with no winner.
+
+Return with the same identity and room invitation to resume. A Google-linked identity can resume on another device; the newer connection replaces the older one. An account can hold a seat in only one unfinished game at a time. After an interrupted action, let the room synchronize before attempting it again.
 
 [[Category:Guides]]
