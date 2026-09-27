@@ -25,3 +25,14 @@
 .board-camera .sea-stage {
   filter: none;
 }
+/* Open Sea is played on open water, not on the table (BoardViewport.tsx): the board's painted water carried
+   out to the edges of the screen, deepened, so the board's own lighter water reads as the shallows. */
+.open-water-depth {
+  fill: #042536;
+  opacity: 0.42;
+}
+/* Without WebGL, the drawn ground does the same: its own deep water gives way to the open sea behind it. */
+.sea-stage .terrain-fallback .sea-base,
+.sea-stage .terrain-fallback .water-band {
+  display: none;
+}

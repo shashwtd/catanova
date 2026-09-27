@@ -305,7 +305,9 @@ export function TradePanel({
                     {game.players.map((other, index) => {
                       if (other.id === me || other.resigned) return null;
                       const response = trade.proposals?.find((p) => p.player === other.id),
-                        declined = trade.declinedBy?.includes(other.id);
+                        // Not taking offers counts as a no, unless they said yes before switching them off.
+                        closed = !response && !!game.notTrading?.includes(other.id),
+                        declined = trade.declinedBy?.includes(other.id) || closed;
                       const selected = !!response && selection === key(other.id, response.give);
                       return (
                         <button
@@ -314,8 +316,15 @@ export function TradePanel({
                           aria-label={`Trade with ${other.name}`}
                           aria-pressed={selected}
                           aria-description={
-                            declined ? 'Declined' : response ? 'Ready to trade' : 'Waiting for response'
+                            closed
+                              ? 'Not taking trade offers'
+                              : declined
+                                ? 'Declined'
+                                : response
+                                  ? 'Ready to trade'
+                                  : 'Waiting for response'
                           }
+                          title={closed ? `${other.name} is not taking trade offers` : undefined}
                           data-response={declined ? 'declined' : response ? 'ready' : 'waiting'}
                           style={
                             {
@@ -466,7 +475,8 @@ export function IncomingTrade({ game, me, disabled, onAction, roomPlayers }: Pro
     trade.player === me ||
     trade.player !== game.players[game.active]?.id ||
     game.phase !== 'actions' ||
-    trade.declinedBy?.includes(me)
+    trade.declinedBy?.includes(me) ||
+    (game.notTrading?.includes(me) && !trade.proposals?.some((p) => p.player === me))
   )
     return null;
   const maker = game.players.find((p) => p.id === trade.player)!,
@@ -538,6 +548,15 @@ export function IncomingTrade({ game, me, disabled, onAction, roomPlayers }: Pro
             </button>
           </div>
           {!trade.open && !canPay(hand, trade.want) && <p className="quiet-note">Not enough resources</p>}
+          <button
+            type="button"
+            className="text-button trade-stop-offers"
+            disabled={locked}
+            title="Nobody’s offers will reach you until you take them again in Settings"
+            onClick={() => void command.submit({ kind: 'blockTrades', on: true })}
+          >
+            Stop all offers
+          </button>
         </>
       )}
       {command.error && (

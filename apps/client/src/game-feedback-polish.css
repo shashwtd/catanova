@@ -532,3 +532,43 @@
 .card-play-celebration.celebration-static {
   animation: none;
 }
+/* Stopping every offer, from an offer: quieter than the answers above it. */
+.playing .trade-notice .text-button.trade-stop-offers {
+  display: flex;
+  margin: 8px auto 0;
+  min-height: 28px;
+  padding: 2px 8px;
+  font:
+    600 12.5px/1.2 Barlow,
+    sans-serif;
+  opacity: 0.78;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.playing .trade-notice .text-button.trade-stop-offers:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+/* A player not taking trade offers: the trade arrows, struck through, beside the name. */
+.playing .profile-no-trades {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: #f2dcb0;
+}
+.playing .profile-no-trades::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: #e7755c;
+  box-shadow: 0 0 0 1px #2b1d14;
+  transform: rotate(-45deg);
+}

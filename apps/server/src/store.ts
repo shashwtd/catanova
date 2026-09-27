@@ -2192,7 +2192,9 @@ export class Store {
           return { revision: room.revision, counter: room.counter, duplicate: true };
         }
       }
-      if (room.revision !== expectedRevision && !sameOfferReply)
+      // Taking trade offers or not is the player's own switch, whatever has happened since they last looked.
+      const ownSwitch = action.kind === 'blockTrades';
+      if (room.revision !== expectedRevision && !sameOfferReply && !ownSwitch)
         throw new ProtocolError('STALE_STATE', 'State changed; review the latest snapshot and try again');
       if (
         current &&

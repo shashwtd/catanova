@@ -4,17 +4,26 @@ import type { Board } from '../../../packages/rules/src/board.js';
 import { useGameInteractionGuards } from './useGameInteractionGuards.js';
 import { BoardGesture, constrainCamera, fitBoard, openingCamera, wheelScale, zoomAt } from './camera.js';
 import type { Bounds, Camera } from './camera.js';
-import { boardKey, islandsBox, MATERIAL_GUTTER, MATERIAL_QUADRANTS, worldBox } from './scene.js';
+import { boardKey, hasSea, islandsBox, MATERIAL_GUTTER, MATERIAL_QUADRANTS, worldBox } from './scene.js';
+
+/** How wide each mirrored quarter of the painted water is, in board units: the board's own `ocean-material`. */
+const OCEAN_QUADRANT = 240;
 
 export function BoardViewport({
   board,
   children,
   reducedMotion = false,
+  ocean,
 }: {
   /** The board being framed: the camera fits its world box, and starts over when a new board is dealt. */
   board: Board;
   children: ReactNode;
   reducedMotion?: boolean;
+  /**
+   * A board with sea is played on open water, not on the table: the painted texture its water is drawn from (the
+   * board theme's environment), carried out to the edges of the screen as deep sea.
+   */
+  ocean?: string;
 }) {
   useGameInteractionGuards();
   const key = boardKey(board),
@@ -36,6 +45,7 @@ export function BoardViewport({
   world.current = box;
   opening.current = () => openingCamera(bounds.current, box, islands);
   const patternId = `table-${useId().replaceAll(':', '')}`;
+  const openSea = useMemo(() => hasSea(board), [key]);
   const [camera, setCamera] = useState(current.current),
     [dragging, setDragging] = useState(false);
   const gesture = useRef(new BoardGesture());
@@ -94,6 +104,11 @@ export function BoardViewport({
     move(opening.current());
     target.current = current.current;
   }, [key]);
+  // Once a zoom settles, the terrain draws itself again at the size now shown (Terrain.tsx), so it stays sharp.
+  useEffect(() => {
+    const timer = window.setTimeout(() => viewport.current?.dispatchEvent(new Event('boardzoom')), 200);
+    return () => window.clearTimeout(timer);
+  }, [camera.scale]);
   useEffect(() => {
     if (reducedMotion) {
       const next = target.current;
@@ -254,35 +269,30 @@ export function BoardViewport({
           );
       }}
     >
-      <svg className="board-world-surface" aria-hidden="true">
-        <defs>
-          <pattern
-            id={patternId}
-            width="720"
-            height="720"
-            patternUnits="userSpaceOnUse"
-            patternTransform={`translate(${origin.current.x + camera.x} ${origin.current.y + camera.y}) scale(${camera.scale})`}
-          >
-            {MATERIAL_QUADRANTS.map(({ x, y, sx, sy }, index) => (
-              <g key={index} transform={`translate(${x * 360} ${y * 360}) scale(${sx} ${sy})`}>
-                <svg
-                  width="360"
-                  height="360"
-                  viewBox={`${512 + MATERIAL_GUTTER} ${512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
-                >
-                  <image
-                    href="/art/optimized/environment-dark.c55c6de597e4.webp"
-                    width="1024"
-                    height="1024"
-                  />
-                </svg>
-              </g>
-            ))}
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill={`url(#${patternId})`} />
-        <rect width="100%" height="100%" fill="#241d2714" />
-      </svg>
+      {openSea ? (
+        <Surface
+          id={patternId}
+          texture={ocean ?? '/art/optimized/environment-painted.00c506c983c0.webp'}
+          // The board's own water, at the board's scale: one board unit is the fitted size over the world's.
+          quadrant={OCEAN_QUADRANT * (fitted.width / world.current.width)}
+          cell={{ x: 0, y: 0 }}
+          overlay="open-water-depth"
+          x={origin.current.x + camera.x}
+          y={origin.current.y + camera.y}
+          scale={camera.scale}
+        />
+      ) : (
+        <Surface
+          id={patternId}
+          texture="/art/optimized/environment-dark.c55c6de597e4.webp"
+          quadrant={360}
+          cell={{ x: 1, y: 1 }}
+          overlay="table-tint"
+          x={origin.current.x + camera.x}
+          y={origin.current.y + camera.y}
+          scale={camera.scale}
+        />
+      )}
       {/* Lit rather than washed: see `table-light.css`. Both sit under the
           board and neither is inside the camera, so panning repaints nothing. */}
       <div className="table-light" aria-hidden="true" />
@@ -298,6 +308,72 @@ export function BoardViewport({
       >
         {children}
       </div>
+    </div>
+  );
+}
+
+/**
+ * What the board lies on, the table or, for a board with sea, the open sea: one mirrored tile of a painted texture,
+ * repeated. It is drawn once, on a plane a little larger than the window, and the camera only moves and scales
+ * that plane, so panning and zooming repaint nothing: redrawing a pattern across the whole window on every frame
+ * was nearly all the work a pan or zoom cost. The plane moves by whole tiles, so it always covers the window.
+ */
+function Surface({
+  id,
+  texture,
+  quadrant,
+  cell,
+  overlay,
+  x,
+  y,
+  scale,
+}: {
+  id: string;
+  texture: string;
+  /** How wide each mirrored quarter of the tile is, in pixels at the camera's scale 1. */
+  quadrant: number;
+  /** Which 512-pixel cell of the texture the tile is cut from. */
+  cell: { x: number; y: number };
+  /** The class of the tint laid over it. */
+  overlay: string;
+  x: number;
+  y: number;
+  scale: number;
+}) {
+  const period = quadrant * 2,
+    step = period * scale;
+  // Sized for the scale rounded down to a step of a half octave, so zooming resizes the plane only now and then.
+  const sizing = 2 ** (Math.floor(Math.log2(Math.max(scale, 0.05)) * 2) / 2);
+  const width = Math.ceil((typeof window === 'undefined' ? 1920 : window.innerWidth) / sizing + period * 2),
+    height = Math.ceil((typeof window === 'undefined' ? 1080 : window.innerHeight) / sizing + period * 2);
+  const left = (((x % step) + step) % step) - step,
+    top = (((y % step) + step) % step) - step;
+  return (
+    <div className="board-world-surface" aria-hidden="true">
+      <svg
+        className="board-world-plane"
+        width={width}
+        height={height}
+        style={{ transform: `translate(${left}px, ${top}px) scale(${scale})` }}
+      >
+        <defs>
+          <pattern id={id} width={period} height={period} patternUnits="userSpaceOnUse">
+            {MATERIAL_QUADRANTS.map(({ x: qx, y: qy, sx, sy }, index) => (
+              <g key={index} transform={`translate(${qx * quadrant} ${qy * quadrant}) scale(${sx} ${sy})`}>
+                <svg
+                  width={quadrant}
+                  height={quadrant}
+                  viewBox={`${cell.x * 512 + MATERIAL_GUTTER} ${cell.y * 512 + MATERIAL_GUTTER} ${512 - MATERIAL_GUTTER * 2} ${512 - MATERIAL_GUTTER * 2}`}
+                >
+                  <image href={texture} width="1024" height="1024" />
+                </svg>
+              </g>
+            ))}
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#${id})`} />
+        <rect className={overlay} width="100%" height="100%" />
+      </svg>
     </div>
   );
 }

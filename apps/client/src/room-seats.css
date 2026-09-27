@@ -110,6 +110,25 @@
 .room-lobby .seat-badge.is-edit:hover {
   background: linear-gradient(#6f8871, #405648);
 }
+/* Add someone at this table as a friend, where your own card has its edit mark. */
+.room-lobby .seat-badge.is-friend {
+  right: -8px;
+  bottom: -5px;
+  background: linear-gradient(#5d7360, #35493c);
+  color: var(--game-gold);
+  cursor: pointer;
+}
+.room-lobby button.seat-badge.is-friend:hover {
+  background: linear-gradient(#6f8871, #405648);
+}
+.room-lobby .seat-badge.is-friend[data-status='received'] {
+  background: linear-gradient(#f6d78e, #d9ae56);
+  color: #3a2a10;
+}
+.room-lobby .seat-badge.is-friend[data-status='sent'] {
+  cursor: default;
+  opacity: 0.85;
+}
 
 .room-lobby .seat-name {
   display: flex;

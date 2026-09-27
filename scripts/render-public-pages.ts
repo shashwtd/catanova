@@ -60,14 +60,15 @@ function llmsText() {
 > ${PUBLIC_PAGES[0].description}
 
 Catanova is a free, open-source, browser-based island trading and building game
-for two to four friends. It is independent and unofficial: it is inspired by
+for two to six friends. It is independent and unofficial: it is inspired by
 Catan, it is not a CATAN product, and it is not affiliated with or endorsed by
 the owners of that trademark.
 
 ## The short version
 
 - Free to play, with nothing to buy and nothing held back.
-- Two to four players, in a private room you share by code or link.
+- Two to six players, in a private room you share by code or link: Classic for
+  two to four, Big Table for five or six, and Open Sea, with ships, for three or four.
 - Runs in any modern browser on a phone, tablet or computer. Nothing to install.
 - You can start as a guest; an account is only needed to add friends.
 - Bots can fill an empty seat, and cover a seat if somebody loses connection.

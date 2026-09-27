@@ -73,6 +73,37 @@
 .red-number text {
   fill: #b23827;
 }
+/* The corner or edge the move history is pointing at, pulsing briefly. */
+.board-spotlight-ring {
+  fill: #fff6dc2e;
+  stroke: #fff6dc;
+  stroke-width: 4;
+  /* Dark edge first, so the ring reads on the palest tiles too, then the glow. */
+  filter: drop-shadow(0 0 1.5px #2a1d0ccc) drop-shadow(0 0 6px #fff1c4);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: board-spotlight 0.65s ease-in-out 4 alternate both;
+}
+@keyframes board-spotlight {
+  from {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+[data-motion='reduced'] .board-spotlight-ring {
+  animation: none;
+}
+/* A place tapped in the move history: the history steps aside while the board shows it, then comes back. */
+.game-popover:has(.turn-journal) {
+  transition: opacity 0.2s ease;
+}
+.game-world:has(.board-spotlight[data-peek]) .game-popover:has(.turn-journal) {
+  opacity: 0.06;
+}
 .port-badge {
   fill: currentColor;
   stroke: #e0c494;
@@ -135,4 +166,20 @@
 .build-ghost .road-body {
   stroke-dasharray: 3 2;
   stroke-width: 1.4;
+}
+/* Where a ship may be built now (ship-sites.css) breathes slowly, so it is seen without shouting. */
+[data-build-site] .ship-water-hint {
+  animation: ship-water-hint 2.6s ease-in-out infinite alternate;
+}
+[data-build-site]:is(:hover, :focus-visible, [data-guided='true'], [data-pending='true']) .ship-water-hint,
+[data-motion='reduced'] .ship-water-hint {
+  animation: none;
+}
+@keyframes ship-water-hint {
+  from {
+    opacity: 0.18;
+  }
+  to {
+    opacity: 0.42;
+  }
 }

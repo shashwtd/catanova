@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { BotMark, GameIcon, Trophy, WifiOff } from './GameIcons.js';
+import { ArrowLeftRight, BotMark, GameIcon, Trophy, WifiOff } from './GameIcons.js';
 import type { GameView, PlayerView } from '../../../packages/rules/src/game.js';
 import type { RoomState } from '../../../packages/protocol/src/index.js';
 import { defaultProfile } from '../../../packages/protocol/src/profile.js';
@@ -75,17 +75,20 @@ export type RailFriendship = {
 
 /**
  * Add someone at the table as a friend, or accept their request, from a small
- * button on the corner of their portrait. It shows while the card is hovered or
- * focused, or once it is tapped, so the rail stays quiet until it is wanted.
+ * button on the corner of their portrait. On the rail it shows while the card is
+ * hovered or focused, or once it is tapped, so the rail stays quiet until it is
+ * wanted; a room's seat cards show it as a badge (`className`).
  */
-function FriendButton({
+export function FriendButton({
   name,
   accountId,
   friendship,
+  className = 'profile-friend',
 }: {
   name: string;
   accountId: string;
   friendship: RailFriendship;
+  className?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const status = friendship.status(accountId);
@@ -93,7 +96,7 @@ function FriendButton({
   if (status === 'sent')
     return (
       <span
-        className="profile-friend"
+        className={className}
         data-status="sent"
         role="img"
         title="Friend request sent"
@@ -107,7 +110,7 @@ function FriendButton({
   return (
     <button
       type="button"
-      className="profile-friend"
+      className={className}
       data-status={status}
       title={label}
       aria-label={label}
@@ -327,6 +330,16 @@ export function PlayerRail({
                   {p.name}
                 </strong>
                 {(seat?.bot || seat?.standIn) && <BotMark level={seat.botLevel} size={16} />}
+                {game.notTrading?.includes(p.id) && (
+                  <span
+                    className="profile-no-trades"
+                    role="img"
+                    title="Not taking trade offers"
+                    aria-label="Not taking trade offers"
+                  >
+                    <ArrowLeftRight size={14} />
+                  </span>
+                )}
               </div>
               <div className="profile-details">
                 <div className="profile-stats">

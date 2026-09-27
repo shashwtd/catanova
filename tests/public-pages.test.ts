@@ -59,7 +59,7 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.match(home, /itemscope="" itemType="https:\/\/schema.org\/WebSite"/i);
   assert.ok(home.includes('itemProp="name" content="Catanova"'));
   assert.ok(home.includes('itemProp="url" href="https://catanova.io/"'));
-  assert.ok(home.includes('A Catan alternative for 2–4 friends.'));
+  assert.ok(home.includes('A Catan alternative for 2–6 friends.'));
   assert.doesNotMatch(home, /(?:#1|Number One)\s+(?:Catan|alternative)/i);
   assert.ok(home.includes('Create room') && home.includes('Join room'));
   assert.ok(home.includes('<a href="/guide/">How to play</a>'));
@@ -249,7 +249,7 @@ test('the production entry is readable before JavaScript and only public pages e
   assert.deepEqual(homeGraph[0]!.numberOfPlayers, {
     '@type': 'QuantitativeValue',
     minValue: 2,
-    maxValue: 4,
+    maxValue: 6,
   });
   assert.match(homeGraph[0]!.disambiguatingDescription, /[Nn]ot affiliated with/);
   const guideGraph = data(guide)['@graph'];

@@ -14,6 +14,7 @@ import { GameTools } from './GameTools.js';
 import { IncomingTrade, TradePanel } from './TradePanel.js';
 import { ResourceSummary } from './ResourcePicker.js';
 import { MoveHistory } from './MoveHistory.js';
+import type { BoardPlace } from './MoveHistory.js';
 import { QuickRules } from './QuickRules.js';
 import { buildShown, edgePieces, isBuildAction, placementValid } from './placement.js';
 import type { BuildAction, PlacementDraft } from './placement.js';
@@ -57,6 +58,7 @@ import {
   previewJoinReference,
 } from './navigation.js';
 import { PlayerRail } from './PlayerRail.js';
+import type { RailFriendship } from './PlayerRail.js';
 import { friendStatus } from './social-presence.js';
 import { BoardViewport } from './BoardViewport.js';
 import { boardKey } from './scene.js';
@@ -760,6 +762,18 @@ function App() {
   useEffect(() => {
     if (panel === 'journal' && connected && room?.game) connection.current?.history();
   }, [panel, connected, room?.historyRevision]);
+  // A place a move in the history names, shown on the board for a moment. The count tells the board a second tap
+  // on the same place is a new showing.
+  const [spotlight, setSpotlight] = useState<{ place: BoardPlace; count: number; peek: boolean } | null>(null);
+  const spotlightTimer = useRef<number | undefined>(undefined);
+  const showPlace = useCallback((place: BoardPlace | null, tapped = false) => {
+    window.clearTimeout(spotlightTimer.current);
+    setSpotlight((shown) => (place ? { place, count: (shown?.count ?? 0) + 1, peek: tapped } : null));
+    if (place) spotlightTimer.current = window.setTimeout(() => setSpotlight(null), 2600);
+  }, []);
+  useEffect(() => {
+    if (panel !== 'journal') showPlace(null);
+  }, [panel, showPlace]);
   useEffect(() => {
     if (connected && panel === 'statistics') connection.current?.statistics();
   }, [panel, connected, g?.phase, room?.historyRevision, room?.round]);
@@ -1081,6 +1095,16 @@ function App() {
                 (g.phase === 'partner' || g.phase === 'buildWindow') && !myTurn
                 ? ''
                 : (gameNotice?.prompt ?? '');
+  // Friend requests from a seat, in the room and at the table alike, for a signed-in Google account.
+  const tableFriendship: RailFriendship | undefined =
+    auth.config?.mode === 'authenticated' && auth.account?.registered && !auth.account.isGuest
+      ? {
+          self: auth.account.id,
+          status: (id) => friendStatus(auth.friends, id),
+          request: (id) => auth.requestFriend(id).catch((failure) => setError(friendFailure(failure))),
+          accept: (id) => auth.respondFriend(id, true).catch((failure) => setError(friendFailure(failure))),
+        }
+      : undefined;
   return (
     <main
       className={`game-world ${g ? 'playing' : room ? 'lobby' : playerHome ? 'player-home' : 'entry-world'}`}
@@ -1093,7 +1117,11 @@ function App() {
       {!g && (room || playerHome) && <LoungeBackdrop />}
       {g && (
         <div className="board-anchor">
-          <BoardViewport board={stableBoard ?? g.board} reducedMotion={reducedMotion}>
+          <BoardViewport
+            board={stableBoard ?? g.board}
+            reducedMotion={reducedMotion}
+            ocean={BOARD_THEMES[preferences.boardTheme].environment}
+          >
             <Board
               art={BOARD_THEMES[preferences.boardTheme]}
               board={stableBoard ?? g.board}
@@ -1112,6 +1140,7 @@ function App() {
               shipMove={shipMove}
               onShip={onBoardShip}
               reducedMotion={reducedMotion}
+              spotlight={spotlight}
             />
           </BoardViewport>
           <ReactionLayer flying={reactions.flying} />
@@ -1169,18 +1198,7 @@ function App() {
               />
             )
           }
-          friendship={
-            auth.config?.mode === 'authenticated' && auth.account?.registered && !auth.account.isGuest
-              ? {
-                  self: auth.account.id,
-                  status: (id) => friendStatus(auth.friends, id),
-                  request: (id) =>
-                    auth.requestFriend(id).catch((failure) => setError(friendFailure(failure))),
-                  accept: (id) =>
-                    auth.respondFriend(id, true).catch((failure) => setError(friendFailure(failure))),
-                }
-              : undefined
-          }
+          friendship={tableFriendship}
         />
       )}
       {(error || auth.error) && (
@@ -1328,6 +1346,7 @@ function App() {
               : undefined
           }
           onStart={() => void act({ kind: 'start' })}
+          friendship={tableFriendship}
           onInvite={() => setPanel('friends')}
           onFriends={auth.config?.mode === 'authenticated' ? () => setPanel('friends') : undefined}
           onLeave={() => void leave()}
@@ -1521,6 +1540,7 @@ function App() {
                 game={g}
                 hasMore={historyHasMore}
                 onEarlier={() => connection.current?.history(historyEntries.at(-1)?.revision)}
+                onPlace={showPlace}
               />
             </UtilityPanel>
           )}
@@ -1627,6 +1647,14 @@ function App() {
             privacy={privacy.value}
             savePrivacy={privacy.save}
             previewSound={() => feedback.sound.play('settlement')}
+            {...(g && me && g.phase !== 'finished' && !room?.spectating && player && !player.resigned
+              ? {
+                  trades: {
+                    taking: !g.notTrading?.includes(me),
+                    onChange: (taking: boolean) => void act({ kind: 'blockTrades', on: !taking }),
+                  },
+                }
+              : {})}
           />
         </Dialog>
       )}

@@ -95,7 +95,8 @@ export function SendFeedback({
   accessToken?: () => Promise<string | undefined>;
   onClose: () => void;
 }) {
-  const [category, setCategory] = useState<FeedbackCategory>('bug');
+  // No kind is chosen for the player: a form that starts on Bug files every idea as a bug.
+  const [category, setCategory] = useState<FeedbackCategory | null>(null);
   const [message, setMessage] = useState('');
   const [includeDetails, setIncludeDetails] = useState(true);
   const [sending, setSending] = useState(false);
@@ -112,6 +113,10 @@ export function SendFeedback({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (sending) return;
+    if (!category) {
+      setError('Choose Bug, Idea or Other first.');
+      return;
+    }
     setError('');
     let body;
     try {
@@ -157,9 +162,12 @@ export function SendFeedback({
             type="button"
             role="radio"
             aria-checked={category === kind}
-            tabIndex={category === kind ? 0 : -1}
+            tabIndex={category === kind || (!category && kind === FEEDBACK_CATEGORIES[0]) ? 0 : -1}
             className="settings-tab"
-            onClick={() => setCategory(kind)}
+            onClick={() => {
+              setCategory(kind);
+              setError('');
+            }}
             onKeyDown={(event) => {
               const step = ['ArrowRight', 'ArrowDown'].includes(event.key)
                 ? 1
@@ -168,7 +176,7 @@ export function SendFeedback({
                   : 0;
               if (!step) return;
               event.preventDefault();
-              const index = FEEDBACK_CATEGORIES.indexOf(category);
+              const index = category ? FEEDBACK_CATEGORIES.indexOf(category) : step > 0 ? -1 : 0;
               const next =
                 FEEDBACK_CATEGORIES[
                   (index + step + FEEDBACK_CATEGORIES.length) % FEEDBACK_CATEGORIES.length
@@ -195,7 +203,9 @@ export function SendFeedback({
               ? 'What happened, and what did you expect?'
               : category === 'idea'
                 ? 'What would make Catanova better?'
-                : 'What would you like to tell us?'
+                : category === 'other'
+                  ? 'What would you like to tell us?'
+                  : 'Choose Bug, Idea or Other above, then tell us.'
           }
           aria-label="Message"
           aria-describedby={`${base}-count`}

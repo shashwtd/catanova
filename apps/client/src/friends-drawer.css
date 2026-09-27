@@ -650,6 +650,15 @@
   align-self: flex-end;
   margin: 0 18px 6px;
 }
+/* Finding someone who is not a friend yet, from the room as from the player home. */
+.room-invite-panel .room-invite-search {
+  width: 100%;
+  margin-top: 12px;
+}
+.room-invite-panel .room-invite-search + *,
+.room-invite-panel .roster-section + .roster-section {
+  margin-top: 16px;
+}
 .invite-room-details {
   flex: none;
   margin: 0 18px;

@@ -138,7 +138,7 @@ export function EntryScreen({
             <h1>
               <BrandLogo />
             </h1>
-            {homeMenu && <p>A Catan alternative for 2–4 friends.</p>}
+            {homeMenu && <p>A Catan alternative for 2–6 friends.</p>}
           </div>
           <section
             className={`title-panel landing-panel ${homeMenu ? 'home-menu' : ''} ${auth.needsOnboarding ? 'onboarding-panel' : ''}`}
