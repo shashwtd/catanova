@@ -1,6 +1,6 @@
 # Catanova
 
-An open-source Catan-style game for **two to four invited friends**, built around reliable multiplayer and a hand-painted island.
+An open-source Catan-style game for **two to six invited friends**, built around reliable multiplayer and a hand-painted island.
 
 **Home: [catanova.io](https://catanova.io)** — the first Azure-hosted playtest is deployed. You can also run it locally using the instructions below.
 
@@ -24,7 +24,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once all two to four seats are connected and everyone else is ready. New rooms start with a 90-second turn timer, which the host can change or switch off in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
+Open **http://127.0.0.1:3000**. Choose **Create room** or **Join room**, then meet in the lobby. Pick a fantasy avatar and invite friends. The other players mark Ready; the host presses Start once every seat is connected and everyone else is ready. New rooms start with a 90-second turn timer, which the host can change or switch off in Settings. An invite opens that room’s roster and Join/Resume prompt. The board appears after Start. To test all four seats locally, open four independent tabs; a duplicated tab can inherit and resume the original seat.
 
 Game and construction tools sit at top left; settings and leave sit at bottom left during play. Player portraits on the right share the brighter piece colors through banners and edges, with prominent points, card counts, awards and a current-turn marker. An offline symbol covers a disconnected player's portrait. Glossy resource cards and the development hand share the bottom shelf, with Trade to the left of Roll/End. Both actions follow your turn; opponents answer live offers through a separate notice. Scroll/pinch to zoom the flat board, or drag to pan the island and wood table together. Each harbor has two bridges to its eligible coastal corners.
 

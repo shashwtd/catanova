@@ -379,7 +379,9 @@ test('the game menu and the player lobby each offer Send feedback, in the settin
   const dialog = renderToStaticMarkup(createElement(SendFeedback, { details: {}, onClose() {} }));
   assert.match(dialog, /class="settings-content settings-menu feedback-form"/);
   assert.equal((dialog.match(/role="radio"/g) ?? []).length, 3);
-  assert.match(dialog, /aria-checked="true"[^>]*>Bug</);
+  // No kind is chosen for the player, so an idea is never filed as a bug by default.
+  assert.doesNotMatch(dialog, /aria-checked="true"/);
+  assert.match(dialog, /aria-checked="false" tabindex="0"[^>]*>Bug</i);
   assert.match(dialog, /<textarea[^>]*maxLength="2000"/i);
   assert.match(dialog, /type="checkbox" role="switch"[^>]*checked=""/);
   assert.match(dialog, /Never your cards/);

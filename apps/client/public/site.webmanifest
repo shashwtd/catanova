@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Catanova",
   "short_name": "Catanova",
-  "description": "An open-source island game for two to four friends.",
+  "description": "An open-source island game for two to six friends.",
   "lang": "en",
   "start_url": "/",
   "scope": "/",

@@ -46,7 +46,7 @@ export function LandingFeatures({ onPlay }: { onPlay: () => void }) {
           <span className="feature-eyebrow">Your people. Your island.</span>
           <h2>Make room for game night.</h2>
           <p>
-            Create a private room, send the link, and gather 2–4 friends. Everyone plays right in their
+            Create a private room, send the link, and gather 2–6 friends. Everyone plays right in their
             browser.
           </p>
           <button className="feature-link" onClick={onPlay}>

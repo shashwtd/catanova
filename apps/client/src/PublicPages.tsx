@@ -37,7 +37,7 @@ export const PUBLIC_PAGES = [
     path: '/',
     title: 'Catanova: play a Catan-style game with friends',
     description:
-      'A free island trading game for two to four friends, in your browser. Build, trade and race to ten points. If you know Catan, you already know how to play.',
+      'A free island trading game for two to six friends, in your browser. Build, trade and race to ten points. If you know Catan, you already know how to play.',
   },
   {
     path: '/guide/',
@@ -77,7 +77,7 @@ export const GUIDE_FAQ = [
   {
     question: 'What is Catanova?',
     answer:
-      'Catanova is a free online island-building game for two to four friends: collect resources, trade, and build your way to ten points. It is an independent game with its own artwork, rules text and interface, not an official CATAN game, and its code is open source on GitHub.',
+      'Catanova is a free online island-building game for two to six friends: collect resources, trade, and build your way to ten points. It is an independent game with its own artwork, rules text and interface, not an official CATAN game, and its code is open source on GitHub.',
   },
   {
     question: 'Is Catanova free to play?',
@@ -92,7 +92,7 @@ export const GUIDE_FAQ = [
   {
     question: 'How many players do you need?',
     answer:
-      'Two to four. Three and four player games follow the familiar rules. Two player games are our own option, on the same island and to the same ten points, without neutral players.',
+      'Two to six. Three and four player games follow the familiar rules, and five or six play Big Table, a larger island with paired turns. Two player games are our own option, on the same island and to the same ten points, without neutral players.',
   },
   {
     question: 'Can I play on my own, or fill an empty seat?',
@@ -130,7 +130,7 @@ function structuredData(page: (typeof PUBLIC_PAGES)[number]) {
     gamePlatform: 'Web browser',
     operatingSystem: 'Any modern web browser',
     playMode: 'MultiPlayer',
-    numberOfPlayers: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 4 },
+    numberOfPlayers: { '@type': 'QuantitativeValue', minValue: 2, maxValue: 6 },
     inLanguage: 'en',
     isAccessibleForFree: true,
     isFamilyFriendly: true,
@@ -538,7 +538,7 @@ export function PublicGuide() {
           </p>
           <h1>How to play Catanova</h1>
           <p className="guide-subtitle">
-            An island trading and building game for two to four players, in a browser
+            An island trading and building game for two to six players, in a browser
           </p>
           <aside className="guide-infobox" aria-label="Catanova at a glance">
             <p className="guide-infobox-title">Catanova</p>
@@ -553,7 +553,7 @@ export function PublicGuide() {
               <figcaption>A four-player game, partway through.</figcaption>
             </figure>
             <dl>
-              <InfoRow label="Players">2–4</InfoRow>
+              <InfoRow label="Players">2–6</InfoRow>
               <InfoRow label="Playing time">30–60 minutes</InfoRow>
               <InfoRow label="Goal">
                 10 victory points <span className="guide-info-note">(host may set 8–15)</span>
@@ -574,7 +574,7 @@ export function PublicGuide() {
             </dl>
           </aside>
           <p className="guide-lead">
-            <strong>Catanova</strong> is a free, browser-based island game for two to four friends. Each
+            <strong>Catanova</strong> is a free, browser-based island game for two to six friends. Each
             player settles a shared island, collects the resources their settlements produce, trades for what
             the dice did not give them, and builds towards ten victory points. A game takes about an hour.
             This page covers the whole of it: the opening placements, what everything costs, how a turn runs,
