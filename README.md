@@ -39,19 +39,14 @@ The same application serves the browser and WebSocket endpoint. No separate clie
 ## Bots for the empty seats
 
 A host can fill any free seat with a bot from the lobby, so two friends can play
-a game of four. Bots take their turns on the server, follow the same rules and
-appear in the roster and move history like anyone else. They decide with
-TypeSafe AI's Jev, a model that picks among options rather than writing text, so
-a bot can only ever choose a move the rules already offered. It needs a
-`TYPESAFE_API_KEY`; without one the bots still play from their own heuristics. Everything
-countable, production pips, affordability, road distance, who is ahead, is
-computed in code.
-
-Each bot keeps a short typed plan between turns and tells you what it is doing
-in a sentence assembled from that plan. With no API key configured the bots
-still play, from their deterministic fallbacks; a bot never stalls a table. A
-room whose only remaining players are bots pauses rather than playing itself
-out. [How the bots work, and what a game costs](docs/BOTS.md).
+a full four-player game. Bots think with their own engine: they race every
+player to ten points in dice rolls, count the cards that move in public, search
+whole turns with the real rules, solve the opening, and trade with people for
+their own reasons only, offering, answering and proposing. TypeSafe AI's Jev
+advises on the close calls when a `TYPESAFE_API_KEY` is set; without one the
+engine decides alone. Bots throw the odd reaction, never chat, and never see a
+card a player at the table could not. A room whose only remaining players are
+bots pauses rather than playing itself out. [How the bots work](docs/BOTS.md).
 
 ## A fairer starting island
 

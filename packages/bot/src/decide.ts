@@ -1,65 +1,55 @@
 /**
- * One turn of bot thinking.
+ * One bot decision.
  *
- * The shape of this file is a ladder, cheapest rung first. Most Catan turns
- * have nothing to decide: no resources, nothing affordable, no card worth
- * playing. Those end the turn here without spending a decision at all. Only
- * when there is a real choice does anything reach Jev, and then every question
- * for the turn goes in one request, because a request answers its questions in
- * parallel for almost nothing while a second round trip costs real time.
+ * The brain in `brain/` does the thinking: the race to ten points
+ * (`race.ts`), card counting (`belief.ts`), a search over whole turns played by
+ * the real rules (`search.ts`), the opening (`opening.ts`) and trading
+ * (`trade.ts`). This file routes each phase of the game to the right part of it,
+ * turns the answer into the plan a player reads, and asks Jev (`advisor.ts`) only
+ * when the engine's own numbers leave a choice genuinely open.
  *
- * When the plan has gone stale its questions ride along in that same request,
- * so thinking ahead is free rather than a separate call.
- *
- * Every rung has a deterministic fallback. If the decision service is slow or
- * unreachable the bot still moves, because a stalled seat ruins a real game for
- * everyone else at the table.
+ * Every path returns a legal move in time, with or without the decision service,
+ * because a stalled seat ruins the game for everyone else at the table.
  */
 
-import { COSTS, RESOURCES, RESOURCE_NAMES } from '../../rules/src/index.js';
-import { CARD_NAMES } from '../../rules/src/game.js';
-import type { Resource } from '../../rules/src/index.js';
+import { COSTS, RESOURCES } from '../../rules/src/index.js';
 import type { Board } from '../../rules/src/board.js';
-import { roadSites, settlementSites } from '../../rules/src/game.js';
-import type { CardKind, GameAction, GameView, Hand } from '../../rules/src/game.js';
-import { choice, noul, JevUnavailable } from './jev.js';
-import type { JevClient, Question } from './jev.js';
-import {
-  affordable,
-  bankTrade,
-  cornerFacts,
-  discardChoice,
-  handOf,
-  needsAndSurplus,
-  rankCorners,
-  rankRoads,
-  rankRobberHexes,
-  robberTargets,
-  leaderOf,
-  handTotal,
-  seatLabel,
-} from './heuristics.js';
-import { ARCHETYPES, describe, initialPlan, planIsStale } from './plan.js';
-import type { Archetype, BotPlan, Focus, Threat } from './plan.js';
+import { seededRandom } from '../../rules/src/board.js';
+import type { GameAction, GameView, Hand } from '../../rules/src/game.js';
+import type { JevClient } from './jev.js';
+import { handOf } from './heuristics.js';
+import { initialPlan, describe } from './plan.js';
+import type { Archetype, BotPlan, Focus } from './plan.js';
 import type { BotLevel } from '../../protocol/src/bots.js';
-import { PLAY_STYLES, STYLE_ARCHETYPE } from './style.js';
+import { STYLE_ARCHETYPE } from './style.js';
 import type { StandInStyle } from './style.js';
-
-/** How many options of each kind are ever shown to the model. Shortlists keep
- *  the state small and stop the few good moves being buried in the many legal
- *  ones. Raising these costs tokens and rarely changes the answer. */
-const LIMIT = { openingCorners: 24, corners: 12, roads: 8, robberHexes: 6 } as const;
+import { imagine, knowledge, newMind } from './brain/mind.js';
+import type { Mind } from './brain/mind.js';
+import { unseenCards } from './brain/belief.js';
+import { race } from './brain/race.js';
+import type { Strategy } from './brain/race.js';
+import { bestDiscard, bestRobber, knightFirst, planTurn, settle, standings, tryMove, value } from './brain/search.js';
+import type { Thinker } from './brain/search.js';
+import { chooseOpening, chooseOpeningRoad } from './brain/opening.js';
+import { answer, makeOffer, manageOffer, openOffer } from './brain/trade.js';
+import { adviseStrategy, adviseThreat, adviseTrade } from './brain/advisor.js';
+import { roadSites } from '../../rules/src/game.js';
 
 export type Decision = {
+  /** The move. While `hold` is set it is only a placeholder and must not be played. */
   action: GameAction;
   plan: BotPlan;
-  /** Jev requests spent on this decision: 0 for anything settled by the rules. */
+  /** Jev requests spent on this decision: 0 for anything the engine settled alone. */
   calls: number;
   tokens: number;
   costUsd: number;
-  /** What the bot would tell you it is doing, rendered from typed fields. */
+  /** What the bot would tell you it is doing. */
   explain: string;
   degraded?: boolean;
+  /** The bot's memory after this decision, for the next one. */
+  mind?: Mind;
+  /** True when the bot has nothing to do yet: its trade offer is still collecting answers. */
+  hold?: boolean;
 };
 
 export type DecideContext = {
@@ -68,667 +58,309 @@ export type DecideContext = {
   meId: string;
   plan: BotPlan;
   jev: JevClient | null;
-  /**
-   * Difficulty. Both bots play the same rules with the same plan; the level
-   * decides how much attention they pay to whoever is winning. See `contests`.
-   */
+  /** Difficulty: how hard the brain thinks. See `DIALS`. */
   level?: BotLevel;
-  /**
-   * Set only when this seat belongs to a player who dropped out and is being
-   * kept warm. It carries how that player was playing, so the stand-in
-   * continues their game rather than starting a different one in their chairs.
-   */
+  /** A seat kept warm for a player who dropped out, and how they were playing. */
   standIn?: StandInStyle;
+  /** Memory from the last decision. A fresh one is started when absent. */
+  mind?: Mind;
+  /** The players who are people, not bots: Jev is asked about trades only with them. */
+  humans?: readonly string[];
+  /** Milliseconds since the epoch, for timing the bot's own trade offers. */
+  now?: number;
+  /** Overrides the level's thinking time, in milliseconds: a safety cap. */
+  budgetMs?: number;
+  /** Overrides how many positions the level scores before settling: the real limit. */
+  positions?: number;
+  random?: () => number;
+  /** False where trades between players do not exist (a simulator that has none): the bot then never offers. */
+  canOffer?: boolean;
 };
 
-/** What each card does, so that "play a development card" is a choice the bot
- *  can actually weigh rather than a word. */
-const CARD_USE: Record<string, string> = {
-  knight: 'move the robber off my land or onto somebody else, and count toward largest army',
-  roadBuilding: 'two roads for free: reach a corner now, or extend the longest road',
-  yearOfPlenty: 'take any two resources from the bank, enough to finish a purchase this turn',
-  monopoly: 'take every card of one resource from every other player',
-};
-
-/** The cards in hand that could be played right now, counted by kind. */
-function playableKinds(ctx: DecideContext): Record<string, number> {
-  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
-  const out: Record<string, number> = {};
-  for (const id of ctx.view.legal.playableCards) {
-    const kind = mine.find((c) => c.id === id)?.kind;
-    if (kind) out[kind] = (out[kind] ?? 0) + 1;
+/**
+ * What each level is allowed. The top level is the whole engine; the others are
+ * the same engine held back, which is how a strong bot is toned down.
+ */
+const DIALS: Record<
+  BotLevel,
+  {
+    budgetMs: number;
+    positions: number;
+    depth: number;
+    beam: number;
+    offers: boolean;
+    open: boolean;
+    opening: [number, number];
+    advisor: boolean;
+    slack: number;
   }
-  return out;
-}
-
-/**
- * The cards that would actually do something if played.
- *
- * `legal.playableCards` means "the rules let you play this now", which is not
- * the same as "this will work": Road Building is refused outright when there is
- * nowhere to put a road, and Year of Plenty needs something left in the bank.
- * Offering either of those as a move produced a rejected action, and offering a
- * card that does nothing is bad play even when the rules allow it.
- */
-function usableCards(ctx: DecideContext): string[] {
-  const { view, meId } = ctx;
-  const mine = view.players.find((p) => p.id === meId)?.cards ?? [];
-  const bankHas = RESOURCES.reduce((n, r) => n + view.bank[r], 0);
-  const roadRoom =
-    (view.players.find((p) => p.id === meId)?.pieces.roads ?? 0) < 15 && roadSites(view, meId).length > 0;
-  return view.legal.playableCards.filter((id) => {
-    const kind = mine.find((c) => c.id === id)?.kind;
-    if (kind === 'roadBuilding') return roadRoom;
-    if (kind === 'yearOfPlenty') return bankHas > 0;
-    return true;
-  });
-}
-
-/**
- * The card to play when nobody is there to judge it.
- *
- * Knights first: they are never wasted, they move the robber and they build
- * toward largest army. Then Road Building, which is two roads for nothing.
- * Year of Plenty and Monopoly want a plan behind them, so they come last.
- */
-const CARD_ORDER = ['knight', 'roadBuilding', 'yearOfPlenty', 'monopoly'];
-function bestCardToPlay(ctx: DecideContext, playable: readonly string[]): string | undefined {
-  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
-  const rank = (id: string) => {
-    const kind = mine.find((c) => c.id === id)?.kind ?? '';
-    const at = CARD_ORDER.indexOf(kind);
-    return at === -1 ? CARD_ORDER.length : at;
-  };
-  return [...playable].sort((a, b) => rank(a) - rank(b))[0];
-}
-
-/**
- * A knight worth playing before the dice.
- *
- * If the robber is sitting on a hex this bot builds on, every turn it waits is
- * a turn of its own production thrown away — and the knight is free. This is a
- * fact about the board, so it is decided here rather than asked about.
- */
-function knightBeforeRoll(ctx: DecideContext): string | null {
-  if (!contests(ctx.level, ctx.standIn).clearsItsOwnLand) return null;
-  const mine = ctx.view.players.find((p) => p.id === ctx.meId)?.cards ?? [];
-  const knight = ctx.view.legal.playableCards.find((id) => mine.find((c) => c.id === id)?.kind === 'knight');
-  if (!knight) return null;
-  const blocked = ctx.board.hexes[ctx.view.robber];
-  const onMine = blocked?.vertices.some((v) => ctx.view.buildings[v]?.player === ctx.meId);
-  return onMine ? knight : null;
-}
-
-/**
- * What a level actually changes.
- *
- * A sharp bot contests the leader: its robber is drawn to the leader's tiles
- * and prefers to rob the leader when it lands, and it starts treating a leader
- * as a threat while they are still three points out, which pulls its plan
- * towards blocking sooner. A steady bot plays its own game: the robber goes
- * wherever the most production is, whoever owns it, and nobody counts as a
- * threat until they are one point from winning.
- *
- * Both are arithmetic, decided here rather than asked about, so the difference
- * holds even when the decision service is unreachable.
- */
-function contests(level: BotLevel | undefined, standIn?: StandInStyle) {
-  // A stand-in that plays nothing like the person it replaced is worse for the
-  // table than the empty seat was, so a read of how they were playing overrides
-  // the level's own temperament on the one axis it speaks to.
-  const contesting = standIn ? standIn.contesting : level === 'sharp' || level === 'champ';
-  const champ = level === 'champ';
-  return {
-    /** How much more a robber tile is worth for belonging to the leader. */
-    leaderWeight: contesting ? 2 : 1,
-    /** How close the leader gets before the bot starts obstructing. */
-    threatWithin: champ ? 4 : contesting ? 3 : 1,
-    /** Whether a contested road or army counts as a threat on its own. */
-    mindsAwards: contesting,
-    /** Whether the robber goes for the leader rather than whoever is there. */
-    huntsLeader: contesting,
-    /** Turns a plan survives before it is thought through again. A champ is
-     *  asked to think often, which is what lets it answer a road being cut
-     *  off by going after something else instead of pushing at the block. */
-    planLife: champ ? 2 : 4,
-    /** How many corners and roads the model is shown. Longer lists play
-     *  better and cost more, which is the trade a champion is worth. */
-    shortlist: champ ? { corners: 16, roads: 12 } : { corners: LIMIT.corners, roads: LIMIT.roads },
-    /** Whether passing stays on the table while anything useful is affordable. */
-    spendsEveryTurn: champ,
-    /** Whether the state carries the award standings and the gap to the win.
-     *  Every number in it is on the other players' portraits already. */
-    readsTheTable: champ,
-    /** Whether a knight is spent before the dice to get the robber off its
-     *  own production rather than waiting for a turn it suits better. */
-    clearsItsOwnLand: champ,
-  };
-}
-
-const FOCUS_COST: Record<Focus, keyof typeof COSTS | null> = {
-  settlement: 'settlement',
-  city: 'city',
-  road: 'road',
-  card: 'developmentCard',
-  save: null,
+> = {
+  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: true, open: true, opening: [8, 14], advisor: true, slack: 0 },
+  sharp: { budgetMs: 700, positions: 900, depth: 3, beam: 6, offers: true, open: false, opening: [4, 10], advisor: true, slack: 0.004 },
+  steady: { budgetMs: 500, positions: 350, depth: 2, beam: 4, offers: false, open: false, opening: [2, 6], advisor: false, slack: 0.012 },
 };
 
-/**
- * A plan is only worth following while it can still happen. A bot saving for a
- * settlement on a board with no legal corner left will hoard timber and clay
- * for the rest of the game, which is the main way these games used to stall.
- * Achievability is a fact about the board, so it is corrected here rather than
- * asked about.
- */
-function effectiveFocus(plan: BotPlan, view: GameView): Focus {
-  const { legal, deckCount } = view;
-  // Asked of the board, not of the hand: the legal lists are empty whenever a
-  // road is unaffordable, which is most of the time, and reading them here
-  // turned every settlement plan into a card plan until the timber and clay
-  // for a road were already in hand.
-  const me = view.players.find((p) => p.hand);
-  const reachable =
-    !!me &&
-    me.pieces.settlements < 5 &&
-    (settlementSites(view, me.id).length > 0 || (me.pieces.roads < 15 && roadSites(view, me.id).length > 0));
-  if (plan.focus === 'settlement' && !reachable) return deckCount > 0 ? 'card' : 'city';
-  if (
-    plan.focus === 'city' &&
-    !legal.cities.length &&
-    !view.players.some((p) => p.hand && p.pieces.settlements > 0)
-  )
-    return deckCount > 0 ? 'card' : 'settlement';
-  if (plan.focus === 'card' && deckCount === 0) return legal.cities.length ? 'city' : 'settlement';
-  if (plan.focus === 'save') return legal.cities.length ? 'city' : 'settlement';
-  return plan.focus;
-}
+const FOCUS: Record<string, Focus> = { city: 'city', settlement: 'settlement', army: 'card', card: 'card', road: 'road' };
+const ARCHETYPE: Record<Strategy, Archetype> = { cities: 'cities', expansion: 'expansion', development: 'development', road: 'road' };
+const STRATEGIES: Strategy[] = ['cities', 'expansion', 'development', 'road'];
+const FROM_ARCHETYPE: Partial<Record<Archetype, Strategy>> = {
+  cities: 'cities',
+  expansion: 'expansion',
+  development: 'development',
+  road: 'road',
+  trading: 'expansion',
+};
 
-/**
- * Everything the current focus costs, not just the part still missing: this is
- * what a seven leaves in hand. Keeping only the missing part protected nothing
- * already collected, so a bot with the hay for a city threw the hay away, and a
- * bot with no list at all kept whatever came first in the resource order, which
- * put rock and hay last.
- */
-function focusCost(plan: BotPlan, view: GameView): Hand {
-  const cost = FOCUS_COST[effectiveFocus(plan, view)];
-  return { ...(cost ? COSTS[cost] : { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }) };
-}
+type Spend = { calls: number; tokens: number; costUsd: number };
+const zero = (): Spend => ({ calls: 0, tokens: 0, costUsd: 0 });
+const add = (into: Spend, a: { calls: number; tokens: number; costUsd: number }) => {
+  into.calls += a.calls;
+  into.tokens += a.tokens;
+  into.costUsd += a.costUsd;
+};
 
-const none = (plan: BotPlan, action: GameAction, explain: string): Decision => ({
-  action,
-  plan,
-  calls: 0,
-  tokens: 0,
-  costUsd: 0,
-  explain,
-});
-
-/** What the model sees. Small on purpose: a state full of board geometry the
- *  question does not need measurably drags the answer around. */
-function summarise(ctx: DecideContext) {
-  const { view, meId, plan, board } = ctx;
-  const me = view.players.find((p) => p.id === meId);
-  const hand = handOf(view);
-  const leader = leaderOf(view, meId);
-  const named = (id: string | null) => seatLabel(view, meId, id);
-  const best = (field: 'roadLength' | 'knights') =>
-    view.players.reduce((n, p) => Math.max(n, p[field] ?? 0), 0);
+function thinker(ctx: DecideContext, mind: Mind, random: () => number): Thinker {
+  const dials = DIALS[ctx.level ?? 'steady'];
+  const lean = mind.strategy ?? (ctx.standIn ? FROM_ARCHETYPE[STYLE_ARCHETYPE[ctx.standIn.style]] : undefined);
+  const me = ctx.view.players.find((p) => p.id === ctx.meId);
   return {
-    me: {
-      name: named(meId),
-      points: me?.points ?? 0,
-      hand: Object.fromEntries(
-        RESOURCES.filter((r) => hand[r]).map((r) => [RESOURCE_NAMES[r].toLowerCase(), hand[r]]),
-      ),
-      settlements: me?.pieces.settlements ?? 0,
-      cities: me?.pieces.cities ?? 0,
-      roads: me?.pieces.roads ?? 0,
-      // Without this a bot was asked whether to play a development card
-      // without being told which ones it was holding, so it almost never did.
-      playable_cards: playableKinds(ctx),
-    },
-    opponents: view.players
-      .filter((p) => p.id !== meId)
-      .map((p) => ({ name: named(p.id), points: p.points, cards: p.resourceCount, knights: p.knights })),
-    target_to_win: view.victoryPoints ?? 10,
-    leader: leader ? `${named(leader.id)} on ${leader.points}` : 'nobody yet',
-    my_plan: {
-      strategy: plan.archetype,
-      saving_for: plan.focus,
-      still_needs: plan.needs,
-      threat: plan.threat,
-    },
-    turn: view.turn,
-    // A stand-in is finishing somebody else's game, and the model is told so:
-    // its job is continuity, not a better idea. Everything here was worked out
-    // from what that player put on the board.
-    ...(ctx.standIn
-      ? {
-          playing_for: {
-            note: 'This seat belongs to a player who dropped out. Keep playing the way they were.',
-            their_style: PLAY_STYLES[ctx.standIn.style],
-          },
-        }
-      : {}),
-    ...(plan.targetSite !== null ? { target_corner: cornerFacts(board, plan.targetSite) } : {}),
-    // Two points each, and the two things a game is most often won on late.
-    // This is the same standings table the portraits show every player.
-    ...(contests(ctx.level, ctx.standIn).readsTheTable
-      ? {
-          awards: {
-            longest_road: `held by ${named(view.longestRoad)}; longest run on the board is ${best('roadLength')}, mine is ${me?.roadLength ?? 0}`,
-            largest_army: `held by ${named(view.largestArmy)}; most knights played is ${best('knights')}, mine is ${me?.knights ?? 0}`,
-          },
-          points_still_needed: (view.victoryPoints ?? 10) - (me?.points ?? 0),
-        }
-      : {}),
+    me: ctx.meId,
+    know: knowledge(ctx.view, ctx.meId, mind),
+    belief: mind.belief,
+    unseen: unseenCards(mind.belief, me?.cards ?? []),
+    lean: lean ? { [ctx.meId]: lean } : undefined,
+    lastVictim: mind.lastVictim,
+    random,
+    deadline: performance.now() + (ctx.budgetMs ?? dials.budgetMs),
+    positions: ctx.positions ?? dials.positions,
+    beam: dials.beam,
+    depth: dials.depth,
+    scored: 0,
   };
 }
 
-/** The plan questions. Added to whatever call is already happening. */
-function planQuestions(ctx: DecideContext): Record<string, Question> {
+/** The plan a player reads, from the first purchases in the bot's own race. */
+function planFrom(ctx: DecideContext, mind: Mind, th: Thinker, g: ReturnType<typeof imagine>, prior: BotPlan): BotPlan {
+  const steps = race(g, ctx.meId, th.know(g)(ctx.meId), mind.strategy).steps;
+  const first = steps[0];
+  const focus: Focus = first ? (FOCUS[first.kind] ?? 'save') : 'save';
+  const cost = focus === 'city' ? COSTS.city : focus === 'settlement' ? COSTS.settlement : focus === 'road' ? COSTS.road : focus === 'card' ? COSTS.developmentCard : null;
+  const hand = handOf(ctx.view);
+  const needs = cost ? RESOURCES.filter((r) => hand[r] < (cost as Hand)[r]) : [];
+  const surplus = cost ? RESOURCES.filter((r) => hand[r] > (cost as Hand)[r] + 1) : [];
   return {
-    plan_strategy: choice(
-      ctx.standIn
-        ? `Which long game suits this position best? This seat's owner was ${PLAY_STYLES[ctx.standIn.style].toLowerCase()}, and the aim is to finish the game they were playing rather than start a different one — so prefer ${STYLE_ARCHETYPE[ctx.standIn.style]} unless the board has made it impossible.`
-        : 'Which long game suits this position best?',
-      ARCHETYPES as unknown as Record<string, string>,
-    ),
-    plan_focus: choice('What should the next few turns of resources be saved for?', {
-      settlement: 'a new settlement, to claim another corner and another point',
-      city: 'upgrading a settlement to a city, doubling its production and worth a point',
-      road: 'another road, to reach a corner or take longest road',
-      card: 'a development card, for knights, hidden points or a surprise',
-      save: 'hold resources and decide later',
-    }),
-  };
-}
-
-function readPlan(
-  ctx: DecideContext,
-  answers: Record<string, any>,
-  threat: Threat,
-  targetSite: number | null,
-): BotPlan {
-  const archetype = (answers.plan_strategy?.choice ?? ctx.plan.archetype) as Archetype;
-  const focus = (answers.plan_focus?.choice ?? ctx.plan.focus) as Focus;
-  const cost = FOCUS_COST[effectiveFocus({ ...ctx.plan, focus }, ctx.view)];
-  const { needs, surplus } = needsAndSurplus(handOf(ctx.view), cost);
-  return {
-    ...ctx.plan,
-    archetype,
+    ...prior,
+    archetype: mind.strategy ? ARCHETYPE[mind.strategy] : prior.archetype,
     focus,
-    targetSite,
+    targetSite: first?.site ?? first?.vertex ?? prior.targetSite,
     needs,
     surplus,
-    threat,
     updatedTurn: ctx.view.turn,
-    decisions: ctx.plan.decisions + 1,
+    decisions: prior.decisions + 1,
   };
-}
-
-/** Who is close enough to winning that the bot should start obstructing. */
-function threatOf(ctx: DecideContext): Threat {
-  const { view, meId } = ctx;
-  const { threatWithin, mindsAwards } = contests(ctx.level, ctx.standIn);
-  const leader = leaderOf(view, meId);
-  const goal = view.victoryPoints ?? 10;
-  if (leader && leader.points >= goal - threatWithin) return 'leader-close';
-  if (!mindsAwards) return 'none';
-  if (view.longestRoad && view.longestRoad !== meId) return 'road-contested';
-  if (view.largestArmy && view.largestArmy !== meId) return 'army-contested';
-  return 'none';
 }
 
 export async function decide(ctx: DecideContext): Promise<Decision> {
-  const { view, board, meId, jev } = ctx;
-  const legal = view.legal;
-  const hand = handOf(view);
-  const plan = ctx.plan ?? initialPlan(view.turn);
-
-  // --- rungs the rules already decide -------------------------------------
-  if (view.phase === 'roll') {
-    const knight = knightBeforeRoll(ctx);
-    if (knight)
-      return none(plan, playCard(ctx, plan, knight), 'Knight first: the robber is on my own production.');
-    return none(plan, { kind: 'roll' }, 'Rolling.');
-  }
-
-  if (view.phase === 'discard') {
-    const count = Math.floor(handTotal(hand) / 2);
-    return none(
-      plan,
-      { kind: 'discard', resources: discardChoice(hand, focusCost(plan, view), count) },
-      `Discarding ${count}, keeping what the plan needs.`,
-    );
-  }
-
-  if (view.phase === 'setupRoad') {
-    const options = legal.roads;
-    if (options.length <= 1)
-      return none(plan, { kind: 'road', edge: options[0] ?? 0 }, 'Only one road fits.');
-    const best = rankRoads(board, options, plan.targetSite, 1)[0]!;
-    return none(plan, { kind: 'road', edge: best }, 'Pointing the first road at the better corners.');
-  }
-
-  if (view.phase === 'freeRoads') {
-    const best = rankRoads(board, legal.roads, plan.targetSite, 1)[0];
-    if (best === undefined) return none(plan, { kind: 'endTurn' }, 'No road to build.');
-    return none(plan, { kind: 'road', edge: best }, 'Taking a free road toward the target corner.');
-  }
-
-  // --- rungs that need judgement ------------------------------------------
-  // When the service fails the same rung is answered again without it, which
-  // is exactly how a bot with no key plays. A thinner fallback used to live
-  // here: it built a city or a settlement and otherwise passed, never a road,
-  // a card or a trade, so its starting roads never reached a new corner and a
-  // table whose service was down stalled at about four points each.
-  try {
-    return await judge(ctx, plan);
-  } catch (error) {
-    if (!(error instanceof JevUnavailable)) throw error;
-    return { ...(await judge({ ...ctx, jev: null }, plan)), degraded: true };
-  }
-}
-
-async function judge(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
-  if (ctx.view.phase === 'setupSettlement') return openingPlacement(ctx, plan);
-  if (ctx.view.phase === 'robber') return placeRobber(ctx, plan);
-  if (ctx.view.phase === 'actions') return takeTurn(ctx, plan);
-  return none(plan, { kind: 'endTurn' }, 'Nothing to do.');
-}
-
-/** The opening corner, which is the single most consequential decision of the
- *  game, so it gets the widest shortlist. */
-async function openingPlacement(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
-  const { board, view, jev } = ctx;
-  const options = rankCorners(board, view.legal.settlements, LIMIT.openingCorners);
-  const criteria = Object.fromEntries(options.map((id) => [String(id), cornerFacts(board, id)]));
-  const fallback = () => ({
-    ...none(plan, { kind: 'settlement', vertex: options[0]! }, 'Taking the strongest corner by production.'),
-    degraded: true,
-  });
-  if (!jev) return fallback();
-
-  const ev = await jev.evaluate(
-    {
-      ...summarise(ctx),
-      note: 'pips are how often a number rolls out of 36; 6 and 8 are the best at 5 each. Three different resources on one corner is usually worth more than raw production.',
-    },
-    { site: choice('Which corner is the strongest opening settlement?', criteria), ...planQuestions(ctx) },
-  );
-  const picked = Number(ev.answers.site?.type === 'choice' ? ev.answers.site.choice : options[0]);
-  const vertex = options.includes(picked) ? picked : options[0]!;
-  const next = readPlan(ctx, ev.answers, threatOf(ctx), vertex);
-  return {
-    action: { kind: 'settlement', vertex },
-    plan: next,
-    calls: 1,
-    tokens: ev.inputTokens,
-    costUsd: ev.costUsd,
-    explain: `Opening on ${cornerFacts(board, vertex).produces.join(', ')}. ${describe(next, board)}`,
-  };
-}
-
-async function placeRobber(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
-  const { board, view, meId, jev } = ctx;
-  const { leaderWeight, huntsLeader } = contests(ctx.level, ctx.standIn);
-  const hexes = rankRobberHexes(board, view, meId, LIMIT.robberHexes, leaderWeight);
-  const first = hexes[0];
-  if (first === undefined)
-    return none(plan, { kind: 'robber', hex: view.robber }, 'Nowhere better to put the robber.');
-  const pick = (hex: number) => {
-    const victims = robberTargets(view, hex, meId);
-    const leader = leaderOf(view, meId);
-    const victim = (huntsLeader && victims.find((v) => v === leader?.id)) || victims[0];
-    return { kind: 'robber', hex, ...(victim ? { victim } : {}) } as GameAction;
-  };
-  if (!jev || hexes.length === 1)
-    return { ...none(plan, pick(first), 'Blocking the best tile available.'), degraded: !jev };
-
-  const criteria = Object.fromEntries(
-    hexes.map((id) => {
-      const hex = board.hexes[id]!;
-      const on = hex.vertices
-        .map((v) => view.buildings[v])
-        .filter(Boolean)
-        .map((b) =>
-          b!.player === meId ? `my ${b!.kind}` : `${seatLabel(view, meId, b!.player)}'s ${b!.kind}`,
-        );
-      return [
-        String(id),
-        {
-          tile: `${RESOURCE_NAMES[hex.terrain as Resource] ?? 'desert'} on ${hex.number}`,
-          blocks: on.length ? on : ['nobody'],
-        },
-      ];
-    }),
-  );
-  // The question differs with the level too, because the two bots are weighing
-  // genuinely different things and one prompt cannot stand for both.
-  const ev = await jev.evaluate(summarise(ctx), {
-    hex: choice(
-      huntsLeader
-        ? 'Where should the robber go to hurt the player most likely to win?'
-        : 'Where should the robber go to block the most production?',
-      criteria,
-    ),
-  });
-  const answer = ev.answers.hex;
-  const chosen =
-    answer?.type === 'choice' && hexes.includes(Number(answer.choice)) ? Number(answer.choice) : first;
-  return {
-    action: pick(chosen),
-    plan,
-    calls: 1,
-    tokens: ev.inputTokens,
-    costUsd: ev.costUsd,
-    explain: huntsLeader
-      ? 'Robber onto the tile that costs the leader most.'
-      : 'Robber onto the busiest tile that is not mine.',
-  };
-}
-
-/** The main turn. One request covers what to do, where to do it, and, when the
- *  plan is stale, what the plan should become. */
-async function takeTurn(ctx: DecideContext, plan: BotPlan): Promise<Decision> {
-  const { board, view, meId, jev } = ctx;
-  const legal = view.legal;
-  const hand = handOf(view);
-  const can = affordable(hand);
-
-  const { shortlist, planLife, spendsEveryTurn } = contests(ctx.level, ctx.standIn);
-  const corners = rankCorners(board, legal.settlements, shortlist.corners);
-  const cities = legal.cities.slice(0, shortlist.corners);
-  const roads = rankRoads(board, legal.roads, plan.targetSite, shortlist.roads);
-  const playable = usableCards(ctx);
-
-  const moves: Record<string, string> = {};
-  if (corners.length) moves.settlement = 'build a settlement on a new corner: one point and more production';
-  if (cities.length) moves.city = 'upgrade a settlement to a city: one point and double production';
-  if (roads.length && can.includes('road')) moves.road = 'build a road toward a corner or for longest road';
-  if (legal.canBuyCard) moves.card = 'buy a development card';
-  // What the focus still needs, worked out from this hand at every decision.
-  // It used to be refreshed only when the decision service answered, so a bot
-  // playing without one kept the empty list it started with, and a trade needs
-  // something to receive: it never traded with the bank or a harbour at all.
-  const focus = FOCUS_COST[effectiveFocus(plan, view)];
-  const { needs, surplus } = needsAndSurplus(hand, focus);
-  const trade = bankTrade(hand, legal.rates, needs, view.bank, focus ? COSTS[focus] : undefined);
-  if (trade)
-    moves.trade = `trade ${RESOURCE_NAMES[trade.give].toLowerCase()} to the bank for the ${RESOURCE_NAMES[trade.receive].toLowerCase()} the plan needs`;
-  const kinds = playableKinds(ctx);
-  if (playable.length)
-    moves.playCard = `play a development card: ${Object.keys(kinds)
-      .map((kind) => CARD_NAMES[kind as CardKind] ?? kind)
-      .join(' or ')}`;
-  // Passing while a point is sitting there affordable is how a bot loses a
-  // game it was winning. A champion goes further: if anything useful can be
-  // bought, the turn is not over.
-  const scoring = (corners.length && can.includes('settlement')) || (cities.length && can.includes('city'));
-  const useful =
-    scoring ||
-    (spendsEveryTurn &&
-      ((roads.length && can.includes('road')) || (legal.canBuyCard && can.includes('developmentCard'))));
-  if (!useful) moves.endTurn = 'do nothing this turn and keep the resources';
-
-  // Nothing worth asking about.
-  if (!Object.keys(moves).length)
-    return none(plan, { kind: 'endTurn' }, 'Nothing affordable; holding resources.');
-  if (Object.keys(moves).length === 1 && moves.endTurn)
-    return none(plan, { kind: 'endTurn' }, 'Nothing affordable; holding resources.');
-
-  const targetTaken = plan.targetSite !== null && !!view.buildings[plan.targetSite];
-  const threat = threatOf(ctx);
-  const stale = planIsStale(plan, { turn: view.turn, targetTaken, threat, everyFewTurns: planLife });
-
-  const fallback = (): Decision => {
-    const current = { ...plan, needs, surplus };
-    // A card held to the end of the game was worth nothing. With no decision
-    // service to ask, playing one beats passing on the turn, and the strongest
-    // of them is picked here rather than the first that came out of the deck.
-    const card = playable.length ? bestCardToPlay(ctx, playable) : undefined;
-    const action: GameAction =
-      cities.length && can.includes('city')
-        ? { kind: 'city', vertex: cities[0]! }
-        : corners.length && can.includes('settlement')
-          ? { kind: 'settlement', vertex: corners[0]! }
-          : roads.length && can.includes('road')
-            ? { kind: 'road', edge: roads[0]! }
-            : trade
-              ? { kind: 'bankTrade', give: trade.give, receive: trade.receive }
-              : legal.canBuyCard
-                ? { kind: 'buyCard' }
-                : card
-                  ? playCard(ctx, current, card)
-                  : { kind: 'endTurn' };
-    return { ...none(current, action, 'Playing the plan without the decision service.'), degraded: true };
-  };
-  if (!jev) return fallback();
-
-  const questions: Record<string, Question> = {
-    move: choice('What is the best move right now?', moves),
-    ...(corners.length
-      ? {
-          where_settlement: choice(
-            'If a settlement is built, which corner?',
-            Object.fromEntries(corners.map((id) => [String(id), cornerFacts(board, id)])),
-          ),
-        }
-      : {}),
-    ...(cities.length
-      ? {
-          where_city: choice(
-            'If a city is built, which settlement should be upgraded?',
-            Object.fromEntries(cities.map((id) => [String(id), cornerFacts(board, id)])),
-          ),
-        }
-      : {}),
-    ...(roads.length
-      ? {
-          where_road: choice(
-            'If a road is built, which edge?',
-            Object.fromEntries(
-              roads.map((id) => {
-                const e = board.edges[id]!;
-                return [
-                  String(id),
-                  {
-                    between_corners: [e.a + 1, e.b + 1],
-                    toward: plan.targetSite !== null ? `corner ${plan.targetSite + 1}` : 'open board',
-                  },
-                ];
-              }),
-            ),
-          ),
-        }
-      : {}),
-    ...(playable.length
-      ? {
-          which_card: choice(
-            'If a card is played, which one?',
-            Object.fromEntries(
-              playable.map((id) => {
-                const kind = (view.players.find((p) => p.id === meId)?.cards ?? []).find(
-                  (c) => c.id === id,
-                )?.kind;
-                return [
-                  id,
-                  {
-                    card: kind ? (CARD_NAMES[kind] ?? kind) : 'card',
-                    does: (kind && CARD_USE[kind]) ?? 'a one-off effect',
-                  },
-                ];
-              }),
-            ),
-          ),
-        }
-      : {}),
-    ...(stale ? planQuestions(ctx) : {}),
+  const mind = ctx.mind ?? newMind();
+  const plan = ctx.plan ?? initialPlan(ctx.view.turn);
+  const random = ctx.random ?? seededRandom(hash(`${ctx.meId}:${ctx.view.turn}:${ctx.view.phase}`));
+  const spend = zero();
+  const view = ctx.view;
+  const g = imagine(view, ctx.meId, mind, random);
+  const th = thinker(ctx, mind, random);
+  const dials = DIALS[ctx.level ?? 'steady'];
+  const done = (action: GameAction, explain: string, extra: Partial<Decision> = {}): Decision => {
+    const next = planFrom(ctx, mind, th, g, plan);
+    return { action, plan: next, ...spend, explain: explain || describe(next, ctx.board), mind, ...extra };
   };
 
-  const ev = await jev.evaluate(summarise(ctx), questions);
-  const move = ev.answers.move?.type === 'choice' ? ev.answers.move.choice : 'endTurn';
-  const pickFrom = (key: string, options: number[]): number | undefined => {
-    const a = ev.answers[key];
-    const value = a?.type === 'choice' ? Number(a.choice) : NaN;
-    return options.includes(value) ? value : options[0];
-  };
-
-  let action: GameAction = { kind: 'endTurn' };
-  if (move === 'settlement' && corners.length)
-    action = { kind: 'settlement', vertex: pickFrom('where_settlement', corners)! };
-  else if (move === 'city' && cities.length)
-    action = { kind: 'city', vertex: pickFrom('where_city', cities)! };
-  else if (move === 'road' && roads.length) action = { kind: 'road', edge: pickFrom('where_road', roads)! };
-  else if (move === 'card' && legal.canBuyCard) action = { kind: 'buyCard' };
-  else if (move === 'trade' && trade)
-    action = { kind: 'bankTrade', give: trade.give, receive: trade.receive };
-  else if (move === 'playCard' && playable.length)
-    action = playCard(
-      ctx,
-      plan,
-      ev.answers.which_card?.type === 'choice' ? ev.answers.which_card.choice : playable[0]!,
-    );
-
-  const nextPlan = stale
-    ? readPlan(ctx, ev.answers, threat, plan.targetSite ?? corners[0] ?? null)
-    : { ...plan, decisions: plan.decisions + 1, needs };
-  return {
-    action,
-    plan: nextPlan,
-    calls: 1,
-    tokens: ev.inputTokens,
-    costUsd: ev.costUsd,
-    explain: describe(nextPlan, board),
-  };
-}
-
-/** Card arguments are worked out here rather than asked: which two resources a
- *  Year of Plenty should fetch is just the plan's shopping list. */
-function playCard(ctx: DecideContext, plan: BotPlan, cardId: string): GameAction {
-  const me = ctx.view.players.find((p) => p.id === ctx.meId);
-  const kind = (me?.cards ?? []).find((c) => c.id === cardId)?.kind;
-  const wanted = plan.needs.length ? plan.needs : (['ore', 'wheat'] as Resource[]);
-  if (kind === 'yearOfPlenty') {
-    // The rules want exactly two, or whatever is left if the bank is down to
-    // one, and never a resource it has run out of.
-    const stock: Hand = { ...ctx.view.bank };
-    const resources: Hand = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
-    let take = Math.min(
-      2,
-      RESOURCES.reduce((n, r) => n + stock[r], 0),
-    );
-    for (const r of [...wanted, ...RESOURCES]) {
-      if (!take) break;
-      if (stock[r] <= 0) continue;
-      stock[r] -= 1;
-      resources[r] += 1;
-      take -= 1;
+  switch (view.phase) {
+    case 'roll': {
+      const knight = knightFirst(g, th);
+      return knight ? done(knight, 'A knight first: the robber has to move.') : done({ kind: 'roll' }, 'Rolling.');
     }
-    return { kind: 'playCard', cardId, resources };
+    case 'discard': {
+      const count = view.discards[ctx.meId] ?? Math.floor(RESOURCES.reduce((n, r) => n + handOf(view)[r], 0) / 2);
+      return done({ kind: 'discard', resources: bestDiscard(g, th, count) }, `Discarding ${count}, keeping what the race needs.`);
+    }
+    case 'setupSettlement': {
+      const [samples, candidates] = dials.opening;
+      const pick = chooseOpening(g, th, samples, candidates);
+      return done({ kind: 'settlement', vertex: pick.vertex }, '');
+    }
+    case 'setupRoad':
+      return done(chooseOpeningRoad(g, th), 'Pointing the road at the next corner.');
+    case 'freeRoads': {
+      const options = roadSites(g, ctx.meId);
+      if (!options.length) return done({ kind: 'endTurn' }, 'No road to build.');
+      let best = options[0]!,
+        bestValue = -1;
+      for (const edge of options) {
+        const next = tryMove(g, ctx.meId, { kind: 'road', edge });
+        if (!next) continue;
+        const v = value(next, th, false);
+        if (v > bestValue) {
+          bestValue = v;
+          best = edge;
+        }
+      }
+      return done({ kind: 'road', edge: best }, 'Placing a free road.');
+    }
+    case 'robber': {
+      const best = bestRobber(g, th);
+      if (!best) return done({ kind: 'robber', hex: view.robber }, 'Nowhere better for the robber.');
+      let action = best.action;
+      // Two targets the engine cannot separate, hitting different people: who is the real threat?
+      if (dials.advisor && best.runnerUp !== undefined && best.value - best.runnerUp < 0.003) {
+        const top = [best.action];
+        const second = bestRobberAlternatives(g, th, best.action);
+        if (second) top.push(second);
+        const victims = [...new Set(top.map((a) => (a as { victim?: string }).victim).filter((v): v is string => !!v))];
+        if (victims.length >= 2) {
+          const advice = await adviseThreat(ctx.jev, view, ctx.meId, victims);
+          add(spend, advice);
+          const pick = top.find((a) => (a as { victim?: string }).victim === advice.value);
+          if (pick) action = pick;
+        }
+      }
+      const victim = (action as { victim?: string }).victim;
+      if (victim) mind.lastVictim = victim;
+      return done(action, victim ? 'Robber onto the tile that costs the leaders most, and a card from them.' : 'Robber onto the busiest tile.');
+    }
+    case 'actions':
+      return takeTurn(ctx, mind, th, g, plan, spend, dials, done);
+    default:
+      return done({ kind: 'endTurn' }, 'Nothing to do.');
   }
-  if (kind === 'monopoly') return { kind: 'playCard', cardId, resource: wanted[0] ?? 'ore' };
-  return { kind: 'playCard', cardId };
 }
+
+/** The runner-up robber placement with a different victim, for the advisor to weigh. */
+function bestRobberAlternatives(g: ReturnType<typeof imagine>, th: Thinker, first: GameAction): GameAction | null {
+  const victim = (first as { victim?: string }).victim;
+  const others = g.players.filter((p) => p.id !== th.me && p.id !== victim && !p.resigned);
+  let best: { a: GameAction; v: number } | null = null;
+  for (const hex of g.board.hexes) {
+    if (hex.id === g.robber) continue;
+    for (const o of others) {
+      if (!hex.vertices.some((v) => g.buildings[v]?.player === o.id)) continue;
+      const a: GameAction = { kind: 'robber', hex: hex.id, victim: o.id };
+      const next = tryMove(g, th.me, a);
+      if (!next) continue;
+      const v = value(next, th, false);
+      if (!best || v > best.v) best = { a, v };
+    }
+  }
+  return best?.a ?? null;
+}
+
+async function takeTurn(
+  ctx: DecideContext,
+  mind: Mind,
+  th: Thinker,
+  g: ReturnType<typeof imagine>,
+  plan: BotPlan,
+  spend: Spend,
+  dials: (typeof DIALS)[BotLevel],
+  done: (action: GameAction, explain: string, extra?: Partial<Decision>) => Decision,
+): Promise<Decision> {
+  const view = ctx.view;
+  const now = ctx.now ?? Date.now();
+  if (mind.offers.turn !== view.turn) mind.offers = { turn: view.turn, made: [] };
+
+  // Its own offer is on the table: take the best answer, wait, or withdraw.
+  if (view.trade && view.trade.player === ctx.meId) {
+    if (!mind.offerSince || mind.offerSince.tradeId !== view.trade.id) mind.offerSince = { tradeId: view.trade.id, at: now };
+    const managed = manageOffer(g, th, view.trade, now - mind.offerSince.at);
+    if (!managed.action) return done({ kind: 'endTurn' }, 'Waiting for answers to the trade offer.', { hold: true });
+    if (managed.action.kind === 'acceptProposal' && managed.verdict && managed.partner && ctx.humans?.includes(managed.partner) && dials.advisor) {
+      const advice = await adviseTrade(ctx.jev, view, ctx.meId, managed.partner, managed.verdict, mind.profiles[managed.partner]);
+      add(spend, advice);
+      if (!advice.value) return done({ kind: 'cancelTrade' }, 'Thought better of that trade.');
+    }
+    return done(managed.action, managed.action.kind === 'cancelTrade' ? 'No good answer; keeping the cards.' : 'Taking the best answer to the offer.');
+  }
+
+  // A seat kept warm for someone who dropped out finishes the game they were
+  // playing: their style is the long game, and nobody is asked for a new one.
+  const inherited = ctx.standIn ? FROM_ARCHETYPE[STYLE_ARCHETYPE[ctx.standIn.style]] : undefined;
+  if (inherited) {
+    mind.strategy = inherited;
+    mind.strategyTurn = view.turn;
+    th.lean = { [ctx.meId]: inherited };
+  }
+  // The long game, chosen after the opening and revisited every few turns.
+  else if (mind.strategy === undefined || (mind.strategyTurn ?? -99) + 4 <= view.turn) {
+    const rolls = {} as Record<Strategy, number>;
+    const know = th.know(g)(ctx.meId);
+    for (const s of STRATEGIES) rolls[s] = race(g, ctx.meId, know, s).rolls;
+    const advice = dials.advisor
+      ? await adviseStrategy(ctx.jev, view, ctx.meId, rolls)
+      : { value: (Object.entries(rolls) as [Strategy, number][]).sort((a, b) => a[1] - b[1])[0]![0], calls: 0, tokens: 0, costUsd: 0 };
+    add(spend, advice);
+    mind.strategy = advice.value;
+    mind.strategyTurn = view.turn;
+    th.lean = { [ctx.meId]: mind.strategy };
+  }
+
+  const best = planTurn(g, th);
+  // A card or two short of something better: ask the table before settling for the bank.
+  if (dials.offers && ctx.canOffer !== false && !view.trade) {
+    const offer = makeOffer(g, th, mind.offers.made, best.value, mind.trading);
+    if (offer) {
+      mind.offers.made.push(offer.key);
+      mind.trading.made++;
+      return done(offer.action, 'Offering a trade for the cards the plan is missing.');
+    }
+    if (dials.open && best.action.kind === 'endTurn') {
+      const open = openOffer(g, th, mind.offers.made);
+      if (open) {
+        mind.offers.made.push(open.key);
+        mind.trading.made++;
+        return done(open.action, 'Offering spare cards for whatever the table has.');
+      }
+    }
+  }
+  // A lower level sometimes settles for a good move rather than the best one.
+  let action = best.action;
+  if (dials.slack > 0 && th.random() < 0.25 && best.value - best.baseline < dials.slack) action = { kind: 'endTurn' };
+  return done(action, '');
+}
+
+/**
+ * Someone else's trade offer is on the table. Answer it: accept, decline, or for
+ * an open offer, propose. Returns null when this seat cannot take part.
+ */
+export async function respond(ctx: DecideContext): Promise<{ action: GameAction | null; mind: Mind; calls: number; tokens: number; costUsd: number }> {
+  const mind = ctx.mind ?? newMind();
+  const spend = zero();
+  const view = ctx.view;
+  const trade = view.trade;
+  if (!trade || trade.player === ctx.meId || view.phase !== 'actions' || (view.notTrading ?? []).includes(ctx.meId))
+    return { action: null, mind, ...spend };
+  if (trade.declinedBy?.includes(ctx.meId) || trade.proposals?.some((p) => p.player === ctx.meId))
+    return { action: null, mind, ...spend };
+  const random = ctx.random ?? seededRandom(hash(`${ctx.meId}:${view.turn}:trade:${trade.id}`));
+  const g = imagine(view, ctx.meId, mind, random);
+  const th = thinker({ ...ctx, positions: Math.min(ctx.positions ?? 300, 300) }, mind, random);
+  const result = answer(g, th, trade);
+  let action = result.action;
+  if (
+    result.verdict &&
+    action.kind !== 'declineTrade' &&
+    ctx.humans?.includes(result.partner) &&
+    DIALS[ctx.level ?? 'steady'].advisor
+  ) {
+    const advice = await adviseTrade(ctx.jev, view, ctx.meId, result.partner, result.verdict, mind.profiles[result.partner]);
+    add(spend, advice);
+    if (!advice.value) action = { kind: 'declineTrade', tradeId: trade.id };
+  }
+  return { action, mind, ...spend };
+}
+
+function hash(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+export { standings, settle };

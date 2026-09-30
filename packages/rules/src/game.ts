@@ -951,13 +951,41 @@ export function resignPlayers(
 
 /** Pure transition: caller supplies private randomness, and commits the result before broadcasting. */
 export function applyAction(state: Game, playerId: string, raw: GameAction, random: () => number): Game {
+  return applyWith(state, playerId, raw, random, structuredClone);
+}
+
+/**
+ * The same move, for a bot thinking ahead rather than for the table.
+ *
+ * Copying the whole game is most of the cost of a move, and most of the game is
+ * the board, which no move changes. A bot trying thousands of moves on copies of
+ * a position shares the board with the position it came from and starts each
+ * copy with an empty log. The rules are the same function either way, so a move
+ * the bot imagines is exactly the move the table would accept. Never used for a
+ * real game: the result shares its board with the input.
+ */
+export function simulateAction(state: Game, playerId: string, raw: GameAction, random: () => number): Game {
+  return applyWith(state, playerId, raw, random, (g) => {
+    const copy = structuredClone({ ...g, board: null as unknown as Board, log: [] });
+    copy.board = g.board;
+    return copy;
+  });
+}
+
+function applyWith(
+  state: Game,
+  playerId: string,
+  raw: GameAction,
+  random: () => number,
+  clone: (g: Game) => Game,
+): Game {
   const a = parseGameAction(raw);
   requireRule(onBoard(state.board, a), 'Invalid board location');
   const rules = rulesetOf(state),
     { bank, pieces: supply } = rules.supply,
     sea = !!rules.sea;
   requireRule(handsWithin(bank, a), `Choose whole resource counts from 0 to ${bank}`);
-  const g = structuredClone(state);
+  const g = clone(state);
   const p = g.players.find((p) => p.id === playerId);
   requireRule(p, 'Not a player in this game');
   requireRule(!p.resigned, 'You resigned from this game; you can still watch');

@@ -1944,29 +1944,29 @@
     {
       "seed": 7,
       "players": 3,
-      "steps": 464,
-      "turn": 149,
+      "steps": 237,
+      "turn": 80,
       "winner": "beacon",
       "rejected": 0,
-      "game": "7412e82f23a4d22b322fa613b95959b36fc13192ee342d3ecae2b2c6c757ea3c"
+      "game": "bf023b41a6892a63d107f70706647a64f9cc8ba5a16f7384a68cdb92c94c60b1"
     },
     {
       "seed": 481,
       "players": 4,
-      "steps": 450,
-      "turn": 134,
-      "winner": "beacon",
+      "steps": 205,
+      "turn": 64,
+      "winner": "drift",
       "rejected": 0,
-      "game": "258be168c72e56e15b82b3dfd4d6a1d2bbc965bbf5924ee8034db2f527b68667"
+      "game": "271171157cf85e2943f957f3dcaa1d888d0f225e4c10171d7839c8bb16c5c25a"
     },
     {
       "seed": 2026,
       "players": 2,
-      "steps": 332,
-      "turn": 118,
-      "winner": "beacon",
+      "steps": 244,
+      "turn": 87,
+      "winner": "anchor",
       "rejected": 0,
-      "game": "4e9e66b90d8dff74922e75e712123f05afebe044a5b2e8889ae3f1ba1df53444"
+      "game": "ba1c936c972761f23c76731bc11efc694e68e9fa5fc5bd8559d19938cf331a7c"
     }
   ]
 }

@@ -17,6 +17,11 @@ import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import {
   decide,
+  respond,
+  newMind,
+  watch,
+  reactTo,
+  reacted,
   createJevClient,
   initialPlan,
   addUsage,
@@ -27,7 +32,8 @@ import {
   STYLE_ARCHETYPE,
   STYLE_LABEL,
 } from '../../../packages/bot/src/index.js';
-import type { BotPlan, BotUsage, JevClient, StandInStyle } from '../../../packages/bot/src/index.js';
+import type { BotPlan, BotUsage, JevClient, Mind, StandInStyle, TableEvent } from '../../../packages/bot/src/index.js';
+import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { gameView } from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
@@ -68,6 +74,10 @@ const THINK_MS: Record<string, [number, number]> = {
   robber: [1400, 2800],
 };
 const THINK_DEFAULT: [number, number] = [800, 1600];
+/** How long a bot takes over somebody else's trade offer. */
+const ANSWER_MS: [number, number] = [1500, 4000];
+/** How often a bot with its own offer open looks at the answers again. */
+const HOLD_MS = 1200;
 /** The opening is the longest decision in a real game, so it reads wrong if it
  *  is quick. */
 const OPENING_MS: [number, number] = [1900, 3600];
@@ -93,6 +103,10 @@ export type BotDriverDependencies = {
   random?: () => number;
   /** Injectable so tests can hand the driver a decision that fails. */
   decide?: typeof decide;
+  /** Throws a reaction across the table for a bot, as if it had tapped one. */
+  react?: (roomId: string, seat: { id: string; name: string }, reaction: ReactionName) => void;
+  /** Injectable so tests can run reactions without real timers. */
+  schedule?: (run: () => void, delayMs: number) => void;
   log?: (event: string, detail: Record<string, unknown>) => void;
 };
 
@@ -103,6 +117,14 @@ export type BotDriverDependencies = {
  */
 export class BotDriver {
   private readonly plans = new Map<string, BotPlan>();
+  /** Each bot's memory: card counting, its long plan, what it has learnt about the table. */
+  private readonly minds = new Map<string, Mind>();
+  /** The last state of each room the bots have watched, so every move since can be replayed to them. */
+  private readonly seen = new Map<string, { revision: number; game: Game }>();
+  /** Answers to other players' trade offers, waiting out a think pause: by room, seat and offer. */
+  private readonly answers = new Map<string, { readyAt: number; action: GameAction; seat: BotSeat; tradeId: number }>();
+  /** A bot whose own offer is collecting answers is asked again after this. */
+  private readonly holdUntil = new Map<string, number>();
   /** Seats currently held for an absent player, so a plan built for a handover
    *  is dropped when the seat goes back to its owner. */
   private readonly standInPlans = new Map<string, number>();
@@ -156,6 +178,18 @@ export class BotDriver {
   /** One pass over every room that currently owes a bot move. */
   async tick(): Promise<void> {
     const rooms = new Set(this.dependencies.store.botRooms());
+    for (const roomId of [...this.seen.keys()])
+      if (!rooms.has(roomId)) {
+        // A game that just ended: let the bots see the last move, then let go.
+        try {
+          const game = this.dependencies.store.loadGame(roomId);
+          if (game) this.watchRoom(roomId, game, this.dependencies.store.snapshot(roomId).revision);
+        } catch {
+          // Nothing to watch; the room is gone.
+        }
+        this.seen.delete(roomId);
+        for (const key of [...this.answers.keys()]) if (key.startsWith(`${roomId}:`)) this.answers.delete(key);
+      }
     for (const roomId of [...this.pending.keys(), ...this.retryAt.keys(), ...this.failures.keys()])
       if (!rooms.has(roomId)) this.forget(roomId);
     for (const roomId of rooms) {
@@ -163,8 +197,11 @@ export class BotDriver {
       this.busy.add(roomId);
       try {
         const live = this.live(roomId);
-        if (live) await this.playRoom(roomId, live.game, live.revision);
-        else this.forget(roomId);
+        if (live) {
+          this.watchRoom(roomId, live.game, live.revision);
+          await this.answerTrades(roomId, live.game);
+          await this.playRoom(roomId, live.game, live.revision);
+        } else this.forget(roomId);
       } catch (error) {
         // Whatever broke, the room is tried again later rather than on every
         // tick, and a room that cannot even be read backs off to once a minute.
@@ -196,6 +233,7 @@ export class BotDriver {
 
   /** Drop everything held for a room that owes no move. */
   private forget(roomId: string): void {
+    this.holdUntil.delete(roomId);
     this.pending.delete(roomId);
     this.retryAt.delete(roomId);
     this.failures.delete(roomId);
@@ -218,6 +256,7 @@ export class BotDriver {
       this.plans.delete(seat.id);
       this.standInPlans.delete(seat.id);
     }
+    if ((this.holdUntil.get(roomId) ?? 0) > now) return;
     const waiting = this.pending.get(roomId);
     if (waiting && waiting.revision === revision && waiting.seat.id === seat.id) {
       if (waiting.readyAt > now) return;
@@ -246,6 +285,9 @@ export class BotDriver {
         plan: this.plans.get(seat.id) ?? this.openingPlan(game.turn, style),
         jev: this.jev,
         level: seat.level,
+        mind: this.mindOf(seat.id),
+        humans: this.humansIn(roomId, game),
+        now,
         ...(style ? { standIn: style } : {}),
       });
     } catch (error) {
@@ -256,8 +298,14 @@ export class BotDriver {
       return;
     }
     this.plans.set(seat.id, decision.plan);
+    if (decision.mind) this.minds.set(seat.id, decision.mind);
     if (seat.standIn) this.standInPlans.set(seat.id, seat.standIn.since);
     addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, decision);
+    // Its own trade offer is still collecting answers: nothing to play yet.
+    if (decision.hold) {
+      this.holdUntil.set(roomId, this.now() + HOLD_MS);
+      return;
+    }
     // Wait before committing, including the very first bot move. Keep the
     // decision so scheduler ticks during the pause never spend more API tokens.
     this.pending.set(roomId, {
@@ -384,6 +432,135 @@ export class BotDriver {
     if (this.random() < DISTRACTED_CHANCE) target += pick(DISTRACTED_MS);
     const spent = this.now() - startedAt;
     return Math.max(120, Math.round(target - spent));
+  }
+
+  private mindOf(seatId: string): Mind {
+    let mind = this.minds.get(seatId);
+    if (!mind) this.minds.set(seatId, (mind = newMind()));
+    return mind;
+  }
+
+  /** The people at the table: trades with them get a second opinion when they are close calls. */
+  private humansIn(roomId: string, game: Game): string[] {
+    const bots = new Set(this.dependencies.store.botSeatsIn(roomId).filter((b) => !b.standIn).map((b) => b.id));
+    return game.players.filter((p) => !bots.has(p.id)).map((p) => p.id);
+  }
+
+  /**
+   * Replay every move since the bots last looked, one state at a time, so each
+   * bot's card counting sees exactly what a player watching the table saw. The
+   * journal keeps every state; a gap (a restart, a compacted row) only means a
+   * bot counts from the public card counts again.
+   */
+  private watchRoom(roomId: string, game: Game, revision: number): void {
+    const bots = this.dependencies.store.botSeatsIn(roomId);
+    if (!bots.length) return;
+    const last = this.seen.get(roomId);
+    this.seen.set(roomId, { revision, game });
+    if (!last || last.revision >= revision) return;
+    const states: Game[] = [last.game];
+    for (let r = last.revision + 1; r < revision && revision - last.revision <= 400; r++) {
+      const state = this.dependencies.store.journalState(roomId, r);
+      if (state?.players) states.push(state);
+    }
+    states.push(game);
+    const events = new Map<string, TableEvent[]>();
+    for (let i = 1; i < states.length; i++) {
+      const before = states[i - 1]!,
+        after = states[i]!;
+      if (!before.players?.length) continue;
+      for (const seat of bots) {
+        const seen = watch(this.mindOf(seat.id), seat.id, before, after);
+        if (seen.length) events.set(seat.id, [...(events.get(seat.id) ?? []), ...seen]);
+      }
+    }
+    this.react(roomId, bots, events, game);
+  }
+
+  /**
+   * At most one bot reacts to a stretch of play, the one it matters to most, and
+   * its faces arrive a moment later, a burst spaced out like a thumb tapping.
+   */
+  private react(roomId: string, bots: BotSeat[], events: Map<string, TableEvent[]>, game: Game): void {
+    const send = this.dependencies.react;
+    if (!send || !events.size) return;
+    const now = this.now();
+    const order = [...bots].sort(() => this.random() - 0.5);
+    for (const seat of order) {
+      const seen = events.get(seat.id);
+      if (!seen?.length) continue;
+      const mind = this.mindOf(seat.id);
+      const faces = reactTo(seen, seat.id, mind, { now, random: this.random, target: game.victoryPoints ?? 10 });
+      if (!faces?.length) continue;
+      reacted(mind, now);
+      const schedule = this.dependencies.schedule ?? ((run, ms) => setTimeout(run, ms).unref?.());
+      let at = 700 + this.random() * 1100;
+      for (const face of faces) {
+        schedule(() => send(roomId, { id: seat.id, name: seat.name }, face), Math.round(at));
+        at += 350 + this.random() * 300;
+      }
+      return;
+    }
+  }
+
+  /**
+   * Bots answer other players' trade offers: accept, decline, or propose, each
+   * after a pause of its own. Nothing is owed here, so nothing waits on a bot;
+   * a person can take the offer first.
+   */
+  private async answerTrades(roomId: string, game: Game): Promise<void> {
+    const trade = game.trade;
+    // Answers queued for an offer that has gone are dropped.
+    for (const [key, queued] of this.answers)
+      if (key.startsWith(`${roomId}:`) && queued.tradeId !== trade?.id) this.answers.delete(key);
+    if (!trade || game.phase !== 'actions') return;
+    const now = this.now();
+    for (const seat of this.dependencies.store.botSeatsIn(roomId)) {
+      if (seat.id === trade.player) continue;
+      const key = `${roomId}:${seat.id}:${trade.id}`;
+      const queued = this.answers.get(key);
+      if (queued) {
+        if (queued.readyAt > now) continue;
+        this.answers.delete(key);
+        const current = this.dependencies.store.loadGame(roomId);
+        if (current?.trade?.id !== trade.id) continue;
+        try {
+          this.dependencies.store.action(
+            { id: seat.id, room_id: roomId, name: seat.name },
+            `bot-trade-${createHash('sha256').update(key + queued.action.kind).digest('hex').slice(0, 40)}`,
+            this.dependencies.store.snapshot(roomId).revision,
+            queued.action,
+            'bot',
+          );
+          this.dependencies.changed(roomId);
+        } catch (error) {
+          this.dependencies.log?.('bot_trade_answer_rejected', { roomId, seat: seat.name, error: (error as Error).message });
+        }
+        continue;
+      }
+      if (trade.declinedBy?.includes(seat.id) || trade.proposals?.some((p) => p.player === seat.id)) continue;
+      let answer;
+      try {
+        answer = await respond({
+          view: gameView(game, seat.id),
+          board: game.board,
+          meId: seat.id,
+          plan: this.plans.get(seat.id) ?? this.openingPlan(game.turn),
+          jev: this.jev,
+          level: seat.level,
+          mind: this.mindOf(seat.id),
+          humans: this.humansIn(roomId, game),
+          now,
+        });
+      } catch (error) {
+        this.dependencies.log?.('bot_trade_answer_failed', { roomId, seat: seat.name, error: (error as Error).message });
+        continue;
+      }
+      addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, answer);
+      if (!answer.action) continue;
+      const pick = ([low, high]: [number, number]) => low + this.random() * (high - low);
+      this.answers.set(key, { readyAt: now + pick(ANSWER_MS), action: answer.action, seat, tradeId: trade.id });
+    }
   }
 
   /**

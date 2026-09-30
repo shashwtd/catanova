@@ -22,7 +22,7 @@ import type { Board as Island } from '../packages/rules/src/board.js';
 import { applyAction, createGame, gameView, roadSites, settlementSites } from '../packages/rules/src/game.js';
 import type { Game } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
-import { decide, initialPlan } from '../packages/bot/src/index.js';
+import { decide, initialPlan, newMind, watch } from '../packages/bot/src/index.js';
 import type { BotPlan } from '../packages/bot/src/index.js';
 import { Board } from '../apps/client/src/Board.js';
 import { BoardViewport } from '../apps/client/src/BoardViewport.js';
@@ -86,6 +86,7 @@ export async function selfPlay(seed: number, players: number): Promise<SelfPlay>
   const random = seededRandom(seed);
   let game = createGame(seats, seed, random);
   const plans = new Map<string, BotPlan>(seats.map((s) => [s.id, initialPlan(0)]));
+  const minds = new Map(seats.map((s) => [s.id, newMind()]));
   let rejected = 0,
     steps = 0;
   for (; steps < 1500 && !game.winner; steps++) {
@@ -99,8 +100,14 @@ export async function selfPlay(seed: number, players: number): Promise<SelfPlay>
       meId: actor,
       plan: plans.get(actor)!,
       jev: null,
+      // Steady, counting cards, and never cut short by the clock, so the game replays exactly.
+      level: 'steady',
+      mind: minds.get(actor),
+      budgetMs: 600_000,
+      canOffer: false,
     });
     plans.set(actor, decision.plan);
+    const before = game;
     try {
       game = applyAction(game, actor, decision.action, random);
     } catch {
@@ -109,6 +116,7 @@ export async function selfPlay(seed: number, players: number): Promise<SelfPlay>
       if (!rescue) break;
       game = applyAction(game, actor, rescue, random);
     }
+    for (const s of seats) watch(minds.get(s.id)!, s.id, before, game);
   }
   return {
     seed,

@@ -141,12 +141,11 @@ test('an unreachable service still produces a stand-in, marked as a guess', asyn
   assert.equal(none!.calls, 0);
 });
 
-test('a stand-in is asked to finish the game it inherited, not to start a new one', async () => {
+test('a stand-in finishes the game it inherited, not a new one', async () => {
   const game = position();
   game.buildings[0] = { player: 'gone', kind: 'settlement' };
   game.players[0]!.hand = { wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 };
-  let asked: Record<string, { instructions: unknown }> = {};
-  let state: Record<string, unknown> = {};
+  const asked: string[] = [];
   const run = (standIn?: { style: 'roadwarden'; contesting: boolean }) =>
     decide({
       view: gameView(game, 'gone'),
@@ -157,25 +156,18 @@ test('a stand-in is asked to finish the game it inherited, not to start a new on
       ...(standIn ? { standIn } : {}),
       jev: {
         model: 'test',
-        async evaluate(seen: unknown, questions: Record<string, { instructions: unknown }>) {
-          asked = questions;
-          state = seen as Record<string, unknown>;
+        async evaluate(_seen: unknown, questions: Record<string, unknown>) {
+          asked.push(...Object.keys(questions));
           return { answers: {}, inputTokens: 0, costUsd: 0 };
         },
       } as never,
     });
 
-  await run();
-  assert.equal((state as { playing_for?: unknown }).playing_for, undefined);
-  const ordinary = String(asked.plan_strategy?.instructions ?? '');
-
-  await run({ style: 'roadwarden', contesting: true });
-  const covering = state as { playing_for?: { their_style: string } };
-  assert.equal(covering.playing_for?.their_style, PLAY_STYLES.roadwarden);
-  const continued = String(asked.plan_strategy?.instructions);
-  assert.notEqual(continued, ordinary);
-  assert.match(continued, new RegExp(STYLE_ARCHETYPE.roadwarden));
-  assert.match(continued, /finish the game they were playing/);
+  const covering = await run({ style: 'roadwarden', contesting: true });
+  // The road builder's seat keeps building roads: its long game is theirs.
+  assert.equal(covering.mind?.strategy, 'road');
+  assert.equal(covering.plan.archetype, STYLE_ARCHETYPE.roadwarden);
+  assert.ok(!asked.includes('plan'), 'nobody is asked to choose a new plan for someone else’s seat');
 });
 
 test('a stored style is read back, and anything else is treated as no style at all', () => {
