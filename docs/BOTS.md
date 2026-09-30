@@ -69,13 +69,21 @@ and answering is never owed: a person can take an offer first.
 
 ### Reactions
 
-A bot throws a reaction now and then, the way a person taps one: robbed, hit by
-a Monopoly, a seven that eats half its hand, an award taken or lost, a rival on
-the brink, a win. Most moments get one face some of the time; the big ones get
-a burst (a win is two or three). It waits at least twenty seconds between
-reactions, throws at most fifteen a game, and only one bot reacts to any
-stretch of play. Reactions go through the same rate limit as a player's. A bot
-still never chats: a talkative bot reads as a threat.
+Games are long and the end screen is brief, so a bot's personality lives in the
+middle of the game, and it is a little toxic, the way friends at a table are.
+It gloats or laughs when it robs you, laughs when a seven eats your hand, plays
+an evil face when it rolls the seven itself, smirks when it takes an award off
+you, rolls its eyes or honks a clown when an offer is turned down, begs now and
+then when it makes one, and cackles over a big Monopoly. When it is the one
+hurt, it rages, sulks or eyes you suspiciously, and a player who robs it twice
+gets double rage. A win is a burst of two or three faces.
+
+It stays a player, not a slot machine: at least twelve seconds between
+reactions, twenty-four a game at most, only the moment that matters most to it
+in any stretch of play, and only one bot at a table. In simulated four-player
+games that came to about eleven faces a game, one every four turns or so.
+Reactions go through the same rate limit as a player's. A bot still never
+chats: a talkative bot reads as a threat.
 
 ### Jev, as an advisor
 

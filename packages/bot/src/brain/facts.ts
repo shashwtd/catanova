@@ -31,6 +31,7 @@ export type TableEvent =
   | { kind: 'award'; award: 'longestRoad' | 'largestArmy'; from: string | null; to: string | null }
   | { kind: 'trade'; players: [string, string] }
   | { kind: 'declined'; maker: string; by: string }
+  | { kind: 'offer'; player: string }
   | { kind: 'points'; player: string; points: number }
   | { kind: 'win'; player: string };
 
@@ -135,6 +136,8 @@ export function observe(before: Game, after: Game, viewer: string): Pair {
         if (after.log.some((l) => l.id >= before.nextLog && /everyone declined/.test(l.text)))
           events.push({ kind: 'declined', maker: before.trade.player, by: p.id });
   }
+
+  if (after.trade && after.trade.id !== before.trade?.id) events.push({ kind: 'offer', player: after.trade.player });
 
   // Buildings.
   for (const [v, b] of Object.entries(after.buildings)) {
