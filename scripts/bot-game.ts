@@ -9,6 +9,7 @@
  *   npx tsx scripts/bot-game.ts --games 3     # repeat
  *   npx tsx scripts/bot-game.ts --offline     # no model: fallbacks only
  *   npx tsx scripts/bot-game.ts --quiet       # totals only
+ *   npx tsx scripts/bot-game.ts --level sharp # steady, sharp or champ (the default)
  */
 
 import { createGame, gameView, applyAction } from '../packages/rules/src/game.js';
@@ -16,13 +17,16 @@ import type { Game } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
 import {
   decide,
+  respond,
+  newMind,
+  watch,
   createJevClient,
   initialPlan,
   emptyUsage,
   addUsage,
   describe,
 } from '../packages/bot/src/index.js';
-import type { BotPlan, BotUsage } from '../packages/bot/src/index.js';
+import type { BotLevel, BotPlan, BotUsage, Mind } from '../packages/bot/src/index.js';
 
 const arg = (name: string, fallback: string) => {
   const i = process.argv.indexOf('--' + name);
@@ -34,6 +38,7 @@ const GAMES = Number(arg('games', '1'));
 const SEATS = Number(arg('seats', '3'));
 const MAX_TURNS = Number(arg('maxTurns', '400'));
 const quiet = flag('quiet');
+const LEVEL = arg('level', 'champ') as BotLevel;
 
 const NAMES = ['Anchor', 'Beacon', 'Compass', 'Drift'];
 
@@ -41,6 +46,14 @@ async function playOne(seed: number, jev: ReturnType<typeof createJevClient>) {
   const seats = NAMES.slice(0, SEATS).map((name, i) => ({ id: `bot${i}`, name }));
   let game: Game = createGame(seats, seed, Math.random);
   const plans = new Map<string, BotPlan>(seats.map((s) => [s.id, initialPlan(0)]));
+  // Each bot's memory, fed every move as the server's driver feeds it.
+  const minds = new Map<string, Mind>(seats.map((s) => [s.id, newMind()]));
+  let clock = 0;
+  const play = (actor: string, action: Parameters<typeof applyAction>[2]) => {
+    const next = applyAction(game, actor, action, Math.random);
+    for (const s of seats) watch(minds.get(s.id)!, s.id, game, next);
+    game = next;
+  };
   const usage: BotUsage = emptyUsage();
   const started = Date.now();
   let steps = 0;
@@ -52,24 +65,46 @@ async function playOne(seed: number, jev: ReturnType<typeof createJevClient>) {
         ? (Object.keys(game.discards)[0] ?? game.players[game.active]!.id)
         : game.players[game.active]!.id;
     const view = gameView(game, actor);
+    clock += 1500;
     const decision = await decide({
       view,
       board: game.board,
       meId: actor,
       plan: plans.get(actor)!,
       jev,
+      level: LEVEL,
+      mind: minds.get(actor),
+      now: clock,
     });
     plans.set(actor, decision.plan);
     addUsage(usage, decision);
-    try {
-      game = applyAction(game, actor, decision.action, Math.random);
-    } catch (error) {
-      // A rejected move means the decision layer offered something the rules
-      // refuse; end the turn rather than spin, and report it loudly.
-      console.error(`  ! ${decision.action.kind} rejected for ${actor}: ${(error as Error).message}`);
-      const rescue = timeoutAction(game, actor, Math.random);
-      if (!rescue) throw error;
-      game = applyAction(game, actor, rescue, Math.random);
+    if (decision.hold) clock += 3000;
+    else
+      try {
+        play(actor, decision.action);
+      } catch (error) {
+        // A rejected move means the decision layer offered something the rules
+        // refuse; end the turn rather than spin, and report it loudly.
+        console.error(`  ! ${decision.action.kind} rejected for ${actor}: ${(error as Error).message}`);
+        const rescue = timeoutAction(game, actor, Math.random);
+        if (!rescue) throw error;
+        play(actor, rescue);
+      }
+    // The others answer a live offer, as they would at the table.
+    for (const s of seats) {
+      if (!game.trade || s.id === game.trade.player) continue;
+      const answer = await respond({
+        view: gameView(game, s.id),
+        board: game.board,
+        meId: s.id,
+        plan: plans.get(s.id)!,
+        jev,
+        level: LEVEL,
+        mind: minds.get(s.id),
+        now: clock,
+      });
+      addUsage(usage, answer);
+      if (answer.action) play(s.id, answer.action);
     }
     if (!quiet && steps % 25 === 0) {
       const points = game.players

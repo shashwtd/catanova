@@ -1,21 +1,24 @@
 /**
  * Catanova's bot players.
  *
- * A bot is a seat that thinks with TypeSafe AI's Jev: a model that returns a
- * chosen option and a probability rather than prose. It cannot invent a move,
- * because every option it is offered was enumerated by the rules engine first.
- *
- * Three files do the work. `heuristics.ts` is the arithmetic: pips, road
- * distances, who is winning, what a hand can afford. `plan.ts` is the memory
- * that survives between turns. `decide.ts` is the ladder that answers most
- * turns for free and asks the model only when something is genuinely open.
+ * A bot thinks with its own engine, in `brain/`: the race to ten points, card
+ * counting, a search over whole turns played by the real rules, an opening
+ * solver, and selfish trading. TypeSafe AI's Jev is an advisor it asks only when
+ * the engine's numbers leave a choice open. `decide.ts` routes each phase of the
+ * game to the brain; `plan.ts` renders what the bot is doing as a sentence.
  */
 
 export { createJevClient, route, JevUnavailable, choice, score, noul } from './jev.js';
 export type { JevClient, Question, Answer, Evaluation } from './jev.js';
 
-export { decide } from './decide.js';
+export { decide, respond } from './decide.js';
 export type { Decision, DecideContext } from './decide.js';
+
+export { newMind } from './brain/mind.js';
+export type { Mind } from './brain/mind.js';
+export { watch } from './brain/watch.js';
+export { reactTo, reacted } from './brain/reactions.js';
+export type { TableEvent } from './brain/facts.js';
 
 export {
   PLAY_STYLES,

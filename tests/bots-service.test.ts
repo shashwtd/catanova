@@ -10,7 +10,8 @@ import {
   choice,
   profileStyle,
 } from '../packages/bot/src/index.js';
-import type { BotPlan, JevClient } from '../packages/bot/src/index.js';
+import { adviseStrategy, adviseThreat, adviseTrade } from '../packages/bot/src/brain/advisor.js';
+import type { BotPlan, JevClient, Mind } from '../packages/bot/src/index.js';
 
 /** A decision service that is down: every request fails, however it is asked. */
 const down = (): JevClient & { requests: number } => ({
@@ -29,6 +30,7 @@ async function playOut(jev: JevClient | null, seed: number) {
   const seats = ['a', 'b', 'c', 'd'].map((id) => ({ id, name: id.toUpperCase() }));
   let game = createGame(seats, seed, random, { diceMode: 'balanced' });
   const plans = new Map<string, BotPlan>();
+  const minds = new Map<string, Mind>();
   const moves: string[] = [];
   while (!game.winner && game.turn < 600) {
     const actor = game.phase === 'discard' ? Object.keys(game.discards)[0]! : game.players[game.active]!.id;
@@ -38,8 +40,14 @@ async function playOut(jev: JevClient | null, seed: number) {
       meId: actor,
       plan: plans.get(actor) ?? initialPlan(game.turn),
       jev,
+      level: 'sharp',
+      positions: 60,
+      budgetMs: 60_000,
+      mind: minds.get(actor),
+      canOffer: false,
     });
     plans.set(actor, decision.plan);
+    if (decision.mind) minds.set(actor, decision.mind);
     moves.push(JSON.stringify(decision.action));
     game = applyAction(game, actor, decision.action, random);
   }
@@ -88,15 +96,23 @@ test('a malformed reply from the decision service counts as the service being un
     4,
     seededRandom(4),
   );
+  const nulls = stubClient({ answers: { plan: null, wise: null, threat: null } });
+  const advice = await adviseStrategy(nulls, gameView(game, 'a'), 'a', {
+    cities: 100,
+    expansion: 102,
+    development: 150,
+    road: 160,
+  });
+  assert.equal(advice.value, 'cities', 'the engine’s own choice stands');
   const decision = await decide({
     view: gameView(game, 'a'),
     board: game.board,
     meId: 'a',
     plan: initialPlan(0),
-    jev: stubClient({ answers: { site: null, plan_strategy: null, plan_focus: null } }),
+    jev: nulls,
+    level: 'champ',
   });
   assert.equal(decision.action.kind, 'settlement');
-  assert.equal(decision.degraded, true);
 });
 
 test('a bot whose decision service is down plays exactly as a bot with no service', async () => {
@@ -190,22 +206,6 @@ test('the decision service is never told who is playing', async () => {
       return { answers: {}, inputTokens: 0, costUsd: 0, latencyMs: 0, model: 'spy' };
     },
   };
-  const ask = (game: ReturnType<typeof createGame>) =>
-    decide({
-      view: gameView(game, 'seat-0'),
-      board: game.board,
-      meId: 'seat-0',
-      plan: initialPlan(game.turn),
-      jev: spy,
-      level: 'champ',
-    });
-
-  // The opening, which weighs every corner against the whole table.
-  const opening = createGame(seats, 9, seededRandom(9));
-  await ask(opening);
-
-  // A champion's turn with the table's standings in front of it: everybody
-  // has built, and the third seat leads and holds longest road.
   const game = createGame(seats, 9, seededRandom(9));
   const corners = game.board.vertices.filter((v) => v.id % 9 === 0).map((v) => v.id);
   corners.forEach((vertex, i) => {
@@ -214,12 +214,21 @@ test('the decision service is never told who is playing', async () => {
   game.longestRoad = 'seat-2';
   game.phase = 'actions';
   game.turn = 12;
-  game.players[0]!.hand = { wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 };
-  await ask(game);
+  const view = gameView(game, 'seat-0');
 
-  // The robber, weighing tiles by whose buildings they would block.
-  await ask({ ...game, phase: 'robber' });
-
+  // The long plan, when two are close.
+  await adviseStrategy(spy, view, 'seat-0', { cities: 80, expansion: 82, development: 120, road: 130 });
+  // A close trade with a person.
+  await adviseTrade(
+    spy,
+    view,
+    'seat-0',
+    'seat-2',
+    { mine: 0.01, theirs: 0.008, speedsThem: 1, threat: false, ok: true, marginal: true },
+    { offersSeen: 2, accepted: 1, declined: 1, robbedMe: 0 },
+  );
+  // Two robber targets the engine cannot separate.
+  await adviseThreat(spy, view, 'seat-0', ['seat-1', 'seat-2']);
   // And a stand-in reading how the player whose seat it takes was playing.
   await profileStyle({ view: gameView(game, 'seat-1'), board: game.board, playerId: 'seat-1', jev: spy });
 
@@ -228,21 +237,10 @@ test('the decision service is never told who is playing', async () => {
     for (const name of names) assert.ok(!JSON.stringify(request).includes(name), `${name} was sent`);
 
   // The same facts still reach it, under the same labels in every request.
-  const turn = requests[1]!.state;
-  assert.equal(turn.me.name, 'me');
-  assert.deepEqual(
-    turn.opponents.map((o: { name: string }) => o.name),
-    ['opponent 1', 'opponent 2', 'opponent 3'],
-  );
-  assert.match(turn.leader, /^opponent 2 on \d+$/, 'the leader is the third seat');
-  assert.match(turn.awards.longest_road, /^held by opponent 2; /);
-  const blocks = Object.values(requests[2]!.questions.hex.criteria).flatMap(
-    (tile) => (tile as { blocks: string[] }).blocks,
-  );
-  assert.ok(
-    blocks.some((owner) => /^opponent \d's (settlement|city)$/.test(owner)),
-    `the robber still sees whose buildings it blocks: ${blocks.join(', ')}`,
-  );
+  const labels = (state: { table: { who: string }[] }) => state.table.map((row) => row.who);
+  assert.deepEqual(labels(requests[0]!.state), ['me', 'opponent 1', 'opponent 2', 'opponent 3']);
+  assert.equal(requests[1]!.state.partner, 'opponent 2');
+  assert.deepEqual(Object.keys(requests[2]!.questions.threat.criteria), ['opponent 1', 'opponent 2']);
   assert.deepEqual(
     requests[3]!.state.others.map((o: { name: string }) => o.name),
     ['opponent 1', 'opponent 2', 'opponent 3'],

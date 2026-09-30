@@ -6,7 +6,8 @@ import { newSession } from '../apps/client/src/connection.js';
 import { gameView } from '../packages/rules/src/game.js';
 import type { Game, GameAction } from '../packages/rules/src/game.js';
 import { timeoutAction } from '../packages/rules/src/timeout.js';
-import { createJevClient } from '../packages/bot/src/index.js';
+import { createJevClient, initialPlan, newMind, respond } from '../packages/bot/src/index.js';
+import { sha256 } from '../apps/server/src/journal.js';
 
 /** A started game between one connected person and one bot. */
 function table() {
@@ -80,7 +81,9 @@ test('a bot handed a null answer by its decision service still takes its turn', 
     });
     await run(driver, clock, () => store.snapshot(roomId).revision > before);
 
-    assert.ok(requests > 0, 'the service was asked');
+    // The engine decides the opening alone; whether or not the service was
+    // asked, a null answer must never stop the seat.
+    void requests;
     assert.equal(store.snapshot(roomId).revision, before + 1, 'the bot moved');
     const game = store.loadGame(roomId)!;
     assert.ok(Object.values(game.buildings).some((b) => b.player === bot.id));
@@ -261,4 +264,116 @@ test('a finished or paused room costs a read or two a tick, and nothing else', a
   }
 
   assert.deepEqual(decisions, [], 'and neither was ever thought about');
+});
+
+/** Rewrite the saved game directly, for a position the test needs, keeping the journal's head in step. */
+function craft(store: Store, roomId: string, change: (game: Game) => void) {
+  const game = store.loadGame(roomId)!;
+  change(game);
+  const text = JSON.stringify(game);
+  store.db.prepare('UPDATE games SET state=? WHERE room_id=?').run(text, roomId);
+  store.db
+    .prepare(
+      'UPDATE game_events SET state_hash=? WHERE room_id=? AND revision=(SELECT max(revision) FROM game_events WHERE room_id=?)',
+    )
+    .run(sha256(text), roomId, roomId);
+}
+
+const cards = (h: Partial<Game['players'][number]['hand']>) => ({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0, ...h });
+
+test('a bot answers a person’s trade offer as its own judgement says, and never feeds a leader', async () => {
+  for (const leader of [false, true]) {
+    const { store, host, roomId, bot } = table();
+    try {
+      advance(store, roomId, (g) => g.phase === 'actions' && g.players[g.active]!.id === host.id);
+      craft(store, roomId, (g) => {
+        g.players.find((p) => p.id === bot.id)!.hand = cards({ ore: 3, wheat: 1, sheep: 2 });
+        g.players.find((p) => p.id === host.id)!.hand = cards({ wheat: 1 });
+        if (leader) {
+          // Eight points on the board: cities on both settlements and two more.
+          for (const [v, b] of Object.entries(g.buildings))
+            if (b.player === host.id) g.buildings[Number(v)] = { ...b, kind: 'city' };
+          const open = g.board.vertices.filter(
+            (v) => !g.buildings[v.id] && v.neighbors.every((n) => !g.buildings[n]),
+          );
+          for (const v of open.slice(0, 1)) g.buildings[v.id] = { player: host.id, kind: 'city' };
+          const second = g.board.vertices.find(
+            (v) => !g.buildings[v.id] && v.neighbors.every((n) => !g.buildings[n]),
+          )!;
+          g.buildings[second.id] = { player: host.id, kind: 'city' };
+        }
+      });
+      store.action(host, `offer-${leader}`, store.snapshot(roomId).revision, {
+        kind: 'offerTrade',
+        give: cards({ wheat: 1 }),
+        want: cards({ sheep: 1 }),
+      });
+      const offered = store.loadGame(roomId)!;
+      if (leader) assert.ok(gameView(offered, bot.id).players.find((p) => p.id === host.id)!.points >= 8);
+      // What the bot's own judgement says, from the same view the driver will give it.
+      const expected = (
+        await respond({
+          view: gameView(offered, bot.id),
+          board: offered.board,
+          meId: bot.id,
+          plan: initialPlan(offered.turn),
+          jev: null,
+          level: bot.level,
+          mind: newMind(),
+          humans: [host.id],
+        })
+      ).action!;
+      if (leader) assert.equal(expected.kind, 'declineTrade', 'no trade with a player on eight points');
+      const clock = { now: 0 };
+      const driver = new BotDriver({ store, changed: () => {}, jev: null, now: () => clock.now, random: () => 0.5 });
+      await run(driver, clock, () => !store.loadGame(roomId)!.trade);
+      assert.ok(clock.now < 6000, 'the bot answered within its pause');
+      const after = store.loadGame(roomId)!;
+      const mine = after.players.find((p) => p.id === bot.id)!.hand;
+      if (expected.kind === 'acceptTrade') assert.deepEqual(mine, cards({ ore: 3, wheat: 2, sheep: 1 }));
+      else {
+        assert.deepEqual(mine, cards({ ore: 3, wheat: 1, sheep: 2 }));
+        assert.ok(after.log.some((l) => /declined/.test(l.text)));
+      }
+    } finally {
+      store.db.close();
+    }
+  }
+});
+
+test('a robbed bot throws a reaction across the table, once', async () => {
+  const { store, host, roomId, bot } = table();
+  try {
+    advance(store, roomId, (g) => g.phase === 'actions' && g.players[g.active]!.id === host.id);
+    let hex = -1;
+    craft(store, roomId, (g) => {
+      g.players.find((p) => p.id === bot.id)!.hand = cards({ ore: 2, wheat: 2 });
+      const home = Number(Object.entries(g.buildings).find(([, b]) => b.player === bot.id)![0]);
+      hex = g.board.vertices[home]!.hexes.find((h) => h !== g.robber && g.board.hexes[h]!.terrain !== 'desert')!;
+      g.phase = 'robber';
+    });
+    const thrown: string[] = [];
+    const clock = { now: 0 };
+    const driver = new BotDriver({
+      store,
+      changed: () => {},
+      jev: null,
+      now: () => clock.now,
+      random: () => 0,
+      react: (_room, seat, reaction) => thrown.push(`${seat.id}:${reaction}`),
+      schedule: (fire) => fire(),
+    });
+    await driver.tick();
+    store.action(host, 'rob-the-bot', store.snapshot(roomId).revision, { kind: 'robber', hex, victim: bot.id });
+    clock.now += 250;
+    await driver.tick();
+    assert.ok(thrown.length >= 1, 'the bot reacted');
+    assert.ok(thrown.every((t) => t.startsWith(`${bot.id}:`)));
+    const count = thrown.length;
+    clock.now += 250;
+    await driver.tick();
+    assert.equal(thrown.length, count, 'and does not keep reacting to the same moment');
+  } finally {
+    store.db.close();
+  }
 });

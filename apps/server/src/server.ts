@@ -1253,6 +1253,11 @@ export async function startServer(
   const bots = new BotDriver({
     store,
     changed: broadcast,
+    // A bot's reaction goes out exactly like a player's, through the same limit.
+    react: (roomId, seat, reaction) => {
+      if (reactionAllowed(seat.id))
+        toRoom(roomId, { type: 'reaction', playerId: seat.id, name: seat.name, reaction, at: now() });
+    },
     // Failures, backoffs and rescued moves go to the server log; every ordinary
     // bot move would drown them.
     log: (event, detail) => {

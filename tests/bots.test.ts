@@ -217,6 +217,8 @@ test('every move a bot makes is legal, through a whole offline game', async () =
       meId: actor,
       plan: plans.get(actor)!,
       jev: null,
+      // A light search: this is about legality through a whole game, not strength.
+      positions: 60,
     });
     plans.set(actor, decision.plan);
     try {
@@ -253,9 +255,10 @@ test('a plan reads as a sentence and never invents one', () => {
   assert.ok(line.endsWith('.'));
 });
 
-test('steady and sharp are the same rules with different attention on the leader', async () => {
-  // A board where the leader sits on a modest tile and somebody else sits on
-  // the busiest one. The two levels should want different tiles.
+test('the robber goes where it costs the likely winner most, and robs them', async () => {
+  // Two opponents on different tiles: the leader on four points on a modest
+  // tile, the other on one point on the busiest tile. Hurting the player most
+  // likely to win is worth more than blocking the most production.
   const game = createGame(
     [
       { id: 'me', name: 'Me' },
@@ -263,156 +266,79 @@ test('steady and sharp are the same rules with different attention on the leader
       { id: 'other', name: 'Other' },
     ],
     11,
-    Math.random,
+    seededRandom(11),
   );
   const pips = (n: number | null) => (n === null ? 0 : 6 - Math.abs(7 - n));
   const numbered = game.board.hexes.filter((h) => h.terrain !== 'desert' && h.number !== null);
   const busiest = numbered.reduce((a, b) => (pips(b.number) > pips(a.number) ? b : a));
-  // A quieter tile that shares no corner with the busiest, so the two choices
-  // can never be the same hex.
   const quiet = numbered.find(
-    (h) => h.id !== busiest.id && !h.vertices.some((v) => busiest.vertices.includes(v)),
+    (h) =>
+      h.id !== busiest.id && pips(h.number) >= 3 && !h.vertices.some((v) => busiest.vertices.includes(v)),
   )!;
   game.buildings[busiest.vertices[0]!] = { player: 'other', kind: 'settlement' };
-  game.buildings[quiet.vertices[0]!] = { player: 'leader', kind: 'settlement' };
+  game.buildings[quiet.vertices[0]!] = { player: 'leader', kind: 'city' };
+  game.buildings[quiet.vertices[3]!] = { player: 'leader', kind: 'city' };
   game.players[1]!.hand.wood = 3;
   game.players[2]!.hand.wood = 3;
   game.phase = 'robber';
   game.active = 0;
+  game.turn = 12;
   game.robber = game.board.hexes.find((h) => h.terrain === 'desert')!.id;
-
-  const move = async (level: 'steady' | 'sharp') =>
-    (
-      await decide({
-        view: gameView(game, 'me'),
-        board: game.board,
-        meId: 'me',
-        plan: initialPlan(game.turn),
-        jev: null,
-        level,
-      })
-    ).action as { kind: string; hex: number; victim?: string };
-
-  const steady = await move('steady'),
-    sharp = await move('sharp');
-  assert.equal(steady.kind, 'robber');
-  assert.equal(sharp.kind, 'robber');
-  // Steady blocks the most production on the board; sharp follows the leader.
-  assert.equal(steady.hex, busiest.id, 'steady blocks the busiest tile, whoever owns it');
-  assert.equal(sharp.hex, quiet.id, 'sharp gives up production to hit the leader');
-  assert.equal(sharp.victim, 'leader');
-  assert.notEqual(steady.hex, sharp.hex, 'the two levels are not the same bot');
+  const move = (
+    await decide({
+      view: gameView(game, 'me'),
+      board: game.board,
+      meId: 'me',
+      plan: initialPlan(game.turn),
+      jev: null,
+      level: 'champ',
+    })
+  ).action as { kind: string; hex: number; victim?: string };
+  assert.equal(move.kind, 'robber');
+  assert.equal(move.hex, quiet.id, 'the robber goes onto the leader, not the busiest tile');
+  assert.equal(move.victim, 'leader');
 });
 
-test('a bot plays the cards it holds, and is told what it is holding', async () => {
+test('a knight goes before the dice when the robber sits on the bot’s own production', async () => {
   const game = createGame(
     [
       { id: 'me', name: 'Me' },
       { id: 'b', name: 'B' },
     ],
     3,
-    Math.random,
+    seededRandom(3),
   );
-  game.phase = 'actions';
+  const pips = (n: number | null) => (n === null ? 0 : 6 - Math.abs(7 - n));
+  const numbered = game.board.hexes.filter((h) => h.terrain !== 'desert' && h.number !== null);
+  const best = numbered.reduce((a, b) => (pips(b.number) > pips(a.number) ? b : a));
+  const theirs = numbered.find((h) => h.id !== best.id && !h.vertices.some((v) => best.vertices.includes(v)))!;
+  game.buildings[best.vertices[0]!] = { player: 'me', kind: 'city' };
+  game.buildings[theirs.vertices[0]!] = { player: 'b', kind: 'settlement' };
+  game.robber = best.id;
+  game.phase = 'roll';
   game.active = 0;
-  game.players[0]!.cards = [
-    { id: 'c1', kind: 'monopoly', boughtTurn: 0 },
-    { id: 'c2', kind: 'knight', boughtTurn: 0 },
-  ];
-  game.turn = 4;
-  assert.equal(gameView(game, 'me').legal.playableCards.length, 2);
-
-  // With nothing to ask, the bot used to end the turn and keep the cards for a
-  // game that was over before it played them.
-  const offline = await decide({
+  game.turn = 8;
+  game.players[0]!.cards = [{ id: 'k1', kind: 'knight', boughtTurn: 2 }];
+  const decision = await decide({
     view: gameView(game, 'me'),
     board: game.board,
     meId: 'me',
     plan: initialPlan(game.turn),
     jev: null,
-    level: 'steady',
+    level: 'champ',
   });
-  assert.equal(offline.action.kind, 'playCard');
-  assert.equal(
-    (offline.action as { cardId: string }).cardId,
-    'c2',
-    'the knight goes first: never wasted, and it counts toward largest army',
-  );
-
-  // And with a service to ask, it is told what is in its hand — without which
-  // it was being asked whether to play a card it could not see.
-  let seen: { me: { playable_cards: Record<string, number> } } | null = null;
-  await decide({
+  assert.deepEqual(decision.action, { kind: 'playCard', cardId: 'k1' });
+  // With the robber elsewhere the same bot just rolls, and keeps its knight.
+  game.robber = theirs.id;
+  const calm = await decide({
     view: gameView(game, 'me'),
     board: game.board,
     meId: 'me',
     plan: initialPlan(game.turn),
-    level: 'steady',
-    jev: {
-      model: 'test',
-      async evaluate(state: unknown) {
-        seen = state as typeof seen;
-        return { answers: {}, inputTokens: 0, costUsd: 0 };
-      },
-    } as never,
+    jev: null,
+    level: 'champ',
   });
-  assert.deepEqual(seen!.me.playable_cards, { monopoly: 1, knight: 1 });
-});
-
-test('a champion never passes on a useful turn, and reads the standings', async () => {
-  const seats = [
-    { id: 'me', name: 'Me' },
-    { id: 'b', name: 'B' },
-    { id: 'c', name: 'C' },
-  ];
-  const game = createGame(seats, 5, Math.random);
-  // A position with a road affordable and nothing that scores a point: one
-  // settlement on the board to build from, and timber and clay in hand.
-  game.phase = 'actions';
-  game.active = 0;
-  game.buildings[0] = { player: 'me', kind: 'settlement' };
-  game.players[0]!.hand = { wood: 1, brick: 1, sheep: 0, wheat: 0, ore: 0 };
-  const legal = gameView(game, 'me').legal;
-  assert.ok(legal.roads.length, 'the position offers a road');
-
-  const asked: Record<string, Record<string, unknown>> = {};
-  const state: Record<string, unknown> = {};
-  const spy = (level: 'sharp' | 'champ') => ({
-    model: 'test',
-    async evaluate(seen: unknown, questions: Record<string, unknown>) {
-      asked[level] = questions as Record<string, unknown>;
-      state[level] = seen;
-      return { answers: {}, inputTokens: 0, costUsd: 0 };
-    },
-  });
-  const run = (level: 'sharp' | 'champ') =>
-    decide({
-      view: gameView(game, 'me'),
-      board: game.board,
-      meId: 'me',
-      plan: { ...initialPlan(game.turn), targetSite: 0 },
-      jev: spy(level) as never,
-      level,
-    });
-  await run('sharp');
-  await run('champ');
-
-  const moves = (level: 'sharp' | 'champ') =>
-    Object.keys((asked[level]!.move as { criteria: Record<string, string> }).criteria);
-  assert.ok(moves('sharp').includes('endTurn'), 'a sharp bot may sit on its resources');
-  assert.ok(!moves('champ').includes('endTurn'), 'a champion spends a turn it can use');
-  assert.ok(moves('champ').includes('road'));
-
-  // A champion is told where the two awards stand and how far it is from the
-  // target. Every number in that is on the portraits already.
-  assert.ok(!('awards' in (state.sharp as object)), 'the others are not');
-  const champState = state.champ as { awards: Record<string, string>; points_still_needed: number };
-  assert.match(champState.awards.longest_road!, /longest run on the board/);
-  assert.match(champState.awards.largest_army!, /knights played/);
-  // One settlement on the board, so one point of the target is already in.
-  const mine = gameView(game, 'me').players.find((p) => p.id === 'me')!;
-  assert.equal(champState.points_still_needed, (game.victoryPoints ?? 10) - mine.points);
-  assert.equal(mine.points, 1);
+  assert.deepEqual(calm.action, { kind: 'roll' });
 });
 
 test('the decision service is TypeSafe only, and absent without a key', () => {
@@ -603,23 +529,23 @@ function midGame(hand: Partial<Hand>): Game {
 }
 
 const offline = (game: Game, plan: BotPlan = initialPlan(game.turn)) =>
-  decide({ view: gameView(game, 'me'), board: game.board, meId: 'me', plan, jev: null });
+  decide({ view: gameView(game, 'me'), board: game.board, meId: 'me', plan, jev: null, level: 'champ' });
 
-test('a bot with no decision service trades what it has spare for what its plan is missing', async () => {
-  // Saving for a settlement with five timber and no clay. Without a service the
-  // bot never worked out what it was short of, so it never traded at all.
+test('a bot trades spare timber with the bank for the clay it lacks, then builds with it', async () => {
+  // Five timber and no clay, with a road already reaching an open corner.
   const game = midGame({ wood: 5, sheep: 1, wheat: 1 });
-  const decision = await offline(game);
+  const home = Number(Object.keys(game.buildings)[0]);
+  const edge = game.board.vertices[home]!.edges[0]!;
+  const e = game.board.edges[edge]!;
+  const far = e.a === home ? e.b : e.a;
+  const next = game.board.vertices[far]!.edges.find((id) => id !== edge)!;
+  game.roads[edge] = 'me';
+  game.roads[next] = 'me';
+  let decision = await offline(game);
   assert.deepEqual(decision.action, { kind: 'bankTrade', give: 'wood', receive: 'brick' });
-  assert.deepEqual(decision.plan.needs, ['brick'], 'and it remembers what it is short of');
   const after = applyAction(game, 'me', decision.action, Math.random);
-  assert.equal(after.players[0]!.hand.brick, 1, 'the rules accept the trade');
-
-  // It never trades below what the purchase itself costs: five hay for a city
-  // is one more than the city needs, not four spare.
-  const city = midGame({ wheat: 5, ore: 1 });
-  const saving = await offline(city, { ...initialPlan(city.turn), focus: 'city' });
-  assert.notEqual(saving.action.kind, 'bankTrade', 'trading four hay would leave the city short of hay');
+  decision = await offline(after);
+  assert.ok(['settlement', 'road'].includes(decision.action.kind), 'and then it builds with it');
 });
 
 test('on a seven a bot keeps what its plan is saving for', async () => {
@@ -650,6 +576,7 @@ test('bots with no decision service use the bank and harbours through a whole ga
       meId: actor,
       plan: plans.get(actor) ?? initialPlan(game.turn),
       jev: null,
+      positions: 60,
     });
     plans.set(actor, decision.plan);
     kinds[decision.action.kind] = (kinds[decision.action.kind] ?? 0) + 1;

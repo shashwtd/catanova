@@ -1,0 +1,309 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { applyAction, createGame, gameView, simulateAction } from '../packages/rules/src/game.js';
+import type { Game, Hand } from '../packages/rules/src/game.js';
+import { seededRandom } from '../packages/rules/src/board.js';
+import { owedMoves } from '../packages/rules/src/owed.js';
+import { timeoutAction } from '../packages/rules/src/timeout.js';
+import { observe } from '../packages/bot/src/brain/facts.js';
+import { composition, learn, newBelief, possibleHands } from '../packages/bot/src/brain/belief.js';
+import { race, winChances } from '../packages/bot/src/brain/race.js';
+import { imagine, knowledge, newMind } from '../packages/bot/src/brain/mind.js';
+import type { Mind } from '../packages/bot/src/brain/mind.js';
+import { unseenCards } from '../packages/bot/src/brain/belief.js';
+import type { Thinker } from '../packages/bot/src/brain/search.js';
+import { answer, makeOffer, manageOffer, OFFER_WAIT_MS } from '../packages/bot/src/brain/trade.js';
+import { chooseOpening } from '../packages/bot/src/brain/opening.js';
+import { reactTo, reacted, REACTION_GAP_MS } from '../packages/bot/src/brain/reactions.js';
+import { watch } from '../packages/bot/src/brain/watch.js';
+import { cornerIncome, incomeTotal } from '../packages/bot/src/brain/table.js';
+
+const hand = (h: Partial<Hand>): Hand => ({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0, ...h });
+
+/** Three players on turn 10 of an ordinary board, in "me"'s action phase. */
+function position(seed = 5): Game {
+  const game = createGame(
+    [
+      { id: 'me', name: 'Me' },
+      { id: 'b', name: 'B' },
+      { id: 'c', name: 'C' },
+    ],
+    seed,
+    seededRandom(seed),
+  );
+  game.phase = 'actions';
+  game.active = 0;
+  game.turn = 10;
+  return game;
+}
+
+/** A thinker for "me" that sees the table through `mind`. */
+function thinker(game: Game, mind: Mind = newMind(), me = 'me'): Thinker {
+  const view = gameView(game, me);
+  return {
+    me,
+    know: knowledge(view, me, mind),
+    belief: mind.belief,
+    unseen: unseenCards(mind.belief, view.players.find((p) => p.id === me)?.cards ?? []),
+    random: seededRandom(1),
+    deadline: performance.now() + 60_000,
+    positions: 600,
+    beam: 6,
+    depth: 3,
+    scored: 0,
+  };
+}
+
+/** Corners far enough apart to build on, best producers first. */
+function spots(game: Game, count: number): number[] {
+  const taken = new Set<number>();
+  const out: number[] = [];
+  const ranked = [...game.board.vertices].sort(
+    (a, b) =>
+      incomeTotal(cornerIncome(game.board, b.id, null)) - incomeTotal(cornerIncome(game.board, a.id, null)),
+  );
+  for (const v of ranked) {
+    if (out.length === count) break;
+    if (taken.has(v.id) || v.neighbors.some((n) => taken.has(n))) continue;
+    out.push(v.id);
+    taken.add(v.id);
+  }
+  return out;
+}
+
+test('a steal reads the same to everyone who was not part of it, whatever card moved', () => {
+  const game = position();
+  const [a, b] = spots(game, 2);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.players[1]!.hand = hand({ ore: 1, wheat: 1 });
+  const hex = game.board.vertices[b!]!.hexes.find((h) => h !== game.robber)!;
+  game.phase = 'robber';
+  const stealing = (roll: number) => applyAction(game, 'me', { kind: 'robber', hex, victim: 'b' }, () => roll);
+  const one = stealing(0.1),
+    other = stealing(0.9);
+  const took = (g: Game) => (['ore', 'wheat'] as const).find((r) => g.players[0]!.hand[r] === 1);
+  assert.notEqual(took(one), took(other), 'the two games stole different cards');
+
+  // Player "c" saw a steal and nothing else, in both.
+  assert.deepEqual(observe(game, one, 'c').facts, observe(game, other, 'c').facts);
+  assert.ok(observe(game, one, 'c').facts.some((f) => f.kind === 'steal'));
+  // The thief knows exactly what it took.
+  const mine = observe(game, one, 'me').facts.find((f) => f.kind === 'change' && f.player === 'me');
+  assert.ok(mine && mine.kind === 'change' && mine.delta[took(one)!] === 1);
+});
+
+test('counting narrows a stolen card down as soon as the thief spends it', () => {
+  const belief = newBelief();
+  const prior = () => ({ count: 0, income: hand({}) });
+  learn(belief, { kind: 'change', player: 'b', delta: hand({ ore: 1, wheat: 1 }) }, prior);
+  learn(belief, { kind: 'change', player: 'c', delta: hand({ wood: 2 }) }, prior);
+  learn(belief, { kind: 'steal', thief: 'c', victim: 'b' }, prior);
+  assert.equal(possibleHands(belief, 'b').length, 2, 'the victim lost ore or hay');
+  assert.ok(Math.abs(composition(belief, 'c').ore - 1 / 6) < 1e-9, 'one card in three, taken half the time');
+  // The thief then pays a rock it can only have got from the steal.
+  learn(belief, { kind: 'change', player: 'c', delta: hand({ ore: -1 }) }, prior);
+  assert.deepEqual(
+    possibleHands(belief, 'c').map((p) => p.hand),
+    [hand({ wood: 2 })],
+  );
+  // And a Monopoly on hay tells everyone the victim has none left.
+  learn(belief, { kind: 'none', player: 'b', resource: 'wheat' }, prior);
+  assert.deepEqual(
+    possibleHands(belief, 'b').map((p) => p.hand),
+    [hand({ ore: 1 })],
+  );
+});
+
+test('the race: more production, fewer rolls; a city in hand, fewer still; chances add up to one', () => {
+  const game = position();
+  const [a, b, c] = spots(game, 3);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  const know = { points: 1, knightsHeld: 0, otherCards: 0 };
+  const base = race(game, 'me', know).rolls;
+  game.buildings[a!] = { player: 'me', kind: 'city' };
+  const richer = race(game, 'me', { ...know, points: 2 }).rolls;
+  assert.ok(richer < base, `a city shortens the race (${richer.toFixed(1)} < ${base.toFixed(1)})`);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.players[0]!.hand = hand({ wheat: 2, ore: 3 });
+  assert.ok(race(game, 'me', know).rolls < base, 'the cards for a city in hand shorten it too');
+
+  const table = winChances(game, () => know);
+  assert.ok(Math.abs(table.reduce((n, s) => n + s.chance, 0) - 1) < 1e-9);
+  const winner = winChances(game, (id) => (id === 'b' ? { ...know, points: 10 } : know));
+  assert.equal(winner.find((s) => s.id === 'b')!.chance, 1, 'a player on the target has won');
+});
+
+test('a bot takes a trade that completes its city, and never feeds a player close to winning', () => {
+  const game = position();
+  const [a, b, c, d, e] = spots(game, 5);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  // "b" is on turn and offers hay for timber; "me" is one hay short of a city.
+  game.active = 1;
+  game.players[0]!.hand = hand({ ore: 3, wheat: 1, wood: 2 });
+  game.players[1]!.hand = hand({ wheat: 2 });
+  game.trade = { id: 1, player: 'b', give: hand({ wheat: 1 }), want: hand({ wood: 1 }) };
+  const view = gameView(game, 'me');
+  const mind = newMind();
+  const g = imagine(view, 'me', mind, seededRandom(1));
+  assert.equal(answer(g, thinker(game, mind), game.trade).action.kind, 'acceptTrade');
+
+  // The same offer from a player on eight points is refused.
+  game.buildings[d!] = { player: 'b', kind: 'city' };
+  game.buildings[e!] = { player: 'b', kind: 'city' };
+  game.longestRoad = 'b';
+  game.largestArmy = 'b';
+  const leaderView = gameView(game, 'me');
+  assert.ok(leaderView.players.find((p) => p.id === 'b')!.points >= 7);
+  const g2 = imagine(leaderView, 'me', mind, seededRandom(1));
+  assert.equal(answer(g2, thinker(game, mind), game.trade).action.kind, 'declineTrade');
+});
+
+test('offered cards for anything, a bot proposes what it can spare and never the same resource', () => {
+  const game = position();
+  const [a, b, c] = spots(game, 3);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  game.active = 1;
+  game.players[0]!.hand = hand({ ore: 3, wheat: 1, sheep: 3 });
+  game.players[1]!.hand = hand({ wheat: 3 });
+  game.trade = { id: 2, player: 'b', give: hand({ wheat: 1 }), want: hand({}), open: true, proposals: [] };
+  const mind = newMind();
+  const g = imagine(gameView(game, 'me'), 'me', mind, seededRandom(1));
+  const result = answer(g, thinker(game, mind), game.trade).action;
+  assert.equal(result.kind, 'proposeTrade');
+  if (result.kind === 'proposeTrade') {
+    assert.equal(result.give.wheat, 0, 'never offers back what it is being given');
+    assert.ok(result.give.ore === 0, 'and keeps the rock its city needs');
+  }
+});
+
+test('a bot one card short offers for it, takes the best answer, and withdraws when nobody bites', () => {
+  const game = position();
+  const [a, b, c] = spots(game, 3);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  game.players[0]!.hand = hand({ ore: 3, wheat: 1, sheep: 2, wood: 1 });
+  game.players[1]!.hand = hand({ wheat: 3 });
+  const mind = newMind();
+  // The counting has seen "b" collect hay.
+  learn(mind.belief, { kind: 'change', player: 'b', delta: hand({ wheat: 3 }) }, () => ({ count: 0, income: hand({}) }));
+  learn(mind.belief, { kind: 'change', player: 'c', delta: hand({}) }, () => ({ count: 0, income: hand({}) }));
+  const g = imagine(gameView(game, 'me'), 'me', mind, seededRandom(1));
+  const th = thinker(game, mind);
+  const offer = makeOffer(g, th, [], 0);
+  assert.ok(offer, 'an offer is made');
+  assert.equal(offer!.action.kind, 'offerTrade');
+  if (offer!.action.kind === 'offerTrade') {
+    assert.equal(offer!.action.want.wheat, 1, 'for the hay the city needs');
+    assert.equal(offer!.action.give.ore, 0, 'never with the rock the city needs');
+  }
+  // Two answers: the bot takes the one better for itself.
+  const trade = {
+    id: 3,
+    player: 'me',
+    give: hand({ sheep: 1 }),
+    want: hand({ wheat: 1 }),
+    proposals: [
+      { player: 'b', give: hand({ wheat: 1 }) },
+      { player: 'c', give: hand({ wood: 1 }) },
+    ],
+  };
+  const taken = manageOffer(g, th, trade, 1000).action;
+  assert.deepEqual(taken, { kind: 'acceptProposal', tradeId: 3, player: 'b', expectedGive: hand({ wheat: 1 }) });
+  // Nobody has answered yet: it waits, then withdraws.
+  const quiet = { ...trade, proposals: [] };
+  assert.equal(manageOffer(g, th, quiet, 1000).action, null);
+  assert.deepEqual(manageOffer(g, th, quiet, OFFER_WAIT_MS + 1).action, { kind: 'cancelTrade' });
+});
+
+test('the opening takes a strong corner', () => {
+  const game = createGame(
+    [
+      { id: 'me', name: 'Me' },
+      { id: 'b', name: 'B' },
+      { id: 'c', name: 'C' },
+      { id: 'd', name: 'D' },
+    ],
+    21,
+    seededRandom(21),
+  );
+  const pick = chooseOpening(game, thinker(game), 3, 8);
+  const incomes = game.board.vertices.map((v) => incomeTotal(cornerIncome(game.board, v.id, null))).sort((a, b) => b - a);
+  const chosen = incomeTotal(cornerIncome(game.board, pick.vertex, null));
+  assert.ok(chosen >= incomes[12]!, `among the strongest corners on the board (${chosen} vs ${incomes[12]})`);
+  assert.ok(gameView(game, 'me').legal.settlements.includes(pick.vertex));
+});
+
+test('reactions: a burst for a win, a face now and then, and never two in quick succession', () => {
+  const mind = newMind();
+  const always = () => 0;
+  const win = reactTo([{ kind: 'win', player: 'me' }], 'me', mind, { now: 1_000_000, random: always, target: 10 });
+  assert.ok(win && win.length >= 2, 'a win gets several faces');
+  const robbed = reactTo([{ kind: 'steal', thief: 'b', victim: 'me' }], 'me', mind, {
+    now: 1_000_000,
+    random: always,
+    target: 10,
+  });
+  assert.ok(robbed && robbed.length >= 1);
+  reacted(mind, 1_000_000);
+  assert.equal(
+    reactTo([{ kind: 'steal', thief: 'b', victim: 'me' }], 'me', mind, {
+      now: 1_000_000 + REACTION_GAP_MS - 1,
+      random: always,
+      target: 10,
+    }),
+    null,
+    'it waits before reacting again',
+  );
+  // Nothing at all for a moment that did not touch it.
+  assert.equal(
+    reactTo([{ kind: 'build', player: 'b', what: 'road' }], 'me', newMind(), { now: 0, random: always, target: 10 }),
+    null,
+  );
+});
+
+test('the bot’s simulated moves are the real rules: same results as the table, board shared', () => {
+  let game = createGame(
+    ['a', 'b', 'c'].map((id) => ({ id, name: id })),
+    8,
+    seededRandom(8),
+  );
+  let simulated = game;
+  for (let step = 0; step < 120; step++) {
+    const owed = owedMoves(game)[0]!;
+    const action = timeoutAction(game, owed.player, seededRandom(step))!;
+    game = applyAction(game, owed.player, action, seededRandom(step));
+    simulated = simulateAction(simulated, owed.player, action, seededRandom(step));
+    assert.equal(simulated.board, game.board === simulated.board ? game.board : simulated.board);
+    assert.deepEqual({ ...simulated, log: [], board: null }, { ...game, log: [], board: null });
+  }
+});
+
+test('watching a game keeps the counting in step with the table', async () => {
+  const random = seededRandom(4);
+  let game = createGame(
+    ['a', 'b', 'c'].map((id) => ({ id, name: id })),
+    4,
+    random,
+  );
+  const mind = newMind();
+  for (let step = 0; step < 300 && !game.winner; step++) {
+    const owed = owedMoves(game)[0]!;
+    const next = applyAction(game, owed.player, timeoutAction(game, owed.player, random)!, random);
+    watch(mind, 'a', game, next);
+    game = next;
+  }
+  // Every opponent's counted hand has the size the table shows.
+  for (const id of ['b', 'c']) {
+    const count = gameView(game, 'a').players.find((p) => p.id === id)!.resourceCount;
+    for (const p of possibleHands(mind.belief, id))
+      assert.equal(Object.values(p.hand).reduce((n, x) => n + x, 0), count);
+  }
+});
