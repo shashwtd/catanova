@@ -2,22 +2,25 @@
  * When a bot throws a reaction across the table.
  *
  * Bots never chat, since research found a talkative bot reads as a threat and
- * gets ganged up on, but a face at the right moment makes a table feel alive. A
- * bot reacts to what happens to it and around it: robbed, hit by a Monopoly, a
- * seven that eats half its hand, an award taken or lost, a rival on the brink, a
- * win. Most moments get one face, some of the time. The big ones get a burst.
+ * gets ganged up on, but faces are another matter: a bot that laughs when your
+ * seven eats half your hand is part of the fun. Games are long and the end
+ * screen is brief, so the personality lives in the middle of the game. A bot is
+ * a little toxic, in the way friends at a table are: it gloats when it robs
+ * you, laughs at your discards, rolls its eyes when you turn down its offer,
+ * honks a clown at yours, and smirks when it takes an award off you. When it is
+ * the one hurt, it sulks or rages.
  *
- * It stays occasional: a bot waits at least twenty seconds between reactions,
- * throws at most fifteen in a game, and only the moment that matters most to it
- * in any stretch of play is considered.
+ * It is still a player, not a slot machine: at least twelve seconds between
+ * reactions, twenty-four in a game at most, and in any stretch of play only the one
+ * moment that matters most to it, and only one bot at a table.
  */
 
 import type { ReactionName } from '../../../protocol/src/reactions.js';
 import type { TableEvent } from './facts.js';
 import type { Mind } from './mind.js';
 
-export const REACTION_GAP_MS = 20_000;
-export const REACTIONS_PER_GAME = 15;
+export const REACTION_GAP_MS = 12_000;
+export const REACTIONS_PER_GAME = 24;
 
 type Moment = { weight: number; chance: number; faces: ReactionName[][] };
 
@@ -40,47 +43,58 @@ export function reactTo(
   for (const e of events) {
     switch (e.kind) {
       case 'win':
-        if (e.player === me) add(100, 0.9, ['nice', 'smug', 'nice'], ['nice', 'nice'], ['smug', 'laugh']);
-        else add(90, 0.45, ['dead'], ['sad'], ['shock']);
+        if (e.player === me) add(100, 0.95, ['nice', 'smug', 'laugh'], ['laugh', 'laugh', 'smug'], ['smug', 'nice']);
+        else add(90, 0.5, ['dead'], ['angry'], ['eyeroll']);
         break;
       case 'monopoly': {
         const fromMe = e.taken[me] ?? 0;
-        if (fromMe >= 3) add(60, 0.65, ['shock', 'angry'], ['dead'], ['angry', 'angry']);
-        else if (fromMe > 0) add(30, 0.3, ['eyeroll'], ['angry']);
+        if (fromMe >= 3) add(60, 0.8, ['shock', 'angry'], ['dead'], ['angry', 'angry']);
+        else if (fromMe > 0) add(30, 0.45, ['eyeroll'], ['angry']);
         const total = Object.values(e.taken).reduce((a, b) => a + b, 0);
-        if (e.player === me && total >= 4) add(55, 0.6, ['evil', 'laugh'], ['smug'], ['evil']);
+        if (e.player === me && total >= 3) add(58, 0.85, ['evil', 'laugh'], ['laugh', 'laugh'], ['smug', 'evil']);
         break;
       }
       case 'steal':
         if (e.victim === me) {
           const again = mind.profiles[e.thief]?.robbedMe ?? 0;
-          if (again >= 1) add(50, 0.6, ['angry', 'angry'], ['suspicious', 'angry']);
-          else add(45, 0.4, ['angry'], ['sad'], ['eyeroll']);
-        } else if (e.thief === me) add(20, 0.18, ['evil'], ['smug']);
+          if (again >= 1) add(50, 0.75, ['angry', 'angry'], ['suspicious', 'angry'], ['angry', 'eyeroll']);
+          else add(45, 0.55, ['angry'], ['sad'], ['suspicious']);
+        } else if (e.thief === me) add(40, 0.6, ['evil'], ['laugh'], ['smug'], ['evil', 'laugh']);
         break;
       case 'discard':
-        if (e.player === me && e.count >= 4) add(48, 0.5, ['dead'], ['sad', 'sad']);
-        else if (e.player === me) add(20, 0.2, ['sad']);
-        else if (e.count >= 5) add(15, 0.15, ['laugh']);
+        if (e.player === me && e.count >= 4) add(48, 0.6, ['dead'], ['sad', 'sad'], ['angry']);
+        else if (e.player === me) add(20, 0.3, ['sad'], ['eyeroll']);
+        else if (e.count >= 4) add(38, 0.6, ['laugh'], ['laugh', 'laugh'], ['wink']);
+        else add(15, 0.18, ['laugh']);
         break;
       case 'award':
-        if (e.to === me) add(40, 0.35, ['nice'], ['smug']);
-        else if (e.from === me) add(42, 0.45, ['shock'], ['angry']);
+        if (e.to === me && e.from) add(47, 0.75, ['smug'], ['laugh', 'smug'], ['nice']);
+        else if (e.to === me) add(40, 0.55, ['nice'], ['smug']);
+        else if (e.from === me) add(42, 0.6, ['shock'], ['angry'], ['suspicious']);
         break;
       case 'points':
-        if (e.player !== me && e.points >= context.target - 1) add(35, 0.3, ['suspicious'], ['shock']);
+        if (e.player !== me && e.points >= context.target - 1) add(35, 0.45, ['suspicious'], ['shock']);
+        else if (e.player === me && e.points >= context.target - 2) add(30, 0.35, ['evil'], ['smug']);
         break;
       case 'robber':
-        if (e.player !== me && e.blocks.includes(me)) add(18, 0.15, ['eyeroll'], ['suspicious']);
+        if (e.player !== me && e.blocks.includes(me)) add(25, 0.35, ['eyeroll'], ['suspicious'], ['angry']);
+        else if (e.player === me && e.blocks.length) add(22, 0.3, ['evil'], ['smug']);
         break;
       case 'declined':
-        if (e.maker === me) add(10, 0.08, ['eyeroll']);
+        // Its offer turned down: a roll of the eyes, sometimes the clown.
+        if (e.maker === me) add(20, 0.25, ['eyeroll'], ['wink'], ['pleading']);
+        // It turned down somebody else's offer: honk.
+        else if (e.by === me) add(14, 0.18, ['wink'], ['laugh'], ['eyeroll']);
+        break;
+      case 'offer':
+        if (e.player === me) add(10, 0.15, ['pleading']);
         break;
       case 'build':
-        if (e.player === me && e.what === 'city') add(8, 0.06, ['smug']);
+        if (e.player === me && e.what === 'city') add(18, 0.25, ['smug'], ['nice']);
+        else if (e.player === me && e.what === 'settlement') add(12, 0.12, ['smug']);
         break;
       case 'roll':
-        if (e.player === me && e.total === 7) add(12, 0.1, ['evil']);
+        if (e.player === me && e.total === 7) add(28, 0.45, ['evil'], ['evil', 'laugh']);
         break;
       default:
         break;
