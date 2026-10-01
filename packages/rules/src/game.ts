@@ -966,10 +966,23 @@ export function applyAction(state: Game, playerId: string, raw: GameAction, rand
  */
 export function simulateAction(state: Game, playerId: string, raw: GameAction, random: () => number): Game {
   return applyWith(state, playerId, raw, random, (g) => {
-    const copy = structuredClone({ ...g, board: null as unknown as Board, log: [] });
+    const copy = plainCopy({ ...g, board: null as unknown as Board, log: [] });
     copy.board = g.board;
     return copy;
   });
+}
+
+/**
+ * A deep copy of plain data (objects, arrays, numbers, strings, booleans and
+ * null), which is all a game is. Several times quicker than `structuredClone`
+ * for a game's many small objects, which matters to a bot copying thousands.
+ */
+function plainCopy<T>(value: T): T {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(plainCopy) as T;
+  const out: Record<string, unknown> = {};
+  for (const key in value) out[key] = plainCopy((value as Record<string, unknown>)[key]);
+  return out as T;
 }
 
 function applyWith(

@@ -34,6 +34,8 @@ import { chooseOpening, chooseOpeningRoad } from './brain/opening.js';
 import { answer, makeOffer, manageOffer, openOffer } from './brain/trade.js';
 import { adviseStrategy, adviseThreat, adviseTrade } from './brain/advisor.js';
 import { roadSites } from '../../rules/src/game.js';
+import { TUNING } from './brain/tuning.js';
+import { sevenChance } from './brain/dice.js';
 
 export type Decision = {
   /** The move. While `hold` is set it is only a placeholder and must not be played. */
@@ -95,7 +97,7 @@ const DIALS: Record<
     slack: number;
   }
 > = {
-  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: true, open: true, opening: [8, 14], advisor: true, slack: 0 },
+  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: true, open: false, opening: [8, 14], advisor: true, slack: 0 },
   sharp: { budgetMs: 700, positions: 900, depth: 3, beam: 6, offers: true, open: false, opening: [4, 10], advisor: true, slack: 0.004 },
   steady: { budgetMs: 500, positions: 350, depth: 2, beam: 4, offers: false, open: false, opening: [2, 6], advisor: false, slack: 0.012 },
 };
@@ -130,13 +132,28 @@ function thinker(ctx: DecideContext, mind: Mind, random: () => number): Thinker 
     unseen: unseenCards(mind.belief, me?.cards ?? []),
     lean: lean ? { [ctx.meId]: lean } : undefined,
     lastVictim: mind.lastVictim,
+    ...(TUNING.countDice && ctx.view.diceMode === 'balanced' && mind.dice?.synced
+      ? { sevens: (rolls: number) => sevenChance(mind.dice, rolls) }
+      : {}),
     random,
     deadline: performance.now() + (ctx.budgetMs ?? dials.budgetMs),
     positions: ctx.positions ?? dials.positions,
-    beam: dials.beam,
-    depth: dials.depth,
+    ...searchShape(ctx, dials),
     scored: 0,
   };
+}
+
+/**
+ * How wide and deep the turn search goes. Near the end it goes further, where a
+ * winning turn can take five or six moves and missing one costs the game.
+ */
+function searchShape(ctx: DecideContext, dials: (typeof DIALS)[BotLevel]): { beam: number; depth: number } {
+  const me = ctx.view.players.find((p) => p.id === ctx.meId);
+  const near =
+    TUNING.endgameWithin > 0 && !!me && me.points >= (ctx.view.victoryPoints ?? 10) - TUNING.endgameWithin;
+  return near && ctx.level === 'champ'
+    ? { beam: Math.max(dials.beam, TUNING.endgameBeam), depth: Math.max(dials.depth, TUNING.endgameDepth) }
+    : { beam: dials.beam, depth: dials.depth };
 }
 
 /** The plan a player reads, from the first purchases in the bot's own race. */
@@ -211,7 +228,7 @@ export async function decide(ctx: DecideContext): Promise<Decision> {
       if (!best) return done({ kind: 'robber', hex: view.robber }, 'Nowhere better for the robber.');
       let action = best.action;
       // Two targets the engine cannot separate, hitting different people: who is the real threat?
-      if (dials.advisor && best.runnerUp !== undefined && best.value - best.runnerUp < 0.003) {
+      if (dials.advisor && best.runnerUp !== undefined && best.value - best.runnerUp < 0.003 * TUNING.gainScale) {
         const top = [best.action];
         const second = bestRobberAlternatives(g, th, best.action);
         if (second) top.push(second);
@@ -305,7 +322,7 @@ async function takeTurn(
   const best = planTurn(g, th);
   // A card or two short of something better: ask the table before settling for the bank.
   if (dials.offers && ctx.canOffer !== false && !view.trade) {
-    const offer = makeOffer(g, th, mind.offers.made, best.value, mind.trading);
+    const offer = makeOffer(g, th, mind.offers.made, best.value, mind.trading, mind.profiles);
     if (offer) {
       mind.offers.made.push(offer.key);
       mind.trading.made++;

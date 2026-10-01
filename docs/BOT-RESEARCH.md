@@ -2,7 +2,9 @@
 
 What every notable Catan program does, how strong it really is, and what made
 the strong ones strong. Written on 1 October 2026 as the research behind
-[The strongest bot we can build](BOT-ENGINE-PLAN.md).
+[The strongest bot we can build](BOT-ENGINE-PLAN.md). A second round the same
+day covered research frameworks, newer work, commercial bots and hard numbers
+about the game; see [Second round](#second-round-frameworks-new-work-and-numbers).
 
 Figures come from the primary source (paper, thesis, code or the author's own
 post) unless marked _second-hand_, which means another source reports them and
@@ -517,6 +519,112 @@ three points.
 **Table manners.** Do not make enemies needlessly: yield a contested corner that
 matters more to someone else. People gang up on whoever looks strongest.
 
+## Second round: frameworks, new work and numbers
+
+A second sweep, also on 1 October 2026, looked for what the first missed:
+research frameworks and competitions, work since 2019, commercial bots, newer
+open-source projects, and hard numbers about the game itself.
+
+**Research frameworks.** Queen Mary's Tabletop Games framework (TAG) has a full
+Catan with player trading. Its only published Catan results (Goodman,
+Perez-Liebana and Lucas, IEEE Transactions on Games, 2025) found that plain tree
+search with no Catan-specific judgement played very poorly. With a learned
+judgement of positions it worked. In three-player games the first player won
+only 22% (a fair share is 33%). The board mattered far more than the dice. That
+learned judgement is four linear models, one per phase of the game, over 52
+features:
+
+- Counting for a position in the opening model: the smallest income of any
+  resource (+0.67), roads (+0.49), and cards for a road or a city in hand.
+- Counting against it: two settlements on one tile (−0.98) and a generic 3:1
+  harbour (−1.16).
+
+Neither OpenSpiel, Ludii nor PettingZoo has Catan. No game-AI competition
+(CIG/CoG, through 2026) has had a Catan track; only course tournaments exist.
+
+**Benchmarks against Catanatron's bots.**
+
+- CatanBench (2026), bots only: AlphaBeta won 19 of 32 four-player games and the
+  simpler value bot 13.
+- CatanBench with one frontier language model seated with random, the value bot
+  and AlphaBeta: the models won 23 of 24 games, at $2–10 a game.
+- Another benchmark: AlphaBeta wins 36% against three value bots (a fair share
+  is 25%). It buys a development card on only 1.5% of the turns it could.
+
+**The robber alone is worth about eight points.** A Kochi University of
+Technology thesis (2025) ran 4,000 four-player games between otherwise identical
+bots:
+
+- A knowledge-based robber won 27.0% of games; a robber learned by trial and
+  error won 19.2%.
+- The knowledge-based robber hit the leader's tiles 92% of the time, and its
+  own 0.2%.
+
+**Learning projects, self-reported.**
+
+- CatanZero (two players, no trading, AlphaZero-style): its network alone won
+  about 31% against AlphaBeta. When its placement search spread too few samples
+  over too many options, 74.6% of its losses were placement blowouts. An
+  earlier claimed result was withdrawn after a leak of hidden information was
+  found.
+- catanatron-1v1: imitation learning and reinforcement learning top out around
+  36% against the value bot; tree search at 100 ms got 5–10%.
+
+**Commercial bots.**
+
+- Colonist added bot difficulty levels in 2024. Bot games were 30% of its 60
+  million games in 2025. Nothing public says how its bots work.
+- Catan Universe has three levels. Players report that its AI rarely builds
+  roads and hoards cards, and one experienced player reported 24 straight wins
+  on the hardest level.
+- In the console edition (2023) the AI only trades true surplus, and games run
+  about twice as long.
+
+**Numbers about the game.**
+
+- Seat order matters, but the effect depends on the board, so every comparison
+  should rotate seats.
+- Colonist one-on-one games average 69 turns, and a third end in resignation.
+- With Largest Army uncontested, the development cards it takes on average to
+  gain points from Largest Army and point cards: 2.95 for one point, 4.43 for
+  two, 6.39 for three and 9.40 for four.
+
+**Techniques from other games that fit Catan.**
+
+- Searching past the bot's own turn, with quick models of the next turns, won
+  57–85% against searching the bot's own turn alone, in a game where a turn has
+  several actions (FH-EMCTS).
+- Fitting a program's judgement to game results by logistic regression ("Texel
+  tuning") was worth about 100 Elo in chess.
+- Mirrored deals, where both sides of a comparison see the same cards (common
+  random numbers), cut the games a comparison needs by four times or more in
+  poker.
+- In four-player games, judge a move by the best reply of the strongest
+  opponent rather than every opponent's (Best-Reply Search).
+
+**What we did with it.** Each idea was tried in our engine and kept only if it
+won. The test was about 200 four-player self-play games, two seats against two,
+with every board played twice with the sides swapped, the same dice in both
+games, and balanced dice as rooms use them:
+
+- **Kept: the race prices expansion.** A new corner is worth what the rest of
+  the race costs with the resources and harbour it brings. The race also checks
+  for overshooting the target. Won 111–87, with a tenth more settlements.
+- **Kept: the robber moves on.** Fitting the race to who won about 200
+  self-play games showed it was too sure of itself, mostly because it counted a
+  tile under the robber as lost for good. Counting a quarter of it lost fixed
+  most of that, and won 113–85.
+- **Kept: paired dice** for every comparison. They cut the error of a
+  comparison by about a tenth.
+- **Not kept: a refitted temperature.** 100–98, and 103–95 with the trading
+  thresholds rescaled to match.
+- **Not kept: looking past the turn** with quick models of the opponents'
+  turns. 102–96, at twice the thinking time.
+- **Not kept: a learned correction for room to expand.** Counting open corners
+  within two roads predicted the winners of games it was not fitted on. In play
+  it lost 13–24, and the duel was stopped. Corrections for resource variety, the
+  weakest income and awards held did not even hold up on unseen games.
+
 ## Our bots, read in full
 
 Today's bots (`packages/bot/src`, described in [Bot players](BOTS.md)) are a
@@ -651,6 +759,38 @@ Strong players
 - Colonist strategy guides:
   https://blog.colonist.io/catan-strategies-beginner-intermediate-advanced/ and
   https://blog.colonist.io/guide-to-catan-starting-strategies/
+
+Second round
+
+- Goodman, Perez-Liebana and Lucas (2025), Seeding for success, IEEE
+  Transactions on Games: https://arxiv.org/abs/2503.02686
+- TAG's Catan and its learned judgement:
+  https://github.com/GAIGResearch/TabletopGames/tree/master/src/main/java/games/catan
+- CatanBench: https://github.com/SoumilRathi/catanbench and
+  https://catanbench.com/api/leaderboard
+- catan-llm (AlphaBeta against three value bots):
+  https://github.com/taziksh/catan-llm
+- Robber thesis, Kochi University of Technology (2025):
+  https://www.kochi-tech.ac.jp/library/ron/pdf/2025/03/13/a1260319.pdf
+- CatanZero:
+  https://github.com/nickita-khylkouski/catan-zero-public/blob/HEAD/docs/CATAN_ZERO_SYSTEM_PAPER_2026-07-06.md
+- catanatron-1v1: https://github.com/PeterLP123/catanatron-1v1
+- Canopy (move ordering, dominated moves):
+  https://github.com/cullback/canopy/blob/HEAD/examples/catan/OPTIMIZATIONS.md
+- Colonist 2024 and 2025 summaries:
+  https://blog.colonist.io/colonist-io-2024-summary/ and
+  https://blog.colonist.io/colonist-io-2025-summary/
+- Colonist one-on-one strategy and balanced sevens:
+  https://blog.colonist.io/ranked-1v1-comprehensive-strategy-guide-colonist-io/
+  and https://blog.colonist.io/balancing-7s-on-1v1/
+- Development cards per point:
+  https://boardgameanalysis.com/the-143-ways-to-win-at-catan-part-ii
+- Best-Reply Search:
+  https://dke.maastrichtuniversity.nl/m.winands/documents/BestReplySearch.pdf
+- Searching past the turn (FH-EMCTS): https://ceur-ws.org/Vol-3305/paper3.pdf
+- Texel tuning: https://www.chessprogramming.org/Texel%27s_Tuning_Method
+- Common random numbers in tuning (RSPSA):
+  https://www.jhuapl.edu/SPSA/PDF-SPSA/Kocsis_acg05.pdf
 
 Not found: the full text of the Szita, Xenou and Pfeiffer papers; any design
 document or measured win rate for Colonist, Catan Universe or the Catan apps;

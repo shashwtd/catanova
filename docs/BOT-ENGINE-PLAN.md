@@ -29,8 +29,36 @@ copying it, so the bot searches with the real rules and no differential test
 is needed. A score still takes about a fifth of a millisecond, so a Champion
 scores up to 2,000 positions a move.
 
-Still to do: self-play tuning of the weights and a trained score (step 5),
-counting the balanced dice deck, and measuring results against people.
+Still to do: a trained score (step 5) and measuring results against people.
+The balanced dice deck is now counted from the public rolls.
+
+Since then (1–2 October): every hand-set number of the brain lives in
+`packages/bot/src/brain/tuning.ts`, so self-play can vary them without touching
+the code that uses them. A duel harness plays two seats of one tuning (or one
+version of the code) against two of another, every board twice with the sides
+swapped, about 200 four-player games an experiment, and new features are added
+switched off and kept only when a duel says they win. Reviewing real games found
+three accounting bugs in the race that made bots hoard cards; the fixed bot loses
+half as many cards to sevens and finishes games faster. Bots now think in a
+worker thread, so a Champion's search no longer holds the server.
+
+A second round of research and measurement (see the second-round section of
+[Catan AI research](BOT-RESEARCH.md)) added three tools, on top of the duel:
+
+- **Paired dice.** Both games of a pair see the same rolls in the same order,
+  whatever the bots decide, so the board and the dice cancel out of a
+  comparison.
+- **Calibration.** Self-play games are saved turn by turn, and the race is fitted
+  to who actually won, the way chess programs fit their evaluation to results
+  ("Texel tuning"). This shows how much luck is left at each point of a game, and
+  what the race misses.
+- **A held-out check.** A correction counts only if it also predicts the winners
+  of games it was not fitted on. Every position of a game shares one winner, so a
+  few dozen games are a few dozen data points, and most corrections that looked
+  strong turned out to fit those games and nothing else.
+
+All three are in `scripts/bot-lab.ts` (`duel`, `record`, `calibrate`; usage at
+the top of the file).
 
 ## The short version
 

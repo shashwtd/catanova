@@ -16,7 +16,21 @@ research on Catan programs found the strong ones do (see
   roll and the harbours they own, how many rolls until each purchase is
   affordable, and how many until ten points if they buy the cheapest points
   first. Races become a chance of winning for every player, and that chance is
-  the one currency every decision is priced in.
+  the one currency every decision is priced in. Three accounting rules keep it
+  honest, each learnt from a bot that hoarded cards in a real game: a bank
+  trade only half-counts until it is a whole trade; cards traded away to buy
+  something are gone, so the same sheep never pay for two purchases; and the
+  part of the race estimated in bulk never costs less per point than the part
+  planned step by step. With those, building an affordable city or settlement
+  never scores below waiting, which a check over self-play positions confirms,
+  except where the same cards buy something better (longest road, say).
+  The race also prices expansion properly. A corner is worth what the rest of
+  the race costs with the income mix it brings, so the clay the bot lacks beats
+  more of the timber it has. A harbour corner is weighed, and owning it changes
+  the rates for the rest of the race. The race also checks, at every step,
+  whether one purchase would finish the game (an award is two points), since a
+  greedy plan can overshoot. Together these won 111 of 198 self-play games
+  against the version without them, with a tenth more settlements.
 - **Card counting** (`belief.ts`, `facts.ts`, `watch.ts`). The driver replays
   every move from the journal to each bot, state by state. Everything public
   (income, building, trades, discards, Monopoly, Year of Plenty) is counted
@@ -32,14 +46,23 @@ research on Catan programs found the strong ones do (see
   be; a steal over every card the victim could be holding.
 - **The opening** (`opening.ts`). For each strong corner, the rest of the
   placement round is played out several times, with the others choosing the
-  way people do, and each finished opening is scored by the race.
+  way people do, and each finished opening is scored by the race. A start with
+  no timber, clay or hay is marked down hard: in a real game a bot on two rock
+  corners built its first road on turn 57.
 - **Trading** (`trade.ts`). Selfish: see below.
 
 Robber, discards, knights, Monopoly, Year of Plenty and Road Building are all
 chosen by the same search, not by fixed rules. A knight goes before the dice
 when the robber sits on the bot's own production or when it takes largest army.
 While nobody is clearly ahead, the robber does not hit the same person twice in
-a row.
+a row. In self-play it robs a leader on points four times in five and never
+touches its own tiles.
+
+The race counts a tile under the robber as only a quarter lost: the robber
+moves on at the next seven or knight, a few rolls away, while a race runs for
+dozens. Counted as lost for good, every robber move swung the race, and the
+race was more confident about who would win than the results bore out; fitted
+to who won a hundred self-play games, a quarter is about right. In self-play it won 113 of 198 games against the same bot counting the tile as lost for good.
 
 ### Trading
 
@@ -57,10 +80,12 @@ race.
 - **Making offers:** only when a card or two stands between it and a purchase,
   priced against the best it could do this turn with the bank and harbours;
   only to players the counting says probably hold the card and who would see
-  the trade as progress; at most two a turn, never the same refused offer twice
-  in a turn, and less often at a table that keeps turning it down. With a pile
-  of one resource it cannot use and several it could, it may open the pile to
-  proposals instead.
+  the trade as progress. At most one offer a turn, and never more cards asked
+  than given: two for one in the bot's favour reads as an insult. A player who
+  turns an offer down (or ignores it) is left alone for a few turns, and one who
+  keeps doing so for ten. Open offers ("these cards for anything") are switched
+  off: in a real game the bot repeated one every turn until the player blocked
+  trades.
 - **Its own offer on the table:** it takes the answer best for itself, waits up
   to nine seconds for more, and withdraws if none is good.
 
@@ -69,21 +94,13 @@ and answering is never owed: a person can take an offer first.
 
 ### Reactions
 
-Games are long and the end screen is brief, so a bot's personality lives in the
-middle of the game, and it is a little toxic, the way friends at a table are.
-It gloats or laughs when it robs you, laughs when a seven eats your hand, plays
-an evil face when it rolls the seven itself, smirks when it takes an award off
-you, rolls its eyes or honks a clown when an offer is turned down, begs now and
-then when it makes one, and cackles over a big Monopoly. When it is the one
-hurt, it rages, sulks or eyes you suspiciously, and a player who robs it twice
-gets double rage. A win is a burst of two or three faces.
-
-It stays a player, not a slot machine: at least twelve seconds between
-reactions, twenty-four a game at most, only the moment that matters most to it
-in any stretch of play, and only one bot at a table. In simulated four-player
-games that came to about eleven faces a game, one every four turns or so.
-Reactions go through the same rate limit as a player's. A bot still never
-chats: a talkative bot reads as a threat.
+A bot reacts only to moments worth a face: it gloats now and then when it robs
+someone or plays a big Monopoly, laughs at a big discard, smirks when it takes
+an award off you, rages at someone who keeps robbing it, and celebrates a win.
+Never for routine play: at least forty-five seconds apart, eight a game at
+most, one face at a time, one bot at a table. An earlier version reacted every
+few turns, and players found it cringe. Reactions go through the same rate
+limit as a player's, and a bot still never chats.
 
 ### Jev, as an advisor
 
@@ -113,7 +130,7 @@ The three levels are the same engine held back:
 | Positions scored a move  | 350    | 900   | 2,000    |
 | Turn search depth        | 2      | 3     | 4        |
 | Opening rehearsals       | 2 × 6  | 4 × 10 | 8 × 14  |
-| Makes trade offers       | no     | yes   | yes, and open offers |
+| Makes trade offers       | no     | yes   | yes      |
 | Asks Jev                 | no     | yes   | yes      |
 | Settles for a good move  | often  | now and then | never |
 
@@ -165,11 +182,11 @@ values. Never commit the key or put it in a client-side environment variable.
 ## Who sits down
 
 There are three of them, and the host does not choose. Filling a seat draws one
-on the server — steady and sharp two in five each, a champion one in five — so
-you find out who you have by playing them, the same way you would with a
-stranger. Each is marked by its own machine beside its name; the seat itself
-says only "bot", because naming the difficulty would give away a game nobody
-has played yet.
+on the server. Since 1 October 2026 the draw always gives a champion: steady
+and sharp are disabled rather than removed (their odds in
+`packages/protocol/src/bots.ts` are zero), so a bot already seated at one keeps
+playing it, and setting the odds back brings them back. Each level is marked by
+its own machine beside its name; the seat itself says only "bot".
 
 How each one plays is under [Levels](#levels).
 
@@ -217,9 +234,13 @@ Card counting is held to the same line. The bot's memory is fed only public
 facts: `brain/facts.ts` compares two consecutive states and keeps what every
 player saw, so a steal the bot was not part of reads as "a card moved", never
 as which card (`tests/bot-brain.test.ts` checks exactly that). Its imagined
-games draw every hidden card from that counting, and in a room with balanced
-dice it knows nothing of the dice deck. A champion that beats you beat you with
-what was on the table, remembered better than most people remember it.
+games draw every hidden card from that counting. In a room with balanced dice
+it also counts the dice deck from the public rolls (`brain/dice.ts`), as a
+player with a notepad could: which of the 36 pairs are left before the refill,
+and so how likely a seven is before its next turn. It never reads the server's
+deck; a test checks that the count from public rolls matches it exactly. A
+champion that beats you beat you with what was on the table, remembered better
+than most people remember it.
 
 ## How a bot behaves at the table
 
@@ -237,6 +258,17 @@ a slow model call is absorbed rather than added on top, and a bot never bursts
 several moves out at once.
 
 ## Operational notes
+
+- Bots think in a worker thread (`apps/server/src/bot-worker.ts`, driven by
+  `bot-thinker.ts`). A Champion scores up to two thousand positions a move,
+  most of a second on the production machine; on the main thread that would
+  hold every room's sockets. The worker has its own decision service client.
+  Card counting stays on the main thread, which watches every move; a decision
+  made in the worker brings back only what it decides (the long plan, offers
+  made, whom it robbed), so a move made while it was thinking is never lost. A
+  worker that dies is replaced on the next request, and one that takes over
+  twenty seconds is abandoned like any failed decision. Tests and tools think
+  inline.
 
 - A bot seat has no socket and is treated as permanently present, so it is never
   marked disconnected and never resigned for absence.
@@ -272,6 +304,26 @@ This runs the rules engine and the decision layer directly, with no server and
 no sockets. It prints each bot's plan as the game goes and reports calls,
 tokens, cost and wall clock at the end.
 
+### Measuring a change
+
+The brain's hand-set numbers live in `packages/bot/src/brain/tuning.ts`, and a
+change is kept only when it measures better:
+
+```sh
+npx tsx scripts/bot-lab.ts duel --a '{"robberBlock":0.25}' --b '{}' --games 11 --offset 0
+npx tsx scripts/bot-lab.ts record --games 40 --out positions.json
+npx tsx scripts/bot-lab.ts calibrate --files positions.json --variants '{"robber":{"robberBlock":0.25}}'
+```
+
+`duel` plays Champions with one tuning against Champions with another, every
+board twice with the sides swapped and the same dice in both games, and prints
+the paired result. A few points of difference needs a few hundred games, so run
+several with different offsets side by side. `record` and `calibrate` measure
+how well the race predicts who wins self-play games, which is quicker than a
+duel for anything that changes the race. A better prediction is not a better
+player, though: counting a player's open corners predicted winners on games it
+was not fitted on, and lost a duel 13 to 24. A duel decides.
+
 ## Known limits
 
 - **Measured against other bots, not yet against people.** In four-player games
@@ -282,9 +334,5 @@ tokens, cost and wall clock at the end.
   restart mid-game it counts from the public card counts until the hands
   settle again.
 - Bots play Classic only, as decided for the modes.
-- Thinking runs on the server's main thread: a Champion's move holds it for up
-  to about a third of a second, bounded by the positions it may score and by a
-  time cap. Moving the engine to a worker thread is the next step if bot games
-  become a large share of the load.
 - A bot's memory (plans, counting, what it has learnt about the table) lives in
   server memory. A restart loses it, and costs a few turns of sharper play.

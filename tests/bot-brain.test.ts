@@ -307,3 +307,182 @@ test('watching a game keeps the counting in step with the table', async () => {
       assert.equal(Object.values(p.hand).reduce((n, x) => n + x, 0), count);
   }
 });
+
+test('cards traded at the bank are spent: the same sheep never pay for two things', async () => {
+  const { afterPaying } = await import('../packages/bot/src/brain/race.js');
+  const rate = { wood: 4, brick: 4, sheep: 3, wheat: 4, ore: 4 };
+  // A city needs two more rock: two trades of three sheep each.
+  assert.deepEqual(afterPaying(hand({ sheep: 7, brick: 2, wheat: 2, ore: 1 }), hand({ wheat: 2, ore: 3 }), rate), hand({ sheep: 1, brick: 2 }));
+});
+
+test('a bot with a big hand trades its way into the city instead of sitting on it', async () => {
+  const { decide, initialPlan, newMind } = await import('../packages/bot/src/index.js');
+  const game = position();
+  const [a, b, c, d] = spots(game, 4);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[d!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  // Eleven cards: no road or settlement possible, but eight sheep buy the two rock a city lacks.
+  game.players[0]!.hand = hand({ sheep: 8, wheat: 2, ore: 1 });
+  const moves: string[] = [];
+  let g = game;
+  for (let i = 0; i < 4; i++) {
+    const decision = await decide({
+      view: gameView(g, 'me'),
+      board: g.board,
+      meId: 'me',
+      plan: initialPlan(g.turn),
+      jev: null,
+      level: 'champ',
+      mind: newMind(),
+      canOffer: false,
+    });
+    moves.push(decision.action.kind);
+    if (decision.action.kind === 'endTurn') break;
+    g = applyAction(g, 'me', decision.action, seededRandom(i));
+  }
+  assert.deepEqual(moves.slice(0, 3), ['bankTrade', 'bankTrade', 'city'], moves.join(', '));
+});
+
+test('with balanced dice the bot counts the deck exactly from the public rolls', async () => {
+  const { sevenChance } = await import('../packages/bot/src/brain/dice.js');
+  const random = seededRandom(9);
+  let game = createGame(
+    ['a', 'b', 'c'].map((id) => ({ id, name: id })),
+    9,
+    random,
+    { diceMode: 'balanced' },
+  );
+  const mind = newMind();
+  let rolls = 0;
+  for (let step = 0; step < 600 && !game.winner; step++) {
+    const owed = owedMoves(game)[0]!;
+    const next = applyAction(game, owed.player, timeoutAction(game, owed.player, random)!, random);
+    watch(mind, 'a', game, next);
+    if (next.dice !== game.dice && next.balancedDice) {
+      rolls++;
+      // The server's own deck, which the bot never reads, is what the bot counted.
+      assert.deepEqual([...mind.dice!.remaining].sort((x, y) => x - y), [...next.balancedDice.remaining].sort((x, y) => x - y));
+    }
+    game = next;
+  }
+  assert.ok(rolls > 30, `the count held over ${rolls} rolls, across refills`);
+  assert.ok(mind.dice!.synced);
+  // With every seven gone from the deck, a seven is impossible until the refill.
+  const noSevens = { remaining: Array.from({ length: 36 }, (_, i) => i).filter((p) => Math.floor(p / 6) + (p % 6) + 2 !== 7), synced: true };
+  assert.equal(sevenChance(noSevens, 1), 0);
+  assert.ok(Math.abs(sevenChance(undefined, 1) - 1 / 6) < 1e-9);
+});
+
+test('the bot decides on what it can see: hidden cards elsewhere never change what it sees or does', async () => {
+  const { decide, initialPlan } = await import('../packages/bot/src/index.js');
+  const random = seededRandom(12);
+  let game = createGame(
+    ['a', 'b', 'c'].map((id) => ({ id, name: id })),
+    12,
+    random,
+  );
+  const mind = newMind();
+  for (let step = 0; step < 400 && !game.winner; step++) {
+    const owed = owedMoves(game)[0]!;
+    if (step > 120 && owed.player === 'a' && game.phase === 'actions') break;
+    const next = applyAction(game, owed.player, timeoutAction(game, owed.player, random)!, random);
+    watch(mind, 'a', game, next);
+    game = next;
+  }
+  assert.equal(owedMoves(game)[0]!.player, 'a');
+  // The same table, but "b" holds other cards of the same number, and the deck is in another order.
+  const other = structuredClone(game);
+  const b = other.players.find((p) => p.id === 'b')!;
+  const h = b.hand;
+  b.hand = { wood: h.ore, brick: h.wood, sheep: h.brick, wheat: h.sheep, ore: h.wheat };
+  b.cards = b.cards.map((c) => ({ ...c, kind: c.kind === 'knight' ? 'victoryPoint' : 'knight' }));
+  other.deck = [...other.deck].reverse();
+  assert.notDeepEqual(other.players, game.players);
+  assert.deepEqual(gameView(other, 'a'), gameView(game, 'a'));
+  const decideOn = (g: Game) =>
+    decide({
+      view: gameView(g, 'a'),
+      board: g.board,
+      meId: 'a',
+      plan: initialPlan(g.turn),
+      jev: null,
+      level: 'champ',
+      mind: structuredClone(mind),
+      positions: 200,
+      canOffer: false,
+    });
+  assert.deepEqual((await decideOn(other)).action, (await decideOn(game)).action);
+});
+
+test('the race arithmetic: the exact wait agrees with halving, and the quick estimate with full part-trades', async () => {
+  const { rollsToAfford, rollsToAffordByHalving, roughRolls } = await import('../packages/bot/src/brain/race.js');
+  const { retune, TUNING } = await import('../packages/bot/src/brain/tuning.js');
+  const rnd = seededRandom(77);
+  const pick = () => hand({ wood: rnd(), brick: rnd(), sheep: rnd(), wheat: rnd(), ore: rnd() });
+  const kept = TUNING.partialTrade;
+  try {
+    for (const part of [0, 0.4, 1]) {
+      retune({ partialTrade: part });
+      for (let i = 0; i < 2000; i++) {
+        const h = pick(), c = pick(), inc = pick(), r = pick();
+        const held = hand({}), cost = hand({}), perRoll = hand({}), rate = hand({});
+        for (const k of Object.keys(held) as (keyof Hand)[]) {
+          held[k] = h[k] < 0.5 ? 0 : Math.floor(h[k] * 7);
+          cost[k] = c[k] < 0.5 ? 0 : Math.ceil(c[k] * 3);
+          perRoll[k] = inc[k] < 0.2 ? 0 : inc[k] * 0.5;
+          rate[k] = [2, 3, 4][Math.floor(r[k] * 3)]!;
+        }
+        const exact = rollsToAfford(held, cost, perRoll, rate);
+        const halved = rollsToAffordByHalving(held, cost, perRoll, rate);
+        // Halving stops within a twentieth of a roll above the answer.
+        assert.ok(halved - exact > -1e-6 && halved - exact < 0.051, `${part}: ${exact} vs ${halved}`);
+        if (part === 1 && !Object.values(held).some(Boolean))
+          assert.ok(Math.abs(roughRolls(cost, perRoll, rate) - exact) < 1e-6);
+      }
+    }
+  } finally {
+    retune({ partialTrade: kept });
+  }
+});
+
+test('the robber costs a race only part of its tile when told to: it moves on', async () => {
+  const { retune, TUNING } = await import('../packages/bot/src/brain/tuning.js');
+  const game = position();
+  const [a, b, c] = spots(game, 3);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  const know = { points: 1, knightsHeld: 0, otherCards: 0 };
+  const open = race(game, 'me', know).rolls;
+  game.robber = game.board.hexes.find((h) => h.vertices.includes(a!) && h.number)!.id;
+  const kept = TUNING.robberBlock;
+  try {
+    retune({ robberBlock: 1 });
+    const blocked = race(game, 'me', know).rolls;
+    retune({ robberBlock: 0.25 });
+    const partly = race(game, 'me', know).rolls;
+    assert.ok(open < partly && partly < blocked, `${open.toFixed(1)} < ${partly.toFixed(1)} < ${blocked.toFixed(1)}`);
+  } finally {
+    retune({ robberBlock: kept });
+  }
+});
+
+test('the race’s correction counts room to expand: a road toward open land adds corners in reach', async () => {
+  const { features, shared } = await import('../packages/bot/src/brain/race.js');
+  const { roadSites } = await import('../packages/rules/src/game.js');
+  const game = position();
+  const [a] = spots(game, 1);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  const know = { points: 1, knightsHeld: 0, otherCards: 0 };
+  const before = features(game, 'me', know, shared(game));
+  assert.equal(before.awards, 0);
+  assert.ok(before.kinds >= 1 && before.income > 0);
+  // Every road out of an open corner reaches further; at least one reaches new corners.
+  const gains = roadSites(game, 'me').map((edge) => {
+    const t = { ...game, roads: { ...game.roads, [edge]: 'me' } };
+    return features(t, 'me', know, shared(t)).sites2 - before.sites2;
+  });
+  assert.ok(gains.every((g) => g >= 0) && gains.some((g) => g > 0), gains.join(','));
+});

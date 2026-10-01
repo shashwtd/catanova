@@ -17,7 +17,6 @@ import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import {
   decide,
-  respond,
   newMind,
   watch,
   reactTo,
@@ -34,6 +33,8 @@ import {
 } from '../../../packages/bot/src/index.js';
 import type { BotPlan, BotUsage, JevClient, Mind, StandInStyle, TableEvent } from '../../../packages/bot/src/index.js';
 import type { ReactionName } from '../../../packages/protocol/src/reactions.js';
+import { inlineThinker, mergeMind } from './bot-thinker.js';
+import type { BotThinker } from './bot-thinker.js';
 import type { BotLevel } from '../../../packages/protocol/src/bots.js';
 import { gameView } from '../../../packages/rules/src/game.js';
 import type { Game, GameAction } from '../../../packages/rules/src/game.js';
@@ -103,6 +104,11 @@ export type BotDriverDependencies = {
   random?: () => number;
   /** Injectable so tests can hand the driver a decision that fails. */
   decide?: typeof decide;
+  /**
+   * Where bots think. Inline by default (tests, tools); the server passes a worker
+   * thread so a Champion's search never holds the other rooms' sockets.
+   */
+  thinker?: BotThinker;
   /** Throws a reaction across the table for a bot, as if it had tapped one. */
   react?: (roomId: string, seat: { id: string; name: string }, reaction: ReactionName) => void;
   /** Injectable so tests can run reactions without real timers. */
@@ -145,12 +151,14 @@ export class BotDriver {
     }
   >();
   private readonly random: () => number;
+  private readonly think: BotThinker;
   private timer: NodeJS.Timeout | null = null;
   private readonly jev: JevClient | null;
 
   constructor(private readonly dependencies: BotDriverDependencies) {
     this.jev = dependencies.jev === undefined ? createJevClient() : dependencies.jev;
     this.random = dependencies.random ?? Math.random;
+    this.think = dependencies.decide ? inlineThinker(dependencies.decide) : (dependencies.thinker ?? inlineThinker());
   }
 
   /** Whether a decision service is configured. Without one the bots still play,
@@ -169,6 +177,7 @@ export class BotDriver {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.pending.clear();
+    this.think.close();
   }
 
   usageFor(roomId: string): BotUsage {
@@ -278,7 +287,7 @@ export class BotDriver {
       // Everything the question is built from is what they put on the board,
       // so a stand-in knows no more about the table than the people still at it.
       const style = seat.standIn ? await this.styleFor(roomId, seat, game) : undefined;
-      decision = await (this.dependencies.decide ?? decide)({
+      decision = await this.think.decide({
         view: gameView(game, seat.id),
         board: game.board,
         meId: seat.id,
@@ -298,7 +307,7 @@ export class BotDriver {
       return;
     }
     this.plans.set(seat.id, decision.plan);
-    if (decision.mind) this.minds.set(seat.id, decision.mind);
+    this.minds.set(seat.id, mergeMind(this.mindOf(seat.id), decision.mind));
     if (seat.standIn) this.standInPlans.set(seat.id, seat.standIn.since);
     addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, decision);
     // Its own trade offer is still collecting answers: nothing to play yet.
@@ -541,7 +550,7 @@ export class BotDriver {
       if (trade.declinedBy?.includes(seat.id) || trade.proposals?.some((p) => p.player === seat.id)) continue;
       let answer;
       try {
-        answer = await respond({
+        answer = await this.think.respond({
           view: gameView(game, seat.id),
           board: game.board,
           meId: seat.id,
@@ -556,6 +565,7 @@ export class BotDriver {
         this.dependencies.log?.('bot_trade_answer_failed', { roomId, seat: seat.name, error: (error as Error).message });
         continue;
       }
+      this.minds.set(seat.id, mergeMind(this.mindOf(seat.id), answer.mind));
       addUsage(this.usage.get(roomId) ?? this.usage.set(roomId, emptyUsage()).get(roomId)!, answer);
       if (!answer.action) continue;
       const pick = ([low, high]: [number, number]) => low + this.random() * (high - low);

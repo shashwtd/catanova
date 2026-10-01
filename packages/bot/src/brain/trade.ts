@@ -7,8 +7,9 @@
  * - it answers yes only when a trade helps it more than it helps the other
  *   player, and never helps someone close to winning;
  * - it offers a trade only when a card or two stands between it and a purchase,
- *   to players the counting says hold what it wants, at most three times a turn
- *   and never the same refused offer twice;
+ *   to players the counting says hold what it wants, at most once a turn, never
+ *   asking more cards than it gives, and leaves alone for a while anyone who
+ *   keeps saying no;
  * - when somebody offers cards and asks for anything in return, it proposes the
  *   least it can give that the other player should still want;
  * - when its own offer draws acceptances or proposals, it takes the best one for
@@ -25,14 +26,20 @@ import type { Game, GameAction, Hand, Trade } from '../../../rules/src/game.js';
 import { chanceHolds } from './belief.js';
 import { planTurn, standings, value } from './search.js';
 import type { Thinker } from './search.js';
+import type { Profile } from './mind.js';
 import { COSTS, canAfford, emptyHand, handSize, minus, plus, target } from './table.js';
+import { TUNING } from './tuning.js';
 
-/** Below this a trade is not worth the table's time. In chance of winning. */
+/**
+ * Below this a trade is not worth the table's time. In chance of winning, at the
+ * race's usual spread of chances; `TUNING.gainScale` rescales all of these when
+ * the spread changes.
+ */
 export const MIN_GAIN = 0.004;
 /** What one roll taken off a race is worth, in chance of winning, when pricing a trade. */
 export const ROLL_WORTH = 0.002;
 /** How many offers a bot makes in one turn at most. */
-export const OFFERS_PER_TURN = 2;
+export const OFFERS_PER_TURN = 1;
 /** An offer must be worth at least this much, expected, to be made at all. */
 export const OFFER_GAIN = 0.008;
 /** How long a bot waits for answers to its own offer before withdrawing it. */
@@ -90,7 +97,7 @@ export function isThreat(g: Game, th: Thinker, partner: string, chances?: Map<st
   if (g.players.filter((p) => !p.resigned).length < 3) return false;
   const theirs = table.get(partner) ?? 0,
     mine = table.get(th.me) ?? 0;
-  return theirs > 0.4 && theirs > mine * 1.4;
+  return theirs > TUNING.threatChance && theirs > mine * 1.4;
 }
 
 /**
@@ -110,16 +117,18 @@ export function judge(g: Game, th: Thinker, partner: string, give: Hand, get: Ha
   // Gains are counted in chance of winning plus a little for every roll taken off
   // a race, so a trade still counts when the chance is all but settled.
   const myRolls = (list: typeof table) => list.find((s) => s.id === th.me)?.rolls ?? 0;
-  let mine = (afterTable.get(th.me) ?? 0) - (before.get(th.me) ?? 0) + ROLL_WORTH * (myRolls(table) - myRolls(afterStandings));
+  const rollWorth = ROLL_WORTH * TUNING.gainScale,
+    minGain = MIN_GAIN * TUNING.gainScale;
+  let mine = (afterTable.get(th.me) ?? 0) - (before.get(th.me) ?? 0) + rollWorth * (myRolls(table) - myRolls(afterStandings));
   if (myTurn) {
     // What the cards let it do this turn, against what it could do without them.
     const quick = { ...th, depth: 2, beam: 6, scored: 0, positions: 120 };
     mine = planTurn(after, quick).value - planTurn(g, quick).value;
   }
-  const theirs = (afterTable.get(partner) ?? 0) - (before.get(partner) ?? 0) + ROLL_WORTH * speedsThem;
+  const theirs = (afterTable.get(partner) ?? 0) - (before.get(partner) ?? 0) + rollWorth * speedsThem;
   // Selfish: it must help the bot, and help the bot more than it helps them.
-  const ok = !threat && mine > MIN_GAIN && mine > theirs;
-  const marginal = ok && (mine < MIN_GAIN * 3 || theirs > mine * 0.7);
+  const ok = !threat && mine > minGain && mine > theirs;
+  const marginal = ok && (mine < minGain * 3 || theirs > mine * 0.7);
   return { mine, theirs, speedsThem, threat, ok, marginal };
 }
 
@@ -151,7 +160,7 @@ export function answer(g: Game, th: Thinker, trade: Trade): { action: GameAction
     const verdict = judge(g, th, maker, give, trade.give, false);
     // They must see it as a step forward for themselves, or they will not take it.
     if (!verdict.ok || verdict.speedsThem < -0.5) continue;
-    const score = verdict.mine + 0.002 * verdict.speedsThem;
+    const score = verdict.mine + ROLL_WORTH * TUNING.gainScale * verdict.speedsThem;
     if (!best || handSize(give) < handSize(best.give) || (handSize(give) === handSize(best.give) && score > best.score))
       best = { give, verdict, score };
   }
@@ -194,6 +203,7 @@ export function makeOffer(
   alreadyMade: readonly string[],
   baseline: number,
   record: { made: number; filled: number } = { made: 0, filled: 0 },
+  profiles: Record<string, Profile> = {},
 ): Offer | null {
   // How often this table actually trades: an offer nobody takes is noise, so a
   // table that keeps refusing hears from the bot less and less, one offer a turn
@@ -208,7 +218,17 @@ export function makeOffer(
   if (!others.length) return null;
   const baseTable = standings(g, th, false);
   const chances = new Map(baseTable.map((s) => [s.id, s.chance]));
-  const partners = others.filter((p) => !isThreat(g, th, p.id, chances) && !(g.notTrading ?? []).includes(p.id));
+  // A player who has just turned the bot down is left alone for a turn, and one
+  // who keeps turning it down for a good while: asking every turn is nagging.
+  const patient = (id: string) => {
+    const p = profiles[id];
+    const n = p?.refusals ?? 0;
+    if (!n) return true;
+    return g.turn >= (p!.refusedTurn ?? 0) + (n >= 2 ? 10 : 3);
+  };
+  const partners = others.filter(
+    (p) => !isThreat(g, th, p.id, chances) && !(g.notTrading ?? []).includes(p.id) && patient(p.id),
+  );
   if (!partners.length) return null;
 
   const candidates: { give: Hand; want: Hand }[] = [];
@@ -221,8 +241,9 @@ export function makeOffer(
     const spare = emptyHand();
     for (const r of RESOURCES) spare[r] = want[r] ? 0 : Math.max(0, hand[r] - cost[r]);
     for (const give of handsUpTo(spare, 2, want)) {
-      // One for one, or two for one when a single card is missing. Never more than asked.
-      if (handSize(give) > short + 1 || handSize(give) < short - 1) continue;
+      // One for one, or two of its own for one card. Never asks for more cards
+      // than it gives: two for one in the bot's favour reads as an insult.
+      if (handSize(give) < short || handSize(give) > short + 1) continue;
       candidates.push({ give, want });
     }
   }
@@ -238,7 +259,7 @@ export function makeOffer(
     const sample = traded(g, th.me, partners[0]!.id, give, want);
     if (!sample) continue;
     const mine = planTurn(sample, { ...quick }).value - base;
-    if (mine < OFFER_GAIN) continue;
+    if (mine < OFFER_GAIN * TUNING.gainScale) continue;
     let pAny = 1;
     const willing: string[] = [];
     for (const p of partners) {
@@ -258,7 +279,7 @@ export function makeOffer(
     }
     if (!willing.length) continue;
     const expected = (1 - pAny) * mine;
-    if (expected < OFFER_GAIN) continue;
+    if (expected < OFFER_GAIN * TUNING.gainScale) continue;
     if (!best || expected > best.mine)
       best = { action: { kind: 'offerTrade', give, want }, key, mine: expected, partners: willing };
   }

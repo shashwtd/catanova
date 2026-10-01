@@ -114,48 +114,15 @@ test('the add-bot command asks for a bot and cannot choose which one', () => {
   );
 });
 
-test('the draw favours the ordinary bots and keeps the champion rare', () => {
+test('every bot drawn is a champion; steady and sharp are disabled, not removed', () => {
   assert.equal(
     Object.values(BOT_LEVEL_ODDS).reduce((a, b) => a + b, 0),
     1,
     'the odds are a distribution',
   );
-  assert.ok(BOT_LEVEL_ODDS.champ < BOT_LEVEL_ODDS.steady, 'a champion is the rare one');
-
-  // Each band of the random source lands in the level that owns it.
-  assert.equal(
-    randomBotLevel(() => 0),
-    'steady',
-  );
-  assert.equal(
-    randomBotLevel(() => 0.39),
-    'steady',
-  );
-  assert.equal(
-    randomBotLevel(() => 0.4),
-    'sharp',
-  );
-  assert.equal(
-    randomBotLevel(() => 0.79),
-    'sharp',
-  );
-  assert.equal(
-    randomBotLevel(() => 0.8),
-    'champ',
-  );
-  assert.equal(
-    randomBotLevel(() => 1),
-    'champ',
-    'never off the end',
-  );
-
-  const counts: Record<string, number> = { steady: 0, sharp: 0, champ: 0 };
-  for (let i = 0; i < 20_000; i++) counts[randomBotLevel()]! += 1;
-  for (const level of BOT_LEVELS)
-    assert.ok(
-      Math.abs(counts[level]! / 20_000 - BOT_LEVEL_ODDS[level]) < 0.02,
-      `${level} came up ${((counts[level]! / 20_000) * 100).toFixed(1)}%`,
-    );
+  assert.deepEqual(BOT_LEVELS, ['steady', 'sharp', 'champ'], 'all three levels still exist');
+  for (const roll of [0, 0.2, 0.39, 0.4, 0.79, 0.8, 0.999, 1]) assert.equal(randomBotLevel(() => roll), 'champ');
+  for (let i = 0; i < 2_000; i++) assert.equal(randomBotLevel(), 'champ');
 });
 
 test('only the host sees the control that seats a bot', () => {

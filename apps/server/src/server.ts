@@ -26,6 +26,7 @@ import { AccountPresence } from './account-presence.js';
 import { PresenceHub } from './presence-hub.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import { BotDriver } from './bots.js';
+import { workerThinker } from './bot-thinker.js';
 import { serverErrors } from './admin/errors.js';
 import { PlayerFeedback } from './feedback.js';
 
@@ -1253,6 +1254,8 @@ export async function startServer(
   const bots = new BotDriver({
     store,
     changed: broadcast,
+    // Bots think in a worker thread: a Champion's search must not hold every room's sockets.
+    thinker: workerThinker(),
     // A bot's reaction goes out exactly like a player's, through the same limit.
     react: (roomId, seat, reaction) => {
       if (reactionAllowed(seat.id))
