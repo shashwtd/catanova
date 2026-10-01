@@ -7,8 +7,9 @@
  * - it answers yes only when a trade helps it more than it helps the other
  *   player, and never helps someone close to winning;
  * - it offers a trade only when a card or two stands between it and a purchase,
- *   to players the counting says hold what it wants, at most three times a turn
- *   and never the same refused offer twice;
+ *   to players the counting says hold what it wants, at most once a turn, never
+ *   asking more cards than it gives, and leaves alone for a while anyone who
+ *   keeps saying no;
  * - when somebody offers cards and asks for anything in return, it proposes the
  *   least it can give that the other player should still want;
  * - when its own offer draws acceptances or proposals, it takes the best one for
@@ -27,8 +28,13 @@ import { planTurn, standings, value } from './search.js';
 import type { Thinker } from './search.js';
 import type { Profile } from './mind.js';
 import { COSTS, canAfford, emptyHand, handSize, minus, plus, target } from './table.js';
+import { TUNING } from './tuning.js';
 
-/** Below this a trade is not worth the table's time. In chance of winning. */
+/**
+ * Below this a trade is not worth the table's time. In chance of winning, at the
+ * race's usual spread of chances; `TUNING.gainScale` rescales all of these when
+ * the spread changes.
+ */
 export const MIN_GAIN = 0.004;
 /** What one roll taken off a race is worth, in chance of winning, when pricing a trade. */
 export const ROLL_WORTH = 0.002;
@@ -91,7 +97,7 @@ export function isThreat(g: Game, th: Thinker, partner: string, chances?: Map<st
   if (g.players.filter((p) => !p.resigned).length < 3) return false;
   const theirs = table.get(partner) ?? 0,
     mine = table.get(th.me) ?? 0;
-  return theirs > 0.4 && theirs > mine * 1.4;
+  return theirs > TUNING.threatChance && theirs > mine * 1.4;
 }
 
 /**
@@ -111,16 +117,18 @@ export function judge(g: Game, th: Thinker, partner: string, give: Hand, get: Ha
   // Gains are counted in chance of winning plus a little for every roll taken off
   // a race, so a trade still counts when the chance is all but settled.
   const myRolls = (list: typeof table) => list.find((s) => s.id === th.me)?.rolls ?? 0;
-  let mine = (afterTable.get(th.me) ?? 0) - (before.get(th.me) ?? 0) + ROLL_WORTH * (myRolls(table) - myRolls(afterStandings));
+  const rollWorth = ROLL_WORTH * TUNING.gainScale,
+    minGain = MIN_GAIN * TUNING.gainScale;
+  let mine = (afterTable.get(th.me) ?? 0) - (before.get(th.me) ?? 0) + rollWorth * (myRolls(table) - myRolls(afterStandings));
   if (myTurn) {
     // What the cards let it do this turn, against what it could do without them.
     const quick = { ...th, depth: 2, beam: 6, scored: 0, positions: 120 };
     mine = planTurn(after, quick).value - planTurn(g, quick).value;
   }
-  const theirs = (afterTable.get(partner) ?? 0) - (before.get(partner) ?? 0) + ROLL_WORTH * speedsThem;
+  const theirs = (afterTable.get(partner) ?? 0) - (before.get(partner) ?? 0) + rollWorth * speedsThem;
   // Selfish: it must help the bot, and help the bot more than it helps them.
-  const ok = !threat && mine > MIN_GAIN && mine > theirs;
-  const marginal = ok && (mine < MIN_GAIN * 3 || theirs > mine * 0.7);
+  const ok = !threat && mine > minGain && mine > theirs;
+  const marginal = ok && (mine < minGain * 3 || theirs > mine * 0.7);
   return { mine, theirs, speedsThem, threat, ok, marginal };
 }
 
@@ -152,7 +160,7 @@ export function answer(g: Game, th: Thinker, trade: Trade): { action: GameAction
     const verdict = judge(g, th, maker, give, trade.give, false);
     // They must see it as a step forward for themselves, or they will not take it.
     if (!verdict.ok || verdict.speedsThem < -0.5) continue;
-    const score = verdict.mine + 0.002 * verdict.speedsThem;
+    const score = verdict.mine + ROLL_WORTH * TUNING.gainScale * verdict.speedsThem;
     if (!best || handSize(give) < handSize(best.give) || (handSize(give) === handSize(best.give) && score > best.score))
       best = { give, verdict, score };
   }
@@ -251,7 +259,7 @@ export function makeOffer(
     const sample = traded(g, th.me, partners[0]!.id, give, want);
     if (!sample) continue;
     const mine = planTurn(sample, { ...quick }).value - base;
-    if (mine < OFFER_GAIN) continue;
+    if (mine < OFFER_GAIN * TUNING.gainScale) continue;
     let pAny = 1;
     const willing: string[] = [];
     for (const p of partners) {
@@ -271,7 +279,7 @@ export function makeOffer(
     }
     if (!willing.length) continue;
     const expected = (1 - pAny) * mine;
-    if (expected < OFFER_GAIN) continue;
+    if (expected < OFFER_GAIN * TUNING.gainScale) continue;
     if (!best || expected > best.mine)
       best = { action: { kind: 'offerTrade', give, want }, key, mine: expected, partners: willing };
   }

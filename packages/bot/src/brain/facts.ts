@@ -21,7 +21,7 @@ import type { PublicFact } from './belief.js';
 import { emptyHand, handSize, minus } from './table.js';
 
 export type TableEvent =
-  | { kind: 'roll'; player: string; total: number }
+  | { kind: 'roll'; player: string; total: number; dice: [number, number]; first: boolean }
   | { kind: 'discard'; player: string; count: number }
   | { kind: 'steal'; thief: string; victim: string }
   | { kind: 'robber'; player: string; hex: number; blocks: string[] }
@@ -49,7 +49,13 @@ export function observe(before: Game, after: Game, viewer: string): Pair {
 
   // Dice.
   if (before.phase === 'roll' && after.dice && (after.phase !== 'roll' || after.turn !== before.turn))
-    events.push({ kind: 'roll', player: active, total: after.dice[0] + after.dice[1] });
+    events.push({
+      kind: 'roll',
+      player: active,
+      total: after.dice[0] + after.dice[1],
+      dice: [after.dice[0], after.dice[1]],
+      first: !before.dice,
+    });
 
   // Discards: public, cards and all.
   if (before.phase === 'discard')

@@ -10,6 +10,7 @@
 
 import type { Game } from '../../../rules/src/game.js';
 import { learn } from './belief.js';
+import { drew } from './dice.js';
 import { observe } from './facts.js';
 import type { TableEvent } from './facts.js';
 import { profileOf } from './mind.js';
@@ -40,6 +41,7 @@ export function watch(mind: Mind, me: string, before: Game, after: Game): TableE
     for (const p of after.players)
       if (p.id !== me && !before.trade.declinedBy?.includes(p.id) && !p.resigned) refused(p.id);
   for (const e of events) {
+    if (e.kind === 'roll' && after.diceMode === 'balanced') mind.dice = drew(mind.dice, e.dice, e.first);
     if (e.kind === 'steal' && e.victim === me) profileOf(mind, e.thief).robbedMe++;
     if (e.kind === 'declined' && e.maker === me) refused(e.by);
     if (e.kind === 'trade' && e.players.includes(me)) {

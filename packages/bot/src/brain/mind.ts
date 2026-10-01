@@ -13,6 +13,7 @@ import { score } from '../../../rules/src/game.js';
 import type { Card, CardKind, Game, GameView, Hand } from '../../../rules/src/game.js';
 import { cardChance, newBelief, reconcile, sampleHand, unseenCards } from './belief.js';
 import type { Belief } from './belief.js';
+import type { DiceDeck } from './dice.js';
 import type { Knowledge, Strategy } from './race.js';
 import { handSize, income } from './table.js';
 import type { Table } from './table.js';
@@ -45,6 +46,8 @@ export type Mind = {
   reacted: { at: number; count: number };
   /** Offers made and offers that ended in a trade this game: a table that never trades gets fewer. */
   trading: { made: number; filled: number };
+  /** The balanced dice deck as the public rolls left it, in a room that uses balanced dice. */
+  dice?: DiceDeck;
 };
 
 export const newMind = (): Mind => ({
