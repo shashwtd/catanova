@@ -14,7 +14,7 @@ import {
   X,
 } from './GameIcons.js';
 export type GameToolPanel =
-  'connection' | 'statistics' | 'journal' | 'rules' | 'settings' | 'feedback' | 'leave';
+  'connection' | 'statistics' | 'journal' | 'chat' | 'rules' | 'settings' | 'feedback' | 'leave';
 export function GameTools({
   panel,
   onPanel,
@@ -23,6 +23,7 @@ export function GameTools({
   onFullscreen,
   onLeave,
   reactions,
+  chat,
   busy = false,
 }: {
   panel?: string | null;
@@ -33,6 +34,8 @@ export function GameTools({
   onLeave: () => void;
   /** Rendered into the tool column; supplied by the game screen. */
   reactions?: ReactNode;
+  /** The chat button, beside the reactions: both are talking to the table. */
+  chat?: ReactNode;
   busy?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -169,6 +172,7 @@ export function GameTools({
             </div>
           </div>
           {reactions}
+          {chat}
         </div>
       </nav>
     </>

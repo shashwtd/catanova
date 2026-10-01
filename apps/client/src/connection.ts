@@ -59,6 +59,10 @@ const TRANSIENT_ERRORS = new Set([
 export class Connection {
   state: RoomState | null = null;
   playerId: string | null = null;
+  /** What the server offers beyond the protocol version (see `welcome`). Empty until it says. */
+  features: string[] = [];
+  /** Chat messages sent and not yet echoed back, by their tab id, resent after a reconnect. */
+  private unconfirmedChat = new Map<string, string>();
   status: ConnectionStatus = 'idle';
   metrics = initialMetrics();
   private socket: WebSocket | null = null;
@@ -217,6 +221,7 @@ export class Connection {
           version: PROTOCOL_VERSION,
           ...this.session,
           ...(this.options.preloadGame ? { preloadGame: true } : {}),
+          chat: true,
           ...(this.options.rulesets ? { rulesets: [...this.options.rulesets] } : {}),
           ...(accessToken ? { accessToken } : {}),
         });
@@ -251,6 +256,7 @@ export class Connection {
         this.session.joined = true;
         this.options.onSession?.({ ...this.session });
         this.playerId = message.playerId;
+        this.features = message.features ?? [];
         const installed = this.install(message.state);
         this.replayAfterSync = !installed;
         if (!installed) {
@@ -260,6 +266,10 @@ export class Connection {
         }
         this.setStatus('connected');
         if (installed && this.pending) this.send(this.pending.message);
+        // Messages that never came back were lost with the old socket: the server
+        // stores each once by its id, so sending again is safe.
+        if (this.features.includes('chat'))
+          for (const [clientId, text] of this.unconfirmedChat) this.send({ type: 'chat', text, clientId });
         this.probes.clear();
         this.ping();
         clearInterval(this.authTimer);
@@ -433,6 +443,21 @@ export class Connection {
    *  a dropped one costs nothing and it never queues behind a move. */
   react(reaction: ReactionName) {
     this.send({ type: 'react', reaction });
+  }
+  /**
+   * Say something at the table. Returns the message's id, which comes back on
+   * its echo, so the sender can show it as sent. Until then it is kept and sent
+   * again after a reconnect.
+   */
+  chat(text: string): string {
+    const clientId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    this.unconfirmedChat.set(clientId, text);
+    this.send({ type: 'chat', text, clientId });
+    return clientId;
+  }
+  /** A message came back from the server: it is stored and needs no resend. */
+  confirmChat(clientId: string | undefined) {
+    if (clientId) this.unconfirmedChat.delete(clientId);
   }
   /** Ask to play in a colour. The server settles ties; two people can press
    *  the same swatch in the same instant. */

@@ -12,12 +12,16 @@ import { parseRoomSettings } from './settings.js';
 import type { RoomSettings, TurnClock } from './settings.js';
 import { isReaction } from './reactions.js';
 import type { ReactionName } from './reactions.js';
+import { cleanChatText, isChatClientId } from './chat.js';
+import type { ChatEntry } from './chat.js';
 import type { BotLevel } from './bots.js';
 import { isPlayerColor } from './colors.js';
 import type { PlayerColor } from './colors.js';
 import type { FriendPresenceChange } from './player-hub.js';
 export { REACTIONS, REACTION_LIST, isReaction } from './reactions.js';
 export type { ReactionName } from './reactions.js';
+export { CHAT_BURST, CHAT_HISTORY, CHAT_MAX_LENGTH, CHAT_WINDOW_MS, chatWaitMs, cleanChatText, isChatClientId } from './chat.js';
+export type { ChatEntry } from './chat.js';
 export { BOT_LEVELS, BOT_LEVEL_LABEL, BOT_NAMES, botName, isBotLevel, randomBotLevel } from './bots.js';
 export type { BotLevel } from './bots.js';
 export { roomHostId } from './room-host.js';
@@ -121,6 +125,8 @@ export type ClientMessage =
       roomId?: string;
       accessToken?: string;
       preloadGame?: boolean;
+      /** This tab can show table chat. A tab from before chat says nothing, and is told how to get it. */
+      chat?: boolean;
       /**
        * The rulesets this tab can draw, by id, like `preloadGame` a capability rather than a new protocol
        * version. A tab from before modes sends none and can draw Classic only; the server keeps it out of any
@@ -147,6 +153,8 @@ export type ClientMessage =
   | { type: 'settings'; commandId: string; expectedRevision: number; settings: RoomSettings }
   | { type: 'launchReady'; id: string; success: boolean }
   | { type: 'react'; reaction: ReactionName }
+  /** A table chat message. Like a reaction it changes no game state; `clientId` lets a resend be stored once. */
+  | { type: 'chat'; text: string; clientId: string }
   | { type: 'sync' }
   | { type: 'history'; before?: number }
   | { type: 'statistics' }
@@ -156,7 +164,17 @@ export type ClientMessage =
   /** Open a presence socket: a signed-in tab outside any room, so friends see it online. */
   | { type: 'presence'; version: number; accessToken: string };
 export type ServerMessage =
-  | { type: 'welcome'; playerId: string; state: RoomState; version: number }
+  | {
+      type: 'welcome';
+      playerId: string;
+      state: RoomState;
+      version: number;
+      /**
+       * What this server offers beyond the protocol version, such as 'chat'. A tab shows a feature only when its
+       * server names it, so a tab from a later release keeps working against a server rolled back.
+       */
+      features?: string[];
+    }
   | { type: 'state'; state: RoomState }
   | {
       type: 'ack';
@@ -170,6 +188,10 @@ export type ServerMessage =
   | { type: 'statistics'; statistics: GameStatistics }
   | { type: 'pong'; nonce: string; revision?: number; serverNow?: number }
   | { type: 'reaction'; playerId: string; name: string; reaction: ReactionName; at: number }
+  /** One chat message, to everyone at the table, the sender included. */
+  | { type: 'chat'; entry: ChatEntry }
+  /** The room's recent chat, oldest first, sent after a welcome. */
+  | { type: 'chatHistory'; entries: ChatEntry[] }
   | { type: 'error'; code: string; message: string; commandId?: string }
   /** Whether a refreshed token was accepted; if not, the client simply offers it again later. */
   | { type: 'auth'; ok: boolean; expiresAt?: number }
@@ -209,6 +231,7 @@ export function parseClientMessage(input: string): ClientMessage {
       ...(typeof v.accessToken === 'string' ? { accessToken: v.accessToken } : {}),
       ...(v.profile === undefined ? {} : { profile: parseProfile(v.profile) }),
       ...(v.preloadGame === true ? { preloadGame: true } : {}),
+      ...(v.chat === true ? { chat: true } : {}),
       ...(Array.isArray(v.rulesets) ? { rulesets: drawableRulesets(v.rulesets) } : {}),
     };
   }
@@ -266,6 +289,13 @@ export function parseClientMessage(input: string): ClientMessage {
     const reaction = v.reaction === 'nervous' ? 'sad' : v.reaction === 'bored' ? 'eyeroll' : v.reaction;
     if (!isReaction(reaction)) throw new Error('Unknown reaction');
     return { type: 'react', reaction };
+  }
+  if (v.type === 'chat') {
+    if (typeof v.text !== 'string' || v.text.length > 2000) throw new Error('Invalid chat message');
+    const text = cleanChatText(v.text);
+    if (!text) throw new Error('Empty chat message');
+    if (!isChatClientId(v.clientId)) throw new Error('Invalid chat message id');
+    return { type: 'chat', text, clientId: v.clientId };
   }
   if (v.type === 'launchReady') {
     if (typeof v.id !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(v.id) || typeof v.success !== 'boolean')
