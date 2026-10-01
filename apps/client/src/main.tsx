@@ -63,7 +63,7 @@ import { friendStatus } from './social-presence.js';
 import { BoardViewport } from './BoardViewport.js';
 import { boardKey } from './scene.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
-import { ChatAnnouncement, ChatButton, ChatLog, useChatAnnouncement, useTableChat } from './Chat.js';
+import { ChatButton, ChatLog, useTableChat } from './Chat.js';
 import { initialMetrics } from './connection.js';
 import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
 import { hasSavedSession } from './saved-session.js';
@@ -344,7 +344,6 @@ function App() {
   /** Whether this server has table chat at all: an older one does not say so, and the button stays away. */
   const [chatOffered, setChatOffered] = useState(false);
   useEffect(() => chat.setOpen(panel === 'chat'), [panel, chat.setOpen]);
-  const chatNews = useChatAnnouncement(chatOffered && !!room?.game && !room.spectating);
   // "/" shows the public landing while sign-in loads, unless a saved session is about
   // to open the player's hub. Later sign-in attempts keep the screen they started on.
   const authSettled = useRef(false);
@@ -1199,15 +1198,6 @@ function App() {
               />
             )
           }
-        />
-      )}
-      {g && chatNews.show && (
-        <ChatAnnouncement
-          onChat={() => {
-            chatNews.dismiss();
-            setPanel('chat');
-          }}
-          onClose={chatNews.dismiss}
         />
       )}
       {g && room && (
