@@ -31,6 +31,13 @@ research on Catan programs found the strong ones do (see
   whether one purchase would finish the game (an award is two points), since a
   greedy plan can overshoot. Together these won 111 of 198 self-play games
   against the version without them, with a tenth more settlements.
+  It races for a corner another player is as close to only when it can settle
+  there within a roll or two; one it would need many rolls to reach is left to
+  them. In a real game the bot built roads toward four corners a person was as
+  close to, lost every race, and ended with roads in every direction and no new
+  settlement. Racing carefully won 106 of 198 three-player self-play games, with
+  7% more settlements from as many roads. Never racing for such corners lost
+  (48 to 71), so the bot still takes the races it can win.
 - **Card counting** (`belief.ts`, `facts.ts`, `watch.ts`). The driver replays
   every move from the journal to each bot, state by state. Everything public
   (income, building, trades, discards, Monopoly, Year of Plenty) is counted
