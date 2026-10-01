@@ -99,7 +99,8 @@ export function workerThinker(): BotThinker {
  * the card counting and what the bot has learnt about each player are kept up to
  * date on the main thread by watching every move, so those stay as they are.
  * What the decision itself decides comes back: the long plan, offers made this
- * turn, the wait on its own offer, whom it robbed, how often it has offered.
+ * turn and when it last offered, the wait on its own offer, whom it robbed, how
+ * often it has offered.
  */
 export function mergeMind(current: Mind, decided: Mind | undefined): Mind {
   if (!decided || decided === current) return decided ?? current;
@@ -109,6 +110,7 @@ export function mergeMind(current: Mind, decided: Mind | undefined): Mind {
     strategyTurn: decided.strategyTurn,
     offers: decided.offers,
     offerSince: decided.offerSince,
+    lastOfferTurn: decided.lastOfferTurn,
     lastVictim: decided.lastVictim,
     trading: { made: decided.trading.made, filled: Math.max(current.trading.filled, decided.trading.filled) },
   };
