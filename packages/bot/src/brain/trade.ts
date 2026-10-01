@@ -220,10 +220,11 @@ export function makeOffer(
   record: { made: number; filled: number } = { made: 0, filled: 0 },
   profiles: Record<string, Profile> = {},
 ): Offer | null {
-  // How often this table actually trades: an offer nobody takes is noise, so a
-  // table that keeps refusing hears from the bot less and less, one offer a turn
-  // at most once it has been ignored a while.
-  const takeRate = Math.min(1, (2 * (record.filled + 1)) / (record.made + 2));
+  // How often this table actually trades. A bot starts out assuming its offer
+  // will probably be refused (an even chance), and offers more only as people
+  // take them: an offer nobody takes is noise, and at the start of a game it is
+  // most of what a person hears from the bots.
+  const takeRate = Math.min(1, (record.filled + 1) / (record.made + 2));
   const cap = record.made >= 6 && record.filled / record.made < 0.15 ? 1 : OFFERS_PER_TURN;
   if (alreadyMade.length >= cap) return null;
   const me = g.players.find((p) => p.id === th.me);

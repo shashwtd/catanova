@@ -325,11 +325,16 @@ async function takeTurn(
 
   const best = planTurn(g, th);
   // A card or two short of something better: ask the table before settling for the bank.
-  if (dials.offers && ctx.canOffer !== false && !view.trade) {
+  // Never on two of its own turns running: at the start of a game every bot is a card
+  // short of something, and a table of bots asking every turn is a wall of offers.
+  const seats = view.players.filter((p) => !p.resigned).length;
+  const rested = mind.lastOfferTurn === undefined || view.turn - mind.lastOfferTurn >= 2 * seats;
+  if (dials.offers && ctx.canOffer !== false && !view.trade && rested) {
     const offer = makeOffer(g, th, mind.offers.made, best.value, mind.trading, mind.profiles);
     if (offer) {
       mind.offers.made.push(offer.key);
       mind.trading.made++;
+      mind.lastOfferTurn = view.turn;
       return done(offer.action, 'Offering a trade for the cards the plan is missing.');
     }
     if (dials.open && best.action.kind === 'endTurn') {

@@ -39,6 +39,8 @@ export type Mind = {
   offers: { turn: number; made: string[] };
   /** When the bot's own live offer went up, to know how long it has waited for answers. */
   offerSince?: { tradeId: number; at: number };
+  /** The turn of the bot's last offer: it skips at least one of its own turns before the next. */
+  lastOfferTurn?: number;
   /** Who the bot robbed last, so it does not pick on the same person twice while nobody is ahead. */
   lastVictim?: string;
   profiles: Record<string, Profile>;
