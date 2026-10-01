@@ -388,8 +388,10 @@ export function createGame(
     options.victoryPoints === undefined || validTarget(rules, options.victoryPoints),
     targetRangeText(rules),
   );
+  // A retired structure still plays (a game started before it was retired, a test of it); offering it to a
+  // host is the server's to refuse.
   requireRule(
-    options.turns === undefined || !!rules.turns?.includes(options.turns),
+    options.turns === undefined || !!rules.turns?.includes(options.turns) || !!rules.retiredTurns?.includes(options.turns),
     `${rules.name} has no turn structure called ${options.turns}`,
   );
   requireRule(

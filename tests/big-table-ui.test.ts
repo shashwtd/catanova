@@ -72,39 +72,22 @@ const lobby = (state: RoomState, me = 'p0') =>
 /** A paired turn in the Partner's phase: Ann leads the first, Dan is her Partner. */
 const partnerPhase = () => act(roll(afterSetup(5), 3, 5), 'p0', { kind: 'endTurn' });
 
-test('Room setup shows Big Table’s turn style under its card, open while Big Table is picked', () => {
+test('Room setup offers Big Table with no turn style to pick: Paired turns is the only one', () => {
   const offered = room(null, { modes: [CLASSIC.id, BIG_TABLE.id], settings: { turnTimerSeconds: 90 } });
   const classic = setup(offered);
-  // Classic is picked: the turn style is there, closed and out of reach.
   assert.match(classic, /<strong>Big Table<\/strong><small>For five and six players\.<\/small>/);
-  assert.match(
-    classic,
-    /<div class="settings-turns t-acc" data-open="false"><div class="t-acc-panel" inert=""/,
-  );
-  assert.ok(!/name="turn-style"[^>]*checked=""/.test(classic), 'nothing is picked while Big Table is not');
-  // In a Big Table room it is open, after Big Table's card and inside the Game mode fieldset, Paired turns first.
+  // Between-turns build was retired on 2 October 2026, so there is nothing to choose and no turn style shows,
+  // whichever mode is picked, and in a room saved with the older rule too.
   const bigTable = setup({ ...offered, settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } });
-  const fieldset = bigTable.match(/<fieldset class="settings-dice settings-mode"[^]*?<\/fieldset>/)![0];
-  assert.match(
-    fieldset,
-    /<strong>Big Table<\/strong>[^]*?<\/label><div class="settings-turns t-acc" data-open="true">/,
-  );
-  assert.match(fieldset, /<p class="settings-caption" id="[^"]+">Turn style<\/p>/);
-  assert.match(
-    fieldset,
-    /data-selected="true"><input type="radio" name="turn-style" checked="" value="paired"\/><span><strong>Paired turns<\/strong><small>After each turn, the Partner gets a full action phase, with no roll and no player trades\.<\/small>/,
-  );
-  assert.match(fieldset, /<strong>Between-turns build<\/strong><small>The older rule: /);
-  // The room's own choice is shown picked, to the others too, who only read it.
   const older: RoomState = {
     ...offered,
     settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id, turns: 'betweenTurnsBuild' },
   };
-  assert.match(setup(older), /checked="" value="betweenTurnsBuild"/);
-  const { modes: _modes, ...guest } = older;
-  const read = setup(guest, 'p1');
-  assert.match(read, /<fieldset class="settings-dice settings-mode" disabled="">/);
-  assert.match(read, /checked="" value="betweenTurnsBuild"/);
+  for (const html of [classic, bigTable, setup(older)]) {
+    assert.ok(!html.includes('settings-turns'), 'no turn style block');
+    assert.ok(!html.includes('name="turn-style"'));
+    assert.ok(!html.includes('Between-turns build'));
+  }
   // The sheet that indents it loads last, and every rule in it, media queries included, reaches only Big
   // Table's parts: the turn style, the trade lock and the rail of five or six.
   const main = readFileSync(new URL('../apps/client/src/main.tsx', import.meta.url), 'utf8');
@@ -125,16 +108,18 @@ test('Room setup shows Big Table’s turn style under its card, open while Big T
     );
 });
 
-test('the lobby chip names the mode and its turn style, and seats six', () => {
+test('the lobby chip names the mode, with no turn style to show, and seats six', () => {
   const html = lobby(room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } }));
   assert.match(
     html,
-    /<button type="button" class="lobby-mode"[^>]*aria-label="Game mode: Big Table, Paired turns\. Room setup"><svg[^]*?<\/svg><span>Big Table <b>Paired<\/b><\/span><\/button>/,
+    /<button type="button" class="lobby-mode"[^>]*aria-label="Game mode: Big Table\. Room setup"><svg[^]*?<\/svg><span>Big Table<\/span><\/button>/,
   );
+  // A room saved with the retired build windows shows the same chip.
   const older = lobby(
     room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id, turns: 'betweenTurnsBuild' } }),
   );
-  assert.match(older, /<span>Big Table <b>Build windows<\/b><\/span>/);
+  assert.match(older, /<span>Big Table<\/span>/);
+  assert.ok(!older.includes('Build windows'));
   const three = room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } });
   three.players = three.players.slice(0, 3);
   assert.match(lobby(three), /Big Table needs five players/);

@@ -53,6 +53,7 @@ import type { Board } from '../../../packages/rules/src/board.js';
 import { GOLD_PICK_SECONDS } from '../../../packages/rules/src/gold.js';
 import {
   CLASSIC,
+  TURN_STRUCTURES,
   findRuleset,
   numberWord,
   playsBoard,
@@ -1503,7 +1504,12 @@ export class Store {
     if (!row) return { turnTimerSeconds: null, diceMode: 'classic' };
     const saved = JSON.parse(row.settings);
     if (saved.diceMode === 'flat') saved.diceMode = 'classic';
-    return parseRoomSettings(saved);
+    const settings = parseRoomSettings(saved);
+    // A turn structure the room's mode no longer offers (Big Table's Between-turns build, retired on
+    // 2 October 2026) is dropped, so the room plays the mode's default rather than refusing to start.
+    const rules = findRuleset(settings.mode ?? CLASSIC.id);
+    if (settings.turns !== undefined && !rules?.turns?.includes(settings.turns)) delete settings.turns;
+    return settings;
   }
   private rejectSettingsReceipt(seat: Seat, commandId: string) {
     if (
@@ -1571,7 +1577,12 @@ export class Store {
       // not the default, as the mode is only when it is not Classic.
       const turns = settings.turns ?? (changing ? undefined : room.settings.turns);
       if (turns !== undefined && !rules.turns?.includes(turns))
-        throw new ProtocolError('INVALID_SETTINGS', `${rules.name} has no turn structure to choose`);
+        throw new ProtocolError(
+          'INVALID_SETTINGS',
+          rules.turns?.length === 1
+            ? `${rules.name} plays ${TURN_STRUCTURES[rules.turns[0]!].name} only`
+            : `${rules.name} has no turn structure to choose`,
+        );
       const saved: RoomSettings = {
         ...(victoryPoints === undefined ? {} : { victoryPoints }),
         turnTimerSeconds: settings.turnTimerSeconds,

@@ -21,7 +21,7 @@ Settings lock when the game starts. Changing them beforehand clears the other pe
 
 == Choose a mode ==
 Every room plays Classic today. Two more [[Game modes|game modes]] are being built and are not yet playable:
-* [[Big Table]], for five and six players, on a larger island. The host chooses whether two players share each turn or everyone gets a short build window between turns.
+* [[Big Table]], for five and six players, on a larger island. Two players share each turn: the Lead plays a full turn, then the Partner gets an action phase.
 * [[Open Sea]], for three or four players, with ships, gold fields, a pirate and bonus points for settling small islands.
 
 When they open, the host will pick the mode in Room setup, beside the other settings. A mode fixes how many seats the table needs, and bots can sit only in Classic, so the lobby refuses a change of mode that the current seats do not fit. See [[Game modes#Choosing a mode|Choosing a mode]].

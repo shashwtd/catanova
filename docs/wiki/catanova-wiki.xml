@@ -98,7 +98,7 @@ For the complete specification, use the [https://github.com/shashwtd/catanova/bl
       <origin>2</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="6547" sha1="m1j0me3tfwz5a4kh9npisbnem9eki1p">'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. The host can set a different target, from 8 to 15, before the game starts. A table has two to four seats, filled by invited friends or by bots, so one person can also play against bots alone. There is no public matchmaking. This is the Classic mode, the only one playable today; see [[#Choose a mode|Choose a mode]].
+      <text xml:space="preserve" bytes="6537" sha1="rfrwwo6fupw10kn0x45bnsb4qi8ah09">'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. The host can set a different target, from 8 to 15, before the game starts. A table has two to four seats, filled by invited friends or by bots, so one person can also play against bots alone. There is no public matchmaking. This is the Classic mode, the only one playable today; see [[#Choose a mode|Choose a mode]].
 
 == Gather your players ==
 # Continue with Google or as a guest, then choose your username and avatar when prompted. See [[Accounts and friends]].
@@ -121,7 +121,7 @@ Settings lock when the game starts. Changing them beforehand clears the other pe
 
 == Choose a mode ==
 Every room plays Classic today. Two more [[Game modes|game modes]] are being built and are not yet playable:
-* [[Big Table]], for five and six players, on a larger island. The host chooses whether two players share each turn or everyone gets a short build window between turns.
+* [[Big Table]], for five and six players, on a larger island. Two players share each turn: the Lead plays a full turn, then the Partner gets an action phase.
 * [[Open Sea]], for three or four players, with ships, gold fields, a pirate and bonus points for settling small islands.
 
 When they open, the host will pick the mode in Room setup, beside the other settings. A mode fixes how many seats the table needs, and bots can sit only in Classic, so the lobby refuses a change of mode that the current seats do not fit. See [[Game modes#Choosing a mode|Choosing a mode]].
@@ -174,7 +174,7 @@ The two-player option keeps the same island, bank, costs, piece limits, normal t
 
 [[Category:Guides]]
 </text>
-      <sha1>m1j0me3tfwz5a4kh9npisbnem9eki1p</sha1>
+      <sha1>rfrwwo6fupw10kn0x45bnsb4qi8ah09</sha1>
     </revision>
   </page>
   <page>
@@ -525,7 +525,7 @@ This is a Catanova preset, separate from the official spiral-number setup or fix
       <origin>9</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="5860" sha1="c784jfitmj8h99ibu366pllf5n9lriu">A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for five and six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
+      <text xml:space="preserve" bytes="5666" sha1="ikhtsfzc50mm5vy6cjnqtgxg23etn6v">A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for five and six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
 
 {| class="wikitable"
 ! Mode !! Players !! Board !! Points target !! Bots !! Status
@@ -541,9 +541,7 @@ This is a Catanova preset, separate from the official spiral-number setup or fix
 Classic is the game every room plays today: one island, two to four seats, and the rules described across this wiki. Start with [[Getting started]]. Its two-player option, bots, balanced island and turn timer are Catanova choices.
 
 == Big Table, for five and six players ==
-A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so the host chooses one of two ways to share each turn:
-* '''Paired turns''', the default. Each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
-* '''Between-turns build'''. After each ordinary turn, every other player gets a short window to build with the cards in their hand.
+A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so each turn is shared as '''paired turns''': each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
 
 See [[Big Table]].
 
@@ -579,7 +577,7 @@ Without stand-in bots, Big Table and Open Sea handle an absent player differentl
 | On return || The seat is handed back at once. || The clock stops acting for them at once.
 |}
 
-The 2-minute rule applies whether or not the room has a turn timer. It covers the player's setup placements, their turns and anything else they owe: a discard after a seven, a Partner's phase or build window in Big Table, and a gold pick in Open Sea. In setup, the clock places a settlement on the legal corner with the most production dots (on the main island in Open Sea), then a road touching it, or in Open Sea a ship if no road fits. The clock never builds, buys, trades, plays a card or moves a ship for anyone. Reconnecting does not reset a clock that is already running.
+The 2-minute rule applies whether or not the room has a turn timer. It covers the player's setup placements, their turns and anything else they owe: a discard after a seven, a Partner's phase in Big Table, and a gold pick in Open Sea. In setup, the clock places a settlement on the legal corner with the most production dots (on the main island in Open Sea), then a road touching it, or in Open Sea a ship if no road fits. The clock never builds, buys, trades, plays a card or moves a ship for anyone. Reconnecting does not reset a clock that is already running.
 
 Everything else is as in Classic. '''Leave game''' resigns for good. If every remaining player is offline, the game pauses, and it closes with no winner once nobody has returned within three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
 
@@ -595,7 +593,7 @@ Big Table and Open Sea are inspired by the official 5–6 player and Seafarers e
 [[Category:Guides]]
 [[Category:Game rules]]
 </text>
-      <sha1>c784jfitmj8h99ibu366pllf5n9lriu</sha1>
+      <sha1>ikhtsfzc50mm5vy6cjnqtgxg23etn6v</sha1>
     </revision>
   </page>
   <page>
@@ -612,7 +610,7 @@ Big Table and Open Sea are inspired by the official 5–6 player and Seafarers e
       <origin>10</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="12074" sha1="dc3c1o9yb5z6vhf4c83ziet0v94abr2">'''Big Table''', for five and six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
+      <text xml:space="preserve" bytes="10366" sha1="tl5nr5a22b19cpd9t8c21znnklbpab7">'''Big Table''', for five and six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
 
 {| class="wikitable"
 ! !! Classic !! Big Table
@@ -627,7 +625,7 @@ Big Table and Open Sea are inspired by the official 5–6 player and Seafarers e
 |-
 | Ports || 9 || 11
 |-
-| Turns || One player at a time || Paired turns (default) or Between-turns build
+| Turns || One player at a time || Paired turns
 |-
 | Absent player || A bot plays the seat after about 30 seconds || The clock makes forced moves only, after 2 minutes
 |}
@@ -676,7 +674,7 @@ There are 11 ports: five general 3:1 ports, two Sheep 2:1 ports, and one 2:1 por
 The [[Resources|bank shortage rule]] works as in Classic, now with 24 cards of each resource. The development deck is never refilled.
 
 == Setting up ==
-Before the game, the host chooses the turn structure, the points target (10 by default, any whole number from 8 to 15), the dice and the [[Turn timer|turn timer]]. Changing the mode resets the target to the new mode's default. These settings lock when the game starts.
+Before the game, the host chooses the points target (10 by default, any whole number from 8 to 15), the dice and the [[Turn timer|turn timer]]. Changing the mode resets the target to the new mode's default. These settings lock when the game starts.
 
 Each player rolls both dice. The highest total starts, and players tied for highest roll again. Placement then follows the usual snake:
 
@@ -690,20 +688,8 @@ Each player rolls both dice. The highest total starts, and players tied for high
 
 Everything else is as in [[Getting started#Place your first pieces|Classic setup]]. Setup is untimed. If the draft reaches a player who has been offline for 2 minutes, the clock places for them: a settlement on the legal corner with the most production dots, with ties broken at random, then a road on a random edge touching it.
 
-== Two turn structures ==
-{| class="wikitable"
-! !! Paired turns !! Between-turns build
-|-
-| Status || The default; the current official way to play a table this size || A classic option; Room setup labels it as the older official rule
-|-
-| Who acts || The Lead plays a full turn, then the Partner has one action phase || One player takes a full turn, then every other player gets a build window
-|-
-| Second player may || Trade with the bank and ports, build, buy, play one card || Build and buy with the cards in hand only
-|-
-| Second player may not || Roll, or trade with other players || Trade in any way, or play a card
-|-
-| Winning || Lead or Partner, at once, during the paired turn || Only during your own turn
-|}
+== Turns ==
+Big Table plays '''paired turns''', the current official way to play a table this size: the Lead plays a full turn, then the Partner has one action phase. Until October 2026 the host could choose the older build windows instead, where every other player got a short window to build after each turn; that option is gone, because at five players the windows made every turn wait and read as skipped turns.
 
 == Paired turns ==
 === Lead and Partner ===
@@ -741,16 +727,7 @@ For example, with a target of 10, the Partner has 9 points. During the Lead's pa
 The official rules cover a Lead or Partner winning with their own action. The other cases are settled by Catanova.
 
 === When fewer than five remain ===
-If resignations leave fewer than five players in the game, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes. Under Between-turns build, the windows carry on at any player count.
-
-== Between-turns build ==
-Each turn is an ordinary Classic turn for one player. After it, every other player gets one build window, one at a time, starting with the player to the left of the one who just finished. That player is also the next to take a turn.
-
-In a window, using only the resource cards already in hand, a player may build roads, settlements and cities and buy development cards. They may not trade with players, trade with the bank or at a port, or play a development card.
-
-Nobody wins during a window. A player who reaches the target there, by building or because an award moves to them, wins at the start of their next turn, before rolling, if they still have the target. A card bought in a window can be played from the buyer's next turn onward, even if that turn comes straight after the window.
-
-Windows follow every turn, but not setup. Every window is optional, and you can end yours at once. The game never skips a window for you, even when you cannot afford anything, because skipping would give away something about your hand.
+If resignations leave fewer than five players in the game, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes.
 
 == Clocks ==
 {| class="wikitable"
@@ -761,8 +738,6 @@ Windows follow every turn, but not setup. Every window is optional, and you can 
 | A discard after a seven || As in Classic: each player who must discard gets the full room time
 |-
 | The Partner's phase || Half the room's turn time, rounded up to a whole second, at least 30 seconds
-|-
-| A build window || 20 seconds, with or without a turn timer
 |}
 
 {| class="wikitable"
@@ -771,23 +746,22 @@ Windows follow every turn, but not setup. Every window is optional, and you can 
 | Partner's phase || 30 s || 33 s || 45 s || 58 s || 70 s || No clock unless the Partner is away during the phase; then 45 s, which keeps running if they come back
 |}
 
-Only the acting player's clock is shown prominently. When the Lead's clock runs out, the usual [[Turn timer#When time runs out|Classic defaults]] finish the turn, and the Partner's phase begins. When the Partner's clock or a build window's clock runs out, that phase simply ends. Nothing is bought, built or traded, and no card is played. If the Partner played Road Building, any free roads not yet placed are lost. If they played a Knight and have not moved the robber yet, the clock moves it for them.
+Only the acting player's clock is shown prominently. When the Lead's clock runs out, the usual [[Turn timer#When time runs out|Classic defaults]] finish the turn, and the Partner's phase begins. When the Partner's clock runs out, that phase simply ends. Nothing is bought, built or traded, and no card is played. If the Partner played Road Building, any free roads not yet placed are lost. If they played a Knight and have not moved the robber yet, the clock moves it for them.
 
 With the timer off, an absent Partner's 45 seconds start when the phase begins with the Partner away, or when they drop out during it, and keep running if they come back.
 
 == Disconnects ==
-Big Table has no bots, so nobody takes over an absent player's seat. The player is shown as disconnected and the game waits for them. Once they have been offline for 2 minutes, the clock acts for them whenever the game waits on them, exactly as if their time had run out: in setup, on their turns, their Partner's phases, their build windows and any discard they owe. This applies whether or not the room has a turn timer, and it stops the moment they reconnect.
+Big Table has no bots, so nobody takes over an absent player's seat. The player is shown as disconnected and the game waits for them. Once they have been offline for 2 minutes, the clock acts for them whenever the game waits on them, exactly as if their time had run out: in setup, on their turns, their Partner's phases and any discard they owe. This applies whether or not the room has a turn timer, and it stops the moment they reconnect.
 
-Leaving, resigning and pausing work as in Classic. A resigned player's pieces stay on the island but stop producing, and turns, Partner's phases and build windows skip them. See [[Game modes#When a player disconnects|When a player disconnects]] for a side-by-side comparison with Classic.
+Leaving, resigning and pausing work as in Classic. A resigned player's pieces stay on the island but stop producing, and turns and Partner's phases skip them. See [[Game modes#When a player disconnects|When a player disconnects]] for a side-by-side comparison with Classic.
 
 == What stays Classic ==
-Building costs and placement, production, the bank shortage rule, sevens and discards, the robber, trading, development-card effects, [[Awards|Longest Road and Largest Army]], and what each player can see. Who holds the Lead and Partner markers, and whose build window is running, are public.
+Building costs and placement, production, the bank shortage rule, sevens and discards, the robber, trading, development-card effects, [[Awards|Longest Road and Largest Army]], and what each player can see. Who holds the Lead and Partner markers is public.
 
 == Cases settled by Catanova ==
 Some cases were left open by the official rules or by the first plan. Catanova has settled each of them. Among them:
 * the half-second Partner's clocks round up, to 33 and 58 seconds;
 * if the Lead resigns during their part, the Partner's phase still follows while five or more players remain;
-* build windows carry on when fewer than five players remain;
 * changing the mode resets the points target to the new mode's default.
 
 One thing is left to measure rather than decide. The balanced generator keeps its limit of eleven production dots per intersection, and the mode opens only once the generator is fast enough on 30 hexes, or runs in the background with a longer time limit.
@@ -796,7 +770,7 @@ The full specification is the [https://github.com/shashwtd/catanova/blob/main/do
 
 [[Category:Game rules]]
 </text>
-      <sha1>dc3c1o9yb5z6vhf4c83ziet0v94abr2</sha1>
+      <sha1>tl5nr5a22b19cpd9t8c21znnklbpab7</sha1>
     </revision>
   </page>
   <page>
@@ -1022,7 +996,7 @@ Later scenarios and a five-and-six-player version are listed under [[Game modes#
       <origin>12</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="3289" sha1="08ahybik6zcidhempfs35loogv1cs6d">The '''turn timer''' is an optional Catanova house rule. New rooms start with a '''90-second''' timer; the host can change it or switch it off before the game begins. Setup placements remain untimed.
+      <text xml:space="preserve" bytes="3226" sha1="iu6q23z5q6z5kj6ru986wvh1tifcwdn">The '''turn timer''' is an optional Catanova house rule. New rooms start with a '''90-second''' timer; the host can change it or switch it off before the game begins. Setup placements remain untimed.
 
 {| class="wikitable"
 ! Available durations
@@ -1052,11 +1026,11 @@ The server keeps every deadline. While at least one person is still at the table
 If every person disconnects, the clock stops and nothing is played automatically. When someone returns, the current turn and any outstanding discards start again with the full configured time. A server restart is handled the same way: the game waits for its players, and nobody's turn runs out while the server is down. The server never fast-forwards through missed turns.
 
 == In other modes ==
-[[Big Table]] and [[Open Sea]], modes still being built, use the same turn timer. Big Table adds a clock for the Partner's phase, half the room's turn time rounded up to a whole second and at least 30 seconds, and 20 seconds for each build window, even with the timer off. Open Sea gives each player owed gold one 20-second clock for all their picks, also with the timer off. Those modes have no bots, so once a player has been away for 2 minutes the clock makes their forced moves instead, with or without a turn timer. That includes their setup placements, which are otherwise untimed. See [[Game modes#When a player disconnects|When a player disconnects]].
+[[Big Table]] and [[Open Sea]], modes still being built, use the same turn timer. Big Table adds a clock for the Partner's phase, half the room's turn time rounded up to a whole second and at least 30 seconds. Open Sea gives each player owed gold one 20-second clock for all their picks, also with the timer off. Those modes have no bots, so once a player has been away for 2 minutes the clock makes their forced moves instead, with or without a turn timer. That includes their setup placements, which are otherwise untimed. See [[Game modes#When a player disconnects|When a player disconnects]].
 
 [[Category:Game rules]]
 </text>
-      <sha1>08ahybik6zcidhempfs35loogv1cs6d</sha1>
+      <sha1>iu6q23z5q6z5kj6ru986wvh1tifcwdn</sha1>
     </revision>
   </page>
   <page>

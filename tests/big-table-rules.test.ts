@@ -75,7 +75,9 @@ test('§1.1 and §2: big-table-v1 seats five or six, with 24 of each resource, a
   assert.deepEqual(BIG_TABLE.costs, CLASSIC.costs);
   assert.equal(BIG_TABLE.bots, false);
   assert.equal(BIG_TABLE.standIns, false);
-  assert.deepEqual(BIG_TABLE.turns, ['paired', 'betweenTurnsBuild']);
+  // Paired turns only for a new game; Between-turns build, retired, still plays for games started with it.
+  assert.deepEqual(BIG_TABLE.turns, ['paired']);
+  assert.deepEqual(BIG_TABLE.retiredTurns, ['betweenTurnsBuild']);
   for (const table of [seats(4), [...seats(6), { id: 'p6', name: 'Gus' }]])
     assert.throws(
       () => createGame(table, 1, random, { ruleset: BIG_TABLE.id }),

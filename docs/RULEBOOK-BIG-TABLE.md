@@ -29,8 +29,8 @@ Catanova decision: in the lobby, a change of mode is refused only while more pla
 | Resource bank      | 19 of each resource                      | 24 of each resource                                | 2        |
 | Development deck   | 25 cards                                 | 34 cards                                           | 2        |
 | Harbours           | 9                                        | 11                                                 | 3.3      |
-| Turn structure     | One player at a time                     | Paired turns (default) or Between-turns build      | 5–7      |
-| When you can win   | Only during your own turn                | Depends on the turn structure                      | 6.7, 7.5 |
+| Turn structure     | One player at a time                     | Paired turns                                       | 5–6      |
+| When you can win   | Only during your own turn                | Only while you hold the Lead or Partner marker     | 6.7      |
 | Bots and stand-ins | Allowed                                  | None                                               | 9        |
 | An absent player   | A stand-in bot takes the seat after 30 s | The clock makes only forced moves, after 2 minutes | 9.4      |
 
@@ -106,10 +106,11 @@ Catanova decision: harbours are placed by Catanova's generator, not by the offic
 Before the game starts, the host chooses:
 
 1. The mode: Big Table.
-2. The turn structure: Paired turns (the default) or Between-turns build (section 5).
-3. The points target: 10 by default. The target slider works as in Classic. Changing the mode resets it to the new mode's default (section 1.2).
-4. The dice mode, as in Classic.
-5. The turn timer, as in Classic (section 9.2).
+2. The points target: 10 by default. The target slider works as in Classic. Changing the mode resets it to the new mode's default (section 1.2).
+3. The dice mode, as in Classic.
+4. The turn timer, as in Classic (section 9.2).
+
+There is no turn structure to choose: Big Table plays Paired turns (section 5).
 
 These settings follow the Classic lobby rules in the [turn clock](TURN_CLOCK.md) document: only the host changes them, each change resets the other players' readiness, and all of them lock when the game starts.
 
@@ -136,16 +137,13 @@ The draft is Classic section 3.3 with more players. The first pass runs clockwis
 
 Everything else is Classic: the distance rule for both settlements, a road touching the settlement just placed, resources from the second settlement only, no cost, and no trading or development cards. Setup is untimed. Section 9.4 says how the clock places for a player who has been absent for 2 minutes.
 
-Under Paired turns, the Lead and Partner markers play no part in setup. The first paired turn begins after setup, with the starting player as Lead (section 6.1). Under Between-turns build, the starting player takes an ordinary first turn, and no build window comes before it (section 7.2).
+The Lead and Partner markers play no part in setup. The first paired turn begins after setup, with the starting player as Lead (section 6.1).
 
-## 5. Two turn structures
+## 5. Turn structure
 
-The host chooses one of two turn structures in Room setup. It is saved with the game and cannot change once the game starts.
+Big Table plays Paired turns, the current official rule. Since 2021 the official 5–6 rules have paired two players in every turn, replacing the older build phase. See section 6.
 
-1. Paired turns, the default. This is the current official rule. Since 2021 the official 5–6 rules have paired two players in every turn, replacing the older build phase. See section 6.
-2. Between-turns build, the older official rule, offered as a labelled option: Room setup marks it as the older rule. Players take ordinary turns, and after each turn every other player gets a short window to build. See section 7.
-
-Both use the same island, supply, setup and Classic rules. They differ only in who may act when, and in when a player can win.
+Catanova decision, made on 2 October 2026: Between-turns build, the older official rule, was offered as a host's option until then and is retired. At five players it put four build windows of up to 20 seconds after every turn. A window that ran out read to the table as a skipped turn, and the first table to play it in earnest gave up by turn 5. Section 7 still describes it, because games started with it before then keep playing and replaying by it; no new game can choose it.
 
 ## 6. Paired turns
 
@@ -249,7 +247,9 @@ Catanova decision, made on 26 September 2026 while building the mode: when the c
 
 ## 7. Between-turns build
 
-This is the older official rule, offered as a labelled option. Since 2021 the official rules have used paired turns instead, first printed in the base game's 5–6 rulebooks in their 2022 revisions. The 2025 edition has no build phase.
+Retired on 2 October 2026 (section 5): no new game plays it. This section stays for the games started with it before then, which keep playing and replaying exactly as they did.
+
+This is the older official rule, offered as a labelled option until then. Since 2021 the official rules have used paired turns instead, first printed in the base game's 5–6 rulebooks in their 2022 revisions. The 2025 edition has no build phase.
 
 ### 7.1 Turns
 
@@ -395,7 +395,7 @@ The first decisions and the turn clock document do not say what happens when a p
 
 ## 11. Completeness and open questions
 
-This book covers the complete Big Table flow on top of the Classic rulebook: supply, island, setup, both turn structures, winning in each, and the online rules. It is a rules target, not a certified engine.
+This book covers the complete Big Table flow on top of the Classic rulebook: supply, island, setup, paired turns and the retired build windows, winning, and the online rules. It is a rules target, not a certified engine.
 
 The points below were not settled by the official sources or by the first decisions. Each is now closed by a Catanova decision, made on 26 September 2026 under the owner's delegation, and each says which section now states the rule. They keep their numbers so that the numbering in the [ledger](RULE_SOURCES.md) still matches.
 
@@ -408,6 +408,7 @@ The points below were not settled by the official sources or by the first decisi
 7. Build-window clock in a room without a timer. Closed. Catanova decision: the 20-second window clock is always on, whether or not the room has a turn timer (section 9.2).
 8. The 45-second Partner's phase. Closed. Catanova decision: section 9.4 stands as written. The clock starts when the phase begins with the Partner absent, or when the Partner disconnects during the phase, and keeps running if they reconnect. An absent player's own turn in a room without a timer has no clock besides the 2-minute rule.
 9. Half-second clocks. Closed. Catanova decision: they round up to whole seconds, so 32.5 seconds becomes 33 and 57.5 becomes 58 (section 9.2).
+10. Keeping Between-turns build as an option. Closed on 2 October 2026 by the owner: it is retired, and Big Table plays Paired turns only (section 5). Points 5 to 7 above now concern only games started with it before then.
 10. Unfinished card effects when the Partner's phase expires. Closed. Catanova decision: free roads still owed from Road Building stay unplaced, and the clock completes a robber move still owed from a Knight (section 9.3).
 11. An absent player during the setup draft. Closed. Catanova decision: once they have been offline for 2 minutes, the clock places for them. It puts a settlement on the legal intersection with the most production pips, with ties broken at random by the server, then a road on a random legal edge touching it (section 9.4).
 12. Changing mode and the target. Closed. Catanova decision: changing mode resets the target to the new mode's default, 10 for Classic and Big Table and 14 for Open Sea (section 1.2).

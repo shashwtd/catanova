@@ -11,7 +11,6 @@ import { computeGameAnalytics } from '../apps/server/src/admin/game-analytics.js
 import { newSession } from '../apps/client/src/connection.js';
 import { activePlayer, gameView, resignPlayers } from '../packages/rules/src/game.js';
 import type { Game } from '../packages/rules/src/game.js';
-import { owedMoves } from '../packages/rules/src/owed.js';
 import { parseRoomSettings, partnerSeconds } from '../packages/protocol/src/settings.js';
 import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
@@ -32,17 +31,15 @@ function leadEnds(room: Room) {
   room.act(lead, { kind: 'endTurn' });
 }
 
-test('a room picks Big Table and its turns: kept when a tab leaves them out, reset with the mode, frozen at Start', () => {
-  assert.deepEqual(
-    parseRoomSettings({ turnTimerSeconds: 90, mode: BIG_TABLE.id, turns: 'betweenTurnsBuild' }),
-    {
-      turnTimerSeconds: 90,
-      mode: BIG_TABLE.id,
-      turns: 'betweenTurnsBuild',
-    },
-  );
+test('Big Table always plays Paired turns: the older build windows are refused, and a room that saved them starts paired', () => {
+  // The protocol still knows both structures, so a game played with build windows reads back.
+  assert.deepEqual(parseRoomSettings({ turnTimerSeconds: 90, mode: BIG_TABLE.id, turns: 'paired' }), {
+    turnTimerSeconds: 90,
+    mode: BIG_TABLE.id,
+    turns: 'paired',
+  });
   for (const turns of ['paired ', 'Paired turns', 1, null])
-    assert.throws(() => parseRoomSettings({ turnTimerSeconds: 90, turns }), /Choose Paired turns or Between/);
+    assert.throws(() => parseRoomSettings({ turnTimerSeconds: 90, turns }), /Choose a turn style/);
   const store = new Store(':memory:', { modes: OPEN });
   try {
     const host = store.enter('create', newSession('Ann').token, 'Ann');
@@ -55,39 +52,33 @@ test('a room picks Big Table and its turns: kept when a tab leaves them out, res
       (error: Error) =>
         code('INVALID_SETTINGS')(error) && /Classic has no turn structure/.test(error.message),
     );
-    // Big Table with the older rule: saved, since it is not the default.
-    store.configureSettings(host, 'big-table', revision(), {
-      turnTimerSeconds: 90,
-      mode: BIG_TABLE.id,
-      turns: 'betweenTurnsBuild',
-    });
-    assert.equal(store.settings(roomId).turns, 'betweenTurnsBuild');
+    store.configureSettings(host, 'big-table', revision(), { turnTimerSeconds: 90, mode: BIG_TABLE.id });
     assert.equal(store.board(roomId).preset, 'big-table-balanced-v1', 'the room deals a Big Table island');
-    // A tab from before Big Table leaves the field out, and the room keeps its turns.
-    store.configureSettings(host, 'older-tab', revision(), {
-      turnTimerSeconds: 65,
-      mode: BIG_TABLE.id,
-    });
-    assert.equal(store.settings(roomId).turns, 'betweenTurnsBuild');
-    // Back to the default: saved as nothing, which reads as Paired turns.
-    store.configureSettings(host, 'paired', revision(), {
-      turnTimerSeconds: 65,
-      mode: BIG_TABLE.id,
-      turns: 'paired',
-    });
+    assert.equal('turns' in store.settings(roomId), false, 'Paired turns, the only structure, is saved as nothing');
+    // Between-turns build, retired on 2 October 2026, is refused with the reason.
+    assert.throws(
+      () =>
+        store.configureSettings(host, 'older-rule', revision(), {
+          turnTimerSeconds: 90,
+          mode: BIG_TABLE.id,
+          turns: 'betweenTurnsBuild',
+        }),
+      (error: Error) => code('INVALID_SETTINGS')(error) && /Big Table plays Paired turns only/.test(error.message),
+    );
+    // A room saved with it before then reads as Paired turns, and changing another setting keeps working.
+    store.db
+      .prepare('UPDATE room_settings SET settings = ? WHERE room_id = ?')
+      .run(JSON.stringify({ turnTimerSeconds: 90, mode: BIG_TABLE.id, turns: 'betweenTurnsBuild' }), roomId);
     assert.equal('turns' in store.settings(roomId), false);
-    store.configureSettings(host, 'again', revision(), {
-      turnTimerSeconds: 65,
-      mode: BIG_TABLE.id,
-      turns: 'betweenTurnsBuild',
-    });
+    store.configureSettings(host, 'timer', revision(), { turnTimerSeconds: 65, mode: BIG_TABLE.id });
+    assert.deepEqual(store.settings(roomId), { turnTimerSeconds: 65, mode: BIG_TABLE.id });
     // A new mode starts from its own default: switching away drops the turns, and they cannot come along.
     assert.throws(
       () =>
         store.configureSettings(host, 'classic-with-turns', revision(), {
           turnTimerSeconds: 65,
           mode: CLASSIC.id,
-          turns: 'betweenTurnsBuild',
+          turns: 'paired',
         }),
       code('INVALID_SETTINGS'),
     );
@@ -97,21 +88,17 @@ test('a room picks Big Table and its turns: kept when a tab leaves them out, res
   } finally {
     store.close();
   }
-  // Start freezes the room's choice into the game, and a rematch keeps it.
-  const room = bigTableRoom({ players: 5, turns: 'betweenTurnsBuild' });
-  try {
-    assert.equal(room.game().ruleset, BIG_TABLE.id);
-    assert.equal(room.game().turns, 'betweenTurnsBuild');
-    assert.equal(room.game().players.length, 5);
-    assert.equal(room.game().robber, room.game().board.robberStart);
-  } finally {
-    room.store.close();
-  }
-  const paired = bigTableRoom({ players: 6 });
-  try {
-    assert.equal(paired.game().turns, 'paired', 'Paired turns when the room left it at the default');
-  } finally {
-    paired.store.close();
+  // Start freezes Paired turns into the game, and a rematch keeps it.
+  for (const players of [5, 6]) {
+    const room = bigTableRoom({ players });
+    try {
+      assert.equal(room.game().ruleset, BIG_TABLE.id);
+      assert.equal(room.game().turns, 'paired');
+      assert.equal(room.game().players.length, players);
+      assert.equal(room.game().robber, room.game().board.robberStart);
+    } finally {
+      room.store.close();
+    }
   }
 });
 
@@ -285,47 +272,6 @@ test('§9.4 and §9.5: after a pause an absent Partner’s clock starts again in
   }
 });
 
-test('§9.2 and §9.3: every build window has 20 seconds, with or without a turn timer, and one that runs out ends', () => {
-  for (const timer of [null, 140] as const) {
-    const room = bigTableRoom({ turns: 'betweenTurnsBuild', timer });
-    try {
-      throughSetup(room);
-      leadEnds(room);
-      let g = room.game();
-      assert.equal(g.phase, 'buildWindow');
-      const first = activePlayer(g);
-      const clock = room.store.clock(room.roomId)!;
-      assert.equal(clock.playerId, first.id);
-      assert.equal(clock.deadlineAt! - clock.startedAt, 20_000);
-      // The player may pass at once; the next window has its own 20 seconds.
-      room.clock.now += 3_000;
-      room.act(first.id, { kind: 'endWindow' });
-      g = room.game();
-      const second = activePlayer(g);
-      assert.equal(room.store.clock(room.roomId)!.deadlineAt, room.clock.now + 20_000);
-      // One that runs out simply ends, and the next begins.
-      room.clock.now += 20_000;
-      room.store.expireRoom(room.roomId);
-      g = room.game();
-      assert.notEqual(activePlayer(g).id, second.id);
-      assert.ok(lines(g).includes(`${second.name}'s timer expired; build window closed automatically.`));
-      for (let i = 0; i < 2; i++) {
-        room.clock.now += 20_000;
-        room.store.expireRoom(room.roomId);
-      }
-      g = room.game();
-      assert.equal(g.turn, 2);
-      assert.equal(g.phase, 'roll');
-      assert.equal(activePlayer(g).id, first.id, 'the next turn goes to the first window’s player');
-      const turn = room.store.clock(room.roomId);
-      if (timer === null) assert.equal(turn, undefined);
-      else assert.equal(turn!.deadlineAt! - turn!.startedAt, timer * 1000);
-    } finally {
-      room.store.close();
-    }
-  }
-});
-
 test('§6.7 and §9.4: a marker holder left at the target by a leaver while away wins at the clock’s first move', () => {
   // The Lead: the Partner leaves in their phase and hands Longest Road to the next Lead, who is away and so is not
   // declared the winner as their turn begins. The absence rule's roll, two minutes on, declares them.
@@ -379,7 +325,7 @@ test('§6.7 and §9.4: a marker holder left at the target by a leaver while away
   }
 });
 
-test('§9.4: after two minutes away, a Partner’s phase and a player’s build windows are ended for them at once', () => {
+test('§9.4: after two minutes away, a Partner’s phase is ended for them at once', () => {
   const room = bigTableRoom({ timer: null });
   try {
     throughSetup(room);
@@ -394,23 +340,6 @@ test('§9.4: after two minutes away, a Partner’s phase and a player’s build 
     assert.ok(lines(room.game()).includes(`${partner.name} is away; Partner's phase ended automatically.`));
   } finally {
     room.store.close();
-  }
-  const windows = bigTableRoom({ turns: 'betweenTurnsBuild', timer: null });
-  try {
-    throughSetup(windows);
-    const away = windows.seatOf(windows.game().players[2]!.id);
-    windows.store.setConnected(away, false);
-    windows.clock.now += ABSENCE_AFTER_MS;
-    leadEnds(windows);
-    // The first window is someone else's; theirs is closed the moment it opens.
-    windows.act(activePlayer(windows.game()).id, { kind: 'endWindow' });
-    assert.equal(activePlayer(windows.game()).id, away.id);
-    assert.deepEqual(owedMoves(windows.game()), [{ player: away.id, kind: 'buildWindow' }]);
-    windows.store.expireRoom(windows.roomId);
-    assert.notEqual(activePlayer(windows.game()).id, away.id);
-    assert.ok(lines(windows.game()).includes(`${away.name} is away; build window closed automatically.`));
-  } finally {
-    windows.store.close();
   }
 });
 

@@ -173,7 +173,7 @@ Neither mode rulebook, nor [map generation](MAP_GENERATION.md), reproduces an of
 | BT17 | Official variable setup and lettered spiral described for reference only; no spiral preset in v1 | 4.2 | R6-56 p. 4; R6 p. 11 | Documented (reference only); not offering a spiral preset is a Catanova decision (BD5) |
 | BT18 | Highest roll starts; tied highest players re-roll | 4.3 | R6 p. 12; R6-56 p. 2 | Documented; the re-roll is Classic decision 7 (BD9) |
 | BT19 | Snake draft 1…n, n…1; the markers play no part in setup | 4.4 | R6 p. 12; R6-56 p. 4; PR21 p. 1 | Documented |
-| BT20 | Host chooses Paired turns (default) or Between-turns build; fixed for the game | 4.1, 5 | R6-56 p. 3; PR21 p. 1; L56 pp. 3–4 | Catanova decision (BD10) |
+| BT20 | Paired turns; Between-turns build was a host's option until 2 October 2026, then retired | 4.1, 5 | R6-56 p. 3; PR21 p. 1; L56 pp. 3–4 | Catanova decision (BD10) |
 | BT21 | Lead is the player on turn; Partner is the third player to the Lead's left | 6.1 | R6-56 pp. 3–4; PR21 p. 1 | Documented; counting only players still in the game is a Catanova decision (BD12) |
 | BT22 | Three phases in fixed order; the Lead finishes before the Partner begins | 6.1 | R6-56 p. 3 | Documented |
 | BT23 | Lead plays a normal turn and may trade with anyone, the Partner included | 6.2 | R6-56 p. 3 | Documented |
@@ -284,7 +284,7 @@ Neither mode rulebook, nor [map generation](MAP_GENERATION.md), reproduces an of
 7. **BD7 Robber start:** a desert chosen at random from the map seed. R6 p. 11 speaks of a single desert, DE56 pp. 2–3 lets the players pick either, and no source says who picks.
 8. **BD8 No fixed layout:** no first-game layout, and so no five-player rule that leaves an unused colour's settlements on the island (R6-56 p. 2).
 9. **BD9 Setup:** the Classic snake draft, 1…n then n…1. The starting player is decided by roll, with Classic decision 7's re-roll of tied highest totals; R6 and R6-56 do not cover a tie.
-10. **BD10 Turn structure:** the host chooses Paired turns, the default and the current official rule (R6-56 p. 3; PR21 p. 1), or Between-turns build, labelled in Room setup as the older official rule. Officially the special building phase was replaced rather than kept as a variant; offering it is our choice.
+10. **BD10 Turn structure:** Paired turns, the current official rule (R6-56 p. 3; PR21 p. 1). Until 2 October 2026 the host could choose Between-turns build instead, labelled in Room setup as the older official rule. Officially the special building phase was replaced rather than kept as a variant, and on 2 October 2026 the owner retired it here too: at five players its four 20-second windows after every turn read as skipped turns, and the first table to play it gave up by turn 5. Games started with it keep playing by it, so BD17 and BQ5 to BQ7 still describe those.
 11. **BD11 The Partner's actions:** as R6-56 p. 3: bank and harbour trades, building, buying and one development card of any type, including a Knight, which moves the robber and robs as usual. Trade with players is the only restriction. A community report that the Partner may not trade with the bank has no official support.
 12. **BD12 Counting the Partner:** the third player to the Lead's left, counting only players still in the game.
 13. **BD13 Passing the markers:** both markers pass one seat left together after the Partner's phase (R6-56 p. 3). DE56 p. 4 hands the Lead marker on as soon as the Lead finishes; that timing is not adopted, so the Lead remains a marker holder through the Partner's phase.

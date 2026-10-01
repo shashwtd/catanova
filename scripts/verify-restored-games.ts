@@ -266,7 +266,7 @@ export function gameInvariantProblems(game: Game): string[] {
         problems.push('the free-road phase has no free road left');
       if (game.trade && (game.phase !== 'actions' || game.trade.player !== active?.id))
         problems.push("an open trade is not the active player's, during their actions");
-      problems.push(...turnStructureProblems(game, rules.turns));
+      problems.push(...turnStructureProblems(game, [...(rules.turns ?? []), ...(rules.retiredTurns ?? [])]));
     }
   } catch (error) {
     problems.push(`the saved game is malformed: ${message(error)}`);
@@ -276,13 +276,14 @@ export function gameInvariantProblems(game: Game): string[] {
 
 /**
  * Big Table's turn structures (docs/RULEBOOK-BIG-TABLE.md, sections 6 and 7): the structure is one the mode
- * offers, the markers of a paired turn and the build windows point at real seats, and the player acting is the
- * one the phase belongs to. A game in progress only.
+ * plays (offered now, or retired but still played by games that started with it), the markers of a paired turn
+ * and the build windows point at real seats, and the player acting is the one the phase belongs to. A game in
+ * progress only.
  */
-function turnStructureProblems(game: Game, offered: readonly string[] | undefined): string[] {
+function turnStructureProblems(game: Game, played: readonly string[]): string[] {
   const problems: string[] = [];
   const seat = (index: unknown) => Number.isInteger(index) && !!game.players[index as number];
-  if (offered ? !game.turns || !offered.includes(game.turns) : game.turns !== undefined)
+  if (played.length ? !game.turns || !played.includes(game.turns) : game.turns !== undefined)
     problems.push(`the turn structure ${String(game.turns)} is not one this mode offers`);
   const setup = game.phase === 'setupSettlement' || game.phase === 'setupRoad';
   if (game.pair) {
