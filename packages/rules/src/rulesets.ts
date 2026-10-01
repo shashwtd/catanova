@@ -10,9 +10,10 @@ type CardKind = keyof typeof DEVELOPMENT_DECK;
 export type Purchase = keyof typeof COSTS;
 
 /**
- * How a mode's turns run, where its host may choose (docs/RULEBOOK-BIG-TABLE.md, section 5). 'paired': after the
- * Lead's turn, the Partner three seats on has an action phase of their own. 'betweenTurnsBuild': after each
- * turn, every other player in order has a short window to build.
+ * How a mode's turns run (docs/RULEBOOK-BIG-TABLE.md, section 5). 'paired': after the Lead's turn, the Partner
+ * three seats on has an action phase of their own. 'betweenTurnsBuild': after each turn, every other player in
+ * order has a short window to build. No mode offers it any more (retired 2 October 2026, section 5): it stays
+ * here so games already played with it keep replaying exactly.
  */
 export type TurnStructure = 'paired' | 'betweenTurnsBuild';
 /** Every turn structure there is, with the names players see: `short` where space is tight, as on a chip. */
@@ -85,6 +86,11 @@ export type Ruleset = {
    */
   turns?: readonly TurnStructure[];
   /**
+   * Turn structures the mode no longer offers a host but still plays, so a game started with one before it was
+   * retired, and its journal, keep playing exactly as they did.
+   */
+  retiredTurns?: readonly TurnStructure[];
+  /**
    * Open Sea: the scenario whose board the mode deals. It turns on the sea's rules, which sea.ts and gold.ts
    * hold and game.ts applies: ships, gold fields, the pirate, Longest Route and island bonuses.
    */
@@ -129,7 +135,10 @@ export const BIG_TABLE: Ruleset = {
   costs: COSTS,
   bots: false,
   standIns: false,
-  turns: ['paired', 'betweenTurnsBuild'],
+  // Paired turns only. Between-turns build was a host's option until 2 October 2026: four windows of up to 20
+  // seconds after every turn at five players read as everyone's turn being skipped, and a table quit by turn 5.
+  turns: ['paired'],
+  retiredTurns: ['betweenTurnsBuild'],
 };
 
 /**
@@ -292,6 +301,13 @@ export function rulesetProblems(ruleset: Ruleset): string[] {
       new Set(ruleset.turns).size !== ruleset.turns.length)
   )
     problems.push('the turn structures must be known ones, each listed once');
+  if (
+    ruleset.retiredTurns &&
+    (!ruleset.turns ||
+      !ruleset.retiredTurns.every(isTurnStructure) ||
+      ruleset.retiredTurns.some((turns) => ruleset.turns!.includes(turns)))
+  )
+    problems.push('a retired turn structure must be a known one the mode no longer offers');
   if (ruleset.sea && !(whole(supply.pieces.ships, 1) && ruleset.costs.ship))
     problems.push('a mode with the sea needs ships and a price for them');
   return problems;

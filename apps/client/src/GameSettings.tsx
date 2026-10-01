@@ -460,7 +460,7 @@ export function RoomConfiguration({
                       </small>
                     </span>
                   </label>
-                  {option.turns && (
+                  {option.turns && option.turns.length > 1 && (
                     <TurnStyle
                       options={option.turns}
                       value={mode === option.id ? turns : undefined}

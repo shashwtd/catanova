@@ -37,7 +37,7 @@ Build in this order:
 | ------ | ------------------------------------------------------------------------------------------ | --------- |
 | 1      | Nothing visible: the mode system, proved with a hidden test mode                           | M         |
 | 2      | Nothing visible: the board becomes data                                                    | M         |
-| 3      | Big Table, for five and six players: paired turns, then the between-turns build option     | M + M + S |
+| 3      | Big Table, for five and six players: paired turns (the between-turns option, retired)     | M + M + S |
 | 4      | Open Sea core: sea tiles, ships, gold fields, the pirate, island bonuses (not yet offered) | L         |
 | 5      | Open Sea opens with Outer Isles, for three and four players                                | M         |
 | 6      | More Open Sea: three more scenarios, then five and six players                             | M each    |
@@ -82,16 +82,16 @@ detail.
   without a room turn timer. Reconnect grace, resignation and pausing an empty
   table work as in Classic. See
   [Modes without bots](TURN_CLOCK.md#modes-without-bots).
-- **Big Table turns.** The host chooses between two turn structures. _Paired
-  turns_ is the default and the current official rule: the Lead plays a full
-  turn, then the Partner (the third seat to the Lead's left, counting only
-  players still in the game) has one action phase with no roll and no trading
-  with players. Both are on turn for the whole paired turn; if both have the
-  target, the Lead wins. With fewer than five players left in the game, turns
-  go one player at a time. _Between-turns build_ is the older official rule,
-  offered as a labelled classic option: after each turn, every other player in
-  order may build and buy development cards, with no trading, no card play and
-  no win.
+- **Big Table turns.** _Paired turns_, the current official rule: the Lead
+  plays a full turn, then the Partner (the third seat to the Lead's left,
+  counting only players still in the game) has one action phase with no roll
+  and no trading with players. Both are on turn for the whole paired turn; if
+  both have the target, the Lead wins. With fewer than five players left in the
+  game, turns go one player at a time. _Between-turns build_, the older official
+  rule, was a host's option until 2 October 2026 and is retired: at five
+  players its four 20-second windows after every turn read as skipped turns,
+  and the first table to play it gave up by turn 5. Games started with it keep
+  replaying by it.
 - **Big Table board and supply.** As the official expansion: 30 land hexes in
   rows of 3-4-5-6-5-4-3, 28 number tokens, 11 harbours, 24 cards of each
   resource, 34 development cards. Our balanced generator, adapted to 30 hexes,
@@ -144,7 +144,8 @@ item and says which section now states the rule.
   Partner's phase under way finishes when the count drops below five; and a
   robber move owed by a resigned player falls to the next player to act. A
   resignation that moves Longest Road or Largest Army triggers the win check.
-- **Big Table build windows.** Once Between-turns build is chosen, windows
+- **Big Table build windows** (retired 2 October 2026; for games started with
+  them). Once Between-turns build is chosen, windows
   continue at any player count. Every other player always gets a window;
   nothing skips one automatically, because that would leak hand information,
   and a player may pass at once. The 20-second window clock is always on, with
@@ -206,8 +207,8 @@ decisions, not rules, and the build follows them.
   [maps plan](BIGGER-MAPS-AND-MODES.md)).
 - **Mode picker.** A "Game mode" section at the top of Room setup, using the
   dialog's existing option cards: Classic; Big Table, "for five and six
-  players"; and Open Sea. While Big Table is selected, its turn style (Paired
-  turns or Between-turns build) shows under it. The lobby also shows the chosen
+  players"; and Open Sea. Big Table has no turn style to choose since
+  2 October 2026: it plays Paired turns. The lobby also shows the chosen
   mode. Proposed and mocked up; the section needs its own icon.
 - **Ships and the pirate.** Ships are small upright boats in the player's
   colour with cream sails, drawn on the edge they occupy. The pirate is a ship

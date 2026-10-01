@@ -286,7 +286,10 @@ as a labelled classic option. The host chooses. Both are in the
   phase stops.
 - _Between-turns build._ After each turn, every other player in order may build
   and buy development cards with the cards in hand, with no trading of any kind
-  and no card play. Nobody can win in the window.
+  and no card play. Nobody can win in the window. Offered as a host's option
+  until 2 October 2026, then retired (see the
+  [Big Table rulebook](RULEBOOK-BIG-TABLE.md#5-turn-structure)); the engine keeps
+  it for games started with it.
 
 That touches more than it looks like:
 
@@ -349,9 +352,10 @@ picked the layouts for six players
 
 The lobby's seat grid is built for four. Room setup gains a "Game mode" section
 at the top, using the dialog's existing option cards (Classic; Big Table, "for
-five and six players"; Open Sea), with Big Table's turn style (Paired turns or
-Between-turns build) under it while Big Table is selected. The lobby also shows
-the chosen mode. The picker is proposed and mocked up, and needs its own
+five and six players"; Open Sea). Big Table's turn style (Paired turns or
+Between-turns build) showed under it until the older option was retired on
+2 October 2026; Big Table now plays Paired turns. The lobby also shows the
+chosen mode. The picker is proposed and mocked up, and needs its own
 icon.
 
 **Order inside the phase.** Board, seats and supply first, merged but not

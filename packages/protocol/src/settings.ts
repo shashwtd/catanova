@@ -82,8 +82,7 @@ export function parseRoomSettings(input: unknown): RoomSettings {
     throw new Error(targetRangeText(rules ?? CLASSIC));
   const diceMode = (input as Record<string, unknown>).diceMode;
   const turns = (input as Record<string, unknown>).turns;
-  if (turns !== undefined && !isTurnStructure(turns))
-    throw new Error('Choose Paired turns or Between-turns build');
+  if (turns !== undefined && !isTurnStructure(turns)) throw new Error('Choose a turn style');
   if (seconds !== null && !TURN_TIMER_STEPS.includes(seconds as TurnTimerSeconds))
     throw new Error('Turn timer must be off, 40, 65, 90, 115, or 140 seconds');
   if (diceMode !== undefined && !DICE_MODES.includes(diceMode as DiceMode))

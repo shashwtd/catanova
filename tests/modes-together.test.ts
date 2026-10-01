@@ -246,23 +246,22 @@ test('a room moves from Classic to Big Table to Open Sea and back, each time wit
     configure({ turnTimerSeconds: 65, diceMode: 'classic', victoryPoints: 12 });
     assert.equal(store.settings(roomId).victoryPoints, 12);
 
-    // Big Table, with the older rule: the target goes back to the mode's default, and the island is Big Table's.
+    // Big Table: the target goes back to the mode's default, the island is Big Table's, and its turns are
+    // Paired turns, the only structure it offers, saved as nothing.
     configure({
       turnTimerSeconds: 65,
       diceMode: 'classic',
       victoryPoints: 12,
       mode: BIG_TABLE.id,
-      turns: 'betweenTurnsBuild',
     });
     const big = state();
     assert.deepEqual(big.settings, {
       turnTimerSeconds: 65,
       diceMode: 'classic',
       mode: BIG_TABLE.id,
-      turns: 'betweenTurnsBuild',
     });
     assert.deepEqual([big.preset, big.players, big.seats], ['big-table-balanced-v1', undefined, 6]);
-    // A tab from before Big Table leaves the turns out: the room keeps its own, and its island.
+    // A tab from before Big Table leaves the turns out: the room keeps its island.
     configure({ turnTimerSeconds: 65, diceMode: 'classic', victoryPoints: 11, mode: BIG_TABLE.id });
     assert.deepEqual(state(), {
       ...big,
@@ -360,7 +359,6 @@ test('each mode’s clocks run only in that mode, with a turn timer and without 
       const rooms = [
         openRoom(store, CLASSIC, 3, { timer }),
         openRoom(store, BIG_TABLE, 5, { timer, turns: 'paired' }),
-        openRoom(store, BIG_TABLE, 5, { timer, turns: 'betweenTurnsBuild' }),
         openRoom(store, OPEN_SEA, 3, { timer, goldOnMain: true }),
       ];
       for (const room of rooms) {
@@ -377,12 +375,7 @@ test('each mode’s clocks run only in that mode, with a turn timer and without 
         }
         // Each mode's own clock was seen running, and nothing else was timed in a room without a timer.
         const g = room.game();
-        const own =
-          g.ruleset === OPEN_SEA.id
-            ? 'goldPick'
-            : g.turns === 'betweenTurnsBuild'
-              ? 'buildWindow'
-              : undefined;
+        const own = g.ruleset === OPEN_SEA.id ? 'goldPick' : undefined;
         if (own) assert.ok(seen.has(own), `${g.ruleset} ${g.turns ?? ''}: its clock never ran`);
         if (timer === null)
           assert.deepEqual(
@@ -444,7 +437,7 @@ test('one database with a game of each mode passes the restore verifier and read
     const rooms = [
       openRoom(store, CLASSIC, 3),
       openRoom(store, BIG_TABLE, 5, { turns: 'paired' }),
-      openRoom(store, BIG_TABLE, 6, { turns: 'betweenTurnsBuild' }),
+      openRoom(store, BIG_TABLE, 6, { turns: 'paired' }),
       openRoom(store, OPEN_SEA, 4, { goldOnMain: true }),
     ];
     for (const room of rooms) {

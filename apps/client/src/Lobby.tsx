@@ -385,8 +385,8 @@ export function Lobby({
     room.players.length < seats ? [...room.players, null] : [...room.players];
   // Only when there is a mode to speak of: a room not in Classic, or a host who could pick another.
   const showMode = rules.id !== CLASSIC.id || (room.modes?.length ?? 0) > 1;
-  // How its turns run, in a mode that lets the host choose: Big Table's Paired turns unless another was picked.
-  const turns = rules.turns ? (room.settings?.turns ?? rules.turns[0]) : undefined;
+  // How its turns run, in a mode that lets the host choose between more than one way.
+  const turns = rules.turns && rules.turns.length > 1 ? (room.settings?.turns ?? rules.turns[0]) : undefined;
   // Resolved the same way the board resolves them, so the swatch on a card and
   // the roads on the island are never two different answers.
   const colors = seatHexColors(room.players);

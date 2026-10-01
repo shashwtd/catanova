@@ -14,9 +14,7 @@ A '''game mode''' sets the board, the number of players and a few rules for a ga
 Classic is the game every room plays today: one island, two to four seats, and the rules described across this wiki. Start with [[Getting started]]. Its two-player option, bots, balanced island and turn timer are Catanova choices.
 
 == Big Table, for five and six players ==
-A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so the host chooses one of two ways to share each turn:
-* '''Paired turns''', the default. Each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
-* '''Between-turns build'''. After each ordinary turn, every other player gets a short window to build with the cards in their hand.
+A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so each turn is shared as '''paired turns''': each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
 
 See [[Big Table]].
 
@@ -52,7 +50,7 @@ Without stand-in bots, Big Table and Open Sea handle an absent player differentl
 | On return || The seat is handed back at once. || The clock stops acting for them at once.
 |}
 
-The 2-minute rule applies whether or not the room has a turn timer. It covers the player's setup placements, their turns and anything else they owe: a discard after a seven, a Partner's phase or build window in Big Table, and a gold pick in Open Sea. In setup, the clock places a settlement on the legal corner with the most production dots (on the main island in Open Sea), then a road touching it, or in Open Sea a ship if no road fits. The clock never builds, buys, trades, plays a card or moves a ship for anyone. Reconnecting does not reset a clock that is already running.
+The 2-minute rule applies whether or not the room has a turn timer. It covers the player's setup placements, their turns and anything else they owe: a discard after a seven, a Partner's phase in Big Table, and a gold pick in Open Sea. In setup, the clock places a settlement on the legal corner with the most production dots (on the main island in Open Sea), then a road touching it, or in Open Sea a ship if no road fits. The clock never builds, buys, trades, plays a card or moves a ship for anyone. Reconnecting does not reset a clock that is already running.
 
 Everything else is as in Classic. '''Leave game''' resigns for good. If every remaining player is offline, the game pauses, and it closes with no winner once nobody has returned within three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
 
