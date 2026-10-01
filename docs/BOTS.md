@@ -66,28 +66,22 @@ to who won a hundred self-play games, a quarter is about right. In self-play it 
 
 ### Trading
 
-A bot trades for its own reasons and nobody else's. Every trade is priced for
-both sides in chance of winning, plus a little for every roll it takes off a
+A bot never offers a trade and never haggles. It only answers the offers people
+make it, yes or no, for its own reasons and nobody else's. Each offer is priced
+for both sides in chance of winning, plus a little for every roll it takes off a
 race.
 
-- **Answering an offer:** it accepts only when the trade helps it more than it
-  helps the other player, and never trades with anyone within three points of
+- **An offer for its cards:** it accepts only when the trade helps it more than
+  it helps the other player, and never trades with anyone within three points of
   winning. At a table of three or more it also refuses whoever is clearly
   leading.
-- **Offered cards for anything** (an open offer): it proposes the least it can
-  give that still moves the other player's own race forward, never a resource
-  they are giving, and never the cards its next purchase needs.
-- **Making offers:** only when a card or two stands between it and a purchase,
-  priced against the best it could do this turn with the bank and harbours;
-  only to players the counting says probably hold the card and who would see
-  the trade as progress. At most one offer a turn, and never more cards asked
-  than given: two for one in the bot's favour reads as an insult. A player who
-  turns an offer down (or ignores it) is left alone for a few turns, and one who
-  keeps doing so for ten. Open offers ("these cards for anything") are switched
-  off: in a real game the bot repeated one every turn until the player blocked
-  trades.
-- **Its own offer on the table:** it takes the answer best for itself, waits up
-  to nine seconds for more, and withdraws if none is good.
+- **Cards for anything** (an open offer, which asks for a proposal): it
+  declines.
+
+It used to make offers of its own. Players found them bad trades and nagging,
+however carefully they were priced, so every level has them switched off. The
+code for making and managing offers is still in `trade.ts`, behind the `offers`,
+`open` and `counter` switches in `decide.ts`.
 
 Bots answer offers after a pause of their own (one and a half to four seconds),
 and answering is never owed: a person can take an offer first.

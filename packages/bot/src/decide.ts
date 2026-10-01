@@ -90,16 +90,22 @@ const DIALS: Record<
     positions: number;
     depth: number;
     beam: number;
+    /** Whether the bot makes trade offers of its own. */
     offers: boolean;
+    /** Whether it makes open offers ("these cards for anything"). */
     open: boolean;
+    /** Whether it answers someone's open offer with a proposal, rather than declining. */
+    counter: boolean;
     opening: [number, number];
     advisor: boolean;
     slack: number;
   }
 > = {
-  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: true, open: false, opening: [8, 14], advisor: true, slack: 0 },
-  sharp: { budgetMs: 700, positions: 900, depth: 3, beam: 6, offers: true, open: false, opening: [4, 10], advisor: true, slack: 0.004 },
-  steady: { budgetMs: 500, positions: 350, depth: 2, beam: 4, offers: false, open: false, opening: [2, 6], advisor: false, slack: 0.012 },
+  // No level offers or haggles: a bot only accepts or declines what people offer it. Its own
+  // offers read to people as bad trades and nagging, however they were priced.
+  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: false, open: false, counter: false, opening: [8, 14], advisor: true, slack: 0 },
+  sharp: { budgetMs: 700, positions: 900, depth: 3, beam: 6, offers: false, open: false, counter: false, opening: [4, 10], advisor: true, slack: 0.004 },
+  steady: { budgetMs: 500, positions: 350, depth: 2, beam: 4, offers: false, open: false, counter: false, opening: [2, 6], advisor: false, slack: 0.012 },
 };
 
 const FOCUS: Record<string, Focus> = { city: 'city', settlement: 'settlement', army: 'card', card: 'card', road: 'road' };
@@ -356,6 +362,9 @@ export async function respond(ctx: DecideContext): Promise<{ action: GameAction 
     return { action: null, mind, ...spend };
   if (trade.declinedBy?.includes(ctx.meId) || trade.proposals?.some((p) => p.player === ctx.meId))
     return { action: null, mind, ...spend };
+  // An open offer asks for a proposal, which is haggling: a bot that does not haggle declines it.
+  if (trade.open && !DIALS[ctx.level ?? 'steady'].counter)
+    return { action: { kind: 'declineTrade', tradeId: trade.id }, mind, ...spend };
   const random = ctx.random ?? seededRandom(hash(`${ctx.meId}:${view.turn}:trade:${trade.id}`));
   const g = imagine(view, ctx.meId, mind, random);
   const th = thinker({ ...ctx, positions: Math.min(ctx.positions ?? 300, 300) }, mind, random);
