@@ -63,6 +63,7 @@ import { friendStatus } from './social-presence.js';
 import { BoardViewport } from './BoardViewport.js';
 import { boardKey } from './scene.js';
 import { ReactionButton, ReactionLayer, useFlyingReactions } from './Reactions.js';
+import { ChatAnnouncement, ChatButton, ChatLog, useChatAnnouncement, useTableChat } from './Chat.js';
 import { initialMetrics } from './connection.js';
 import { NetworkMetricsFeed, useClockOffset } from './network-metrics.js';
 import { hasSavedSession } from './saved-session.js';
@@ -103,6 +104,7 @@ import './style.css';
 import './card-motion.css';
 import './dice.css';
 import './reactions.css';
+import './chat.css';
 import './presentation.css';
 import './board-camera.css';
 import './fantasy-transition.css';
@@ -310,6 +312,7 @@ function App() {
       | 'trade'
       | 'rules'
       | 'journal'
+      | 'chat'
       | 'statistics'
       | 'connection'
       | 'leave'
@@ -337,6 +340,11 @@ function App() {
     active = g?.players[g.active],
     myTurn = !!me && active?.id === me && !player?.resigned;
   const matchResults = useMatchResults(room, `${accountIdentity ?? 'anonymous'}:${me ?? 'spectator'}`);
+  const chat = useTableChat(me ?? null);
+  /** Whether this server has table chat at all: an older one does not say so, and the button stays away. */
+  const [chatOffered, setChatOffered] = useState(false);
+  useEffect(() => chat.setOpen(panel === 'chat'), [panel, chat.setOpen]);
+  const chatNews = useChatAnnouncement(chatOffered && !!room?.game && !room.spectating);
   // "/" shows the public landing while sign-in loads, unless a saved session is about
   // to open the player's hub. Later sign-in attempts keep the screen they started on.
   const authSettled = useRef(false);
@@ -583,6 +591,18 @@ function App() {
         reactions.add(message.reaction, message.name);
         return;
       }
+      if (message.type === 'chat') {
+        if (message.entry.playerId === c.playerId) c.confirmChat(message.entry.clientId);
+        chat.receive(message.entry);
+        if (message.entry.playerId !== c.playerId) feedback.sound.play('hover');
+        return;
+      }
+      if (message.type === 'chatHistory') {
+        for (const entry of message.entries) if (entry.playerId === c.playerId) c.confirmChat(entry.clientId);
+        chat.replay(message.entries);
+        return;
+      }
+      if (message.type === 'welcome') setChatOffered(c.features.includes('chat'));
       if (message.type === 'welcome' || message.type === 'state') {
         const next = c.state;
         if (next && c.playerId) {
@@ -1156,6 +1176,17 @@ function App() {
           onFullscreen={() => void fullscreen()}
           busy={busy}
           onLeave={() => (room?.spectating || g.phase === 'finished' ? void leave() : setPanel('leave'))}
+          chat={
+            chatOffered && (
+              <ChatButton
+                open={panel === 'chat'}
+                unread={chat.unread}
+                glimpse={chat.glimpse}
+                colors={seatColors}
+                onToggle={() => setPanel(panel === 'chat' ? null : 'chat')}
+              />
+            )
+          }
           reactions={
             !room?.spectating && (
               <ReactionButton
@@ -1168,6 +1199,15 @@ function App() {
               />
             )
           }
+        />
+      )}
+      {g && chatNews.show && (
+        <ChatAnnouncement
+          onChat={() => {
+            chatNews.dismiss();
+            setPanel('chat');
+          }}
+          onClose={chatNews.dismiss}
         />
       )}
       {g && room && (
@@ -1531,6 +1571,23 @@ function App() {
           {panel === 'statistics' && (
             <UtilityPanel tool="statistics" title="Dice statistics" onClose={() => setPanel(null)}>
               <GameStatistics game={g} statistics={statistics} />
+            </UtilityPanel>
+          )}
+          {panel === 'chat' && chatOffered && (
+            <UtilityPanel tool="chat" title="Table chat" onClose={() => setPanel(null)}>
+              <ChatLog
+                lines={chat.lines}
+                me={me ?? null}
+                myName={room?.players.find((p) => p.id === me)?.name ?? ''}
+                colors={seatColors}
+                canWrite={!room?.spectating}
+                connected={connected}
+                waitMs={chat.waitMs}
+                onSend={(text) => {
+                  const clientId = connection.current?.chat(text);
+                  if (clientId) chat.sent(clientId, text);
+                }}
+              />
             </UtilityPanel>
           )}
           {panel === 'journal' && (

@@ -12,6 +12,7 @@ import { createServer } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseClientMessage, PROTOCOL_VERSION } from '../../../packages/protocol/src/index.js';
 import { REACTION_WINDOW_MS, reactionAllowedAt } from '../../../packages/protocol/src/reactions.js';
+import { CHAT_WINDOW_MS, chatWaitMs } from '../../../packages/protocol/src/chat.js';
 import type { RoomState, ServerMessage } from '../../../packages/protocol/src/index.js';
 import { ProtocolError, Store } from './store.js';
 import type { Seat } from './store.js';
@@ -527,6 +528,41 @@ export async function startServer(
     reactionRate.set(seatId, recent);
     return true;
   }
+  /** Chat is rate limited the same way, with its own, slower rule (`chatWaitMs`). */
+  const chatRate = new Map<string, number[]>();
+  let nextChatSweep = 0;
+  function chatAllowed(seatId: string) {
+    const at = now();
+    if (at >= nextChatSweep) {
+      for (const [id, times] of chatRate)
+        if ((times.at(-1) ?? 0) <= at - CHAT_WINDOW_MS) chatRate.delete(id);
+      nextChatSweep = at + CHAT_WINDOW_MS;
+    }
+    const recent = (chatRate.get(seatId) ?? []).filter((t) => at - t < CHAT_WINDOW_MS);
+    if (chatWaitMs(recent, at) > 0) {
+      chatRate.set(seatId, recent);
+      return false;
+    }
+    recent.push(at);
+    chatRate.set(seatId, recent);
+    return true;
+  }
+  /** What this server offers beyond its protocol version; a tab shows only what is named here. */
+  const FEATURES = ['chat'];
+  /**
+   * A tab still running the page from before chat cannot show it, and cannot be told
+   * in words it would display: but it does show reactions, with a name beneath. Each
+   * seat on an old page gets one surprised face saying how to get chat, once per server run.
+   */
+  const chatNudged = new Set<string>();
+  function nudgeOldTab(ws: WebSocket, seatId: string, chat: boolean | undefined) {
+    if (chat || chatNudged.has(seatId)) return;
+    chatNudged.add(seatId);
+    setTimeout(
+      () => send(ws, { type: 'reaction', playerId: '@catanova', name: 'Chat is here! Refresh to talk', reaction: 'shock', at: now() }),
+      4000,
+    ).unref?.();
+  }
   function broadcast(roomId: string) {
     if (closing) return;
     for (const [ws, watchedRoom] of spectators) {
@@ -778,7 +814,9 @@ export async function startServer(
               playerId: '@spectator',
               version: PROTOCOL_VERSION,
               state: { ...snapshot(roomId, '@spectator'), spectating: true },
+              features: FEATURES,
             });
+            send(ws, { type: 'chatHistory', entries: store.chatHistory(roomId) });
             return;
           }
           // Checked before a seat exists, so a refused tab never leaves one behind. Start checks every tab again.
@@ -817,7 +855,10 @@ export async function startServer(
             playerId: seat.id,
             state: snapshot(seat.room_id, seat.id),
             version: PROTOCOL_VERSION,
+            features: FEATURES,
           });
+          send(ws, { type: 'chatHistory', entries: store.chatHistory(seat.room_id) });
+          nudgeOldTab(ws, seat.id, message.chat);
           broadcast(seat.room_id);
         } else if (message.type === 'presence') {
           // A signed-in tab outside any room: it keeps its account online and hears friends change.
@@ -983,6 +1024,15 @@ export async function startServer(
                   'Save your account profile before updating the lobby',
                 );
             }
+          }
+          if (message.type === 'chat') {
+            // A resend after a dropped socket is stored once (by its tab id) and echoed
+            // again, so the sender sees it confirmed; every tab keeps a message once, by id.
+            if (!chatAllowed(seat.id))
+              throw new ProtocolError('CHAT_TOO_FAST', 'Wait a moment before sending another message.');
+            const { entry } = store.addChat(seat.room_id, seat.id, seat.name, message.text, now(), message.clientId);
+            toRoom(seat.room_id, { type: 'chat', entry });
+            return;
           }
           if (message.type === 'react') {
             if (reactionAllowed(seat.id))

@@ -1,0 +1,317 @@
+/*
+ * Table chat, in the game's parchment: names in strong ink with a dot of the
+ * player's colour (amber or jade text on parchment would not read), the words
+ * in the journal's softer ink, and the box to write in like every other field.
+ */
+
+.playing .side-controls .chat-tool {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.playing .side-controls .chat-trigger {
+  position: relative;
+}
+.chat-unread {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #d9573a;
+  border: 1.5px solid #fff3df;
+  color: #fff8ec;
+  font:
+    700 11px/15px Barlow,
+    sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* A new message while the chat is closed: a slip of parchment above the button,
+   clear of the cards along the bottom. */
+.chat-glimpse {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  width: max-content;
+  max-width: min(280px, 60vw);
+  padding: 8px 11px;
+  border: 1px solid var(--dialog-edge);
+  border-radius: 10px;
+  background: var(--dialog-fill);
+  box-shadow: var(--dialog-shadow);
+  color: #6b5538;
+  font:
+    500 14px/1.3 Barlow,
+    sans-serif;
+  text-align: left;
+  cursor: pointer;
+  animation: chat-glimpse-in 180ms ease-out;
+}
+.chat-glimpse strong {
+  flex: none;
+  font-weight: 700;
+  color: #4c3b27;
+}
+.chat-glimpse span {
+  text-align: left;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+@keyframes chat-glimpse-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+[data-motion='reduced'] .chat-glimpse {
+  animation: none;
+}
+
+/* The panel. */
+.table-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.chat-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: min(48vh, 380px);
+  min-height: 120px;
+  margin: 0;
+  padding: 2px 2px 2px 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  list-style: none;
+}
+.chat-line {
+  color: #6f5940;
+  font:
+    500 14.5px/1.35 Barlow,
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+.chat-line strong {
+  margin-right: 6px;
+  color: #4c3b27;
+  font-weight: 700;
+}
+:is(.chat-line, .chat-glimpse) strong::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 6px 1px 0;
+  border-radius: 50%;
+  background: var(--who, #9a8566);
+  box-shadow: 0 0 0 1px #5a452a33;
+  vertical-align: middle;
+}
+.chat-line.is-pending {
+  opacity: 0.55;
+}
+.chat-empty {
+  color: var(--dialog-muted);
+  font:
+    italic 500 14px/1.4 Barlow,
+    sans-serif;
+  padding: 18px 4px;
+  text-align: center;
+}
+
+.chat-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid #b79a6640;
+}
+.chat-compose input {
+  min-width: 0;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 11px;
+  border: 1px solid #bda16c66;
+  border-radius: 8px;
+  background: #fff7e05c;
+  color: #493a27;
+  font:
+    500 15px/1.2 Barlow,
+    sans-serif;
+}
+.chat-compose input::placeholder {
+  color: #96805e;
+}
+.chat-compose input:focus-visible {
+  outline: 2px solid #8a6a3f;
+  outline-offset: 1px;
+}
+.chat-send {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #47613c;
+  border-radius: 8px;
+  background: linear-gradient(#63825c, #486843);
+  box-shadow:
+    inset 0 1px #ebefb947,
+    0 2px #35482929;
+  color: #fff4da;
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  cursor: pointer;
+}
+.chat-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.chat-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--dialog-muted);
+  font:
+    500 12.5px/1.3 Barlow,
+    sans-serif;
+}
+.chat-readonly {
+  padding-top: 10px;
+  border-top: 1px solid #b79a6640;
+}
+
+/* The news that chat has arrived: once per browser, with a cheering face. */
+.chat-announcement {
+  position: fixed;
+  z-index: 95;
+  left: 50%;
+  top: max(18%, 96px);
+  translate: -50% 0;
+  width: min(340px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 22px 22px 18px;
+  text-align: center;
+  color: var(--dialog-ink);
+  background: var(--dialog-fill);
+  border: 1px solid var(--dialog-edge);
+  border-radius: 14px;
+  box-shadow:
+    var(--dialog-shadow),
+    0 18px 48px #1d140b66;
+  animation: chat-announce-in 460ms cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.chat-announcement-art {
+  position: relative;
+  width: 92px;
+  height: 78px;
+  margin: -60px auto 8px;
+  animation: chat-announce-bob 1.8s ease-in-out infinite;
+}
+.chat-announcement-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 6px 10px #2a1d1040);
+}
+.chat-announcement-art path {
+  fill: #fff6e2;
+  stroke: #b08f5a;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.chat-typing {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 25px;
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+}
+.chat-typing i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #5b7a53;
+  animation: chat-typing 1.2s ease-in-out infinite;
+}
+.chat-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.chat-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.chat-announcement h2 {
+  margin: 4px 0 6px;
+  color: #574128;
+  font:
+    700 24px/1.15 Cinzel,
+    serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.chat-announcement p {
+  margin: 0 0 16px;
+  color: var(--dialog-muted);
+  font:
+    500 15px/1.4 Barlow,
+    sans-serif;
+}
+.chat-announcement-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.chat-later {
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #b5945e5c;
+  border-radius: 8px;
+  background: #c4a37118;
+  color: #745331;
+  font:
+    600 15px/1.2 Barlow,
+    sans-serif;
+  cursor: pointer;
+}
+@keyframes chat-announce-in {
+  from {
+    opacity: 0;
+    scale: 0.82;
+  }
+}
+@keyframes chat-announce-bob {
+  50% {
+    translate: 0 -4px;
+    rotate: -3deg;
+  }
+}
+@keyframes chat-typing {
+  0%,
+  60%,
+  100% {
+    translate: 0 0;
+    opacity: 0.55;
+  }
+  30% {
+    translate: 0 -7px;
+    opacity: 1;
+  }
+}
+[data-motion='reduced'] :is(.chat-announcement, .chat-announcement-art, .chat-typing i) {
+  animation: none;
+}

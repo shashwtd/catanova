@@ -17,6 +17,8 @@ import type { StandInStyle } from '../../../packages/bot/src/style.js';
 import { defaultProfile, parseProfile } from '../../../packages/protocol/src/profile.js';
 import type { Profile } from '../../../packages/protocol/src/profile.js';
 import type { HistoryEntry } from '../../../packages/protocol/src/index.js';
+import { CHAT_HISTORY } from '../../../packages/protocol/src/chat.js';
+import type { ChatEntry } from '../../../packages/protocol/src/chat.js';
 import { parseAccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import type { AccountPrivacy } from '../../../packages/protocol/src/player-hub.js';
 import {
@@ -97,6 +99,17 @@ export { ABSENCE_AFTER_MS };
 export const STANDIN_LEVEL: BotLevel = 'sharp';
 type Absence = { disconnectedAt: number; resignAt: number };
 type JournalRow = { state: string; state_z: Uint8Array | null; board_hash: string | null };
+type ChatRow = { id: number; player_id: string; name: string; text: string; at: number; client_id: string | null };
+/** Chat messages kept per room: the replayed history and some to spare. */
+const CHAT_KEPT = CHAT_HISTORY * 2;
+const chatEntry = (row: ChatRow): ChatEntry => ({
+  id: row.id,
+  playerId: row.player_id,
+  name: row.name,
+  text: row.text,
+  at: row.at,
+  ...(row.client_id ? { clientId: row.client_id } : {}),
+});
 /**
  * What a compact row keeps in its `state` column. Valid JSON on purpose: a
  * server rolled back to a version from before compaction reads this column
@@ -294,6 +307,13 @@ export class Store {
         room_id TEXT NOT NULL REFERENCES rooms(id), user_id TEXT NOT NULL, round INTEGER NOT NULL,
         PRIMARY KEY(room_id, user_id)
       );
+      /* Table chat: each room's recent messages, numbered within the room, replayed to
+         anyone who joins or reconnects. Only the last CHAT_KEPT are kept. */
+      CREATE TABLE IF NOT EXISTS room_chat (
+        room_id TEXT NOT NULL REFERENCES rooms(id), id INTEGER NOT NULL,
+        player_id TEXT NOT NULL, name TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL,
+        client_id TEXT, PRIMARY KEY(room_id, id)
+      );
     `);
     if (
       !this.db
@@ -392,6 +412,50 @@ export class Store {
     }
   }
   /** Anonymous previews are read-only: code leases only change after admitted player activity. */
+  /**
+   * Add a chat message to a room, numbered after the room's last. A message the
+   * same player already sent under the same tab id (a resend after a dropped
+   * socket) is not stored twice: the stored one comes back, marked a duplicate.
+   */
+  addChat(
+    roomId: string,
+    playerId: string,
+    name: string,
+    text: string,
+    at: number,
+    clientId: string,
+  ): { entry: ChatEntry; duplicate: boolean } {
+    return this.transaction(() => {
+      const existing = this.db
+        .prepare(
+          'SELECT id, player_id, name, text, at, client_id FROM room_chat WHERE room_id=? AND player_id=? AND client_id=?',
+        )
+        .get(roomId, playerId, clientId) as ChatRow | undefined;
+      if (existing) return { entry: chatEntry(existing), duplicate: true };
+      const last = this.db.prepare('SELECT max(id) AS id FROM room_chat WHERE room_id=?').get(roomId) as {
+        id: number | null;
+      };
+      const id = (last.id ?? 0) + 1;
+      this.db
+        .prepare(
+          'INSERT INTO room_chat(room_id, id, player_id, name, text, at, client_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(roomId, id, playerId, name, text, at, clientId);
+      this.db.prepare('DELETE FROM room_chat WHERE room_id=? AND id<=?').run(roomId, id - CHAT_KEPT);
+      return { entry: { id, playerId, name, text, at, clientId }, duplicate: false };
+    });
+  }
+
+  /** A room's most recent chat messages, oldest first. */
+  chatHistory(roomId: string, limit = CHAT_HISTORY): ChatEntry[] {
+    const rows = this.db
+      .prepare(
+        'SELECT id, player_id, name, text, at, client_id FROM room_chat WHERE room_id=? ORDER BY id DESC LIMIT ?',
+      )
+      .all(roomId, limit) as ChatRow[];
+    return rows.reverse().map(chatEntry);
+  }
+
   resolveRoom(reference: string): string {
     const normalized = normalizeRoomReference(reference);
     if (!isRoomReference(normalized)) throw new ProtocolError('ROOM_NOT_FOUND', 'Room not found');
