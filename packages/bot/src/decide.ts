@@ -101,11 +101,9 @@ const DIALS: Record<
     slack: number;
   }
 > = {
-  // No level offers or haggles: a bot only accepts or declines what people offer it. Its own
-  // offers read to people as bad trades and nagging, however they were priced.
-  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: false, open: false, counter: false, opening: [8, 14], advisor: true, slack: 0 },
-  sharp: { budgetMs: 700, positions: 900, depth: 3, beam: 6, offers: false, open: false, counter: false, opening: [4, 10], advisor: true, slack: 0.004 },
-  steady: { budgetMs: 500, positions: 350, depth: 2, beam: 4, offers: false, open: false, counter: false, opening: [2, 6], advisor: false, slack: 0.012 },
+  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: true, open: false, counter: true, opening: [8, 14], advisor: true, slack: 0 },
+  sharp: { budgetMs: 700, positions: 900, depth: 3, beam: 6, offers: true, open: false, counter: true, opening: [4, 10], advisor: true, slack: 0.004 },
+  steady: { budgetMs: 500, positions: 350, depth: 2, beam: 4, offers: false, open: false, counter: true, opening: [2, 6], advisor: false, slack: 0.012 },
 };
 
 const FOCUS: Record<string, Focus> = { city: 'city', settlement: 'settlement', army: 'card', card: 'card', road: 'road' };

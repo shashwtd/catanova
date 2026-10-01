@@ -82,9 +82,20 @@ export function traded(g: Game, me: string, partner: string, give: Hand, get: Ha
 }
 
 /**
- * Whether a player is too close to winning to trade with. From about seven
- * points in a game to ten, a leader gets nothing: research on JSettlers found
- * its own cut-off of eight came too late.
+ * Whether a player is two points or less from winning. They get nothing at all:
+ * with points hidden in development cards, any card could be the last one.
+ */
+export function nearWinning(g: Game, partner: string): boolean {
+  const seat = g.players.find((p) => p.id === partner);
+  if (!seat) return true;
+  return score(g, { ...seat, cards: [] }, false) >= target(g) - 2;
+}
+
+/**
+ * Whether a player is ahead enough to be careful with: within three points of
+ * winning, or (at a table of three or more) clearly the likeliest winner. Such a
+ * player gets no trade that helps them, though one that costs them is fine:
+ * research on JSettlers found its own cut-off of eight points came too late.
  */
 export function isThreat(g: Game, th: Thinker, partner: string, chances?: Map<string, number>): boolean {
   const seat = g.players.find((p) => p.id === partner);
@@ -107,7 +118,8 @@ export function isThreat(g: Game, th: Thinker, partner: string, chances?: Map<st
 export function judge(g: Game, th: Thinker, partner: string, give: Hand, get: Hand, myTurn: boolean): Verdict {
   const table = standings(g, th, false);
   const before = new Map(table.map((s) => [s.id, s.chance]));
-  const threat = isThreat(g, th, partner, before);
+  const closing = nearWinning(g, partner);
+  const threat = closing || isThreat(g, th, partner, before);
   const after = traded(g, th.me, partner, give, get);
   if (!after) return { mine: -1, theirs: 0, speedsThem: 0, threat, ok: false, marginal: false };
   const afterStandings = standings(after, th, false);
@@ -126,9 +138,13 @@ export function judge(g: Game, th: Thinker, partner: string, give: Hand, get: Ha
     mine = planTurn(after, quick).value - planTurn(g, quick).value;
   }
   const theirs = (afterTable.get(partner) ?? 0) - (before.get(partner) ?? 0) + rollWorth * speedsThem;
-  // Selfish: it must help the bot, and help the bot more than it helps them.
-  const ok = !threat && mine > minGain && mine > theirs;
-  const marginal = ok && (mine < minGain * 3 || theirs > mine * 0.7);
+  // Selfish: it must help the bot, and help the bot more than it helps them. A
+  // player ahead gets no trade that helps them, but a generous offer that costs
+  // them (four cards for one, say) is taken: refusing it would only help them.
+  // Nobody two points from winning gets anything.
+  const ok = !closing && (!threat || theirs <= 0) && mine > minGain && mine > theirs;
+  // Close enough to ask for a second opinion: a small gain, or one they nearly match.
+  const marginal = ok && (mine < minGain * 3 || (theirs > 0 && theirs > mine * 0.7));
   return { mine, theirs, speedsThem, threat, ok, marginal };
 }
 
@@ -150,8 +166,7 @@ export function answer(g: Game, th: Thinker, trade: Trade): { action: GameAction
   }
   // An open offer: they give `give` and take proposals. Propose the least it can
   // give that still leaves them better off, as long as the bot gains more.
-  const chances = new Map(standings(g, th, false).map((s) => [s.id, s.chance]));
-  if (isThreat(g, th, maker, chances)) return { action: decline, partner: maker };
+  if (nearWinning(g, maker)) return { action: decline, partner: maker };
   // They chose to part with those cards, so a proposal only has to look fair to
   // them, not be a gift. Prefer giving less; among equals, what suits the bot best
   // while still looking good to them.
@@ -264,16 +279,19 @@ export function makeOffer(
     const willing: string[] = [];
     for (const p of partners) {
       const holds = RESOURCES.reduce((chance, r) => (want[r] ? chance * chanceHolds(th.belief, p.id, r, want[r]) : chance), 1);
-      if (holds < 0.2) continue;
+      // Only someone who probably holds the cards: asking anyone else is noise.
+      if (holds < 0.5) continue;
       const after = traded(g, th.me, p.id, give, want);
       if (!after) continue;
       const afterTable = standings(after, th, false);
       const theirs = (afterTable.find((x) => x.id === p.id)?.chance ?? 0) - (chances.get(p.id) ?? 0);
       // Selfish: never an offer that helps them more than it helps the bot.
       if (theirs >= mine) continue;
-      // Whether they would take it: does it move their own race forward?
+      // Only someone the trade clearly moves forward, or they will not want it,
+      // and an offer nobody wants is just nagging.
       const speeds = (baseTable.find((x) => x.id === p.id)?.rolls ?? 0) - (afterTable.find((x) => x.id === p.id)?.rolls ?? 0);
-      const accept = holds * (speeds > 0 ? 0.7 : 0.2) * takeRate;
+      if (speeds < 0.5) continue;
+      const accept = holds * 0.7 * takeRate;
       pAny *= 1 - accept;
       willing.push(p.id);
     }

@@ -66,22 +66,34 @@ to who won a hundred self-play games, a quarter is about right. In self-play it 
 
 ### Trading
 
-A bot never offers a trade and never haggles. It only answers the offers people
-make it, yes or no, for its own reasons and nobody else's. Each offer is priced
-for both sides in chance of winning, plus a little for every roll it takes off a
-race.
+A bot trades for its own reasons and nobody else's. Every trade is priced for
+both sides in chance of winning, plus a little for every roll it takes off a
+race. It never makes a trade that is bad for itself, and never one that helps
+the other player more than it helps the bot.
 
-- **An offer for its cards:** it accepts only when the trade helps it more than
-  it helps the other player, and never trades with anyone within three points of
-  winning. At a table of three or more it also refuses whoever is clearly
-  leading.
-- **Cards for anything** (an open offer, which asks for a proposal): it
-  declines.
-
-It used to make offers of its own. Players found them bad trades and nagging,
-however carefully they were priced, so every level has them switched off. The
-code for making and managing offers is still in `trade.ts`, behind the `offers`,
-`open` and `counter` switches in `decide.ts`.
+- **Answering an offer:** it accepts when the trade helps it more than it helps
+  the other player. Nobody two points from winning gets a trade: with points
+  hidden in development cards, any card could be the last one. A player who is
+  ahead (within three points of winning, or clearly the likeliest winner at a
+  table of three or more) gets no trade that helps them. A generous offer that
+  costs them is taken, though, because refusing it would only help them. In
+  self-play positions it takes four of a player's cards for one of its own 82%
+  of the time. Most refusals are offers worth little to it, such as four of one
+  kind, which is only one bank trade.
+- **Offered cards for anything** (an open offer): it proposes the least it can
+  give that still moves the other player's own race forward, never a resource
+  they are giving, and never the cards its next purchase needs.
+- **Making offers:** only when a card or two stands between it and a purchase,
+  priced against the best it could do this turn with the bank and harbours.
+  It offers only to players the counting says probably hold the card, and only
+  when the trade clearly moves their own race forward: an offer they would not
+  want is nagging. At most one offer a turn, and never more cards asked than
+  given. A player who turns an offer down (or ignores it) is left alone for a
+  few turns, and one who keeps doing so for ten. Open offers ("these cards for
+  anything") are switched off: in a real game the bot repeated one every turn
+  until the player blocked trades.
+- **Its own offer on the table:** it takes the answer best for itself, waits up
+  to nine seconds for more, and withdraws if none is good.
 
 Bots answer offers after a pause of their own (one and a half to four seconds),
 and answering is never owed: a person can take an offer first.

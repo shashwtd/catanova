@@ -487,38 +487,32 @@ test('the race’s correction counts room to expand: a road toward open land add
   assert.ok(gains.every((g) => g >= 0) && gains.some((g) => g > 0), gains.join(','));
 });
 
-test('bots never offer or haggle: one card short it asks nobody, and an open offer is declined', async () => {
-  const { decide, respond, initialPlan } = await import('../packages/bot/src/index.js');
+test('a generous offer is taken even from a player ahead when it costs them; two points from winning gets nothing', async () => {
+  const { judge } = await import('../packages/bot/src/brain/trade.js');
   const game = position();
-  const [a, b, c] = spots(game, 3);
+  const [a, b, c, d, e] = spots(game, 5);
   game.buildings[a!] = { player: 'me', kind: 'settlement' };
-  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'city' };
   game.buildings[c!] = { player: 'c', kind: 'settlement' };
-  // One clay short of a settlement, with plenty to give, and B holding clay.
-  game.players[0]!.hand = hand({ wood: 1, sheep: 3, wheat: 1 });
-  game.players[1]!.hand = hand({ brick: 2 });
-  for (const level of ['champ', 'sharp', 'steady'] as const) {
-    const decision = await decide({
-      view: gameView(game, 'me'),
-      board: game.board,
-      meId: 'me',
-      plan: initialPlan(game.turn),
-      jev: null,
-      level,
-      mind: newMind(),
-    });
-    assert.ok(!['offerTrade', 'openTrade'].includes(decision.action.kind), `${level}: ${decision.action.kind}`);
-  }
-  // B offers clay for anything: the bot says no rather than proposing.
-  const offered = applyAction({ ...game, active: 1 }, 'b', { kind: 'openTrade', give: hand({ brick: 1 }) }, seededRandom(1));
-  const answer = await respond({
-    view: gameView(offered, 'me'),
-    board: offered.board,
-    meId: 'me',
-    plan: initialPlan(offered.turn),
-    jev: null,
-    level: 'champ',
-    mind: newMind(),
-  });
-  assert.equal(answer.action?.kind, 'declineTrade');
+  game.buildings[d!] = { player: 'b', kind: 'city' };
+  game.longestRoad = 'b';
+  // "b" leads on six points and offers four hay, which its cities need, for one timber.
+  game.active = 1;
+  game.players[0]!.hand = hand({ ore: 3, wood: 2 });
+  game.players[1]!.hand = hand({ wheat: 4 });
+  game.trade = { id: 7, player: 'b', give: hand({ wheat: 4 }), want: hand({ wood: 1 }) };
+  const mind = newMind();
+  const g = imagine(gameView(game, 'me'), 'me', mind, seededRandom(1));
+  const th = thinker(game, mind);
+  const verdict = judge(g, th, 'b', hand({ wood: 1 }), hand({ wheat: 4 }), false);
+  assert.ok(verdict.threat, 'b is the player to be careful with');
+  assert.ok(verdict.theirs <= 0 && verdict.mine > 0, `it costs them and helps the bot (${verdict.mine}, ${verdict.theirs})`);
+  assert.equal(answer(g, th, game.trade).action.kind, 'acceptTrade');
+
+  // Two points from winning, the same offer is refused: any card could be the last one.
+  game.buildings[e!] = { player: 'b', kind: 'settlement' };
+  game.largestArmy = 'b';
+  const closing = imagine(gameView(game, 'me'), 'me', mind, seededRandom(1));
+  assert.ok(gameView(game, 'me').players.find((p) => p.id === 'b')!.points >= 8);
+  assert.equal(answer(closing, thinker(game, mind), game.trade).action.kind, 'declineTrade');
 });
