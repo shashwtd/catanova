@@ -278,7 +278,15 @@ export function shared(t: Table): Shared {
   return { dist, trail };
 }
 
-export function race(t: Table, id: string, know: Knowledge, lean?: Strategy, common: Shared = shared(t)): Race {
+export function race(
+  t: Table,
+  id: string,
+  know: Knowledge,
+  lean?: Strategy,
+  common: Shared = shared(t),
+  /** The bot's own race: only its own plans weigh a contested corner by the time it needs (`contest: 'timed'`). */
+  own = true,
+): Race {
   const player = t.players.find((p) => p.id === id);
   if (!player || player.resigned) return { rolls: MAX_ROLLS * 4, steps: [] };
   const goal = target(t);
@@ -306,8 +314,8 @@ export function race(t: Table, id: string, know: Knowledge, lean?: Strategy, com
       const rival = Math.min(99, ...theirs.map((m) => m.get(v) ?? 99));
       // How likely the corner is still ours by the time we get there.
       const odds =
-        TUNING.contest === 'skip'
-          ? rival < d
+        TUNING.contest === 'skip' || TUNING.contest === 'strict' || TUNING.contest === 'timed'
+          ? rival < d || (TUNING.contest === 'strict' && rival === d)
             ? 0
             : 1
           : rival < d
@@ -318,7 +326,9 @@ export function race(t: Table, id: string, know: Knowledge, lean?: Strategy, com
                 ? TUNING.contestAhead
                 : 1;
       const harbour = TUNING.raceHarbours ? harbours(t.board).get(v) : undefined;
-      return { vertex: v, roads: d, gain: raceCorner(t, v), odds, harbour };
+      // A corner a rival is as close to, or one road further from, is a race.
+      const contested = TUNING.contest === 'timed' && (own || !TUNING.contestOwnOnly) && rival <= d + 1;
+      return { vertex: v, roads: d, gain: raceCorner(t, v), odds, harbour, contested };
     })
     .filter((s) => s.odds > 0)
     .sort((a, b) => incomeTotal(b.gain) * b.odds - incomeTotal(a.gain) * a.odds);
@@ -369,9 +379,20 @@ export function race(t: Table, id: string, know: Knowledge, lean?: Strategy, com
     const pointNow = perPoint(perRoll);
     const incomeNow = Math.max(0.05, incomeTotal(perRoll));
     const roughNow = TUNING.restPriced ? roughPoint(perRoll, rate) : 0;
-    const consider = (step: Omit<Step, 'rolls'>, cost: Hand, gain: Hand, odds = 1, harbour?: Resource | 'any') => {
-      // A corner that may be taken first costs, on average, the tries it takes.
-      const r = rollsToAfford(hand, cost, perRoll, rate) / odds;
+    const consider = (
+      step: Omit<Step, 'rolls'>,
+      cost: Hand,
+      gain: Hand,
+      odds = 1,
+      harbour?: Resource | 'any',
+      contested = false,
+    ) => {
+      // A corner that may be taken first costs, on average, the tries it takes. A
+      // contested one is likelier to go the longer the bot needs to get there: one
+      // it can settle now is its own, one a dozen rolls away probably is not.
+      const wait = rollsToAfford(hand, cost, perRoll, rate);
+      const chance = contested ? Math.max(0.05, Math.exp(-wait / TUNING.contestPatience)) : odds;
+      const r = wait / chance;
       if (r >= MAX_ROLLS) return;
       const after = plus(perRoll, gain);
       const left = Math.max(0, need - step.points);
@@ -404,6 +425,7 @@ export function race(t: Table, id: string, know: Knowledge, lean?: Strategy, com
             site.gain,
             site.odds,
             site.harbour,
+            site.contested,
           );
     }
     if (Number.isFinite(knightsNeeded)) {
@@ -611,6 +633,8 @@ export function winChances(
   options: {
     endOfTurn?: boolean;
     lean?: Record<string, Strategy | undefined>;
+    /** The player whose own plans these are, for anything only the bot's own race does. */
+    self?: string;
     /** The chance of a seven within so many rolls, when the dice are counted. */
     sevens?: (rolls: number) => number;
   } = {},
@@ -623,7 +647,7 @@ export function winChances(
   const coef = TUNING.features;
   const races = seats.map((p) => {
     const k = know(p.id);
-    const r = race(t, p.id, k, options.lean?.[p.id], common);
+    const r = race(t, p.id, k, options.lean?.[p.id], common, options.self === undefined || options.self === p.id);
     let bonus = 0;
     if (coef) {
       // Open corners in reach alone is cheap; anything else takes the full set.

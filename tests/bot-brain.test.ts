@@ -455,17 +455,20 @@ test('the robber costs a race only part of its tile when told to: it moves on', 
   game.buildings[b!] = { player: 'b', kind: 'settlement' };
   game.buildings[c!] = { player: 'c', kind: 'settlement' };
   const know = { points: 1, knightsHeld: 0, otherCards: 0 };
-  const open = race(game, 'me', know).rolls;
-  game.robber = game.board.hexes.find((h) => h.vertices.includes(a!) && h.number)!.id;
-  const kept = TUNING.robberBlock;
+  const kept = { robberBlock: TUNING.robberBlock, contest: TUNING.contest };
+  // The race is greedy, and timing contested corners can switch its first step
+  // between these positions; the robber's share is clearest with that held fixed.
   try {
+    retune({ contest: 'skip' });
+    const open = race(game, 'me', know).rolls;
+    game.robber = game.board.hexes.find((h) => h.vertices.includes(a!) && h.number)!.id;
     retune({ robberBlock: 1 });
     const blocked = race(game, 'me', know).rolls;
     retune({ robberBlock: 0.25 });
     const partly = race(game, 'me', know).rolls;
     assert.ok(open < partly && partly < blocked, `${open.toFixed(1)} < ${partly.toFixed(1)} < ${blocked.toFixed(1)}`);
   } finally {
-    retune({ robberBlock: kept });
+    retune(kept);
   }
 });
 
@@ -515,4 +518,32 @@ test('a generous offer is taken even from a player ahead when it costs them; two
   const closing = imagine(gameView(game, 'me'), 'me', mind, seededRandom(1));
   assert.ok(gameView(game, 'me').players.find((p) => p.id === 'b')!.points >= 8);
   assert.equal(answer(closing, thinker(game, mind), game.trade).action.kind, 'declineTrade');
+});
+
+test('racing carefully for contested corners changes only the bot’s own plans, never shortening them', async () => {
+  const { retune, TUNING } = await import('../packages/bot/src/brain/tuning.js');
+  const { shared } = await import('../packages/bot/src/brain/race.js');
+  const game = position();
+  const [a, b, c] = spots(game, 3);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  // Roads out of every settlement, so corners are within reach of more than one player.
+  for (const [v, owner] of [[a!, 'me'], [b!, 'b'], [c!, 'c']] as const)
+    for (const e of game.board.vertices[v]!.edges) game.roads[e] = owner;
+  const know = { points: 1, knightsHeld: 0, otherCards: 0 };
+  const kept = { contest: TUNING.contest, contestPatience: TUNING.contestPatience };
+  try {
+    for (const held of [hand({}), hand({ wood: 1, brick: 1 })]) {
+      game.players[0]!.hand = held;
+      retune({ contest: 'skip' });
+      const before = ['me', 'b', 'c'].map((id) => race(game, id, know, undefined, shared(game), id === 'me').rolls);
+      retune({ contest: 'timed', contestPatience: 4 });
+      const after = ['me', 'b', 'c'].map((id) => race(game, id, know, undefined, shared(game), id === 'me').rolls);
+      assert.ok(after[0]! >= before[0]! - 1e-9, 'its own race is never made to look shorter');
+      assert.deepEqual(after.slice(1), before.slice(1), 'everyone else’s race is untouched');
+    }
+  } finally {
+    retune(kept);
+  }
 });

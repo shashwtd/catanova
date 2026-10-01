@@ -17,10 +17,23 @@ export const TUNING = {
   progressCardWorth: 2,
   /**
    * How a corner a rival can reach is treated. 'skip': gone if they are closer.
-   * 'soft': kept, but only likely to be ours in proportion to who is closer,
-   * which gives a road toward it value before it is too late.
+   * 'strict': gone unless the bot is closer: level is a race the player on turn
+   * and with the cards usually wins (in a real game the bot built toward a corner
+   * a person was as close to, lost it the next turn, and did that three times).
+   * 'soft': kept, but only likely to be ours in proportion to who is closer.
+   * 'timed': as 'skip', and a corner a rival is as close to (or one road further
+   * from) is likelier lost the longer the bot needs to get there: it races for
+   * one it can settle within a roll or two and leaves the rest. In a real game
+   * the bot started roads toward four corners a person was as close to, lost
+   * them, and spread its roads in every direction. Timed (own plans, 4 rolls):
+   * 106-92 in three-player self-play, with 7% more settlements from as many
+   * roads; strict lost 48-71, and timing everyone's race lost 49-62.
    */
-  contest: 'skip' as 'skip' | 'soft',
+  contest: 'timed' as 'skip' | 'strict' | 'soft' | 'timed',
+  /** For 'timed': rolls of waiting after which a contested corner is about a third as likely to be ours. */
+  contestPatience: 4,
+  /** For 'timed': only the bot's own plans are timed; everyone else's race stays as fitted. */
+  contestOwnOnly: true,
   /** Chance a corner is still ours when a rival is closer, level, or one road further. */
   contestBehind: 0.2,
   contestLevel: 0.55,

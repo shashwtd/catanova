@@ -56,7 +56,7 @@ export const spent = (th: Thinker) => th.scored >= th.positions || now() > th.de
 
 export function standings(g: Table, th: Thinker, endOfTurn = true): Standing[] {
   th.scored++;
-  return winChances(g, th.know(g), { endOfTurn, lean: th.lean, sevens: th.sevens });
+  return winChances(g, th.know(g), { endOfTurn, lean: th.lean, sevens: th.sevens, self: th.me });
 }
 
 /**
