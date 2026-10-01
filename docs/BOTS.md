@@ -165,11 +165,11 @@ values. Never commit the key or put it in a client-side environment variable.
 ## Who sits down
 
 There are three of them, and the host does not choose. Filling a seat draws one
-on the server — steady and sharp two in five each, a champion one in five — so
-you find out who you have by playing them, the same way you would with a
-stranger. Each is marked by its own machine beside its name; the seat itself
-says only "bot", because naming the difficulty would give away a game nobody
-has played yet.
+on the server. Since 1 October 2026 the draw always gives a champion: steady
+and sharp are disabled rather than removed (their odds in
+`packages/protocol/src/bots.ts` are zero), so a bot already seated at one keeps
+playing it, and setting the odds back brings them back. Each level is marked by
+its own machine beside its name; the seat itself says only "bot".
 
 How each one plays is under [Levels](#levels).
 

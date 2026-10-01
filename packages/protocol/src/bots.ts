@@ -33,14 +33,15 @@ export const BOT_LEVEL_LABEL: Record<BotLevel, string> = {
 /**
  * How often each one turns up.
  *
- * Not evenly: a champion you meet every third game is a difficulty setting you
- * did not choose, while one in five is an occasional bad afternoon. Must sum
- * to one.
+ * Only the champion, for now (owner's call, 1 October 2026): every bot that sits
+ * down plays at full strength. Steady and sharp stay defined, and a bot already
+ * seated at one of them keeps playing it, but neither is drawn. Setting their
+ * odds back above zero brings them back. Must sum to one.
  */
 export const BOT_LEVEL_ODDS: Record<BotLevel, number> = {
-  steady: 0.4,
-  sharp: 0.4,
-  champ: 0.2,
+  steady: 0,
+  sharp: 0,
+  champ: 1,
 };
 
 /**
