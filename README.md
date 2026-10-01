@@ -41,8 +41,8 @@ The same application serves the browser and WebSocket endpoint. No separate clie
 A host can fill any free seat with a bot from the lobby, so two friends can play
 a full four-player game. Bots think with their own engine: they race every
 player to ten points in dice rolls, count the cards that move in public, search
-whole turns with the real rules, solve the opening, and trade with people for
-their own reasons only, offering, answering and proposing. TypeSafe AI's Jev
+whole turns with the real rules, solve the opening, and answer people's trade
+offers yes or no for their own reasons only; they never offer or haggle. TypeSafe AI's Jev
 advises on the close calls when a `TYPESAFE_API_KEY` is set; without one the
 engine decides alone. Bots throw the odd reaction, never chat, and never see a
 card a player at the table could not. A room whose only remaining players are

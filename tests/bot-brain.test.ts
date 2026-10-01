@@ -486,3 +486,39 @@ test('the race’s correction counts room to expand: a road toward open land add
   });
   assert.ok(gains.every((g) => g >= 0) && gains.some((g) => g > 0), gains.join(','));
 });
+
+test('bots never offer or haggle: one card short it asks nobody, and an open offer is declined', async () => {
+  const { decide, respond, initialPlan } = await import('../packages/bot/src/index.js');
+  const game = position();
+  const [a, b, c] = spots(game, 3);
+  game.buildings[a!] = { player: 'me', kind: 'settlement' };
+  game.buildings[b!] = { player: 'b', kind: 'settlement' };
+  game.buildings[c!] = { player: 'c', kind: 'settlement' };
+  // One clay short of a settlement, with plenty to give, and B holding clay.
+  game.players[0]!.hand = hand({ wood: 1, sheep: 3, wheat: 1 });
+  game.players[1]!.hand = hand({ brick: 2 });
+  for (const level of ['champ', 'sharp', 'steady'] as const) {
+    const decision = await decide({
+      view: gameView(game, 'me'),
+      board: game.board,
+      meId: 'me',
+      plan: initialPlan(game.turn),
+      jev: null,
+      level,
+      mind: newMind(),
+    });
+    assert.ok(!['offerTrade', 'openTrade'].includes(decision.action.kind), `${level}: ${decision.action.kind}`);
+  }
+  // B offers clay for anything: the bot says no rather than proposing.
+  const offered = applyAction({ ...game, active: 1 }, 'b', { kind: 'openTrade', give: hand({ brick: 1 }) }, seededRandom(1));
+  const answer = await respond({
+    view: gameView(offered, 'me'),
+    board: offered.board,
+    meId: 'me',
+    plan: initialPlan(offered.turn),
+    jev: null,
+    level: 'champ',
+    mind: newMind(),
+  });
+  assert.equal(answer.action?.kind, 'declineTrade');
+});
