@@ -65,46 +65,59 @@ const MAX_ROLLS = 400;
  * and any surplus converted at the player's bank or harbour rates. Continuous, so
  * that a little more income always shortens it a little.
  */
+/**
+ * Cards still missing for `cost` after `t` rolls: what income has not covered,
+ * less what spare cards buy at the bank: four spare of a kind (fewer with a
+ * harbour) buy one card, and a part-filled trade counts for a little. Counting
+ * spare cards in full as fractions of a card made a hand of rock look a few rolls
+ * from a city when the bot had no way to get the hay, and it sat on that hand for
+ * fifty turns.
+ */
+/** How much a part-filled bank trade counts for. Counting it in full made a hand of rock look a few rolls from
+ *  a city; not at all made the score so lumpy the search lost a fifth of its games. Measured in the arena. */
+const PARTIAL_TRADE = 0.4;
+
 function shortfallAt(hand: Hand, cost: Hand, perRoll: Hand, rate: Hand, t: number): number {
-  let s = 0;
+  let deficit = 0,
+    convertible = 0;
   for (let i = 0; i < 5; i++) {
     const r = RESOURCES[i]!;
     const have = hand[r] + perRoll[r] * t;
-    s += have < cost[r] ? cost[r] - have : -(have - cost[r]) / rate[r];
-  }
-  return s;
-}
-
-export function rollsToAfford(hand: Hand, cost: Hand, perRoll: Hand, rate: Hand): number {
-  // Short of cards on resource r while hand + income·t < cost; beyond that the
-  // surplus converts at the rate. shortfall(t) = deficit − convertible is
-  // piecewise linear and falling, with a kink where each resource stops being
-  // short, so the root is found exactly between two kinks.
-  let covered = true;
-  const kinks: number[] = [];
-  for (let i = 0; i < 5; i++) {
-    const r = RESOURCES[i]!;
-    const gap = cost[r] - hand[r];
-    if (gap > 0) {
-      covered = false;
-      if (perRoll[r] > 0) kinks.push(gap / perRoll[r]);
+    if (have < cost[r]) deficit += cost[r] - have;
+    else {
+      // Whole trades count in full; a part-filled trade counts for a little,
+      // because more of that resource is on the way.
+      const trades = (have - cost[r]) / rate[r];
+      const whole = Math.floor(trades + 1e-9);
+      convertible += whole + PARTIAL_TRADE * (trades - whole);
     }
   }
-  if (covered) return 0;
-  kinks.sort((a, b) => a - b);
-  kinks.push(MAX_ROLLS);
+  return deficit - convertible;
+}
+
+/**
+ * Rolls until `cost` is affordable from `hand`, with `perRoll` arriving each roll
+ * and spare cards traded at the bank or a harbour in whole trades. Income is an
+ * average, so the answer is continuous; it is found by halving, since the
+ * shortfall only ever falls as rolls go by.
+ */
+export function rollsToAfford(hand: Hand, cost: Hand, perRoll: Hand, rate: Hand): number {
+  if (shortfallAt(hand, cost, perRoll, rate, 0) <= 0) return 0;
+  // Most answers are a few dozen rolls: double up to a bound, then halve to a
+  // twentieth of a roll.
   let lo = 0,
-    fLo = shortfallAt(hand, cost, perRoll, rate, 0);
-  if (fLo <= 0) return 0;
-  for (const hi of kinks) {
-    if (hi <= lo) continue;
-    const fHi = shortfallAt(hand, cost, perRoll, rate, Math.min(hi, MAX_ROLLS));
-    if (fHi <= 0) return lo + (fLo * (hi - lo)) / (fLo - fHi);
+    hi = 4;
+  while (shortfallAt(hand, cost, perRoll, rate, hi) > 0) {
+    if (hi >= MAX_ROLLS) return MAX_ROLLS;
     lo = hi;
-    fLo = fHi;
-    if (lo >= MAX_ROLLS) break;
+    hi = Math.min(MAX_ROLLS, hi * 2);
   }
-  return MAX_ROLLS;
+  while (hi - lo > 0.05) {
+    const mid = (lo + hi) / 2;
+    if (shortfallAt(hand, cost, perRoll, rate, mid) > 0) lo = mid;
+    else hi = mid;
+  }
+  return hi;
 }
 
 const scale = (h: Hand, k: number): Hand => ({
@@ -296,10 +309,11 @@ function averageCard(perRoll: Hand): Hand {
 export function sevenRisk(t: Table, id: string, rollsUntilMyTurn: number): number {
   const player = t.players.find((p) => p.id === id);
   if (!player) return 0;
-  const n = handSize(player.hand);
-  if (n <= 7) return 0;
-  const chance = 1 - (5 / 6) ** Math.max(0, rollsUntilMyTurn);
   const perRoll = Math.max(0.15, incomeTotal(income(t, id)));
+  // The hand that will meet the seven: what is held now plus what arrives first.
+  const n = handSize(player.hand) + perRoll * Math.max(0, rollsUntilMyTurn - 1) * 0.5;
+  if (n <= 7.5) return 0;
+  const chance = 1 - (5 / 6) ** Math.max(0, rollsUntilMyTurn);
   return (chance * Math.floor(n / 2)) / perRoll;
 }
 

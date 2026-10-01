@@ -23,6 +23,9 @@ export type Profile = {
   accepted: number;
   declined: number;
   robbedMe: number;
+  /** The bot's offers this player has turned down or ignored in a row, and the turn of the last. */
+  refusals?: number;
+  refusedTurn?: number;
 };
 
 export type Mind = {

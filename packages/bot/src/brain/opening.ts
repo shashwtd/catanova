@@ -148,12 +148,32 @@ export function chooseOpening(g: Game, th: Thinker, samples = 6, candidates = 12
         t.buildings = { ...t.buildings, [pick]: { player: seat.id, kind: 'settlement' } };
         if (i >= n) seat.hand = add(seat.hand, startingHand(board, pick));
       }
-      total += value({ ...t, active: 0, turn: 1 }, th, false);
+      total += value({ ...t, active: 0, turn: 1 }, th, false) - starved(t, th.me);
     }
     const v = total / samples;
     if (v > best.value) best = { vertex, value: v };
   }
   return best;
+}
+
+/**
+ * A start that cannot produce timber, clay or hay at all is a trap the race
+ * underrates: every road and settlement then goes through the bank at four to
+ * one, and in a real game a bot with two rock corners built its first road on
+ * turn 57. Each of those three missing costs the opening dearly; missing rock or
+ * wool costs less, since cities and cards can wait.
+ */
+export function starved(t: Table, me: string): number {
+  const made = emptyHand();
+  for (const [v, b] of Object.entries(t.buildings)) {
+    if (b.player !== me) continue;
+    const corner = cornerIncome(t.board, Number(v), null);
+    for (const r of RESOURCES) made[r] += corner[r];
+  }
+  let cost = 0;
+  for (const r of ['wood', 'brick', 'wheat'] as const) if (made[r] <= 0) cost += 0.08;
+  for (const r of ['ore', 'sheep'] as const) if (made[r] <= 0) cost += 0.03;
+  return cost;
 }
 
 const add = (a: Hand, b: Hand): Hand => {

@@ -95,7 +95,7 @@ const DIALS: Record<
     slack: number;
   }
 > = {
-  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: true, open: true, opening: [8, 14], advisor: true, slack: 0 },
+  champ: { budgetMs: 1200, positions: 2000, depth: 4, beam: 10, offers: true, open: false, opening: [8, 14], advisor: true, slack: 0 },
   sharp: { budgetMs: 700, positions: 900, depth: 3, beam: 6, offers: true, open: false, opening: [4, 10], advisor: true, slack: 0.004 },
   steady: { budgetMs: 500, positions: 350, depth: 2, beam: 4, offers: false, open: false, opening: [2, 6], advisor: false, slack: 0.012 },
 };
@@ -305,7 +305,7 @@ async function takeTurn(
   const best = planTurn(g, th);
   // A card or two short of something better: ask the table before settling for the bank.
   if (dials.offers && ctx.canOffer !== false && !view.trade) {
-    const offer = makeOffer(g, th, mind.offers.made, best.value, mind.trading);
+    const offer = makeOffer(g, th, mind.offers.made, best.value, mind.trading, mind.profiles);
     if (offer) {
       mind.offers.made.push(offer.key);
       mind.trading.made++;

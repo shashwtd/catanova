@@ -32,7 +32,9 @@ research on Catan programs found the strong ones do (see
   be; a steal over every card the victim could be holding.
 - **The opening** (`opening.ts`). For each strong corner, the rest of the
   placement round is played out several times, with the others choosing the
-  way people do, and each finished opening is scored by the race.
+  way people do, and each finished opening is scored by the race. A start with
+  no timber, clay or hay is marked down hard: in a real game a bot on two rock
+  corners built its first road on turn 57.
 - **Trading** (`trade.ts`). Selfish: see below.
 
 Robber, discards, knights, Monopoly, Year of Plenty and Road Building are all
@@ -57,10 +59,12 @@ race.
 - **Making offers:** only when a card or two stands between it and a purchase,
   priced against the best it could do this turn with the bank and harbours;
   only to players the counting says probably hold the card and who would see
-  the trade as progress; at most two a turn, never the same refused offer twice
-  in a turn, and less often at a table that keeps turning it down. With a pile
-  of one resource it cannot use and several it could, it may open the pile to
-  proposals instead.
+  the trade as progress. At most one offer a turn, and never more cards asked
+  than given: two for one in the bot's favour reads as an insult. A player who
+  turns an offer down (or ignores it) is left alone for a few turns, and one who
+  keeps doing so for ten. Open offers ("these cards for anything") are switched
+  off: in a real game the bot repeated one every turn until the player blocked
+  trades.
 - **Its own offer on the table:** it takes the answer best for itself, waits up
   to nine seconds for more, and withdraws if none is good.
 
@@ -69,21 +73,13 @@ and answering is never owed: a person can take an offer first.
 
 ### Reactions
 
-Games are long and the end screen is brief, so a bot's personality lives in the
-middle of the game, and it is a little toxic, the way friends at a table are.
-It gloats or laughs when it robs you, laughs when a seven eats your hand, plays
-an evil face when it rolls the seven itself, smirks when it takes an award off
-you, rolls its eyes or honks a clown when an offer is turned down, begs now and
-then when it makes one, and cackles over a big Monopoly. When it is the one
-hurt, it rages, sulks or eyes you suspiciously, and a player who robs it twice
-gets double rage. A win is a burst of two or three faces.
-
-It stays a player, not a slot machine: at least twelve seconds between
-reactions, twenty-four a game at most, only the moment that matters most to it
-in any stretch of play, and only one bot at a table. In simulated four-player
-games that came to about eleven faces a game, one every four turns or so.
-Reactions go through the same rate limit as a player's. A bot still never
-chats: a talkative bot reads as a threat.
+A bot reacts only to moments worth a face: it gloats now and then when it robs
+someone or plays a big Monopoly, laughs at a big discard, smirks when it takes
+an award off you, rages at someone who keeps robbing it, and celebrates a win.
+Never for routine play: at least forty-five seconds apart, eight a game at
+most, one face at a time, one bot at a table. An earlier version reacted every
+few turns, and players found it cringe. Reactions go through the same rate
+limit as a player's, and a bot still never chats.
 
 ### Jev, as an advisor
 
@@ -113,7 +109,7 @@ The three levels are the same engine held back:
 | Positions scored a move  | 350    | 900   | 2,000    |
 | Turn search depth        | 2      | 3     | 4        |
 | Opening rehearsals       | 2 × 6  | 4 × 10 | 8 × 14  |
-| Makes trade offers       | no     | yes   | yes, and open offers |
+| Makes trade offers       | no     | yes   | yes      |
 | Asks Jev                 | no     | yes   | yes      |
 | Settles for a good move  | often  | now and then | never |
 
