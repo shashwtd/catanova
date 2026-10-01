@@ -466,6 +466,11 @@ export function bestRobber(g: Game, th: Thinker): { action: GameAction; value: n
   const table = standings(g, th, false);
   const lead = [...table].sort((a, b) => b.chance - a.chance);
   const clearLeader = lead[0] && lead[1] && lead[0].chance > lead[1].chance * 1.5 ? lead[0].id : null;
+  // Between placements the bot's own chance cannot separate (a bot far behind
+  // has almost none to gain), the one that slows the strongest rival most.
+  const rival = lead.find((s) => s.id !== th.me);
+  const slows = (moved: Game) =>
+    rival ? race(moved, rival.id, th.know(moved)(rival.id), th.lean?.[rival.id]).rolls - rival.race.rolls : 0;
   const scored: { action: GameAction; value: number }[] = [];
   for (const hex of g.board.hexes) {
     if (hex.id === g.robber || !isLand(hex)) continue;
@@ -476,6 +481,7 @@ export function bestRobber(g: Game, th: Thinker): { action: GameAction; value: n
       if (!moved) continue;
       let v = victim ? stealValue(g, moved, victim, th) : value(moved, th, false);
       if (victim && victim === th.lastVictim && !clearLeader) v *= 0.97;
+      v += 1e-6 * slows(moved);
       scored.push({ action, value: v });
     }
   }
