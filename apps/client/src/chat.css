@@ -192,3 +192,39 @@
   padding-top: 10px;
   border-top: 1px solid #b79a6640;
 }
+
+/* Phones: type you can read and a box iOS will not zoom into (16px or more),
+   taller lists, and buttons a thumb can hit. */
+@media (max-width: 760px), (max-height: 500px) {
+  .chat-line {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  :is(.chat-line, .chat-glimpse) strong::before {
+    width: 9px;
+    height: 9px;
+  }
+  .chat-lines {
+    gap: 9px;
+    max-height: min(52dvh, 480px);
+    min-height: 160px;
+  }
+  .chat-compose input,
+  .chat-send {
+    height: 44px;
+    font-size: 16px;
+  }
+  .chat-glimpse {
+    font-size: 15px;
+    max-width: min(300px, 75vw);
+  }
+  .chat-empty {
+    font-size: 15px;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .chat-lines {
+    max-height: calc(100dvh - 190px);
+    min-height: 90px;
+  }
+}

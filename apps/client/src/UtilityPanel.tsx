@@ -27,7 +27,18 @@ export function UtilityPanel({
       key={tool ?? title}
       anchor={anchor}
       placement="beside"
-      width={tool === 'settings' || tool === 'feedback' ? 310 : tool === 'journal' || tool === 'chat' ? 330 : 390}
+      width={
+        tool === 'settings' || tool === 'feedback'
+          ? 310
+          : tool === 'chat'
+            ? // On a phone the chat takes the width it can get: it is something to read and type in.
+              innerWidth < 700
+              ? 520
+              : 340
+            : tool === 'journal'
+              ? 330
+              : 390
+      }
       onClose={onClose}
     >
       {(dismiss) => (
