@@ -57,7 +57,8 @@ const lastLines = (g: Game, n = 3) => g.log.slice(-n).map((line) => line.text);
 test('§1.1 and §2: big-table-v1 seats five or six, with 24 of each resource, a 34-card deck and no bots', () => {
   assert.equal(findRuleset('big-table-v1'), BIG_TABLE);
   assert.deepEqual(rulesetProblems(BIG_TABLE), []);
-  assert.equal(BIG_TABLE.name, 'Big Table');
+  // Shown to players as Big World since 3 October 2026; the ruleset and its rulebook keep the name Big Table.
+  assert.equal(BIG_TABLE.name, 'Big World');
   assert.equal(BIG_TABLE.summary, 'For five and six players.');
   assert.equal(BIG_TABLE.board, 'big-table-balanced-v1');
   assert.deepEqual(BIG_TABLE.seats, { min: 5, max: 6 });

@@ -25,6 +25,7 @@ import { ResourceHand } from './ResourceHand.js';
 import { DevelopmentCards, DevelopmentPurchase } from './DevelopmentCards.js';
 import { GameEffects } from './GameEffects.js';
 import { PlayerSettings, RoomConfiguration } from './GameSettings.js';
+import { ModeChooser } from './ModeChooser.js';
 import { SendFeedback, useLastMessage } from './SendFeedback.js';
 import { TurnTimer } from './TurnTimer.js';
 import { RobberFlow } from './RobberFlow.js';
@@ -90,6 +91,7 @@ import '@fontsource/cinzel/latin-700.css';
 import '@fontsource/barlow/latin-400.css';
 import '@fontsource/barlow/latin-500.css';
 import '@fontsource/barlow/latin-600.css';
+import '@fontsource/barlow/latin-800.css';
 import { Connection, newSession } from './connection.js';
 import type { ConnectionStatus, PendingCommand } from './connection.js';
 import type { RoomPreview, RoomState, Session } from '../../../packages/protocol/src/index.js';
@@ -145,7 +147,8 @@ import './landing-features.css';
 import './room-seats.css';
 import './mobile-shelf.css';
 import './table-light.css';
-import './game-mode.css';
+import './mode-chooser.css';
+import './room-layout.css';
 import './open-sea.css';
 import './ship-sites.css';
 import './placement-choice.css';
@@ -309,6 +312,7 @@ function App() {
     [panel, setPanel] = useState<
       | 'settings'
       | 'configure'
+      | 'mode'
       | 'trade'
       | 'rules'
       | 'journal'
@@ -1383,6 +1387,7 @@ function App() {
           onEdit={() => setPanel('editProfile')}
           onSettings={() => setPanel('settings')}
           onConfigure={() => setPanel('configure')}
+          onMode={() => setPanel('mode')}
           onChooseColor={(color) => void chooseColor(color)}
         />
       )}
@@ -1723,6 +1728,16 @@ function App() {
         <Dialog title="Room setup" compact onClose={() => setPanel(null)}>
           <RoomConfiguration room={room} me={me} busy={disabled} save={saveSettings} />
         </Dialog>
+      )}
+      {panel === 'mode' && room && !room.game && (
+        <ModeChooser
+          room={room}
+          me={me}
+          busy={disabled}
+          save={saveSettings}
+          art={BOARD_THEMES[preferences.boardTheme]}
+          onClose={() => setPanel(null)}
+        />
       )}
       {panel === 'invite' && room && (
         <Dialog title="Room invitation" compact onClose={() => setPanel(null)}>

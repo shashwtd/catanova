@@ -452,7 +452,8 @@ test('a gold pick is made with Year of Plenty’s buttons, only from what the ba
 
 test('the stand-in icons for ships, the pirate, gold and the island bonus are named in one place, none the boat', () => {
   for (const name of Object.values(SEA_ICONS)) assert.ok(GAME_ICON_NAMES.includes(name), name);
-  // The painted boat is not used while the ship's look is chosen again: the client names it only in its old export.
+  // The painted boat is not used for ships while their look is chosen again: the client names it in its old export,
+  // and as Open Seas Saga's mark beside its name in the room and the mode chooser (chosen on 3 October 2026).
   assert.ok(!(Object.values(SEA_ICONS) as string[]).includes('boat'));
   const uses = readdirSync('apps/client/src')
     .filter((file) => /\.tsx?$/.test(file))
@@ -462,7 +463,10 @@ test('the stand-in icons for ships, the pirate, gold and the island bonus are na
         .filter((line) => /'boat'|"boat"|Sailboat/.test(line))
         .map((line) => `${file}: ${line.trim()}`),
     );
-  assert.deepEqual(uses, ["GameIcons.tsx: Sailboat = icon('boat');"]);
+  assert.deepEqual(uses, [
+    "GameIcons.tsx: Sailboat = icon('boat');",
+    "game-modes.ts: icons: [{ icon: 'boat', label: 'Ships that sail between the islands' }],",
+  ]);
 });
 
 test('an island bonus is celebrated once, named in the score’s tooltip, and listed with its icon in the results', () => {
@@ -516,7 +520,7 @@ test('an island bonus is celebrated once, named in the score’s tooltip, and li
   );
   assert.match(
     results,
-    /<dl class="game-over-facts" aria-label="This match"><div><dt>Mode<\/dt><dd>Open Sea<\/dd><\/div><div><dt>Turns<\/dt>/,
+    /<dl class="game-over-facts" aria-label="This match"><div><dt>Mode<\/dt><dd>Open Seas Saga<\/dd><\/div><div><dt>Turns<\/dt>/,
   );
   const part = results.match(/<li data-part="islandBonus">[^]*?<\/li>/)![0];
   assert.ok(part.includes(drawn(SEA_ICONS.islandBonus)));
@@ -542,7 +546,7 @@ test('Open Sea’s words: the guide’s section and costs, the cards, the prompt
   const guide = renderToStaticMarkup(createElement(QuickRules, { ruleset: OPEN_SEA }));
   assert.match(
     guide,
-    /<section class="guide-section t-acc" data-open="true"><button class="t-acc-head" aria-expanded="true"[^>]*>[^]*?<span>Open Sea<\/span>/,
+    /<section class="guide-section t-acc" data-open="true"><button class="t-acc-head" aria-expanded="true"[^>]*>[^]*?<span>Open Seas Saga<\/span>/,
   );
   for (const words of [
     'A ship costs 1 Timber and 1 Sheep.',
@@ -550,7 +554,7 @@ test('Open Sea’s words: the guide’s section and costs, the cards, the prompt
     'A gold field pays the resource you choose',
     'After a 7 or a Knight, move the robber or the pirate.',
     'Your first settlement on each small island is worth 2 extra points.',
-    'Open Sea plays to 14 points unless the host chose another target.',
+    'Open Seas Saga plays to 14 points unless the host chose another target.',
     'Longest Route · +2 points',
   ])
     assert.ok(guide.includes(words), words);

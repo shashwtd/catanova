@@ -101,7 +101,8 @@ test('§1.1, §3 and §15.1 Open Sea is a ruleset: three or four players, 14 poi
     rulesets().map((r) => r.id),
     [CLASSIC.id, BIG_TABLE.id, OPEN_SEA.id],
   );
-  assert.equal(OPEN_SEA.name, 'Open Sea');
+  // Shown to players as Open Seas Saga since 3 October 2026; the ruleset and its rulebook keep the name Open Sea.
+  assert.equal(OPEN_SEA.name, 'Open Seas Saga');
   assert.equal(OPEN_SEA.board, 'outer-isles-v1');
   assert.deepEqual(OPEN_SEA.seats, { min: 3, max: 4 });
   assert.deepEqual(OPEN_SEA.victoryPoints, { default: 14, min: 10, max: 18 });

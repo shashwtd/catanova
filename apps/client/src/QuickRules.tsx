@@ -261,7 +261,7 @@ export function QuickRules({
       </GuideSection>
       {/* Last, so that Classic's sections keep their places, and with them their ids (useId). */}
       {sea && (
-        <GuideSection title="Open Sea" icon={<Ship />} {...disclosure('sea')}>
+        <GuideSection title={ruleset.name} icon={<Ship />} {...disclosure('sea')}>
           <p>
             <b>Ships.</b> A ship costs 1 Timber and 1 Sheep. Build it on an edge beside the sea, touching your
             settlement, city or another of your ships. Roads and ships join only at your own settlements and
@@ -285,8 +285,8 @@ export function QuickRules({
             <b>Island bonus.</b> Your first settlement on each small island is worth 2 extra points.
           </p>
           <p>
-            <b>Winning.</b> Open Sea plays to {ruleset.victoryPoints.default} points unless the host chose
-            another target. Longest Route counts roads and ships.
+            <b>Winning.</b> {ruleset.name} plays to {ruleset.victoryPoints.default} points unless the host
+            chose another target. Longest Route counts roads and ships.
           </p>
         </GuideSection>
       )}

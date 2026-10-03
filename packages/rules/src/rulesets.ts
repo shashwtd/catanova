@@ -118,11 +118,12 @@ export const CLASSIC: Ruleset = {
 
 /**
  * Big Table, for five and six players: Classic's rules on the 30-hex island, with a larger bank and deck, and
- * a second player acting in every turn. docs/RULEBOOK-BIG-TABLE.md is its rulebook.
+ * a second player acting in every turn. docs/RULEBOOK-BIG-TABLE.md is its rulebook. Players know it as Big World
+ * (named so on 3 October 2026); the code and the rulebook keep its first name.
  */
 export const BIG_TABLE: Ruleset = {
   id: 'big-table-v1',
-  name: 'Big Table',
+  name: 'Big World',
   summary: 'For five and six players.',
   board: 'big-table-balanced-v1',
   seats: { min: 5, max: 6 },
@@ -144,11 +145,12 @@ export const BIG_TABLE: Ruleset = {
 /**
  * Open Sea, for three or four players: ships, gold fields, the pirate and small islands, on Outer Isles
  * (docs/RULEBOOK-OPEN-SEA.md). Classic's bank, deck and costs, a ship for 1 Timber and 1 Sheep, and 15 ships
- * each. No bots, and no stand-ins: an absent player's forced moves are the clock's.
+ * each. No bots, and no stand-ins: an absent player's forced moves are the clock's. Players know it as Open Seas
+ * Saga (named so on 3 October 2026); the code and the rulebook keep its first name.
  */
 export const OPEN_SEA: Ruleset = {
   id: OPEN_SEA_RULESET,
-  name: 'Open Sea',
+  name: 'Open Seas Saga',
   summary: 'Ships, gold and small islands, for three or four players.',
   board: 'outer-isles-v1',
   seats: { min: 3, max: 4 },

@@ -164,6 +164,39 @@ test('room options name the turn timer explicitly and long player names remain a
   assert.ok(html.includes('Turn timer <b>Off</b>'));
 });
 
+test('each seat shows its player at a glance: the host’s crown, a ready tick, your colour on your own portrait', () => {
+  const room = lobby();
+  room.players[2]!.ready = false;
+  const html = renderLobby(room, 'p0', false, true, { onChooseColor: () => {} });
+  const cards = html.match(/<article class="seat-card[^]*?<\/article>/g)!;
+  // The host's crown leads their name; nobody else's card has one.
+  assert.match(
+    cards[0]!,
+    /<div class="seat-name"><span class="seat-host-mark" title="Host"><svg[^]*?<\/svg><\/span><strong/,
+  );
+  assert.equal(html.match(/seat-host-mark/g)!.length, 1);
+  // A ready player has a tick before their name; the host, who starts the game, and anyone not ready have none.
+  assert.ok(!cards[0]!.includes('seat-ready-mark'));
+  assert.match(
+    cards[1]!,
+    /<div class="seat-name"><span class="seat-ready-mark" title="Ready"><svg[^]*?<\/svg><\/span><strong/,
+  );
+  assert.ok(!cards[2]!.includes('seat-ready-mark'));
+  // The words stay for assistive technology, out of sight.
+  assert.match(cards[1]!, /<span class="seat-status visually-hidden is-ready">[^]*Ready<\/span>/);
+  assert.match(cards[2]!, /<span class="seat-status visually-hidden ">Not ready<\/span>/);
+  // Your colour is a swatch on your own portrait, and your profile is edited from the header.
+  assert.match(
+    cards[0]!,
+    /<div class="seat-portrait">[^]*<div class="seat-color-choice[^]*<\/div><div class="seat-name">/,
+  );
+  assert.ok(!html.includes('seat-badge is-edit'));
+  assert.match(
+    html,
+    /<header class="lobby-heading"><button type="button" class="lobby-self lobby-profile" aria-label="Edit your profile"/,
+  );
+});
+
 test('sharing keeps three distinct controls and a screen-reader status without an extra visible feedback row', () => {
   const html = renderToStaticMarkup(
     createElement(Invite, { code: 'AB2C', roomId: '9bfec3ad-0a2c-47d1-bfe5-735a3e2dc25f' }),

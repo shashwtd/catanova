@@ -53,6 +53,16 @@ Each region is exactly what the game shows: the square that the avatar's `slice`
 
 `optimize-art.mjs` exports whole images only and Sharp is not installed in the repository, so these were made once in Chromium: a Lanczos-3 resample of the PNG master on premultiplied RGBA, then `canvas.toBlob(…, 'image/webp', quality)`. Alpha survived encoding exactly. Against the atlas rendering at display size, the mean channel difference is 3–4 of 255 for the avatars and 2–3 for the resources; the atlas itself differs from its master by up to 1.5. The files are named by the first twelve hex digits of their SHA-256, like the other optimized art, but are deliberately not in `runtime-art.json`, whose export would rebuild them at full size. To remake one with Sharp instead, use `extract` with the region (rounded to whole pixels), `resize(size, size, { kernel: 'lanczos3' })` and `webp({ quality })`, then rename it by hash and update `apps/client/src/LandingFeatures.tsx`.
 
+## Mode emblems
+
+The room's mode banner shows its mode's painted emblem at up to 116 CSS pixels (84 on a phone). The three files are
+256 × 256 WebP exports of the [1024-pixel masters](mode-emblems.md), twice the largest display size and enough for a
+three-times phone: Sharp `resize(256, 256, { kernel: 'lanczos3' })` and `webp({ quality: 86, alphaQuality: 100 })`,
+named by the first twelve hex digits of the file's SHA-256 like the other optimized art. Together they are 89,026
+bytes, loaded only in a room that shows its mode. Like the landing thumbnails they are not in `runtime-art.json`,
+whose export would rebuild them at full size; to remake one, export it the same way, rename it by hash and update
+`apps/client/src/game-modes.ts`.
+
 ## Current development cards
 
 The September 2026 [readability pass](development-cards-readable.md) uses a new, smaller 768px atlas (96,886 bytes). The full-resolution table above and `runtime-art.json` record the legacy art exports, which remain available for old PNG URLs.

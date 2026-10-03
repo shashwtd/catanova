@@ -1,29 +1,21 @@
-import {
-  CLASSIC,
-  TURN_STRUCTURES,
-  botsPlayIn,
-  findRuleset,
-  numberWord,
-} from '../../../packages/rules/src/rulesets.js';
+import { CLASSIC, botsPlayIn, findRuleset, numberWord } from '../../../packages/rules/src/rulesets.js';
 import {
   Bot,
   BotMark,
   Check,
   Clock3,
   Dices,
-  GameMode,
   Copy,
-  DoorOpen,
+  LogOut,
   Link,
-  Pencil,
   Plus,
   Play,
-  Configure,
   Settings2,
   Share2,
   Users,
   Trophy,
   WifiOff,
+  LightCheck,
   LightClose,
 } from './GameIcons.js';
 import { useEffect, useRef, useState, useId } from 'react';
@@ -43,6 +35,42 @@ import { Avatar } from './Profile.js';
 import { FriendButton } from './PlayerRail.js';
 import type { RailFriendship } from './PlayerRail.js';
 import { roomPath, visibleRoomCode } from './navigation.js';
+import { modeCopy, seatsText } from './game-modes.js';
+import { ModeIcons } from './ModeChooser.js';
+
+/** Room setup: three rails, each broken by a ring at a different place, drawn on a 24-unit grid. */
+function SetupIcon({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="setup-icon">
+      <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none">
+        <path d="M3 6h2.75M10.25 6H21M3 12h10.75M18.25 12H21M3 18h4.75M12.25 18H21" />
+        <circle cx="8" cy="6" r="2.25" />
+        <circle cx="16" cy="12" r="2.25" />
+        <circle cx="10" cy="18" r="2.25" />
+      </g>
+    </svg>
+  );
+}
+/** The host's crown, drawn in the colour of the text beside it. */
+function HostCrown() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 8.5 8 12l4-6.5 4 6.5 4.5-3.5-1.8 9.5H5.3z" fill="currentColor" />
+      <path d="M5.5 20.5h13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+/** Swap the mode: two arrows passing each other. */
+function SwapIcon({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="swap-icon">
+      <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        <path d="M4 8h15M15.5 4.5 19 8l-3.5 3.5" />
+        <path d="M20 16H5M8.5 12.5 5 16l3.5 3.5" />
+      </g>
+    </svg>
+  );
+}
 
 export function Invite({ code, roomId = code ?? '' }: { code?: string; roomId?: string }) {
   const [feedback, setFeedback] = useState<{ kind: 'code' | 'link'; request: number } | null>(null);
@@ -336,6 +364,7 @@ export function Lobby({
   onEdit,
   onSettings,
   onConfigure = onSettings,
+  onMode = onConfigure,
   onFriends,
   onAddBot,
   onKick,
@@ -355,6 +384,8 @@ export function Lobby({
   onEdit: () => void;
   onSettings: () => void;
   onConfigure?: () => void;
+  /** Opens the mode chooser; Room setup when there is none. */
+  onMode?: () => void;
   onFriends?: () => void;
   onAddBot?: () => void;
   onKick?: (playerId: string) => Promise<void>;
@@ -385,25 +416,29 @@ export function Lobby({
     room.players.length < seats ? [...room.players, null] : [...room.players];
   // Only when there is a mode to speak of: a room not in Classic, or a host who could pick another.
   const showMode = rules.id !== CLASSIC.id || (room.modes?.length ?? 0) > 1;
-  // How its turns run, in a mode that lets the host choose between more than one way.
-  const turns = rules.turns && rules.turns.length > 1 ? (room.settings?.turns ?? rules.turns[0]) : undefined;
+  const copy = modeCopy(rules);
   // Resolved the same way the board resolves them, so the swatch on a card and
   // the roads on the island are never two different answers.
   const colors = seatHexColors(room.players);
   const held = new Set(room.players.map((p) => p.color).filter((c): c is PlayerColor => !!c));
   return (
     <section className="lobby-screen room-lobby" aria-label="Room lobby">
+      {/* Your profile (the button that edits it), the logo, then Friends, your settings and Leave. */}
       <header className="lobby-heading">
-        <button
-          type="button"
-          className="lobby-back"
-          onClick={() => setConfirmLeave(true)}
-          disabled={busy}
-          aria-label="Leave lobby"
-        >
-          <DoorOpen size={20} />
-          <span>Leave lobby</span>
-        </button>
+        {self ? (
+          <button
+            type="button"
+            className="lobby-self lobby-profile"
+            onClick={onEdit}
+            aria-label="Edit your profile"
+            title="Edit your profile"
+          >
+            <Avatar profile={self.profile ?? defaultProfile(self.name)} />
+            <strong>{self.name}</strong>
+          </button>
+        ) : (
+          <span />
+        )}
         <div className="lobby-wordmark">
           <BrandLogo />
         </div>
@@ -425,31 +460,22 @@ export function Lobby({
           >
             <Settings2 />
           </button>
+          <button
+            type="button"
+            className="lobby-back"
+            onClick={() => setConfirmLeave(true)}
+            disabled={busy}
+            aria-label="Leave lobby"
+          >
+            <LogOut size={20} />
+            <span>Leave lobby</span>
+          </button>
         </div>
       </header>
       <div className="lobby-center">
         <div className="lobby-caption">
-          <h1>Game room</h1>
-          <div className="lobby-room-options" {...(showMode ? { 'data-mode': rules.id } : {})}>
-            {showMode && (
-              <button
-                type="button"
-                className="lobby-mode"
-                onClick={onConfigure}
-                aria-label={`Game mode: ${rules.name}${turns ? `, ${TURN_STRUCTURES[turns].name}` : ''}. Room setup`}
-              >
-                <GameMode size={18} />
-                <span>
-                  {rules.name}
-                  {turns && (
-                    <>
-                      {' '}
-                      <b>{TURN_STRUCTURES[turns].short}</b>
-                    </>
-                  )}
-                </span>
-              </button>
-            )}
+          <h1 className="visually-hidden">Game room</h1>
+          <div className="lobby-room-options">
             <button className="lobby-goal" onClick={onConfigure} aria-label="Points to win. Room setup">
               <Trophy size={18} />
               <span>{room.settings?.victoryPoints ?? rules.victoryPoints.default} points</span>
@@ -507,23 +533,21 @@ export function Lobby({
                   )}
                   <div className="seat-portrait">
                     <Avatar profile={p.profile ?? defaultProfile(p.name)} />
-                    {p.id === me && (
-                      <button
-                        type="button"
-                        className="seat-badge is-edit"
-                        onClick={onEdit}
-                        aria-label="Edit your profile"
-                        title="Edit your profile"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    )}
                     {p.id !== me && friendship && p.accountId && p.accountId !== friendship.self && (
                       <FriendButton
                         name={p.name}
                         accountId={p.accountId}
                         friendship={friendship}
                         className="seat-badge is-friend"
+                      />
+                    )}
+                    {/* Your colour, as a swatch on your portrait: tap it to pick another. */}
+                    {p.id === me && onChooseColor && (
+                      <ColorChoice
+                        mine={(p.color ?? PLAYER_COLOR_LIST.find((c) => PLAYER_COLORS[c] === colors[i]))!}
+                        taken={held}
+                        busy={busy || !connected}
+                        onChoose={onChooseColor}
                       />
                     )}
                     {!p.connected && (
@@ -533,18 +557,23 @@ export function Lobby({
                     )}
                   </div>
                   <div className="seat-name">
+                    {/* The host's crown, or a tick for a player who is ready, where the eye reads the name. */}
+                    {p.id === hostId && (
+                      <span className="seat-host-mark" title="Host">
+                        <HostCrown />
+                      </span>
+                    )}
+                    {p.connected && !p.bot && p.id !== hostId && p.ready && (
+                      <span className="seat-ready-mark" title="Ready">
+                        <LightCheck size={13} />
+                      </span>
+                    )}
                     <strong title={p.name}>{p.name}</strong>
                     {p.bot && <BotMark level={p.botLevel} />}
                   </div>
-                  {p.id === me && onChooseColor && (
-                    <ColorChoice
-                      mine={(p.color ?? PLAYER_COLOR_LIST.find((c) => PLAYER_COLORS[c] === colors[i]))!}
-                      taken={held}
-                      busy={busy || !connected}
-                      onChoose={onChooseColor}
-                    />
-                  )}
-                  <span className={`seat-status ${p.ready && p.connected && !p.bot ? 'is-ready' : ''}`}>
+                  <span
+                    className={`seat-status visually-hidden ${p.ready && p.connected && !p.bot ? 'is-ready' : ''}`}
+                  >
                     {!p.connected ? (
                       'Disconnected'
                     ) : p.id === hostId ? (
@@ -636,14 +665,39 @@ export function Lobby({
                   : 'Waiting for players'}
           </span>
           <div className="lobby-start-controls">
+            {showMode && (
+              <button
+                type="button"
+                className="lobby-mode-banner"
+                onClick={onMode}
+                aria-label={`Game mode: ${copy.name}. ${host ? 'Choose a game mode' : 'Game modes'}`}
+              >
+                {copy.emblem && <img src={copy.emblem} alt="" />}
+                <span className="lobby-mode-banner-text">
+                  <small>Game mode</small>
+                  <strong>{copy.name}</strong>
+                  <span>
+                    <Users size={15} />
+                    {seatsText(rules)}
+                    <ModeIcons copy={copy} />
+                  </span>
+                </span>
+                {host && (
+                  <span className="lobby-mode-banner-change" aria-hidden="true">
+                    <SwapIcon />
+                  </span>
+                )}
+              </button>
+            )}
             <button
-              className="lobby-configure hub-room-button"
+              type="button"
+              className="lobby-setup hub-room-button"
+              title="Room setup"
               onClick={onConfigure}
               disabled={busy}
               aria-label={host ? 'Room setup' : 'Room setup, chosen by the host'}
             >
-              <Configure size={22} />
-              <span>Room setup</span>
+              <SetupIcon />
             </button>
             {host ? (
               <button
