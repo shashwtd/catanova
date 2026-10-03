@@ -1,14 +1,15 @@
 /**
- * Big Table at random: seeded games of five and six players under both turn structures, with development
- * cards, trades, moves the rules refuse, the clock's moves and resignations, checked after every step. However
- * a game goes, it owes a move until it ends and takes the clock's move for everyone it waits on; every resource
- * card, development card and piece stays accounted for; the restore verifier finds nothing wrong; and a win goes
- * to a player on turn, the Lead before the Partner, never to one in a build window. A bounded version of the
- * review's fuzzer: the same games every run, in a few seconds.
+ * Big Table at random: seeded games of four players, and of five and six under both turn structures, with
+ * development cards, trades, moves the rules refuse, the clock's moves and resignations, checked after every
+ * step. However a game goes, it owes a move until it ends and takes the clock's move for everyone it waits on;
+ * every resource card, development card and piece stays accounted for; the restore verifier finds nothing
+ * wrong; and a win goes to a player on turn, the Lead before the Partner, never to one in a build window. A
+ * bounded version of the review's fuzzer: the same games every run, in a few seconds.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  PAIRED_PLAYERS,
   RuleError,
   activePlayer,
   applyAction,
@@ -143,6 +144,8 @@ function check(
     );
   }
   if (verify) assert.deepEqual(gameInvariantProblems(g), [], where);
+  if (g.players.length < PAIRED_PLAYERS)
+    assert.equal(g.pair, undefined, `${where}: a marker at a table of four`);
   if (g.phase === 'finished') return;
   const owed = owedMoves(g);
   assert.ok(owed.length, `${where}: the game waits on someone`);
@@ -258,6 +261,7 @@ function play(seed: number, players: number, turns: TurnStructure) {
 
 /** Two games for each table: seeds whose games end within the steps, with every kind of move below in them. */
 const GAMES: [players: number, turns: TurnStructure, seeds: number[]][] = [
+  [4, 'paired', [1, 7]],
   [5, 'paired', [1, 7]],
   [5, 'betweenTurnsBuild', [4, 1]],
   [6, 'paired', [2, 3]],
@@ -275,6 +279,8 @@ for (const [players, turns, seeds] of GAMES)
     // The games reach the moves that matter, and end.
     for (const kind of ['playCard', 'bankTrade', 'buyCard', 'discard', 'robber', 'resignation'])
       assert.ok(seen.has(kind), `no ${kind} in these games`);
-    assert.ok(seen.has(turns === 'paired' ? 'endPhase' : 'endWindow'));
+    // Paired turns pair from five players: a game for four never has a Partner's phase (§6.8).
+    if (turns === 'paired' && players < PAIRED_PLAYERS) assert.ok(!seen.has('endPhase'), 'a Partner at four');
+    else assert.ok(seen.has(turns === 'paired' ? 'endPhase' : 'endWindow'));
     assert.ok(finished >= 1, 'a game ends');
   });

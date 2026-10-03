@@ -3,7 +3,7 @@ __NOTOC__
 |+ Catanova at a glance
 |-
 ! Players
-| 2–4 seats today, friends or bots · 5 or 6 planned in [[Big Table]]
+| 2–4 seats today, friends or bots · 4 to 6 planned in [[Big Table]]
 |-
 ! Modes
 | Classic · Big Table and Open Sea being built
@@ -37,7 +37,7 @@ Welcome to the '''Catanova Wiki''': a guide to the island, its resources, and th
 |-
 | [[Map generation]] || How Catanova balances a new island
 |-
-| [[Game modes]] || Classic, and two modes being built: [[Big Table]], for five and six players, and [[Open Sea]]
+| [[Game modes]] || Classic, and two modes being built: [[Big Table]], for four to six players, and [[Open Sea]]
 |}
 
 == Play together ==

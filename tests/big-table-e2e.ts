@@ -1,10 +1,10 @@
 /**
- * Big Table end to end, through the Store as the server plays it: whole games of five and six players, driven by
- * scripted legal moves, with a player who leaves, a player who drops out long enough for the clock to act for
- * them, and (under paired turns with a timer) Partners whose clock runs out with free roads or a Knight's robber
- * still owed. Then each game's journal replays move by move, every row keeps every card, the restore verifier
- * passes it and the admin's game analytics reads it. The two turn structures have a test file each, so that
- * their games play at the same time.
+ * Big Table end to end, through the Store as the server plays it: whole games of four, five and six players,
+ * driven by scripted legal moves, with a player who leaves, a player who drops out long enough for the clock
+ * to act for them, and (under paired turns with a timer) Partners whose clock runs out with free roads or a
+ * Knight's robber still owed. Then each game's journal replays move by move, every row keeps every card, the
+ * restore verifier passes it and the admin's game analytics reads it. Paired games and games for four have a
+ * test file each, so that their games play at the same time.
  */
 import assert from 'node:assert/strict';
 import { ABSENCE_AFTER_MS } from '../apps/server/src/store.js';
@@ -15,6 +15,7 @@ import {
   applyAction,
   emptyHand,
   gameView,
+  pairsTurns,
   resignPlayers,
   score,
   total,
@@ -180,7 +181,8 @@ function playGame(
     room.clock.now += 1_500;
     const g = room.game();
     accounted(g, `step ${step}`);
-    // One player leaves partway: at six, the pairs are recounted; at five, turns go single.
+    // One player leaves partway: at six, the pairs are recounted; at five, turns go single; at four, three
+    // play on.
     if (!left && g.turn === 8) {
       const leaving = g.players.find((p) => !p.resigned && p.id !== activePlayer(g).id && p.id !== away)!;
       const eligible = g.players.filter((p) => !p.resigned && p.id !== leaving.id && connected.has(p.id));
@@ -334,7 +336,8 @@ export function playAndCheck(
       for (const player of final.players) {
         const stats = analytics.players.find((p) => p.id === player.id)!;
         assert.equal(stats.points, score(final, player, !!final.winner));
-        if (turns === 'paired') assert.ok(stats.partnerTime, 'Partner’s phases are timed for the Partner');
+        // Only a game that pairs has Partners to time: a game for four never does (§6.8).
+        if (pairsTurns(final)) assert.ok(stats.partnerTime, 'Partner’s phases are timed for the Partner');
         else assert.equal(stats.partnerTime, undefined);
       }
       assert.ok(

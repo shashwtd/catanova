@@ -1826,6 +1826,7 @@ function App() {
             ruleset={findRuleset(g?.ruleset ?? room?.settings?.mode) ?? CLASSIC}
             victoryPoints={g?.victoryPoints ?? room?.settings?.victoryPoints}
             turns={g ? g.turns : room?.settings?.turns}
+            table={g?.players.length}
           />
         </Dialog>
       )}

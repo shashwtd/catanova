@@ -15,6 +15,7 @@ import {
 } from '../packages/rules/src/game.js';
 import type { Game } from '../packages/rules/src/game.js';
 import { owedBy, owedMoves } from '../packages/rules/src/owed.js';
+import { gameInvariantProblems } from '../scripts/verify-restored-games.js';
 import { timeoutAction, timeoutDescription } from '../packages/rules/src/timeout.js';
 import { BIG_TABLE_BALANCED_V1, generateBoard, seededRandom } from '../packages/rules/src/board.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
@@ -54,15 +55,16 @@ const random = seededRandom(5);
 const pair = (g: Game) => g.pair && { lead: idAt(g, g.pair.lead), partner: idAt(g, g.pair.partner) };
 const lastLines = (g: Game, n = 3) => g.log.slice(-n).map((line) => line.text);
 
-test('§1.1 and §2: big-table-v1 seats five or six, with 24 of each resource, a 34-card deck and no bots', () => {
+test('§1.1 and §2: big-table-v1 seats four to six, with 24 of each resource, a 34-card deck and no bots', () => {
   assert.equal(findRuleset('big-table-v1'), BIG_TABLE);
   assert.deepEqual(rulesetProblems(BIG_TABLE), []);
   // Shown to players as Big World since 3 October 2026; the ruleset and its rulebook keep the name Big Table.
   assert.equal(BIG_TABLE.name, 'Big World');
-  assert.equal(BIG_TABLE.summary, 'For five and six players.');
+  assert.equal(BIG_TABLE.summary, 'For four to six players.');
   assert.equal(BIG_TABLE.board, 'big-table-balanced-v1');
-  assert.deepEqual(BIG_TABLE.seats, { min: 5, max: 6 });
-  assert.equal(seatRange(BIG_TABLE), 'five or six');
+  // Four since 3 October 2026, on the same island with the same supply.
+  assert.deepEqual(BIG_TABLE.seats, { min: 4, max: 6 });
+  assert.equal(seatRange(BIG_TABLE), 'four to six');
   assert.deepEqual(BIG_TABLE.victoryPoints, { default: 10, min: 8, max: 15 });
   assert.equal(BIG_TABLE.supply.bank, 24);
   assert.deepEqual(BIG_TABLE.supply.deck, {
@@ -79,12 +81,12 @@ test('§1.1 and §2: big-table-v1 seats five or six, with 24 of each resource, a
   // Paired turns only for a new game; Between-turns build, retired, still plays for games started with it.
   assert.deepEqual(BIG_TABLE.turns, ['paired']);
   assert.deepEqual(BIG_TABLE.retiredTurns, ['betweenTurnsBuild']);
-  for (const table of [seats(4), [...seats(6), { id: 'p6', name: 'Gus' }]])
+  for (const table of [seats(3), [...seats(6), { id: 'p6', name: 'Gus' }]])
     assert.throws(
       () => createGame(table, 1, random, { ruleset: BIG_TABLE.id }),
-      /Start with five or six players/,
+      /Start with four to six players/,
     );
-  for (const n of [5, 6]) {
+  for (const n of [4, 5, 6]) {
     const g = createGame(seats(n), 1, random, { ruleset: BIG_TABLE.id });
     assert.equal(g.players.length, n);
     assert.deepEqual(g.bank, { wood: 24, brick: 24, sheep: 24, wheat: 24, ore: 24 });
@@ -98,7 +100,7 @@ test('§1.1 and §2: big-table-v1 seats five or six, with 24 of each resource, a
 test('§4.2: every game deals the balanced 30-hex island, and the robber starts on the desert its seed chose', () => {
   const starts = { lower: 0, higher: 0 };
   for (let seed = 0; seed < 40; seed++) {
-    const g = createGame(seats(5), seed, random, { ruleset: BIG_TABLE.id });
+    const g = createGame(seats(4 + (seed % 3)), seed, random, { ruleset: BIG_TABLE.id });
     assert.equal(g.board.preset, 'big-table-balanced-v1');
     assert.equal(g.board.hexes.length, 30);
     const deserts = g.board.hexes.filter((h) => h.terrain === 'desert').map((h) => h.id);
@@ -107,6 +109,12 @@ test('§4.2: every game deals the balanced 30-hex island, and the robber starts 
     starts[g.robber === Math.min(...deserts) ? 'lower' : 'higher']++;
   }
   assert.ok(starts.lower > 5 && starts.higher > 5, 'either desert can start the robber');
+  // Four play the same island as five and six (§1.1): a seed deals one board whatever the count.
+  for (const seed of [3, 77])
+    assert.deepEqual(
+      createGame(seats(4), seed, random, { ruleset: BIG_TABLE.id }).board,
+      createGame(seats(6), seed, random, { ruleset: BIG_TABLE.id }).board,
+    );
   // A lobby's island is played as dealt, its robber start included.
   const board = generateBoard(77, BIG_TABLE_BALANCED_V1);
   const game = createGame(seats(6), 77, random, { ruleset: BIG_TABLE.id, board });
@@ -116,8 +124,8 @@ test('§4.2: every game deals the balanced 30-hex island, and the robber starts 
   assert.equal(classic.board.robberStart, undefined);
   assert.equal(classic.board.hexes[classic.robber]!.terrain, 'desert');
 });
-test('§4.4: the setup draft runs 1…5, 5…1 and 1…6, 6…1, with no markers until the first paired turn', () => {
-  for (const n of [5, 6]) {
+test('§4.4: the setup draft runs 1…4, 4…1, 1…5, 5…1 and 1…6, 6…1, with no markers until the first paired turn', () => {
+  for (const n of [4, 5, 6]) {
     let g = createGame(seats(n), 9, random, { ruleset: BIG_TABLE.id });
     const order: number[] = [];
     while (g.turn === 0) {
@@ -127,8 +135,15 @@ test('§4.4: the setup draft runs 1…5, 5…1 and 1…6, 6…1, with no markers
     }
     const forward = Array.from({ length: n }, (_, i) => i);
     assert.deepEqual(order, [...forward, ...forward.slice().reverse()]);
-    // §6.1: the first paired turn begins after setup, with the starting player as Lead.
     assert.equal(g.phase, 'roll');
+    assert.equal(activePlayer(g).id, 'p0');
+    if (n === 4) {
+      // §6.8: a game for four has no markers at all; the starting player simply takes the first turn.
+      assert.equal(g.pair, undefined);
+      assert.equal(g.log.at(-1)!.text, 'Setup complete. Roll the dice to begin.');
+      continue;
+    }
+    // §6.1: the first paired turn begins after setup, with the starting player as Lead.
     assert.deepEqual(g.pair, { lead: 0, partner: 3 });
     assert.match(g.log.at(-1)!.text, /^Ann's turn, with Dan as Partner\.$/);
   }
@@ -665,6 +680,76 @@ test('§6.8: with fewer than five players left, turns go one player at a time, a
   while (h.turn === 0) h = act(h, activePlayer(h).id, timeoutAction(h, activePlayer(h).id, random)!);
   assert.equal(h.pair, undefined);
   assert.ok(h.log.some((line) => line.text.startsWith('Fewer than five players remain')));
+});
+
+test('§1.1 and §6.8: a game for four takes single turns from its first turn, and nobody holds a marker', () => {
+  // The mode's one structure is frozen as at five and six, but a table of four never pairs, and says so once.
+  const start = createGame(seats(4), 12, random, { ruleset: BIG_TABLE.id });
+  assert.equal(start.turns, 'paired');
+  assert.deepEqual(
+    start.log.map((line) => line.text),
+    [
+      'The island is ready. Place two settlements and roads in snake order.',
+      'With four players, turns go one player at a time, with no Partner.',
+    ],
+  );
+  let g = afterSetup(4);
+  const order: string[] = [];
+  for (let turn = 1; turn <= 8; turn++) {
+    assert.equal(g.turn, turn);
+    assert.equal(g.phase, 'roll');
+    assert.equal(g.pair, undefined);
+    assert.equal(gameView(g, 'p3').pair, undefined);
+    const player = activePlayer(g).id;
+    order.push(player);
+    // Only the player on turn is owed a move: nobody waits as Partner, and nobody ends a Partner's phase.
+    assert.deepEqual(owedMoves(g), [{ player, kind: 'roll' }]);
+    g = roll(g, 3, 5);
+    assert.throws(() => act(g, player, { kind: 'endPhase' }));
+    g = act(g, player, { kind: 'endTurn' });
+  }
+  assert.deepEqual(order, ['p0', 'p1', 'p2', 'p3', 'p0', 'p1', 'p2', 'p3']);
+  assert.equal(lastLines(g, 1)[0], "Ann's turn.");
+  assert.ok(!g.log.some((line) => /as Partner|Partner's phase|Fewer than five/.test(line.text)));
+  // The restore verifier holds a game for four to it: a marker in one is a corrupt save.
+  assert.deepEqual(gameInvariantProblems(g), []);
+  const forged = structuredClone(g);
+  forged.pair = { lead: forged.active, partner: (forged.active + 2) % 4 };
+  assert.ok(
+    gameInvariantProblems(forged).includes('a paired turn is under way in a game that began with four'),
+  );
+});
+
+test('§6.8: in a game for four only the player on turn wins, at once or as their turn begins', () => {
+  let g = roll(afterSetup(4, { victoryPoints: 8 }), 3, 5);
+  // Ann's turn: Cat reaches the target off turn, and does not win, as in Classic.
+  pointsTo(g, 'p2', 8);
+  g = act(g, 'p0', { kind: 'endTurn' });
+  assert.equal(g.winner, null);
+  g = pass(g);
+  // Ben's turn ends and Cat's begins: Cat wins before rolling.
+  assert.equal(g.winner, 'p2');
+  assert.equal(g.turn, 3);
+  assert.equal(g.dice, null);
+  assert.equal(lastLines(g, 1)[0], 'Cat wins with 8 points!');
+  // On their own turn, a player wins the moment they reach the target.
+  let h = roll(afterSetup(4, { victoryPoints: 8 }), 3, 5);
+  pointsTo(h, 'p0', 7);
+  deal(h, 'p0', 'victoryPoint');
+  give(h, 'p0', CARD);
+  h = act(h, 'p0', { kind: 'buyCard' });
+  assert.equal(h.winner, 'p0');
+});
+
+test('§6.8 and §9.5: a game for four that loses a player plays on one at a time, with nothing to announce', () => {
+  let g = afterSetup(4);
+  g = resignPlayers(g, ['p1'], { reason: 'leave' });
+  g = pass(g);
+  assert.equal(activePlayer(g).id, 'p2');
+  assert.equal(g.pair, undefined);
+  g = untilTurn(g, 4);
+  assert.equal(activePlayer(g).id, 'p0');
+  assert.ok(!g.log.some((line) => line.text.startsWith('Fewer than five')));
 });
 
 test('§9.6 rule 1: a Lead who resigns in their part is still followed by the Partner’s phase while five remain', () => {

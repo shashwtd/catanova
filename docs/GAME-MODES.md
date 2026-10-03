@@ -8,7 +8,7 @@ engineering detail for bigger boards and the sea is in
 sits over it and covers the rest.
 
 The first two new modes have their own rulebooks:
-[Big Table](RULEBOOK-BIG-TABLE.md), for five and six players, and
+[Big Table](RULEBOOK-BIG-TABLE.md), for four to six players, and
 [Open Sea](RULEBOOK-OPEN-SEA.md). Rules are described in our own words, as in
 the [rulebook](RULEBOOK.md). Official product names appear here only to say
 which published variation a mode resembles; [Names](#names) covers what we call
@@ -23,8 +23,8 @@ room that picks nothing new plays exactly as it does now.
 
 The owner has chosen two new modes, and only these two, for now:
 
-- **Big Table**, for five and six players, modelled on the official 5–6 player
-  expansion.
+- **Big Table**, for four to six players, modelled on the official 5–6 player
+  expansion. Four play its island one turn at a time (since 3 October 2026).
 - **Open Sea**, modelled on the Seafarers expansion. Its first release has one
   scenario of our own, Outer Isles, for three and four players.
 
@@ -87,11 +87,12 @@ detail.
   counting only players still in the game) has one action phase with no roll
   and no trading with players. Both are on turn for the whole paired turn; if
   both have the target, the Lead wins. With fewer than five players left in the
-  game, turns go one player at a time. _Between-turns build_, the older official
-  rule, was a host's option until 2 October 2026 and is retired: at five
-  players its four 20-second windows after every turn read as skipped turns,
-  and the first table to play it gave up by turn 5. Games started with it keep
-  replaying by it.
+  game, turns go one player at a time, and a game for four (allowed since
+  3 October 2026) plays that way from its first turn. _Between-turns build_, the
+  older official rule, was a host's option until 2 October 2026 and is retired:
+  at five players its four 20-second windows after every turn read as skipped
+  turns, and the first table to play it gave up by turn 5. Games started with
+  it keep replaying by it.
 - **Big Table board and supply.** As the official expansion: 30 land hexes in
   rows of 3-4-5-6-5-4-3, 28 number tokens, 11 harbours, 24 cards of each
   resource, 34 development cards. Our balanced generator, adapted to 30 hexes,
@@ -221,6 +222,27 @@ decisions, not rules, and the build follows them.
   the high-quality image model when Open Sea is built, as a new terrain in both
   board themes. How it joins the art is under
   [Matching the existing look](#matching-the-existing-look).
+
+### Four players at Big Table, 3 October 2026
+
+The owner asked for Big Table to work for four players as well, and chose from
+a written proposal how it plays:
+
+- **Seats.** Big Table seats four, five or six (`seats: { min: 4, max: 6 }`),
+  shown as "4–6 players". A full four-player Classic room can switch to it and
+  start at once.
+- **Turns.** Four players take ordinary turns one at a time, with no Lead or
+  Partner, as a five-player game does once a player has left. The official
+  paired rule is written for five and six, and at four its Partner would be
+  the Lead's right-hand neighbour, who led the turn before.
+- **Island and supply.** Unchanged: the 30-hex island and its 11 harbours, 24
+  of each resource, the 34-card deck, the setup draft in Classic's snake
+  order, a target of 10, and no bots.
+- **Ruleset.** Still `big-table-v1`: four players could not start a game
+  before, so no saved game plays differently.
+
+Sections 1.1 and 6.8 of the [Big Table rulebook](RULEBOOK-BIG-TABLE.md) state
+the rules.
 
 ## The variations
 
@@ -371,7 +393,7 @@ type Ruleset = {
   summary: string; // the line under the name in Room setup
   board: BoardPresetId; // the preset that deals its boards
   earlierBoards?: BoardPresetId[]; // presets whose boards a lobby may still hold
-  seats: { min: number; max: number }; // 2–4, 5–6, 3–4
+  seats: { min: number; max: number }; // 2–4, 4–6, 3–4
   victoryPoints: { default: number; min: number; max: number }; // 10 (8–15), 10 (8–15), 14 (10–18)
   supply: {
     bank: number; // cards of each resource: 19, 24, 19
@@ -416,7 +438,7 @@ In the lobby (built in Release A):
   mode's default, and the host moves the target once the mode is applied;
 - a settings change without `mode`, as a tab from before modes sends, keeps the
   room's mode. A Classic room stores no `mode`, so its settings are unchanged;
-- Start requires the mode's minimum (five for Big Table, three for Open Sea),
+- Start requires the mode's minimum (four for Big Table, three for Open Sea),
   checks again that the host may pick the mode and that no bot is seated in a
   mode without them, and freezes the ruleset into the game;
 - the room deals its board when it is created, so a mode change re-deals it. A
@@ -522,7 +544,7 @@ Four things every mode touches, so they get one home early:
 
 - **Room setup** gets a "Game mode" section at the top, using the dialog's
   existing option cards, with a line of explanation per mode ("Big Table, for
-  five and six players"), the turn structure under Big Table while it is
+  four to six players"), the turn structure under Big Table while it is
   selected, and the target range each mode allows. The lobby shows the chosen
   mode. Outside Classic, "Add a bot" is shown disabled, with the reason. See
   [Interface decisions for the build](#interface-decisions-for-the-build).
@@ -1240,7 +1262,7 @@ Decided on 25 September 2026:
 | Resembles                 | Name in Catanova                                                                       | Ruleset        |
 | ------------------------- | -------------------------------------------------------------------------------------- | -------------- |
 | Base game                 | Classic                                                                                | `base-3-4-v1`  |
-| 5–6 player expansion      | Big World (Big Table until 3 October 2026), shown with its players, "5–6 players"      | `big-table-v1` |
+| 5–6 player expansion      | Big World (Big Table until 3 October 2026), shown with its players, "4–6 players"      | `big-table-v1` |
 | Seafarers                 | Open Seas Saga (Open Sea until 3 October 2026)                                         | `open-sea-v1`  |
 | Cities & Knights (parked) | Not chosen; an "X & Y" name, with Guilds & Guards and Raiders & Ramparts as candidates | none yet       |
 

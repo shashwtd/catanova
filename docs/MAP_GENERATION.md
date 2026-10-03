@@ -38,7 +38,7 @@ The test suite checks 500 seeds against every rule above, including harbour alte
 
 ## Big Table islands
 
-Big Table, for five and six players (ruleset `big-table-v1`), deals every board from one preset, `big-table-balanced-v1`. It is Catanova's balanced approach adapted to the 30-hex island, and the default and only board in v1. It is our own policy, not the official setup. The official lettered spiral is described for reference in the [Big Table rulebook](RULEBOOK-BIG-TABLE.md). It is not offered in `big-table-v1`, and a spiral preset is recorded only as a possible later option. There is no fixed first-game layout. The preset is `BIG_TABLE_BALANCED_V1` in `packages/rules/src/board.ts`, and the [measurements](#measurements-so-far) below are of that code.
+Big Table, for four to six players (ruleset `big-table-v1`), deals every board from one preset, `big-table-balanced-v1`. It is Catanova's balanced approach adapted to the 30-hex island, and the default and only board in v1. It is our own policy, not the official setup. The official lettered spiral is described for reference in the [Big Table rulebook](RULEBOOK-BIG-TABLE.md). It is not offered in `big-table-v1`, and a spiral preset is recorded only as a possible later option. There is no fixed first-game layout. The preset is `BIG_TABLE_BALANCED_V1` in `packages/rules/src/board.ts`, and the [measurements](#measurements-so-far) below are of that code.
 
 ### The island
 

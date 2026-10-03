@@ -22,7 +22,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { journalReader } from '../journal.js';
 import type { JournalRow } from '../journal.js';
-import { partnerActing, score } from '../../../../packages/rules/src/game.js';
+import { pairsTurns, partnerActing, score } from '../../../../packages/rules/src/game.js';
 import { CLASSIC, findRuleset, rulesetOf } from '../../../../packages/rules/src/rulesets.js';
 import type { Game, Player } from '../../../../packages/rules/src/game.js';
 import { RESOURCES } from '../../../../packages/rules/src/index.js';
@@ -472,7 +472,8 @@ export function computeGameAnalytics(db: DatabaseSync, job: GameAnalyticsJob): G
       medianSeconds: round(median(times)),
       botTurns: stats.turnTime.botTurns,
     };
-    if (first.turns === 'paired') {
+    // Only a game that pairs its turns has Partners: never one for four (docs/RULEBOOK-BIG-TABLE.md, 6.8).
+    if (pairsTurns(first)) {
       const phases = partnerTimes.get(player.id) ?? [];
       stats.partnerTime = {
         phases: phases.length,

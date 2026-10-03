@@ -26,7 +26,7 @@ const COPY: Readonly<Record<string, Omit<ModeCopy, 'name'>>> = {
     emblem: '/art/optimized/mode-emblem-classic.61d640b72787.webp',
   },
   [BIG_TABLE.id]: {
-    tagline: 'A bigger island for bigger groups, with paired turns.',
+    tagline: 'A bigger island for bigger groups. Paired turns at five or six.',
     icons: [],
     emblem: '/art/optimized/mode-emblem-big-world.3ca68fd7e99b.webp',
   },

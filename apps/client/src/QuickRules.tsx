@@ -1,8 +1,9 @@
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CLASSIC, seatRange } from '../../../packages/rules/src/rulesets.js';
+import { CLASSIC, numberWord, seatRange } from '../../../packages/rules/src/rulesets.js';
 import type { Ruleset, TurnStructure } from '../../../packages/rules/src/rulesets.js';
 import { BUILD_WINDOW_SECONDS } from '../../../packages/protocol/src/settings.js';
+import { PAIRED_PLAYERS } from '../../../packages/rules/src/game.js';
 import {
   Castle,
   Dices,
@@ -55,15 +56,29 @@ function GuideSection({
   );
 }
 
-/** How a mode that lets the host choose runs its turns: Big Table's two structures, in a few lines each. */
-function TurnsGuide({ ruleset, turns }: { ruleset: Ruleset; turns: TurnStructure }) {
-  const seats = seatRange(ruleset),
-    players = seats[0]!.toUpperCase() + seats.slice(1);
+/**
+ * How a mode that lets the host choose runs its turns: Big Table's two structures, in a few lines each.
+ * `table`, once a game has begun, is how many it began with: a game for four never pairs
+ * (docs/RULEBOOK-BIG-TABLE.md, 6.8).
+ */
+function TurnsGuide({ ruleset, turns, table }: { ruleset: Ruleset; turns: TurnStructure; table?: number }) {
+  const capital = (words: string) => words[0]!.toUpperCase() + words.slice(1),
+    players = capital(seatRange(ruleset));
+  if (turns === 'paired' && table !== undefined && table < PAIRED_PLAYERS)
+    return (
+      <>
+        <p>
+          {capital(numberWord(table))} players take turns one at a time, as in Classic, on the bigger island:
+          no Lead and no Partner.
+        </p>
+        <p>Paired turns, with a Partner’s phase after each turn, need five or six players.</p>
+      </>
+    );
   return turns === 'paired' ? (
     <>
       <p>
-        {players} play. Each turn has a <b>Lead</b>, the player on turn, and a <b>Partner</b>, the third
-        player to their left.
+        With five or six players, each turn has a <b>Lead</b>, the player on turn, and a <b>Partner</b>, the
+        third player to their left.
       </p>
       <p>
         The Lead plays a full turn. Then the Partner has a phase of their own: build, buy, trade with the bank
@@ -71,7 +86,7 @@ function TurnsGuide({ ruleset, turns }: { ruleset: Ruleset; turns: TurnStructure
       </p>
       <p>
         Both hold the turn until the Partner’s phase ends, so either can win in it; if both reach the goal at
-        once, the Lead wins. With fewer than five players left, turns go one player at a time.
+        once, the Lead wins. With four players, or fewer than five left, turns go one player at a time.
       </p>
     </>
   ) : (
@@ -90,12 +105,15 @@ export function QuickRules({
   ruleset = CLASSIC,
   victoryPoints = ruleset.victoryPoints.default,
   turns = ruleset.turns?.[0],
+  table,
 }: {
   /** The mode being played, for its costs and its default target. */
   ruleset?: Ruleset;
   victoryPoints?: number;
   /** How its turns run, in a mode that lets the host choose. */
   turns?: TurnStructure;
+  /** How many players the game began with, once it has: Big Table pairs its turns only from five. */
+  table?: number;
 }) {
   // Open Sea opens on what it changes (docs/RULEBOOK-OPEN-SEA.md); the rest of the guide is Classic's.
   const sea = !!ruleset.sea;
@@ -115,7 +133,7 @@ export function QuickRules({
       </div>
       {turns && (
         <GuideSection title={ruleset.name} icon={<GameMode />} {...disclosure('mode')}>
-          <TurnsGuide ruleset={ruleset} turns={turns} />
+          <TurnsGuide ruleset={ruleset} turns={turns} table={table} />
         </GuideSection>
       )}
       <GuideSection title="Your turn" icon={<Dices />} {...disclosure('turn')}>

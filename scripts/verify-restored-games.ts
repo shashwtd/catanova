@@ -35,7 +35,14 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from '../apps/server/src/store.js';
-import { applyAction, pieces, roadSites, settlementSites, total } from '../packages/rules/src/game.js';
+import {
+  applyAction,
+  pairsTurns,
+  pieces,
+  roadSites,
+  settlementSites,
+  total,
+} from '../packages/rules/src/game.js';
 import type { CardKind, Game, GameAction, Phase } from '../packages/rules/src/game.js';
 import { RESOURCES } from '../packages/rules/src/index.js';
 import { isLand } from '../packages/rules/src/board.js';
@@ -277,8 +284,8 @@ export function gameInvariantProblems(game: Game): string[] {
 /**
  * Big Table's turn structures (docs/RULEBOOK-BIG-TABLE.md, sections 6 and 7): the structure is one the mode
  * plays (offered now, or retired but still played by games that started with it), the markers of a paired turn
- * and the build windows point at real seats, and the player acting is the one the phase belongs to. A game in
- * progress only.
+ * (never held in a game for four) and the build windows point at real seats, and the player acting is the one
+ * the phase belongs to. A game in progress only.
  */
 function turnStructureProblems(game: Game, played: readonly string[]): string[] {
   const problems: string[] = [];
@@ -288,6 +295,7 @@ function turnStructureProblems(game: Game, played: readonly string[]): string[] 
   const setup = game.phase === 'setupSettlement' || game.phase === 'setupRoad';
   if (game.pair) {
     if (game.turns !== 'paired' || setup) problems.push('a paired turn is under way outside paired turns');
+    else if (!pairsTurns(game)) problems.push('a paired turn is under way in a game that began with four');
     else if (!seat(game.pair.lead) || !seat(game.pair.partner) || game.pair.lead === game.pair.partner)
       problems.push('the Lead and Partner markers are not on two seats of the game');
     else if (game.active !== game.pair.lead && game.active !== game.pair.partner)

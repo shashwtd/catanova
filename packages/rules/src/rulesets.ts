@@ -117,16 +117,17 @@ export const CLASSIC: Ruleset = {
 };
 
 /**
- * Big Table, for five and six players: Classic's rules on the 30-hex island, with a larger bank and deck, and
- * a second player acting in every turn. docs/RULEBOOK-BIG-TABLE.md is its rulebook. Players know it as Big World
+ * Big Table, for four to six players: Classic's rules on the 30-hex island, with a larger bank and deck, and
+ * at five or six a second player acting in every turn. Four take single turns, as a table that drops below
+ * five does (added 3 October 2026). docs/RULEBOOK-BIG-TABLE.md is its rulebook. Players know it as Big World
  * (named so on 3 October 2026); the code and the rulebook keep its first name.
  */
 export const BIG_TABLE: Ruleset = {
   id: 'big-table-v1',
   name: 'Big World',
-  summary: 'For five and six players.',
+  summary: 'For four to six players.',
   board: 'big-table-balanced-v1',
-  seats: { min: 5, max: 6 },
+  seats: { min: 4, max: 6 },
   victoryPoints: { default: DEFAULT_VICTORY_POINTS, min: MIN_VICTORY_POINTS, max: MAX_VICTORY_POINTS },
   supply: {
     bank: 24,
@@ -136,8 +137,9 @@ export const BIG_TABLE: Ruleset = {
   costs: COSTS,
   bots: false,
   standIns: false,
-  // Paired turns only. Between-turns build was a host's option until 2 October 2026: four windows of up to 20
-  // seconds after every turn at five players read as everyone's turn being skipped, and a table quit by turn 5.
+  // Paired turns only, which pair from five players (game.ts, pairsTurns). Between-turns build was a host's
+  // option until 2 October 2026: four windows of up to 20 seconds after every turn at five players read as
+  // everyone's turn being skipped, and a table quit by turn 5.
   turns: ['paired'],
   retiredTurns: ['betweenTurnsBuild'],
 };

@@ -8,7 +8,7 @@ follows from them.
 For every variation of the game, the owner's decisions of 25 September 2026 and
 the order to build modes in, see [Game modes](GAME-MODES.md), which this plan
 sits under. The rules of the two modes it builds toward are in the
-[Big Table rulebook](RULEBOOK-BIG-TABLE.md), for five and six players, and the
+[Big Table rulebook](RULEBOOK-BIG-TABLE.md), for four to six players, and the
 [Open Sea rulebook](RULEBOOK-OPEN-SEA.md). This plan says how to build them.
 
 Rules research is summarised at the end, with sources. Nothing here reproduces

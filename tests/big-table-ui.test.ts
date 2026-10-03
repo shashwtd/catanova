@@ -118,7 +118,7 @@ test('the room names Big World in its banner beside Start, with no turn style to
   assert.match(banner, /<img src="\/art\/optimized\/mode-emblem-big-world\.[0-9a-f]{12}\.webp" alt=""\/>/);
   assert.match(
     banner,
-    /<small>Game mode<\/small><strong>Big World<\/strong><span><svg[^]*?<\/svg>5–6 players<\/span>/,
+    /<small>Game mode<\/small><strong>Big World<\/strong><span><svg[^]*?<\/svg>4–6 players<\/span>/,
   );
   assert.ok(
     html.indexOf('lobby-mode-banner') > html.indexOf('lobby-start-controls'),
@@ -135,7 +135,11 @@ test('the room names Big World in its banner beside Start, with no turn style to
   assert.ok(!older.includes('Build windows'));
   const three = room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } });
   three.players = three.players.slice(0, 3);
-  assert.match(lobby(three), /Big World needs five players/);
+  assert.match(lobby(three), /Big World needs four players/);
+  // Four are enough since 3 October 2026: a table of four, all ready, may start.
+  const four = room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } });
+  four.players = four.players.slice(0, 4);
+  assert.match(lobby(four), /<span role="status">Everyone is ready<\/span>/);
   // Five seated and an open sixth place.
   assert.equal([...lobby(room(null)).matchAll(/class="seat-place"/g)].length, 6);
 });
@@ -366,13 +370,48 @@ test('history names the new situations, and the results name the mode and its tu
   });
   assert.equal('ruleset' in classic.game, false);
   assert.equal('turns' in classic.game, false);
+  // A game for four took single turns, so its results name the mode alone (§6.8).
+  let four = afterSetup(4, { victoryPoints: 8 });
+  four.players[0]!.cards.push(
+    ...Array.from({ length: 8 }, (_, i) => ({ id: `vp-${i}`, kind: 'victoryPoint' as const, boughtTurn: 0 })),
+  );
+  four = roll(four, 3, 5);
+  assert.equal(four.winner, 'p0');
+  const fourState = room(four);
+  assert.equal(resultsFromRoom(fourState).game.turns, 'paired');
+  assert.match(
+    renderToStaticMarkup(
+      createElement(GameOver, {
+        room: fourState,
+        busy: false,
+        canReturn: true,
+        onReturn: noop,
+        onQuit: noop,
+      }),
+    ),
+    /<div><dt>Mode<\/dt><dd>Big World<\/dd><\/div>/,
+  );
 });
 
 test('the quick rules explain the table’s turn structure in a few plain lines', () => {
   const paired = renderToStaticMarkup(createElement(QuickRules, { ruleset: BIG_TABLE }));
   assert.match(paired, /<span>Big World<\/span>/);
-  assert.match(paired, /Five or six play\. Each turn has a <b>Lead<\/b>/);
+  assert.match(paired, /With five or six players, each turn has a <b>Lead<\/b>/);
   assert.match(paired, /The Partner never rolls and never trades with players\./);
+  assert.match(paired, /With four players, or fewer than five left, turns go one player at a time\./);
+  // In a game for four, only what applies: single turns, with no Lead and no Partner (§6.8).
+  const four = renderToStaticMarkup(
+    createElement(QuickRules, { ruleset: BIG_TABLE, turns: 'paired', table: 4 }),
+  );
+  assert.match(
+    four,
+    /Four players take turns one at a time, as in Classic, on the bigger island: no Lead and no Partner\./,
+  );
+  assert.ok(!four.includes('<b>Lead</b>'));
+  assert.equal(
+    renderToStaticMarkup(createElement(QuickRules, { ruleset: BIG_TABLE, turns: 'paired', table: 5 })),
+    paired,
+  );
   const build = renderToStaticMarkup(
     createElement(QuickRules, { ruleset: BIG_TABLE, turns: 'betweenTurnsBuild' }),
   );
