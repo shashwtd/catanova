@@ -63,7 +63,7 @@ test('Big Table always plays Paired turns: the older build windows are refused, 
           mode: BIG_TABLE.id,
           turns: 'betweenTurnsBuild',
         }),
-      (error: Error) => code('INVALID_SETTINGS')(error) && /Big Table plays Paired turns only/.test(error.message),
+      (error: Error) => code('INVALID_SETTINGS')(error) && /Big World plays Paired turns only/.test(error.message),
     );
     // A room saved with it before then reads as Paired turns, and changing another setting keeps working.
     store.db

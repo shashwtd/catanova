@@ -1,0 +1,384 @@
+/*
+ * The game room, as redesigned in October 2026 (docs/GAME-MODES.md, "The game room").
+ *
+ * The header: your profile (the button that edits it), the logo, then Friends, your settings and Leave. Beneath it
+ * the table's rules, the seats as cards in their players' colours, and the start row: the mode's banner with its
+ * emblem, Room setup and Start (or Ready). The room code sits at the foot. On a phone everything keeps to one
+ * column as wide as the start row; wider, the logo leads the header and the start row stands on one line.
+ *
+ * Everything here is scoped to the room (`.room-lobby`), and the screen's other parts keep their own sheets.
+ */
+.room-lobby .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Seat cards in their players' colours ------------------------------------------------------------------- */
+.lobby .room-lobby .seat-card {
+  border-radius: 12px;
+}
+.lobby .room-lobby .seat-card:not(.seat-open) {
+  display: grid;
+  grid-template-rows: auto 28px;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  border-top: 4px solid var(--seat-color);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--seat-color) 24%, transparent), transparent 50%),
+    var(--game-panel-fill);
+}
+.lobby .room-lobby .seat-portrait {
+  width: clamp(112px, 10.5vw, 148px);
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--seat-color);
+}
+.lobby .room-lobby .seat-portrait .avatar-medallion,
+.lobby .room-lobby .seat-portrait .avatar-medallion svg {
+  border-radius: 9px;
+}
+.lobby .room-lobby .seat-name {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 6px;
+}
+.lobby .room-lobby .seat-name strong {
+  font-size: 21px;
+}
+.lobby .room-lobby .seat-host-mark {
+  display: inline-grid;
+  flex: none;
+  color: #f3cf7a;
+}
+/* A ready player: a green tick before their name, where the host has the crown. */
+.lobby .room-lobby .seat-ready-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  border-radius: 50%;
+  background: #4f9d5f;
+}
+.lobby .room-lobby .seat-ready-mark svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 3;
+}
+/* Removing a player: a round button you can see on any card. */
+.lobby .room-lobby .seat-remove {
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #f6e8ce4d;
+  border-radius: 50%;
+  background: #140d09e0;
+  color: #f6e8ce;
+  opacity: 1;
+}
+.lobby .room-lobby .seat-remove svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.6;
+}
+.lobby .room-lobby .seat-remove:hover:not(:disabled) {
+  border-color: #ffb9a5;
+  background: #a8442f;
+  color: #fff;
+}
+/* Your colour is a swatch on your portrait's corner: tap it for the colours. */
+.lobby .room-lobby .seat-portrait .seat-color-choice {
+  position: absolute;
+  left: -9px;
+  bottom: -9px;
+  z-index: 2;
+  margin: 0;
+}
+.lobby .room-lobby .seat-portrait .seat-color-current {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  border: 3px solid #2b221b;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: 0 0 0 1px #f6e8ce66;
+  transition: transform 160ms ease;
+}
+.lobby .room-lobby .seat-portrait .seat-color-current:hover:not(:disabled) {
+  transform: scale(1.12);
+  background: var(--swatch);
+}
+.lobby .room-lobby .seat-portrait .seat-color-current > span {
+  display: none;
+}
+.lobby .room-lobby .seat-portrait .seat-colors {
+  left: 0;
+  translate: 0 0;
+}
+
+/* ---- The header ---------------------------------------------------------------------------------------- */
+.lobby .room-lobby .lobby-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.lobby .room-lobby :is(.lobby-back, .lobby-preferences, .lobby-friends) {
+  height: 48px;
+  min-height: 48px;
+  color: var(--game-cream);
+  border: 1px solid #d7b97966;
+  border-radius: 10px;
+  background: var(--game-panel-fill);
+  box-shadow:
+    inset 0 1px #fbe8bc22,
+    0 3px 0 #211b1670;
+}
+.lobby .room-lobby :is(.lobby-back, .lobby-preferences, .lobby-friends):hover {
+  border-color: #eccd8ba6;
+  background: linear-gradient(140deg, #66553f, #43382f 75%);
+}
+.lobby .room-lobby :is(.lobby-back, .lobby-friends) {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px 0 13px;
+  font:
+    600 15px/1 Barlow,
+    sans-serif;
+}
+.lobby .room-lobby .lobby-preferences {
+  width: 48px;
+}
+.lobby .room-lobby :is(.lobby-back, .lobby-preferences, .lobby-friends) svg {
+  width: 23px;
+  height: 23px;
+  color: #f2d5a0;
+  stroke-width: 2.2;
+}
+/* Your profile: the button that edits it. */
+.lobby .room-lobby .lobby-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  min-height: 48px;
+  padding: 4px 16px 4px 4px;
+  color: var(--game-cream);
+  border: 1px solid #d7b97966;
+  border-radius: 10px;
+  background: var(--game-panel-fill);
+  box-shadow:
+    inset 0 1px #fbe8bc22,
+    0 3px 0 #211b1670;
+  clip-path: none;
+}
+.lobby .room-lobby .lobby-profile:hover {
+  border-color: #eccd8ba6;
+}
+.lobby .room-lobby .lobby-profile .avatar-medallion {
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+.lobby .room-lobby .lobby-profile .avatar-medallion svg {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+}
+.lobby .room-lobby .lobby-profile .avatar-medallion::after {
+  display: none;
+}
+.lobby .room-lobby .lobby-profile strong {
+  overflow: hidden;
+  font:
+    600 16px/1.2 Barlow,
+    sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Wider than a phone: the logo at the left with your profile after it; Friends, settings and Leave at the right. */
+@media (min-width: 651px) {
+  .lobby .room-lobby .lobby-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .lobby .room-lobby .lobby-wordmark {
+    order: 0;
+    flex: none;
+    width: auto;
+  }
+  .lobby .room-lobby .lobby-wordmark .landing-logo {
+    width: 180px;
+    height: auto;
+    max-width: none;
+  }
+  .lobby .room-lobby .lobby-profile {
+    order: 1;
+  }
+  .lobby .room-lobby .lobby-tools {
+    order: 2;
+    margin-left: auto;
+  }
+}
+
+/* ---- The mode beside Start, and its swap ----------------------------------------------------------------- */
+.room-lobby .lobby-mode-banner:hover .lobby-mode-banner-change {
+  transform: none;
+  color: #ffe6b3;
+}
+.room-lobby .lobby-mode-banner .lobby-mode-banner-change svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2.4;
+}
+.lobby .room-lobby :is(.room-share, .lobby-mode-banner, .lobby-setup, .seat-fill) {
+  border-radius: 10px;
+}
+.lobby .room-lobby .lobby-room-options {
+  border-radius: 12px;
+}
+.lobby .room-lobby .lobby-start-controls:has(.lobby-mode-banner) {
+  align-items: flex-end;
+}
+/* On one line on a laptop, standing on the same foot; Room setup is a square button beside Start. */
+.lobby .room-lobby .lobby-start-controls > .lobby-setup {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 60px;
+  min-width: 0;
+  max-width: 60px;
+  height: 60px;
+  min-height: 60px;
+  padding: 0;
+}
+.lobby .room-lobby .lobby-start-controls > .lobby-setup svg {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2.4;
+}
+.lobby .room-lobby .lobby-start-controls > .gold-button {
+  min-height: 60px;
+  border-radius: 10px;
+  font-size: 20px;
+}
+
+/* ---- Phones: everything smaller, one column at the Start row's width ------------------------------------- */
+@media (max-width: 650px) {
+  .lobby .room-lobby .lobby-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lobby .room-lobby .lobby-profile {
+    order: 0;
+    min-height: 44px;
+    padding: 3px;
+  }
+  .lobby .room-lobby .lobby-profile strong {
+    display: none;
+  }
+  .lobby .room-lobby .lobby-wordmark {
+    order: 1;
+    margin-right: auto;
+  }
+  .lobby .room-lobby .lobby-wordmark .landing-logo {
+    max-width: 130px;
+  }
+  .lobby .room-lobby .lobby-tools {
+    order: 2;
+    gap: 6px;
+  }
+  .lobby .room-lobby :is(.lobby-back, .lobby-friends) span {
+    display: none;
+  }
+  .lobby .room-lobby :is(.lobby-back, .lobby-friends) {
+    justify-content: center;
+    width: 44px;
+    padding: 0;
+  }
+  .lobby .room-lobby :is(.lobby-back, .lobby-preferences, .lobby-friends) {
+    height: 44px;
+    min-height: 44px;
+  }
+  .lobby .room-lobby .lobby-preferences {
+    width: 44px;
+  }
+  .lobby .room-lobby :is(.seat-row, .lobby-room-options, .lobby-start-controls, .lobby-share-results) {
+    width: min(100%, 340px);
+    margin-inline: auto;
+  }
+  .lobby .room-lobby .seat-card {
+    min-height: 0;
+    padding: 12px 8px 10px;
+  }
+  .lobby .room-lobby .seat-card:not(.seat-open) {
+    grid-template-rows: auto 22px;
+    gap: 8px;
+  }
+  .lobby .room-lobby .seat-portrait {
+    width: 92px;
+    padding: 3px;
+  }
+  .lobby .room-lobby .seat-name {
+    margin-top: 4px;
+  }
+  .lobby .room-lobby .seat-name strong {
+    font-size: 15.5px;
+  }
+  .lobby .room-lobby .seat-portrait .seat-color-current {
+    width: 26px;
+    height: 26px;
+  }
+  .lobby .room-lobby .seat-remove {
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+  }
+  .lobby .room-lobby .seat-remove svg {
+    width: 12px;
+    height: 12px;
+  }
+  .lobby .room-lobby .lobby-room-options {
+    flex-wrap: nowrap;
+    justify-content: space-evenly;
+    gap: 0;
+  }
+  .lobby .room-lobby .lobby-room-options > button {
+    min-width: 0;
+    padding-inline: 6px;
+    white-space: nowrap;
+  }
+  .lobby .room-lobby .lobby-start-controls > .gold-button {
+    flex: 1;
+    max-width: none;
+    min-height: 56px;
+  }
+  .lobby .room-lobby .lobby-start-controls > .lobby-setup {
+    width: 56px;
+    max-width: 56px;
+    height: 56px;
+    min-height: 56px;
+  }
+  .lobby .room-lobby .lobby-share-results .room-share {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

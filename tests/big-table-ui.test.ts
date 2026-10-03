@@ -1,7 +1,7 @@
 /**
- * Big Table in the client: Room setup's turn style, the lobby chip, the rail's Lead and Partner, the prompts,
- * clock labels and trade lock of the new phases, card locks, history lines, results and the quick rules
- * (docs/GAME-MODES.md, "Matching the existing look").
+ * Big Table (Big World to players) in the client: Room setup without a turn style, its banner in the room, the
+ * rail's Lead and Partner, the prompts, clock labels and trade lock of the new phases, card locks, history lines,
+ * results and the quick rules (docs/GAME-MODES.md, "Matching the existing look").
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -72,10 +72,11 @@ const lobby = (state: RoomState, me = 'p0') =>
 /** A paired turn in the Partner's phase: Ann leads the first, Dan is her Partner. */
 const partnerPhase = () => act(roll(afterSetup(5), 3, 5), 'p0', { kind: 'endTurn' });
 
-test('Room setup offers Big Table with no turn style to pick: Paired turns is the only one', () => {
+test('Room setup lists no modes and no turn style for Big Table: Paired turns is the only one', () => {
   const offered = room(null, { modes: [CLASSIC.id, BIG_TABLE.id], settings: { turnTimerSeconds: 90 } });
   const classic = setup(offered);
-  assert.match(classic, /<strong>Big Table<\/strong><small>For five and six players\.<\/small>/);
+  // The mode is picked in the mode chooser (ModeChooser.tsx), so Room setup has no list of modes.
+  assert.ok(!classic.includes('Big World'));
   // Between-turns build was retired on 2 October 2026, so there is nothing to choose and no turn style shows,
   // whichever mode is picked, and in a room saved with the older rule too.
   const bigTable = setup({ ...offered, settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } });
@@ -84,12 +85,12 @@ test('Room setup offers Big Table with no turn style to pick: Paired turns is th
     settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id, turns: 'betweenTurnsBuild' },
   };
   for (const html of [classic, bigTable, setup(older)]) {
-    assert.ok(!html.includes('settings-turns'), 'no turn style block');
+    assert.ok(!html.includes('Turn style'), 'no turn style block');
     assert.ok(!html.includes('name="turn-style"'));
     assert.ok(!html.includes('Between-turns build'));
   }
-  // The sheet that indents it loads last, and every rule in it, media queries included, reaches only Big
-  // Table's parts: the turn style, the trade lock and the rail of five or six.
+  // The sheet loads last, and every rule in it, media queries included, reaches only Big Table's parts: the
+  // trade lock and the rail of five or six.
   const main = readFileSync(new URL('../apps/client/src/main.tsx', import.meta.url), 'utf8');
   const sheets = [...main.matchAll(/^import '\.\/([\w-]+\.css)';$/gm)].map((match) => match[1]);
   assert.equal(sheets.at(-1), 'big-table.css');
@@ -99,30 +100,42 @@ test('Room setup offers Big Table with no turn style to pick: Paired turns is th
     .map((match) => match[1]!.trim())
     .filter((selector) => !selector.startsWith('@'))
     .flatMap((selector) => selector.split(/,(?![^()]*\))/).map((part) => part.trim()));
-  assert.ok(selectors.length >= 6);
+  assert.ok(selectors.length >= 5);
   for (const selector of selectors)
     assert.match(
       selector,
-      /settings-turns|trade-lock|:where\([^)]*player-rail\[data-seats\]/,
+      /trade-lock|:where\([^)]*player-rail\[data-seats\]/,
       `every rule is scoped to Big Table's parts: ${selector}`,
     );
 });
 
-test('the lobby chip names the mode, with no turn style to show, and seats six', () => {
-  const html = lobby(room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } }));
-  assert.match(
-    html,
-    /<button type="button" class="lobby-mode"[^>]*aria-label="Game mode: Big Table\. Room setup"><svg[^]*?<\/svg><span>Big Table<\/span><\/button>/,
+test('the room names Big World in its banner beside Start, with no turn style to show, and seats six', () => {
+  const html = lobby(
+    room(null, { modes: [CLASSIC.id, BIG_TABLE.id], settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } }),
   );
-  // A room saved with the retired build windows shows the same chip.
+  const banner = html.match(/<button type="button" class="lobby-mode-banner"[^]*?<\/button>/)![0];
+  assert.match(banner, /aria-label="Game mode: Big World\. Choose a game mode"/);
+  assert.match(banner, /<img src="\/art\/optimized\/mode-emblem-big-world\.[0-9a-f]{12}\.webp" alt=""\/>/);
+  assert.match(
+    banner,
+    /<small>Game mode<\/small><strong>Big World<\/strong><span><svg[^]*?<\/svg>5–6 players<\/span>/,
+  );
+  assert.ok(
+    html.indexOf('lobby-mode-banner') > html.indexOf('lobby-start-controls'),
+    'the banner leads the start row',
+  );
+  // A room saved with the retired build windows shows the same banner, and the others at the table see it too,
+  // with nothing to swap.
   const older = lobby(
     room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id, turns: 'betweenTurnsBuild' } }),
+    'p1',
   );
-  assert.match(older, /<span>Big Table<\/span>/);
+  assert.match(older, /aria-label="Game mode: Big World\. Game modes"/);
+  assert.ok(!older.includes('lobby-mode-banner-change'));
   assert.ok(!older.includes('Build windows'));
   const three = room(null, { settings: { turnTimerSeconds: 90, mode: BIG_TABLE.id } });
   three.players = three.players.slice(0, 3);
-  assert.match(lobby(three), /Big Table needs five players/);
+  assert.match(lobby(three), /Big World needs five players/);
   // Five seated and an open sixth place.
   assert.equal([...lobby(room(null)).matchAll(/class="seat-place"/g)].length, 6);
 });
@@ -346,7 +359,7 @@ test('history names the new situations, and the results name the mode and its tu
   const html = renderToStaticMarkup(
     createElement(GameOver, { room: state, busy: false, canReturn: true, onReturn: noop, onQuit: noop }),
   );
-  assert.match(html, /<div><dt>Mode<\/dt><dd>Big Table · Paired turns<\/dd><\/div><div><dt>Turns<\/dt>/);
+  assert.match(html, /<div><dt>Mode<\/dt><dd>Big World · Paired turns<\/dd><\/div><div><dt>Turns<\/dt>/);
   const classic = resultsFromRoom({
     ...state,
     game: { ...state.game!, ruleset: CLASSIC.id, turns: undefined },
@@ -357,7 +370,7 @@ test('history names the new situations, and the results name the mode and its tu
 
 test('the quick rules explain the table’s turn structure in a few plain lines', () => {
   const paired = renderToStaticMarkup(createElement(QuickRules, { ruleset: BIG_TABLE }));
-  assert.match(paired, /<span>Big Table<\/span>/);
+  assert.match(paired, /<span>Big World<\/span>/);
   assert.match(paired, /Five or six play\. Each turn has a <b>Lead<\/b>/);
   assert.match(paired, /The Partner never rolls and never trades with players\./);
   const build = renderToStaticMarkup(

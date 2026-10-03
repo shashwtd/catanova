@@ -92,7 +92,7 @@ export const GUIDE_FAQ = [
   {
     question: 'How many players do you need?',
     answer:
-      'Two to six. Three and four player games follow the familiar rules, and five or six play Big Table, a larger island with paired turns. Two player games are our own option, on the same island and to the same ten points, without neutral players.',
+      'Two to six. Three and four player games follow the familiar rules, and five or six play Big World, a larger island with paired turns. Two player games are our own option, on the same island and to the same ten points, without neutral players.',
   },
   {
     question: 'Can I play on my own, or fill an empty seat?',
