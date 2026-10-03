@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../apps/server/src/store.js';
 import { ABSENCE_AFTER_MS } from '../apps/server/src/store.js';
+import { GameLaunch } from '../apps/server/src/game-launch.js';
 import { computeGameAnalytics } from '../apps/server/src/admin/game-analytics.js';
 import { newSession } from '../apps/client/src/connection.js';
 import { activePlayer, gameView, resignPlayers } from '../packages/rules/src/game.js';
@@ -16,7 +17,7 @@ import { BIG_TABLE, CLASSIC } from '../packages/rules/src/rulesets.js';
 import { parseClientMessage } from '../packages/protocol/src/index.js';
 import { continueGame, gameInvariantProblems, verifyStore } from '../scripts/verify-restored-games.js';
 import { OPEN, bigTableRoom, throughSetup } from './big-table-room.js';
-import { act, afterSetup, clearBoard, layRoads, line, pointsTo, roll } from './big-table-helpers.js';
+import { NAMES, act, afterSetup, clearBoard, layRoads, line, pointsTo, roll } from './big-table-helpers.js';
 import type { Room } from './big-table-room.js';
 
 const code = (expected: string) => (error: unknown) => (error as { code?: string }).code === expected;
@@ -99,6 +100,64 @@ test('Big Table always plays Paired turns: the older build windows are refused, 
     } finally {
       room.store.close();
     }
+  }
+});
+
+test('§1.2: a full Classic room of four switches to Big World and starts at once; three wait for a fourth', () => {
+  const store = new Store(':memory:', { modes: OPEN, trackPresence: true });
+  try {
+    const table = (players: number) => {
+      const sessions = NAMES.slice(0, players).map((name) => newSession(name));
+      const host = store.enter('create', sessions[0]!.token, sessions[0]!.name);
+      const roomId = host.room_id;
+      const seats = [host, ...sessions.slice(1).map((s) => store.enter('join', s.token, s.name, roomId))];
+      for (const seat of seats) store.setConnected(seat, true);
+      const revision = () => store.snapshot(roomId).revision;
+      // The room is Classic until the host switches: four fill it, and the switch keeps them all.
+      assert.equal(store.seatLimit(roomId), 4);
+      store.configureSettings(host, 'big-world', revision(), { turnTimerSeconds: 90, mode: BIG_TABLE.id });
+      assert.equal(store.seatLimit(roomId), 6);
+      for (const seat of seats.slice(1)) store.lobby(seat, `ready-${seat.id}`, revision(), true);
+      return { host, roomId, revision };
+    };
+    // The loading screen's own check, on the room as the server shows it, everyone connected.
+    const launch = new GameLaunch({
+      now: () => 0,
+      state: (roomId) => {
+        const state = store.snapshot(roomId);
+        return { ...state, players: state.players.map((player) => ({ ...player, connected: true })) };
+      },
+      commit: () => {},
+      changed: () => {},
+      failed: () => {},
+    });
+    const three = table(3);
+    assert.throws(
+      () => store.action(three.host, 'start-three', three.revision(), { kind: 'start' }),
+      /Start with four to six players/,
+    );
+    assert.throws(
+      () =>
+        launch.begin({
+          roomId: three.roomId,
+          hostId: three.host.id,
+          commandId: 'go',
+          revision: three.revision(),
+        }),
+      (error: Error) =>
+        code('NOT_ENOUGH_PLAYERS')(error) && /^Big World needs at least four players$/.test(error.message),
+    );
+    const four = table(4);
+    launch.begin({ roomId: four.roomId, hostId: four.host.id, commandId: 'go', revision: four.revision() });
+    store.action(four.host, 'start-four', four.revision(), { kind: 'start' });
+    const g = store.loadGame(four.roomId)!;
+    assert.equal(g.ruleset, BIG_TABLE.id);
+    assert.equal(g.players.length, 4);
+    assert.equal(g.board.preset, 'big-table-balanced-v1');
+    assert.equal(g.board.hexes.length, 30);
+    assert.ok(lines(g).includes('With four players, turns go one player at a time, with no Partner.'));
+  } finally {
+    store.close();
   }
 });
 

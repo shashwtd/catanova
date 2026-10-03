@@ -172,7 +172,7 @@ test('the Modes tab opens and closes a mode at once, shows the waiting host, and
       [OPEN_SEA.id, 'testers', 'default'],
     ],
   );
-  assert.deepEqual(before.modes[1]!.seats, { min: 5, max: 6 });
+  assert.deepEqual(before.modes[1]!.seats, { min: 4, max: 6 });
   assert.deepEqual(before.testers, []);
 
   // Open to everyone: the host's picker appears without anyone reconnecting, and only the host is sent it.

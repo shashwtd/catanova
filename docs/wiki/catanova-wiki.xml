@@ -26,12 +26,12 @@
       <origin>1</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="2612" sha1="24c4tfu0zct956ztuspsis1b6gpswe9">__NOTOC__
+      <text xml:space="preserve" bytes="2611" sha1="a0ymd8a8a9asx2c1dx97280ctnyijqe">__NOTOC__
 {| class="wikitable" style="float:right; margin:0 0 1em 1em; max-width:22em;"
 |+ Catanova at a glance
 |-
 ! Players
-| 2–4 seats today, friends or bots · 5 or 6 planned in [[Big Table]]
+| 2–4 seats today, friends or bots · 4 to 6 planned in [[Big Table]]
 |-
 ! Modes
 | Classic · Big Table and Open Sea being built
@@ -65,7 +65,7 @@ Welcome to the '''Catanova Wiki''': a guide to the island, its resources, and th
 |-
 | [[Map generation]] || How Catanova balances a new island
 |-
-| [[Game modes]] || Classic, and two modes being built: [[Big Table]], for five and six players, and [[Open Sea]]
+| [[Game modes]] || Classic, and two modes being built: [[Big Table]], for four to six players, and [[Open Sea]]
 |}
 
 == Play together ==
@@ -81,7 +81,7 @@ For the complete specification, use the [https://github.com/shashwtd/catanova/bl
 
 [[Category:Guides]]
 </text>
-      <sha1>24c4tfu0zct956ztuspsis1b6gpswe9</sha1>
+      <sha1>a0ymd8a8a9asx2c1dx97280ctnyijqe</sha1>
     </revision>
   </page>
   <page>
@@ -98,7 +98,7 @@ For the complete specification, use the [https://github.com/shashwtd/catanova/bl
       <origin>2</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="6537" sha1="rfrwwo6fupw10kn0x45bnsb4qi8ah09">'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. The host can set a different target, from 8 to 15, before the game starts. A table has two to four seats, filled by invited friends or by bots, so one person can also play against bots alone. There is no public matchmaking. This is the Classic mode, the only one playable today; see [[#Choose a mode|Choose a mode]].
+      <text xml:space="preserve" bytes="6585" sha1="4qbl4wq9g1fq8nkmopu968dyjsgstwb">'''Catanova''' is a game of collecting [[Resources|resources]], making trades, and building toward '''10 points on your own turn'''. The host can set a different target, from 8 to 15, before the game starts. A table has two to four seats, filled by invited friends or by bots, so one person can also play against bots alone. There is no public matchmaking. This is the Classic mode, the only one playable today; see [[#Choose a mode|Choose a mode]].
 
 == Gather your players ==
 # Continue with Google or as a guest, then choose your username and avatar when prompted. See [[Accounts and friends]].
@@ -121,7 +121,7 @@ Settings lock when the game starts. Changing them beforehand clears the other pe
 
 == Choose a mode ==
 Every room plays Classic today. Two more [[Game modes|game modes]] are being built and are not yet playable:
-* [[Big Table]], for five and six players, on a larger island. Two players share each turn: the Lead plays a full turn, then the Partner gets an action phase.
+* [[Big Table]], for four to six players, on a larger island. With five or six, two players share each turn: the Lead plays a full turn, then the Partner gets an action phase. Four take turns one at a time.
 * [[Open Sea]], for three or four players, with ships, gold fields, a pirate and bonus points for settling small islands.
 
 When they open, the host will pick the mode in Room setup, beside the other settings. A mode fixes how many seats the table needs, and bots can sit only in Classic, so the lobby refuses a change of mode that the current seats do not fit. See [[Game modes#Choosing a mode|Choosing a mode]].
@@ -174,7 +174,7 @@ The two-player option keeps the same island, bank, costs, piece limits, normal t
 
 [[Category:Guides]]
 </text>
-      <sha1>rfrwwo6fupw10kn0x45bnsb4qi8ah09</sha1>
+      <sha1>4qbl4wq9g1fq8nkmopu968dyjsgstwb</sha1>
     </revision>
   </page>
   <page>
@@ -525,14 +525,14 @@ This is a Catanova preset, separate from the official spiral-number setup or fix
       <origin>9</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="5666" sha1="ikhtsfzc50mm5vy6cjnqtgxg23etn6v">A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for five and six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
+      <text xml:space="preserve" bytes="5760" sha1="lkmqzlxw97vmfj78sr6fwq8qzopkoid">A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for four to six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
 
 {| class="wikitable"
 ! Mode !! Players !! Board !! Points target !! Bots !! Status
 |-
 | '''Classic''' || 2–4 || One island of 19 land hexes || 10; host can set 8–15 || Yes || Playable
 |-
-| '''[[Big Table]]''', for five and six players || 5 or 6 || One island of 30 land hexes || 10; host can set 8–15 || No || Being built
+| '''[[Big Table]]''', for four to six players || 4, 5 or 6 || One island of 30 land hexes || 10; host can set 8–15 || No || Being built
 |-
 | '''[[Open Sea]]''' || 3 or 4 || Outer Isles: a main island, small islands and open sea || 14; host can set 10–18 || No || Being built
 |}
@@ -540,8 +540,8 @@ This is a Catanova preset, separate from the official spiral-number setup or fix
 == Classic ==
 Classic is the game every room plays today: one island, two to four seats, and the rules described across this wiki. Start with [[Getting started]]. Its two-player option, bots, balanced island and turn timer are Catanova choices.
 
-== Big Table, for five and six players ==
-A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so each turn is shared as '''paired turns''': each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
+== Big Table, for four to six players ==
+A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so each turn is shared as '''paired turns''': each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card. Four players get the same island, bank and deck, and take turns one at a time, as in Classic.
 
 See [[Big Table]].
 
@@ -593,7 +593,7 @@ Big Table and Open Sea are inspired by the official 5–6 player and Seafarers e
 [[Category:Guides]]
 [[Category:Game rules]]
 </text>
-      <sha1>ikhtsfzc50mm5vy6cjnqtgxg23etn6v</sha1>
+      <sha1>lkmqzlxw97vmfj78sr6fwq8qzopkoid</sha1>
     </revision>
   </page>
   <page>
@@ -610,12 +610,12 @@ Big Table and Open Sea are inspired by the official 5–6 player and Seafarers e
       <origin>10</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="10366" sha1="tl5nr5a22b19cpd9t8c21znnklbpab7">'''Big Table''', for five and six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
+      <text xml:space="preserve" bytes="11018" sha1="g2gowq0jqxni55hg1xc5ux1n41umqqn">'''Big Table''', for four to six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
 
 {| class="wikitable"
 ! !! Classic !! Big Table
 |-
-| Players || 2–4, friends or bots || 5 or 6, people only
+| Players || 2–4, friends or bots || 4, 5 or 6, people only
 |-
 | Island || 19 land hexes in rows of 3-4-5-4-3 || 30 land hexes in rows of 3-4-5-6-5-4-3
 |-
@@ -625,7 +625,7 @@ Big Table and Open Sea are inspired by the official 5–6 player and Seafarers e
 |-
 | Ports || 9 || 11
 |-
-| Turns || One player at a time || Paired turns
+| Turns || One player at a time || Paired turns with five or six; one player at a time with four
 |-
 | Absent player || A bot plays the seat after about 30 seconds || The clock makes forced moves only, after 2 minutes
 |}
@@ -681,6 +681,8 @@ Each player rolls both dice. The highest total starts, and players tied for high
 {| class="wikitable"
 ! Players !! Placement order
 |-
+| 4 || 1, 2, 3, 4, 4, 3, 2, 1
+|-
 | 5 || 1, 2, 3, 4, 5, 5, 4, 3, 2, 1
 |-
 | 6 || 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1
@@ -689,7 +691,9 @@ Each player rolls both dice. The highest total starts, and players tied for high
 Everything else is as in [[Getting started#Place your first pieces|Classic setup]]. Setup is untimed. If the draft reaches a player who has been offline for 2 minutes, the clock places for them: a settlement on the legal corner with the most production dots, with ties broken at random, then a road on a random edge touching it.
 
 == Turns ==
-Big Table plays '''paired turns''', the current official way to play a table this size: the Lead plays a full turn, then the Partner has one action phase. Until October 2026 the host could choose the older build windows instead, where every other player got a short window to build after each turn; that option is gone, because at five players the windows made every turn wait and read as skipped turns.
+With five or six players, Big Table plays '''paired turns''', the current official way to play a table this size: the Lead plays a full turn, then the Partner has one action phase. Until October 2026 the host could choose the older build windows instead, where every other player got a short window to build after each turn; that option is gone, because at five players the windows made every turn wait and read as skipped turns.
+
+With four players, turns go one player at a time, as in Classic: there is no Lead and no Partner (see [[#Four players, or fewer than five left|below]]).
 
 == Paired turns ==
 === Lead and Partner ===
@@ -726,8 +730,10 @@ For example, with a target of 10, the Partner has 9 points. During the Lead's pa
 
 The official rules cover a Lead or Partner winning with their own action. The other cases are settled by Catanova.
 
-=== When fewer than five remain ===
-If resignations leave fewer than five players in the game, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes.
+=== Four players, or fewer than five left ===
+Paired turns need at least five players. A game for four plays one player at a time from its first turn, as ordinary Classic turns on the Big Table island with its bank and deck, and you win only on your own turn. The official paired rule is written for five and six players: at four, its Partner would be the Lead's right-hand neighbour, who led the turn before.
+
+If resignations leave fewer than five players in a game of five or six, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes.
 
 == Clocks ==
 {| class="wikitable"
@@ -770,7 +776,7 @@ The full specification is the [https://github.com/shashwtd/catanova/blob/main/do
 
 [[Category:Game rules]]
 </text>
-      <sha1>tl5nr5a22b19cpd9t8c21znnklbpab7</sha1>
+      <sha1>g2gowq0jqxni55hg1xc5ux1n41umqqn</sha1>
     </revision>
   </page>
   <page>
@@ -1127,8 +1133,8 @@ Return with the same identity and room invitation to resume. A Google-linked ide
       <origin>14</origin>
       <model>wikitext</model>
       <format>text/x-wiki</format>
-      <text xml:space="preserve" bytes="4998" sha1="r9ib91vk598m193e5p4082nk9i89fjl">== How many people can play? ==
-Classic, the mode playable today, has two to four seats, filled by invited friends or by bots the host adds. One person can play against one to three bots. There is no public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players. See [[Getting started#Playing with bots|Playing with bots]]. [[Big Table]], for five and six players, and [[Open Sea]], for three or four, are being built.
+      <text xml:space="preserve" bytes="4996" sha1="funoeqndvun33hce8id18kqo7tyqwmj">== How many people can play? ==
+Classic, the mode playable today, has two to four seats, filled by invited friends or by bots the host adds. One person can play against one to three bots. There is no public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players. See [[Getting started#Playing with bots|Playing with bots]]. [[Big Table]], for four to six players, and [[Open Sea]], for three or four, are being built.
 
 == Are Timber and Clay different from wood and brick? ==
 Only the names differ. [[Resources|Timber, Clay, Sheep, Hay, and Rock]] correspond to wood, brick, wool, wheat, and ore.
@@ -1161,7 +1167,7 @@ A reconnect should restore the server's saved game for the same identity and roo
 In Classic, after about 30 seconds, a bot plays their seat with their own cards and pieces, and hands it back the moment they reconnect. '''Leave game''' is different: it resigns for good. If everyone disconnects, the game pauses and closes with no winner after three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
 
 == Can five or six people play together? ==
-Not yet. [[Big Table]], for five and six players, is being built. It uses a larger island and a bigger bank and deck, and lets a second player act in every turn so the wait between turns stays short. See [[Game modes]].
+Not yet. [[Big Table]], for four to six players, is being built. It uses a larger island and a bigger bank and deck, and lets a second player act in every turn so the wait between turns stays short. See [[Game modes]].
 
 == Can I add bots in Big Table or Open Sea? ==
 No. For now bots play only in Classic, and the lobby will not switch to another mode while a bot is seated. In [[Big Table]] and [[Open Sea]], two modes still being built, nobody will take over a disconnected player's seat. The game will wait, and after 2 minutes the clock will make only the moves the game cannot go on without. See [[Game modes#When a player disconnects|When a player disconnects]].
@@ -1177,7 +1183,7 @@ No. Catanova is an independent, open-source project. Its current balanced maps a
 
 [[Category:Guides]]
 </text>
-      <sha1>r9ib91vk598m193e5p4082nk9i89fjl</sha1>
+      <sha1>funoeqndvun33hce8id18kqo7tyqwmj</sha1>
     </revision>
   </page>
   <page>

@@ -1,5 +1,5 @@
 == How many people can play? ==
-Classic, the mode playable today, has two to four seats, filled by invited friends or by bots the host adds. One person can play against one to three bots. There is no public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players. See [[Getting started#Playing with bots|Playing with bots]]. [[Big Table]], for five and six players, and [[Open Sea]], for three or four, are being built.
+Classic, the mode playable today, has two to four seats, filled by invited friends or by bots the host adds. One person can play against one to three bots. There is no public matchmaking. The [[Getting started|two-player option]] is a Catanova variant using the ordinary island and turn rules, with no neutral players. See [[Getting started#Playing with bots|Playing with bots]]. [[Big Table]], for four to six players, and [[Open Sea]], for three or four, are being built.
 
 == Are Timber and Clay different from wood and brick? ==
 Only the names differ. [[Resources|Timber, Clay, Sheep, Hay, and Rock]] correspond to wood, brick, wool, wheat, and ore.
@@ -32,7 +32,7 @@ A reconnect should restore the server's saved game for the same identity and roo
 In Classic, after about 30 seconds, a bot plays their seat with their own cards and pieces, and hands it back the moment they reconnect. '''Leave game''' is different: it resigns for good. If everyone disconnects, the game pauses and closes with no winner after three minutes. See [[Accounts and friends#Leaving and reconnecting|Leaving and reconnecting]].
 
 == Can five or six people play together? ==
-Not yet. [[Big Table]], for five and six players, is being built. It uses a larger island and a bigger bank and deck, and lets a second player act in every turn so the wait between turns stays short. See [[Game modes]].
+Not yet. [[Big Table]], for four to six players, is being built. It uses a larger island and a bigger bank and deck, and lets a second player act in every turn so the wait between turns stays short. See [[Game modes]].
 
 == Can I add bots in Big Table or Open Sea? ==
 No. For now bots play only in Classic, and the lobby will not switch to another mode while a bot is seated. In [[Big Table]] and [[Open Sea]], two modes still being built, nobody will take over a disconnected player's seat. The game will wait, and after 2 minutes the clock will make only the moves the game cannot go on without. See [[Game modes#When a player disconnects|When a player disconnects]].

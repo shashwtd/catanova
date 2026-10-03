@@ -1,11 +1,11 @@
-A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for five and six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
+A '''game mode''' sets the board, the number of players and a few rules for a game. Catanova has one mode today, '''Classic'''. Two more are being built: '''[[Big Table]]''', for four to six players, and '''[[Open Sea]]'''. They are not yet playable. Their pages describe the rules planned for when they open, and those rules can still change.
 
 {| class="wikitable"
 ! Mode !! Players !! Board !! Points target !! Bots !! Status
 |-
 | '''Classic''' || 2–4 || One island of 19 land hexes || 10; host can set 8–15 || Yes || Playable
 |-
-| '''[[Big Table]]''', for five and six players || 5 or 6 || One island of 30 land hexes || 10; host can set 8–15 || No || Being built
+| '''[[Big Table]]''', for four to six players || 4, 5 or 6 || One island of 30 land hexes || 10; host can set 8–15 || No || Being built
 |-
 | '''[[Open Sea]]''' || 3 or 4 || Outer Isles: a main island, small islands and open sea || 14; host can set 10–18 || No || Being built
 |}
@@ -13,8 +13,8 @@ A '''game mode''' sets the board, the number of players and a few rules for a ga
 == Classic ==
 Classic is the game every room plays today: one island, two to four seats, and the rules described across this wiki. Start with [[Getting started]]. Its two-player option, bots, balanced island and turn timer are Catanova choices.
 
-== Big Table, for five and six players ==
-A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so each turn is shared as '''paired turns''': each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card.
+== Big Table, for four to six players ==
+A larger island with 30 land hexes, two deserts and 11 ports, a bank of 24 cards of each resource and a 34-card development deck. More players means more waiting, so each turn is shared as '''paired turns''': each turn has a '''Lead''', who rolls and plays a full turn, and a '''Partner''', who then gets one action phase to trade with the bank, build, buy and play a card. Four players get the same island, bank and deck, and take turns one at a time, as in Classic.
 
 See [[Big Table]].
 

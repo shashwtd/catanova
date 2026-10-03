@@ -1,9 +1,9 @@
-'''Big Table''', for five and six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
+'''Big Table''', for four to six players, is Catanova's [[Game modes|mode]] for larger groups. It is being built and is not yet playable. This page describes the planned rules. Everything works as in Classic unless this page says otherwise.
 
 {| class="wikitable"
 ! !! Classic !! Big Table
 |-
-| Players || 2–4, friends or bots || 5 or 6, people only
+| Players || 2–4, friends or bots || 4, 5 or 6, people only
 |-
 | Island || 19 land hexes in rows of 3-4-5-4-3 || 30 land hexes in rows of 3-4-5-6-5-4-3
 |-
@@ -13,7 +13,7 @@
 |-
 | Ports || 9 || 11
 |-
-| Turns || One player at a time || Paired turns
+| Turns || One player at a time || Paired turns with five or six; one player at a time with four
 |-
 | Absent player || A bot plays the seat after about 30 seconds || The clock makes forced moves only, after 2 minutes
 |}
@@ -69,6 +69,8 @@ Each player rolls both dice. The highest total starts, and players tied for high
 {| class="wikitable"
 ! Players !! Placement order
 |-
+| 4 || 1, 2, 3, 4, 4, 3, 2, 1
+|-
 | 5 || 1, 2, 3, 4, 5, 5, 4, 3, 2, 1
 |-
 | 6 || 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1
@@ -77,7 +79,9 @@ Each player rolls both dice. The highest total starts, and players tied for high
 Everything else is as in [[Getting started#Place your first pieces|Classic setup]]. Setup is untimed. If the draft reaches a player who has been offline for 2 minutes, the clock places for them: a settlement on the legal corner with the most production dots, with ties broken at random, then a road on a random edge touching it.
 
 == Turns ==
-Big Table plays '''paired turns''', the current official way to play a table this size: the Lead plays a full turn, then the Partner has one action phase. Until October 2026 the host could choose the older build windows instead, where every other player got a short window to build after each turn; that option is gone, because at five players the windows made every turn wait and read as skipped turns.
+With five or six players, Big Table plays '''paired turns''', the current official way to play a table this size: the Lead plays a full turn, then the Partner has one action phase. Until October 2026 the host could choose the older build windows instead, where every other player got a short window to build after each turn; that option is gone, because at five players the windows made every turn wait and read as skipped turns.
+
+With four players, turns go one player at a time, as in Classic: there is no Lead and no Partner (see [[#Four players, or fewer than five left|below]]).
 
 == Paired turns ==
 === Lead and Partner ===
@@ -114,8 +118,10 @@ For example, with a target of 10, the Partner has 9 points. During the Lead's pa
 
 The official rules cover a Lead or Partner winning with their own action. The other cases are settled by Catanova.
 
-=== When fewer than five remain ===
-If resignations leave fewer than five players in the game, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes.
+=== Four players, or fewer than five left ===
+Paired turns need at least five players. A game for four plays one player at a time from its first turn, as ordinary Classic turns on the Big Table island with its bank and deck, and you win only on your own turn. The official paired rule is written for five and six players: at four, its Partner would be the Lead's right-hand neighbour, who led the turn before.
+
+If resignations leave fewer than five players in a game of five or six, the Partner's phase stops. Turns continue one player at a time, as ordinary Classic turns, on the same island with the same supply. A Partner's phase already under way still finishes.
 
 == Clocks ==
 {| class="wikitable"

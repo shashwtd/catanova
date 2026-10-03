@@ -14,6 +14,7 @@ import {
   findRuleset,
   routeAwardName,
 } from '../../../packages/rules/src/rulesets.js';
+import { pairsTurns } from '../../../packages/rules/src/game.js';
 
 /**
  * Who took an award, and on what.
@@ -32,12 +33,16 @@ function award(game: ResultGame, kind: 'longestRoad' | 'largestArmy') {
     : `${holder.name} · ${holder.knights} knights`;
 }
 
-/** The mode a game played, when it was not Classic: "Big Table · Paired turns", or "Open Sea". */
+/**
+ * The mode a game played, when it was not Classic: "Big Table · Paired turns", or "Open Sea". A Big Table
+ * game for four took single turns, so it is the mode alone (docs/RULEBOOK-BIG-TABLE.md, 6.8).
+ */
 function modeFact(game: ResultGame) {
   const rules = findRuleset(game.ruleset);
   if (!game.ruleset || game.ruleset === CLASSIC.id) return null;
   const name = rules?.name ?? game.ruleset;
-  return game.turns ? `${name} · ${TURN_STRUCTURES[game.turns].name}` : name;
+  const turns = game.turns === 'paired' && !pairsTurns(game) ? undefined : game.turns;
+  return turns ? `${name} · ${TURN_STRUCTURES[turns].name}` : name;
 }
 
 /** Results use the final viewer-safe snapshot; scores are revealed by the server at victory. */

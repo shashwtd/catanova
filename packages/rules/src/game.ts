@@ -6,6 +6,7 @@ import {
   findRuleset,
   fullBank,
   handLimit,
+  numberWord,
   playsBoard,
   rulesetOf,
   seatRange,
@@ -133,7 +134,8 @@ export type Game = {
   /**
    * Paired turns: the seats of the paired turn's Lead and Partner, from the moment the markers reach them until
    * the Partner's phase ends. Both are on turn for the whole paired turn, whoever is acting. Absent once fewer
-   * than five players remain, when turns go one player at a time (docs/RULEBOOK-BIG-TABLE.md, 6.8).
+   * than five players remain, when turns go one player at a time, and always in a game for four
+   * (docs/RULEBOOK-BIG-TABLE.md, 6.8).
    */
   pair?: { lead: number; partner: number };
   /**
@@ -450,13 +452,25 @@ export function createGame(
       ? 'The islands are ready. Place two settlements on the main island, each with a road or a ship, in snake order.'
       : 'The island is ready. Place two settlements and roads in snake order.',
   );
-  if (g.turns) log(g, `This game plays ${TURN_STRUCTURES[g.turns].name}.`);
+  // A game of Paired turns for four takes single turns from the start (docs/RULEBOOK-BIG-TABLE.md, 6.8).
+  if (g.turns === 'paired' && !pairsTurns(g))
+    log(g, `With ${numberWord(g.players.length)} players, turns go one player at a time, with no Partner.`);
+  else if (g.turns) log(g, `This game plays ${TURN_STRUCTURES[g.turns].name}.`);
   return g;
 }
 export const activePlayer = (g: Pick<Game, 'players' | 'active'>) => g.players[g.active]!;
 /** How many players are still in the game. */
 const stillPlaying = (g: { players: readonly { resigned?: boolean }[] }) =>
   g.players.filter((p) => !p.resigned).length;
+/** How many players still in the game a paired turn needs (docs/RULEBOOK-BIG-TABLE.md, 6.8). */
+export const PAIRED_PLAYERS = 5;
+/**
+ * Whether a game of Paired turns ever pairs them: only one that started with five or more. A Big Table game
+ * for four takes single turns from its first turn to its end (docs/RULEBOOK-BIG-TABLE.md, 6.8). Asked of a
+ * game, a player's view of it or its results.
+ */
+export const pairsTurns = (g: { turns?: TurnStructure; players: readonly unknown[] }) =>
+  g.turns === 'paired' && g.players.length >= PAIRED_PLAYERS;
 /** Whether the player acting is the Partner, in their phase of a paired turn (or a card played in it). */
 export const partnerActing = (g: Pick<Game, 'pair' | 'active'>) => !!g.pair && g.active === g.pair.partner;
 /**
@@ -465,7 +479,8 @@ export const partnerActing = (g: Pick<Game, 'pair' | 'active'>) => !!g.pair && g
  */
 export const partnerFollows = (
   g: Pick<Game, 'pair' | 'active'> & { players: readonly { resigned?: boolean }[] },
-) => !!g.pair && !partnerActing(g) && !g.players[g.pair.partner]!.resigned && stillPlaying(g) >= 5;
+) =>
+  !!g.pair && !partnerActing(g) && !g.players[g.pair.partner]!.resigned && stillPlaying(g) >= PAIRED_PLAYERS;
 /**
  * The Partner of a paired turn led from `lead`: the third player to the Lead's left, counting only players
  * still in the game (docs/RULEBOOK-BIG-TABLE.md, 6.1). Only asked while five or more remain.
@@ -735,15 +750,16 @@ function advanceTurn(g: Game, pendingRobber = false) {
 
 /**
  * Hand out the markers as a paired turn begins: the Lead is the player on turn and the Partner is recounted
- * from them. With fewer than five players left, turns go one player at a time for the rest of the game.
+ * from them. With fewer than five players left, turns go one player at a time for the rest of the game. A
+ * game for four never pairs, and said so as it began (createGame).
  */
 function pairUp(g: Game) {
   if (g.turns !== 'paired') return;
-  if (stillPlaying(g) >= 5) {
+  if (stillPlaying(g) >= PAIRED_PLAYERS) {
     g.pair = { lead: g.active, partner: partnerSeat(g, g.active) };
     return;
   }
-  if (g.pair || g.turn === 1)
+  if (g.pair || (g.turn === 1 && pairsTurns(g)))
     log(g, 'Fewer than five players remain, so turns go one player at a time from now on, with no Partner.');
   delete g.pair;
 }

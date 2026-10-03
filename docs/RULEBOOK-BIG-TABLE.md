@@ -2,7 +2,7 @@
 
 Ruleset: `big-table-v1` · Written 25 September 2026
 
-Big Table, for five and six players, is Catanova's mode for larger groups. It aims to reproduce the mechanics of the official 5–6 player expansion to the base game. Catanova is an independently developed browser game, and this is an independently written explanation, with original organization and examples. It is not an official CATAN publication. The reference edition is the English 2025 rulebook of the official 5–6 player expansion (CN3082), played with the English 2025 base game. See [sources and compatibility decisions](RULE_SOURCES.md); Big Table rows are in its [Big Table and Open Sea](RULE_SOURCES.md#big-table-and-open-sea) part, keyed to the section numbers in this book.
+Big Table, for four to six players, is Catanova's mode for larger groups. It aims to reproduce the mechanics of the official 5–6 player expansion to the base game, and lets four players play its island too (section 1.1). Catanova is an independently developed browser game, and this is an independently written explanation, with original organization and examples. It is not an official CATAN publication. The reference edition is the English 2025 rulebook of the official 5–6 player expansion (CN3082), played with the English 2025 base game. See [sources and compatibility decisions](RULE_SOURCES.md); Big Table rows are in its [Big Table and Open Sea](RULE_SOURCES.md#big-table-and-open-sea) part, keyed to the section numbers in this book.
 
 This book is a companion to the [Classic rulebook](RULEBOOK.md) (ruleset `base-3-4-v1`). Everything in the Classic rulebook applies unless this book changes it, and this book says exactly what changes. Where the official texts leave a gap, or where Catanova departs from them, the rule is marked as a Catanova decision. Section 11 lists the points that the official texts and the first decisions left open, and says where each is now settled.
 
@@ -12,25 +12,27 @@ This is the rules target for the mode. Since 26 September 2026 the engine implem
 
 ### 1.1 Players
 
-A Big Table game has exactly five or six players, all invited people. There is no Big Table game for two, three or four players, and no seventh or eighth seat. Bots cannot take a seat, and no stand-in bot covers an absent player (section 9).
+A Big Table game has four, five or six players, all invited people. There is no Big Table game for two or three players, and no seventh or eighth seat. Bots cannot take a seat, and no stand-in bot covers an absent player (section 9).
+
+The official expansion is for five and six players. Catanova decision, made by the owner on 3 October 2026: four players may play Big Table too. They play the same island with the same supply and deck, and take ordinary turns one player at a time, with no Lead or Partner (section 6.8).
 
 ### 1.2 Choosing the mode
 
-The host picks the mode in Room setup. The modes are Classic (`base-3-4-v1`), Big Table (`big-table-v1`) and Open Sea (`open-sea-v1`). In the app, the name Big Table always appears with its short description, "for five and six players".
+The host picks the mode in Room setup. The modes are Classic (`base-3-4-v1`), Big Table (`big-table-v1`) and Open Sea (`open-sea-v1`). In the app, Big Table is called Big World (since 3 October 2026), and it always appears with its players, "4–6 players".
 
-Catanova decision: in the lobby, a change of mode is refused only while more players are seated than the new mode allows, or while bots are seated and the new mode allows none. Fewer players is fine: the room's seat limit becomes the new mode's maximum, and the minimum is checked only when the game starts. A Classic room, which holds at most four, can therefore switch to Big Table and then wait for its fifth and sixth players. Each mode has its own island, so changing the mode also deals a new island. Catanova decision: a change of mode resets the points target to the new mode's default, even if the host had chosen another: 10 for Classic and Big Table, 14 for Open Sea. The game can start only with five or six seated players, and, as in Classic, only when every other player is ready and every seat is connected. When the game starts, its ruleset is frozen into it. A saved game keeps its ruleset for good.
+Catanova decision: in the lobby, a change of mode is refused only while more players are seated than the new mode allows, or while bots are seated and the new mode allows none. Fewer players is fine: the room's seat limit becomes the new mode's maximum, and the minimum is checked only when the game starts. A Classic room, which holds at most four, can therefore switch to Big Table, and then start at once with four players or wait for a fifth and sixth. Each mode has its own island, so changing the mode also deals a new island. Catanova decision: a change of mode resets the points target to the new mode's default, even if the host had chosen another: 10 for Classic and Big Table, 14 for Open Sea. The game can start only with four, five or six seated players, and, as in Classic, only when every other player is ready and every seat is connected. When the game starts, its ruleset is frozen into it. A saved game keeps its ruleset for good.
 
 ### 1.3 What changes from Classic
 
 | Topic              | Classic                                  | Big Table                                          | Section  |
 | ------------------ | ---------------------------------------- | -------------------------------------------------- | -------- |
-| Players            | 2–4                                      | 5 or 6                                             | 1.1      |
+| Players            | 2–4                                      | 4, 5 or 6                                          | 1.1      |
 | Island             | 19 land hexes in rows of 3-4-5-4-3       | 30 land hexes in rows of 3-4-5-6-5-4-3             | 3        |
 | Resource bank      | 19 of each resource                      | 24 of each resource                                | 2        |
 | Development deck   | 25 cards                                 | 34 cards                                           | 2        |
 | Harbours           | 9                                        | 11                                                 | 3.3      |
-| Turn structure     | One player at a time                     | Paired turns                                       | 5–6      |
-| When you can win   | Only during your own turn                | Only while you hold the Lead or Partner marker     | 6.7      |
+| Turn structure     | One player at a time                     | Paired turns at five or six; single turns at four  | 5–6      |
+| When you can win   | Only during your own turn                | While you hold a marker; at four, your own turn    | 6.7, 6.8 |
 | Bots and stand-ins | Allowed                                  | None                                               | 9        |
 | An absent player   | A stand-in bot takes the seat after 30 s | The clock makes only forced moves, after 2 minutes | 9.4      |
 
@@ -132,16 +134,17 @@ As in Classic section 3.2, each player rolls both dice and the highest total sta
 
 The draft is Classic section 3.3 with more players. The first pass runs clockwise from the starting player; the second runs back.
 
+- Four players: 1, 2, 3, 4, 4, 3, 2, 1, as in Classic.
 - Five players: 1, 2, 3, 4, 5, 5, 4, 3, 2, 1.
 - Six players: 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1.
 
 Everything else is Classic: the distance rule for both settlements, a road touching the settlement just placed, resources from the second settlement only, no cost, and no trading or development cards. Setup is untimed. Section 9.4 says how the clock places for a player who has been absent for 2 minutes.
 
-The Lead and Partner markers play no part in setup. The first paired turn begins after setup, with the starting player as Lead (section 6.1).
+The Lead and Partner markers play no part in setup. The first paired turn begins after setup, with the starting player as Lead (section 6.1). A game for four has no markers at all: the starting player simply takes the first turn (section 6.8).
 
 ## 5. Turn structure
 
-Big Table plays Paired turns, the current official rule. Since 2021 the official 5–6 rules have paired two players in every turn, replacing the older build phase. See section 6.
+With five or six players, Big Table plays Paired turns, the current official rule. Since 2021 the official 5–6 rules have paired two players in every turn, replacing the older build phase. See section 6. With four players, turns go one player at a time (section 6.8).
 
 Catanova decision, made on 2 October 2026: Between-turns build, the older official rule, was offered as a host's option until then and is retired. At five players it put four build windows of up to 20 seconds after every turn. A window that ran out read to the table as a skipped turn, and the first table to play it in earnest gave up by turn 5. Section 7 still describes it, because games started with it before then keep playing and replaying by it; no new game can choose it.
 
@@ -239,7 +242,10 @@ The cases this settles:
 
 ### 6.8 Fewer than five players
 
-The paired turn is defined only for five and six players. Catanova decision: when resignations leave fewer than five players in the game, the Partner's phase stops. From then on, turns continue one player at a time in the same clockwise order, each an ordinary Classic turn with no Partner. The island, the supply and the deck stay those of Big Table. Catanova decision: "stops" means that no Partner's phase begins while fewer than five players remain, but one already under way finishes (section 9.6).
+The paired turn is defined only for five and six players. With fewer than five players in the game, turns go one player at a time in clockwise order, each an ordinary Classic turn with no Partner. The island, the supply and the deck stay those of Big Table. A game gets there in one of two ways:
+
+1. It starts with four players (section 1.1). Catanova decision, made on 3 October 2026: such a game takes single turns from its first turn to its end, and nobody ever holds a marker. Paired turns are not stretched to four. At four, the third player to the Lead's left would be the Lead's right-hand neighbour, who led the turn before, so that player would act in two turns running and then wait two. The paired turn is there to shorten the wait at five and six, and at four the wait is no longer than in Classic.
+2. It starts with five or six, and resignations leave fewer than five players in it. Catanova decision: the Partner's phase then stops, and turns continue one player at a time in the same clockwise order. "Stops" means that no Partner's phase begins while fewer than five players remain, but one already under way finishes (section 9.6).
 
 Once turns are single, only the player on turn acts, so a player wins only during their own turn, as in Classic section 1. While five or six players remain, the Partner is recounted over the players still in the game, so a resigned player is never Lead or Partner.
 
@@ -384,7 +390,8 @@ The first decisions and the turn clock document do not say what happens when a p
 
 `big-table-v1` does not include:
 
-- games for two, three or four players, or for seven or more;
+- games for two or three players, or for seven or more;
+- paired turns at four players (section 6.8);
 - bots or stand-in bots;
 - the official fixed first-game layout, its five-player rule for an unused colour, or any fixed layout of Catanova's own;
 - the official lettered spiral or the official shuffled frame as a selectable board;
@@ -413,5 +420,6 @@ The points below were not settled by the official sources or by the first decisi
 11. An absent player during the setup draft. Closed. Catanova decision: once they have been offline for 2 minutes, the clock places for them. It puts a settlement on the legal intersection with the most production pips, with ties broken at random by the server, then a road on a random legal edge touching it (section 9.4).
 12. Changing mode and the target. Closed. Catanova decision: changing mode resets the target to the new mode's default, 10 for Classic and Big Table and 14 for Open Sea (section 1.2).
 13. When a player who held no marker wins. Closed. Catanova decision: they win when a later paired turn begins in which they hold the Lead or Partner marker, if they still have the target then. A new Partner therefore wins before the Lead rolls (section 6.7, rule 4).
+14. Four players. Closed on 3 October 2026 by the owner, who asked for Big Table to work for four as well: four players play the same island with the same supply and deck, one player at a time with no Partner, as a game that has dropped below five does (sections 1.1 and 6.8). The ruleset stays `big-table-v1`: no game started under it plays differently, because four players could not start one before, and every game of five or six plays and replays exactly as it did.
 
 To report a rules issue, identify the section, describe the exact game state, and link the official rule or clarification. Changes that alter legal moves or hidden information require a new ruleset version (`big-table-v2`); wording-only corrections do not.
